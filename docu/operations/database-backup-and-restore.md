@@ -26,7 +26,7 @@ containers (`Backup__RootPath`):
 
 ```env
 # .env
-LOCATION_BACKUP=./tests/data/backups
+LOCATION_BACKUP=./data/backups
 ```
 
 Schedule and retention are stored in the database and edited by administrators with

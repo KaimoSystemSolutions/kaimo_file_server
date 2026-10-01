@@ -25,12 +25,12 @@ secrets
 **/values.dev.yaml
 LICENSE
 README.md
-# Complete test tree: test project source AND runtime/test data
-# (bind mount targets for Postgres, Elasticsearch, storage). Not needed by any
-# service image, grows unbounded at runtime and causes build problems
-# -> should never be in the build context.
+# Test project source; not needed by any service image.
 tests
-**/tests/data
+# Runtime data (bind mount targets for Postgres, Elasticsearch, storage, PKI).
+# Grows unbounded at runtime and causes build problems
+# -> should never be in the build context.
+data
 # Additional non-source folders/files that no image needs.
 docu
 tools
@@ -38,7 +38,6 @@ TestResults
 **/TestResults
 **/.idea
 .github
-qodana.yaml
 .gitattributes
 **/*.dcproj
 **/*.dcproj.user

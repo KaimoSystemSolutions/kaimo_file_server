@@ -3,9 +3,7 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
-/tests/data
-/secrets/smb-control-plane/*
-!/secrets/smb-control-plane/.gitkeep
+data
 .env
 
 # User-specific files

@@ -5,7 +5,7 @@
 # Production may pre-populate the same layout with externally managed PKI.
 set -eu
 
-output="${1:-./secrets/smb-control-plane}"
+output="${1:-./data/smb-control-plane}"
 umask 077
 mkdir -p "$output"
 bridge_output="$output/bridge"

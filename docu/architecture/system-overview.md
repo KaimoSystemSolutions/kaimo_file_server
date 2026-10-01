@@ -47,7 +47,7 @@ flowchart LR
 
 | Service (container) | Built from | Role | Published ports | Networks |
 |---|---|---|---|---|
-| `kaimo_smb_pki_init` | `src/samba-vfs/Dockerfile.pki` | One-shot generation of the control-plane mTLS PKI into `secrets/smb-control-plane` | – | default |
+| `kaimo_smb_pki_init` | `src/samba-vfs/Dockerfile.pki` | One-shot generation of the control-plane mTLS PKI into `data/smb-control-plane` | – | default |
 | `kaimo_file_server.host` (`kaimo_file_server`) | `src/Kaimo_File_Server.Host/Dockerfile` | Database owner: restore, backup, migrations, seeding; data-service reconciliation; version-storage reconciliation | – | default, `kaimo_database` |
 | `kaimo_smb_bridge` | `src/Kaimo_File_Server.SmbBridge/Dockerfile` | gRPC control plane for Samba (authentication, authorization, events, shares, configuration, snapshots) | – (5080 internal) | `kaimo_bridge_database`, `kaimo_smb_control` |
 | `kaimo_samba` | `src/samba-vfs/Dockerfile.vfs` | Native SMB data path: Samba built from source, the `kaimo_bridge` VFS module and the `kaimo_authd` sidecar | `445` | default, `kaimo_smb_control` |
@@ -80,7 +80,7 @@ Every .NET service and Samba mount the same host directories (YAML anchors at th
 | `/data/kaimo-logs` | Structured log archive, one source folder per process |
 | `/data/kaimo-backups` | Database backups (Host and Web only) |
 | `/var/lib/kaimo/event-spool` | Durable SMB lifecycle event spool (Samba only) |
-| `/run/secrets/kaimo-control-plane` | mTLS material: `secrets/smb-control-plane/bridge` for the bridge, `.../samba` for Samba |
+| `/run/secrets/kaimo-control-plane` | mTLS material: `data/smb-control-plane/bridge` for the bridge, `.../samba` for Samba |
 
 Samba additionally uses a `tmpfs` at `/run/kaimo-user-sync` for transient credential import files.
 

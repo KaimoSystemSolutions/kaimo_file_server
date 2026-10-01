@@ -21,7 +21,7 @@ Related: [Samba VFS integration](samba-vfs-integration.md) ·
 ### PKI
 
 The one-shot `kaimo_smb_pki_init` service runs `src/samba-vfs/generate-control-plane-certs.sh` and
-writes into `secrets/smb-control-plane/` (overridable with `KAIMO_SMB_CONTROL_PKI` for externally
+writes into `data/smb-control-plane/` (overridable with `KAIMO_SMB_CONTROL_PKI` for externally
 managed certificates):
 
 | Material | Subject | Usage | Mounted into |

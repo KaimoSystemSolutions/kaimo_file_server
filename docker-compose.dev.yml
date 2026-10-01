@@ -13,8 +13,8 @@ services:
       #Seed__AdminPassword: admin12345
       NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:-DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey}
     volumes:
-      - ${APPDATA:-./tests/data/user-secrets}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA:-./tests/data/user-secrets}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+      - ${APPDATA:-./data/user-secrets}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA:-./data/user-secrets}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
 
   kaimo_smb_bridge:
     environment:
@@ -32,8 +32,8 @@ services:
       Jwt__Secret: ${JWT_SECRET:-DevOnly-LocalDevelopment-DoNotUseInProduction-JwtSecret}
       NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:-DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey}
     volumes:
-      - ${APPDATA:-./tests/data/user-secrets}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA:-./tests/data/user-secrets}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+      - ${APPDATA:-./data/user-secrets}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA:-./data/user-secrets}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
 
 
   # Local SMTP catcher for mail notifications. In Settings -> Mail server use host "mailpit",

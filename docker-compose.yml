@@ -1,13 +1,13 @@
 x-storage-pool-01: &storage-pool-01
-  ${LOCATION_STORAGE_01:-./tests/data/storage/pool01}:/data/storage/pool01
+  ${LOCATION_STORAGE_01:-./data/storage/pool01}:/data/storage/pool01
 x-storage-pool-02: &storage-pool-02
-  ${LOCATION_STORAGE_02:-./tests/data/storage/pool02}:/data/storage/pool02
+  ${LOCATION_STORAGE_02:-./data/storage/pool02}:/data/storage/pool02
 x-app-data: &app-data
-  ${LOCATION_APP_DATA:-./tests/data/kaimo-system}:/data/kaimo-system
+  ${LOCATION_APP_DATA:-./data/kaimo-system}:/data/kaimo-system
 x-logs: &logs
-  ${LOCATION_LOGS:-./tests/data/logs}:/data/kaimo-logs
+  ${LOCATION_LOGS:-./data/logs}:/data/kaimo-logs
 x-backups: &backups
-  ${LOCATION_BACKUP:-./tests/data/backups}:/data/kaimo-backups
+  ${LOCATION_BACKUP:-./data/backups}:/data/kaimo-backups
 
 x-bounded-logging: &bounded-logging
   driver: json-file
@@ -40,7 +40,7 @@ services:
       context: ./src/samba-vfs
       dockerfile: Dockerfile.pki
     volumes:
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}:/pki
+      - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}:/pki
     restart: "no"
 
   kaimo_file_server.host:
@@ -91,7 +91,7 @@ services:
       - *storage-pool-02
       - *app-data
       - *logs
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/bridge:/run/secrets/kaimo-control-plane:ro
+      - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}/bridge:/run/secrets/kaimo-control-plane:ro
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
@@ -158,8 +158,8 @@ services:
       - *storage-pool-02
       - *app-data
       - *logs
-      - ${LOCATION_SAMBA_EVENT_SPOOL:-./tests/data/samba-event-spool}:/var/lib/kaimo/event-spool
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
+      - ${LOCATION_SAMBA_EVENT_SPOOL:-./data/samba-event-spool}:/var/lib/kaimo/event-spool
+      - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
     tmpfs:
       - /run/kaimo-user-sync:rw,noexec,nosuid,nodev,mode=0700,uid=0,gid=0
     depends_on:
@@ -189,14 +189,12 @@ services:
       <<: *dotnet-environment
       KAIMO_LOG_SOURCE: web
       Jwt__Secret: ${JWT_SECRET:-}
-      GOOGLE_APPLICATION_CREDENTIALS: /data/logins/google-service-account.json
     volumes:
       - *storage-pool-01
       - *storage-pool-02
       - *app-data
       - *logs
       - *backups
-      - ${LOCATION_GDRIVE_CREDENTIALS:-./tests/data/logins/google-service-account.json}:/data/logins/google-service-account.json:ro
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
@@ -223,7 +221,7 @@ services:
       cluster.routing.allocation.disk.watermark.high: "97%"
       cluster.routing.allocation.disk.watermark.flood_stage: "98%"
     volumes:
-      - ${LOCATION_ES:-./tests/data/elastic_search}:/usr/share/elasticsearch/data
+      - ${LOCATION_ES:-./data/elasticsearch}:/usr/share/elasticsearch/data
     # Security is disabled for local development: never publish beyond loopback.
     ports:
       - "127.0.0.1:9200:9200"
@@ -239,7 +237,7 @@ services:
       # echo "vm.max_map_count=262144" | sudo tee -a /etc/sysctl.conf
       #  
       # give permissions to folder:
-      # sudo chown -R 1000:1000 ./tests/data/elasticsearch-9.4
+      # sudo chown -R 1000:1000 ./data/elasticsearch
 
   kaimo_file_server_db:
     image: postgres:${POSTGRES_VERSION:-17-alpine}
@@ -250,7 +248,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-kaimo_test_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
     volumes:
-      - ${LOCATION_DB:-./tests/data/postgres}:/var/lib/postgresql/data
+      - ${LOCATION_DB:-./data/postgres}:/var/lib/postgresql/data
     #ports:
     #  - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
