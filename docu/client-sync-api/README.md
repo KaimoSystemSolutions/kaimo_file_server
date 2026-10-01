@@ -231,6 +231,7 @@ URL or reverse-proxy access logs:
 { "q": "invoice 2026",   // required, 2–100 chars, no control characters
   "shareId": "…",        // optional: restrict to one share
   "path": "projects/a",  // optional, requires shareId: that folder and below
+                         // (share-relative, no leading "/"; "" = share root)
   "limit": 25 }          // optional, 1–50 (default 25)
 ```
 Response (`Cache-Control: no-store`):
@@ -421,7 +422,9 @@ Common codes: `unauthorized` (401), `forbidden` (403), `not_found` (404),
 `invalid_path` / `invalid_request` / `invalid_timestamp` / `invalid_idempotency_key` /
 `invalid_query` (400), `precondition_failed` (412), `idempotency_key_conflict` (422),
 `conflict` (409), `locked_out` / `rate_limited` (429), `search_timeout` (503). Clients should branch on `code`, not on `message` (the message
-is an English developer hint; user-facing text is localized in the app).
+is an English developer hint; user-facing text is localized in the app). A body or
+parameter that cannot be bound at all (malformed JSON, wrong types, invalid GUIDs)
+yields `invalid_request` (400) in the same envelope.
 
 > **OpenAPI note.** The generated `/openapi/v1.json` describes the routes, bodies, and
 > success shapes, but the opt-in `If-Match` / `If-None-Match` / `Idempotency-Key` headers

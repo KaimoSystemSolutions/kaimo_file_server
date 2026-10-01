@@ -34,8 +34,8 @@ public class ElasticSearchService : ISearchService
     private const int NgramMinGram = 2;
     private const int NgramMaxGram = 20;
 
-    // How many results to pull from ES before ACL filtering. We over-fetch so that
-    // dropping unauthorized hits still leaves enough to display.
+    // Page size for pulling results from ES before ACL filtering; further pages are
+    // fetched while too few readable hits remain (see SearchLimits).
     private const int RawFetchSize = 50;
 
     private readonly ElasticsearchClient _client;
@@ -521,12 +521,22 @@ public class ElasticSearchService : ISearchService
         if (user is null)
             return new List<FileDocument>();
 
-        var raw = await RawSearchAsync(searchText, shareName, pathPrefix, ct);
-        if (raw.Count == 0)
-            return raw;
+        // Page through the ranked hits until enough readable ones are collected, so
+        // matches the user may not read cannot crowd out the ones they may.
+        var allowed = new List<FileDocument>();
+        for (int from = 0; from < SearchLimits.MaxRawScan; from += RawFetchSize)
+        {
+            var raw = await RawSearchAsync(searchText, shareName, pathPrefix, from, ct);
 
-        // SECURITY: every hit must pass an ACL check before it is exposed.
-        return await _aclFilter.FilterAsync(raw, user, ct);
+            // SECURITY: every hit must pass an ACL check before it is exposed.
+            if (raw.Count > 0)
+                allowed.AddRange(await _aclFilter.FilterAsync(raw, user, ct));
+
+            if (raw.Count < RawFetchSize || allowed.Count >= SearchLimits.MinVisibleHits)
+                break;
+        }
+
+        return allowed;
     }
 
     /// <summary>
@@ -538,7 +548,7 @@ public class ElasticSearchService : ISearchService
     /// query is filtered to that share (and folder subtree) via keyword filters.
     /// </summary>
     private async Task<List<FileDocument>> RawSearchAsync(
-        string searchText, string? shareName, string? pathPrefix, CancellationToken ct)
+        string searchText, string? shareName, string? pathPrefix, int from, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(searchText))
             return new List<FileDocument>();
@@ -547,6 +557,7 @@ public class ElasticSearchService : ISearchService
 
         var response = await _client.SearchAsync<FileDocument>(s => s
             .Indices(IndexName)
+            .From(from)
             .Size(RawFetchSize)
             .Query(q => q
                 .Bool(b =>
@@ -600,6 +611,9 @@ public class ElasticSearchService : ISearchService
 
         if (!response.IsValidResponse)
         {
+            // The transport may report a cancelled request as an invalid response;
+            // surface it as a cancellation so callers can tell a timeout from "no hits".
+            ct.ThrowIfCancellationRequested();
             _logger.LogError("Content search failed: {Error}", response.DebugInformation);
             return new List<FileDocument>();
         }

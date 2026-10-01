@@ -31,7 +31,8 @@ public sealed class SearchApiController : ApiControllerBase
     internal const int MinQueryLength = 2;
     internal const int MaxQueryLength = 100;
     internal const int DefaultLimit = 25;
-    internal const int MaxLimit = 50;
+    // The backends collect at least this many readable hits before they stop paging.
+    internal const int MaxLimit = SearchLimits.MinVisibleHits;
 
     // Upper bound for one search, so a slow filename walk cannot pin a request.
     private static readonly TimeSpan SearchTimeout = TimeSpan.FromSeconds(10);
@@ -102,7 +103,6 @@ public sealed class SearchApiController : ApiControllerBase
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
         var dtos = new List<SearchHitDto>(limit);
-        var seen = new HashSet<(Guid, string)>();
         foreach (var hit in hits)
         {
             if (!sharesByName.TryGetValue(hit.ShareName, out var share))
@@ -110,11 +110,7 @@ public sealed class SearchApiController : ApiControllerBase
 
             // Homes are presented as the caller's "user" entry, as in api/v1/browse/shares.
             var displayName = share.IsUserHomes ? HomeFileBrowserViewModel.DisplayName : share.Name;
-            var dto = SearchHitDto.From(hit, share.Id, displayName);
-            if (!seen.Add((dto.ShareId, dto.Path)))
-                continue;
-
-            dtos.Add(dto);
+            dtos.Add(SearchHitDto.From(hit, share.Id, displayName));
             if (dtos.Count == limit)
                 break;
         }

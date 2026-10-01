@@ -49,6 +49,7 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
     private readonly SemaphoreSlim _stateLock = new(1, 1);
     private SearchEngineState? _cachedState;
     private DateTime _stateExpiresUtc = DateTime.MinValue;
+    private int _refreshing; // 1 while a background state probe runs
     // Edge-trigger for the "ES enabled but unreachable" warning: log once when it
     // goes down, then stay quiet until it recovers, so a persistently down cluster
     // doesn't spam a warning on every probe.
@@ -165,7 +166,37 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
     private void InvalidateState() => _stateExpiresUtc = DateTime.MinValue;
 
     private async Task<bool> IsElasticActiveAsync(CancellationToken ct = default)
-        => (await ResolveStateAsync(forceFresh: false, ct)).Effective;
+    {
+        // A merely expired state is answered from cache and re-probed in the background:
+        // a hanging Elasticsearch would otherwise cost the caller up to
+        // PingAttempts × PingTimeout — a client search's entire time budget. An explicit
+        // invalidation (admin toggle, failed search) still re-probes synchronously.
+        if (_cachedState is { } known && _stateExpiresUtc != DateTime.MinValue)
+        {
+            if (DateTime.UtcNow >= _stateExpiresUtc && Interlocked.Exchange(ref _refreshing, 1) == 0)
+                _ = RefreshStateAsync();
+            return known.Effective;
+        }
+
+        return (await ResolveStateAsync(forceFresh: false, ct)).Effective;
+    }
+
+    private async Task RefreshStateAsync()
+    {
+        try
+        {
+            await ResolveStateAsync(forceFresh: false, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            // Keep serving the last known state; the next expiry retries.
+            _logger.LogDebug(ex, "Background search-state probe failed");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _refreshing, 0);
+        }
+    }
 
     /// <summary>
     /// Ensures the index exists with the correct mapping before the first write or
@@ -269,6 +300,12 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
             catch (OperationCanceledException)
             {
                 throw;
+            }
+            catch (Exception) when (ct.IsCancellationRequested)
+            {
+                // The transport may wrap a cancellation in its own exception type. That is
+                // the caller's timeout, not an Elasticsearch failure: no fallback, no warning.
+                throw new OperationCanceledException(ct);
             }
             catch (Exception ex)
             {

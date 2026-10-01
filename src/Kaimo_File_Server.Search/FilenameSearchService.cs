@@ -16,8 +16,8 @@ namespace Kaimo_File_Server.Search;
 /// </summary>
 public sealed class FilenameSearchService
 {
-    // Over-fetch before ACL filtering so dropping unauthorized hits still leaves
-    // enough to display; also bounds the filesystem walk on huge trees.
+    // Raw matches are ACL-filtered in batches of this size during the walk; the walk
+    // stops once enough readable hits are collected (see SearchLimits).
     private const int RawFetchSize = 200;
 
     // Each search walks whole directory trees, so concurrent walks are capped
@@ -48,37 +48,54 @@ public sealed class FilenameSearchService
         if (user is null || string.IsNullOrWhiteSpace(searchText))
             return new List<FileDocument>();
 
-        List<FileDocument> raw;
         await WalkSlots.WaitAsync(ct);
         try
         {
-            raw = await CollectRawMatchesAsync(searchText, shareName, pathPrefix, ct);
+            return await CollectVisibleMatchesAsync(searchText, user, shareName, pathPrefix, ct);
         }
         finally
         {
             WalkSlots.Release();
         }
-
-        if (raw.Count == 0)
-            return raw;
-
-        // SECURITY: every hit must pass an ACL check before it is exposed.
-        return await _aclFilter.FilterAsync(raw, user, ct);
     }
 
     /// <summary>
     /// Enumerates files under each persisted share path and keeps those whose name contains
-    /// the query. Hidden/system folders (".versions", ".dp-keys", recycle bin, …)
-    /// are skipped — they are never part of the Elasticsearch index either.
+    /// the query and that the user may read. Hidden/system folders (".versions", ".dp-keys",
+    /// recycle bin, …) are skipped — they are never part of the Elasticsearch index either.
     ///
     /// When <paramref name="shareName"/> is set the walk is restricted to that share,
     /// and when <paramref name="pathPrefix"/> is also set (a share-relative folder) the
     /// walk starts at that folder so only it and its descendants are considered.
     /// </summary>
-    private async Task<List<FileDocument>> CollectRawMatchesAsync(
-        string searchText, string? shareName, string? pathPrefix, CancellationToken ct)
+    private async Task<List<FileDocument>> CollectVisibleMatchesAsync(
+        string searchText, UserContext user, string? shareName, string? pathPrefix,
+        CancellationToken ct)
     {
         var results = new List<FileDocument>();
+        var batch = new List<FileDocument>(RawFetchSize);
+        int scanned = 0;
+
+        // SECURITY: every hit must pass an ACL check before it is exposed. Batches are
+        // filtered as the walk goes, so unreadable matches cannot crowd out readable ones.
+        async Task FlushAsync()
+        {
+            if (batch.Count > 0)
+                results.AddRange(await _aclFilter.FilterAsync(batch, user, ct));
+            batch.Clear();
+        }
+
+        // Adds a raw match; true once the walk can stop (enough hits or scan cap reached).
+        async Task<bool> AddAsync(FileDocument doc)
+        {
+            batch.Add(doc);
+            scanned++;
+            if (batch.Count < RawFetchSize)
+                return false;
+
+            await FlushAsync();
+            return results.Count >= SearchLimits.MinVisibleHits || scanned >= SearchLimits.MaxRawScan;
+        }
 
         using var scope = _scopeFactory.CreateScope();
         var shares = await scope.ServiceProvider
@@ -134,11 +151,9 @@ public sealed class FilenameSearchService
                     try { size = new FileInfo(absolutePath).Length; }
                     catch { /* file vanished mid-walk — keep going */ }
 
-                    results.Add(CreateDocument(
-                        share, absolutePath, relativePath, fileName, searchText,
-                        isDirectory: false, size));
-
-                    if (results.Count >= RawFetchSize)
+                    if (await AddAsync(CreateDocument(
+                            share, absolutePath, relativePath, fileName, searchText,
+                            isDirectory: false, size)))
                         return results;
                 }
 
@@ -155,11 +170,9 @@ public sealed class FilenameSearchService
                     if (IsHiddenPath(relativePath))
                         continue;
 
-                    results.Add(CreateDocument(
-                        share, absolutePath, relativePath, folderName, searchText,
-                        isDirectory: true, size: 0));
-
-                    if (results.Count >= RawFetchSize)
+                    if (await AddAsync(CreateDocument(
+                            share, absolutePath, relativePath, folderName, searchText,
+                            isDirectory: true, size: 0)))
                         return results;
                 }
             }
@@ -175,6 +188,7 @@ public sealed class FilenameSearchService
             }
         }
 
+        await FlushAsync();
         return results;
     }
 
