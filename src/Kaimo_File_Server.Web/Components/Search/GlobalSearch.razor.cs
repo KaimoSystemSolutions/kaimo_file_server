@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.JSInterop;
 
 namespace Kaimo_File_Server.Web.Components.Search;
 
@@ -40,6 +41,7 @@ public partial class GlobalSearch : IDisposable
     [Inject] private FileSelectionCoordinator FileSelectionCoordinator { get; set; } = default!;
     [Inject] private IShareRepository ShareRepo { get; set; } = default!;
     [Inject] private IAclService Acl { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
 
     //  "dest"   → settings/tabs only
     //  "global" → all shares (file search)
@@ -59,6 +61,8 @@ public partial class GlobalSearch : IDisposable
 
     private List<FileDocument> _fileResults = new();
     private List<SearchDestination> _destResults = new();
+    private int _activeIndex = -1;        // keyboard-selected result (files first, then destinations); -1 = none
+    private bool _revealActive;           // scroll the selected result into view after the next render
     private bool _dropdownVisible;
     private bool _isSearching;
     private CancellationTokenSource? _searchCts;
@@ -233,6 +237,7 @@ public partial class GlobalSearch : IDisposable
 
     private async Task OnSearchInputChanged()
     {
+        _activeIndex = -1;   // the query changed: the old selection no longer applies
         if (_searchQuery.Length < 2)
         {
             ResetResults();
@@ -367,12 +372,16 @@ public partial class GlobalSearch : IDisposable
             return;
         }
 
+        // Kept in display order (grouped by share) so the keyboard index matches the dropdown.
         _fileResults = files
             .GroupBy(f => f.Id)
             .Select(g => g.First())
             .Take(8)
+            .GroupBy(f => f.ShareName)
+            .SelectMany(g => g)
             .ToList();
         _destResults = dests.Take(plan.DestLimit).ToList();
+        _activeIndex = -1;
         _isSearching = false;
     }
 
@@ -434,8 +443,36 @@ public partial class GlobalSearch : IDisposable
 
     private void HandleSearchKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Escape")
-            _dropdownVisible = false;
+        var count = _fileResults.Count + _destResults.Count;
+        switch (e.Key)
+        {
+            case "Escape":
+                _dropdownVisible = false;
+                _activeIndex = -1;
+                break;
+            case "ArrowDown" or "ArrowUp" when _dropdownVisible && count > 0:
+                // Wraps around; the first ArrowUp from "nothing selected" picks the last item.
+                _activeIndex = e.Key == "ArrowDown"
+                    ? (_activeIndex + 1) % count
+                    : (_activeIndex <= 0 ? count : _activeIndex) - 1;
+                _revealActive = true;
+                break;
+            case "Enter" when _dropdownVisible && _activeIndex >= 0 && _activeIndex < count:
+                // Same as clicking the selected result.
+                if (_activeIndex < _fileResults.Count)
+                    NavigateToFile(_fileResults[_activeIndex]);
+                else
+                    NavigateToDestination(_destResults[_activeIndex - _fileResults.Count]);
+                break;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_revealActive)
+            return;
+        _revealActive = false;
+        try { await JS.InvokeVoidAsync("kaimoGlobalSearch.revealActive"); } catch (JSDisconnectedException) { }
     }
 
     // Focus-within tracking so moving focus between the input and the scope picker
@@ -512,6 +549,7 @@ public partial class GlobalSearch : IDisposable
     {
         _fileResults = new();
         _destResults = new();
+        _activeIndex = -1;
         _isSearching = false;
     }
 

@@ -27,7 +27,7 @@
 
             @if (_dropdownVisible && HasResults)
             {
-                <div class="search-dropdown">
+                <div class="search-dropdown" role="listbox">
                     @if (_fileResults.Any())
                     {
                         @foreach (var group in _fileResults.GroupBy(r => r.ShareName))
@@ -35,7 +35,10 @@
                             <div class="search-group-header">@group.Key</div>
                             @foreach (var result in group)
                             {
-                                <div class="search-result-item" @onmousedown="() => NavigateToFile(result)">
+                                var fileIndex = _fileResults.IndexOf(result);
+                                <div class="search-result-item @(fileIndex == _activeIndex ? "active" : "")"
+                                     role="option" aria-selected="@(fileIndex == _activeIndex)"
+                                     @onmousedown="() => NavigateToFile(result)">
                                     @Assets.SVG(result.IsDirectory ? "folder.svg" : FileHelper.GetIcon(result.FileName), new SvgOptions())
                                     <div class="search-result-info">
                                         <span class="search-result-name">@result.FileName</span>
@@ -71,7 +74,10 @@
                         <div class="search-group-header">@Text("Web_Search_Section_Destinations", "Settings & tabs")</div>
                         @foreach (var dest in _destResults)
                         {
-                            <div class="search-result-item" @onmousedown="() => NavigateToDestination(dest)">
+                            var destIndex = _fileResults.Count + _destResults.IndexOf(dest);
+                            <div class="search-result-item @(destIndex == _activeIndex ? "active" : "")"
+                                 role="option" aria-selected="@(destIndex == _activeIndex)"
+                                 @onmousedown="() => NavigateToDestination(dest)">
                                 @Assets.SVG(dest.Icon, new SvgOptions())
                                 <div class="search-result-info">
                                     <span class="search-result-name">@dest.Title</span>

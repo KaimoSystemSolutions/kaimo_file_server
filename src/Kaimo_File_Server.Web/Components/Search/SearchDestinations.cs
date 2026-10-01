@@ -118,6 +118,11 @@ public static class SearchDestinations
         new("Web_Settings_Tab_Storage",
             ["storage", "speicher", "speicherpool", "pool", "festplatte", "disk"],
             "/settings?tab=storage", "folder.svg", Settings),
+        // Home-folder settings live in the storage tab. "users"/"user" deliberately
+        // overlap with the Users page: the share is named "users", its web label "user".
+        new("Web_Settings_Homes_Label",
+            ["home", "homes", "users", "user", "home folder", "home-ordner", "heimverzeichnis", "benutzerordner"],
+            "/settings?tab=storage", "folder.svg", Settings),
         new("Web_Settings_Tab_Ram",
             ["ram", "memory", "arbeitsspeicher"],
             "/settings?tab=memory", "gear.svg", Settings),
@@ -162,7 +167,8 @@ public static class SearchDestinations
     public static async Task<List<SearchDestination>> MatchAsync(
         string query, IManagementAuthService mgmt, UserContext user, CancellationToken ct = default)
     {
-        var q = (query ?? string.Empty).Trim();
+        // A leading "/" (path-style input such as "/homes") is ignored for destinations.
+        var q = (query ?? string.Empty).Trim().TrimStart('/');
         if (q.Length < 2 || user is null)
             return new List<SearchDestination>();
 

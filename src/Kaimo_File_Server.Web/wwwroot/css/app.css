@@ -4173,7 +4173,8 @@ h1, h2, h3, h4, h5, h6 {
     transition: background 0.1s ease;
 }
 
-.search-result-item:hover {
+.search-result-item:hover,
+.search-result-item.active {
     background: var(--bg-hover, rgba(var(--accent-rgb), 0.08));
 }
 
