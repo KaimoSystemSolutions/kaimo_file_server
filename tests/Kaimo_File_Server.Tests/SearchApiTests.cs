@@ -145,13 +145,16 @@ public sealed class SearchApiTests : IDisposable
     // ─────────────────── controller ───────────────────
 
     [Fact]
-    public async Task Unknown_share_is_not_found()
+    public async Task Unknown_share_returns_no_hits_without_searching()
     {
-        var (controller, _) = CreateController();
+        // Same answer as an unreadable share, so share ids cannot be probed for existence.
+        var (controller, search) = CreateController(Hit("docs", "a.txt"));
 
         var result = await controller.Search(new SearchRequestDto("report", ShareId: Guid.NewGuid()));
 
-        Assert.Equal("not_found", AssertError(result, 404));
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Empty(Assert.IsAssignableFrom<IEnumerable<SearchHitDto>>(ok.Value));
+        search.VerifyNoOtherCalls();
     }
 
     [Fact]

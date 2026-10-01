@@ -62,6 +62,9 @@ public sealed class SearchApiController : ApiControllerBase
             return ApiBadRequest("invalid_query",
                 $"'q' must be {MinQueryLength}-{MaxQueryLength} characters without control characters.");
 
+        // Personal, ACL-filtered results: never cache in shared proxies.
+        Response.Headers[HeaderNames.CacheControl] = "no-store";
+
         var enabledShares = await _shares.GetAllEnabledAsync();
 
         string? shareName = null;
@@ -69,7 +72,9 @@ public sealed class SearchApiController : ApiControllerBase
         if (request!.ShareId is { } shareId)
         {
             var share = enabledShares.FirstOrDefault(s => s.Id == shareId);
-            if (share is null) return ApiNotFound("Share not found.");
+            // An unknown or disabled share answers like a share the caller cannot read
+            // (no hits), so share ids cannot be probed for existence.
+            if (share is null) return Ok(Array.Empty<SearchHitDto>());
             shareName = share.Name;
 
             if (!ShareRelativePath.TryNormalizeStrict(request.Path ?? string.Empty, out var normalized))
@@ -115,8 +120,6 @@ public sealed class SearchApiController : ApiControllerBase
                 break;
         }
 
-        // Personal, ACL-filtered results: never cache in shared proxies.
-        Response.Headers[HeaderNames.CacheControl] = "no-store";
         return Ok(dtos);
     }
 

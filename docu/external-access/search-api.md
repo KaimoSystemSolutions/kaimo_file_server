@@ -42,9 +42,10 @@ Response (`Cache-Control: no-store`):
   read timestamps from the browse endpoints.
 - `snippet` is pre-split into plain-text segments. Render them as text (e.g. styled
   `TextSpan`s); the API never returns markup.
-- Errors: `invalid_query` / `invalid_path` (400), `not_found` (404, unknown or disabled
-  share), `rate_limited` (429, honor `Retry-After`), `search_timeout` (503, a search is
-  capped at 10 s).
+- An unknown or disabled `shareId` returns an empty list, exactly like a share the
+  caller cannot read, so share ids cannot be probed for existence.
+- Errors: `invalid_query` / `invalid_path` (400), `rate_limited` (429, honor
+  `Retry-After`), `search_timeout` (503, a search is capped at 10 s).
 - Rate limit: per user, a burst of 10 requests, then one every 2 s. Clients should
   debounce input (≥ 250 ms), require at least 2 characters, and cancel the previous
   request when the query changes.
