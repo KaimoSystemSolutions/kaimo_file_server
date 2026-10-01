@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.Shared;
 using Kaimo_File_Server.Web.Services;
@@ -153,7 +154,38 @@ public partial class GlobalSearch : IDisposable
         _contextSubPath = segs.Length > 2
             ? string.Join('/', segs.Skip(2).Select(Uri.UnescapeDataString))
             : "";
+
+        // /files/user is the caller's own folder inside the home-folder share.
+        if (_contextShare.Equals(HomeRoute, StringComparison.OrdinalIgnoreCase) && _user is not null)
+        {
+            _contextShare = HomeDirectoryService.ShareName;
+            _contextSubPath = $"{HomeDirectoryService.HomePathOf(_user.User.Id)}/{_contextSubPath}".TrimEnd('/');
+        }
+
         _scope = _lastScope = ScopeFolder;
+    }
+
+    // Route segment of the own home folder (/files/user).
+    private const string HomeRoute = "user";
+
+    /// <summary>
+    /// Presents a home-folder hit the way the browser shows the home: as "user", relative to
+    /// the caller's own folder, so the folder GUID never reaches the dropdown or the URL.
+    /// Hits in other users' homes cannot be opened in the web UI and are dropped.
+    /// </summary>
+    private FileDocument? ToWebHit(FileDocument hit)
+    {
+        if (!hit.ShareName.Equals(HomeDirectoryService.ShareName, StringComparison.OrdinalIgnoreCase))
+            return hit;
+
+        var root = HomeDirectoryService.HomePathOf(_user!.User.Id) + "/";
+        var path = hit.SharePath.Replace('\\', '/').TrimStart('/');
+        if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        hit.ShareName = HomeRoute;
+        hit.SharePath = path[root.Length..];
+        return hit;
     }
 
     /// <summary>Scope options for the current context, as (value, label) pairs.</summary>
@@ -359,7 +391,7 @@ public partial class GlobalSearch : IDisposable
         foreach (var (share, sub) in plan.Targets)
         {
             var hits = await SearchService.SearchAsync(_searchQuery, _user, share, sub, token);
-            files.AddRange(hits);
+            files.AddRange(hits.Select(ToWebHit).OfType<FileDocument>());
         }
 
         var dests = plan.Dest
@@ -428,7 +460,9 @@ public partial class GlobalSearch : IDisposable
                 ? $"/files/{result.ShareName}"
                 : $"/files/{result.ShareName}/{folderPath}";
 
-            if (FileSelectionCoordinator.RequestSelection(result.ShareName, folderPath, result.FileName))
+            // The home browser addresses its share by the real name, not by the "user" route.
+            var browserShare = result.ShareName == HomeRoute ? HomeDirectoryService.ShareName : result.ShareName;
+            if (FileSelectionCoordinator.RequestSelection(browserShare, folderPath, result.FileName))
                 return;
         }
 

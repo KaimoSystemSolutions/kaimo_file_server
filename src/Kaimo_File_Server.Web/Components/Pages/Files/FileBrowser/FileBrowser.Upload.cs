@@ -256,7 +256,7 @@ public partial class FileBrowser
                 type: ToastType.Error);
         }
 
-            await VM.LoadShareAsync(ShareName, VM.CurrentPath);
+            await VM.LoadShareAsync(ShareName, EffectiveLoadSubPath);
             StateHasChanged();
         }
         catch (Exception)
@@ -281,7 +281,7 @@ public partial class FileBrowser
     // added or replaced a file).
     private async Task OnConflictResolved()
     {
-        await VM.LoadShareAsync(ShareName, VM.CurrentPath);
+        await VM.LoadShareAsync(ShareName, EffectiveLoadSubPath);
         StateHasChanged();
     }
 
