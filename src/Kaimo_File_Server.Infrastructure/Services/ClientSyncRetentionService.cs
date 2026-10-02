@@ -59,6 +59,11 @@ public sealed class ClientSyncRetentionService(
             {
                 return;
             }
+            catch (Core.Security.ReadOnlyDemoException)
+            {
+                // Read-only demo: pruning is a write, so this service has nothing to do.
+                return;
+            }
             catch (Exception error)
             {
                 logger.LogError(error, "Client-sync retention pruning failed.");

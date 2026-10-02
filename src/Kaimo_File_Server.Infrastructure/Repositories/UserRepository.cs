@@ -231,8 +231,6 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         }
 
         /// <inheritdoc />
-        // Uses the tracked SaveChanges path (not ExecuteUpdate) so the read-only demo
-        // guard — a SaveChanges interceptor — covers this self-service write surface.
         public async Task UpdatePersonalNamesAsync(Guid userId, string? firstName, string? lastName)
         {
             await using var db = await dbFactory.CreateDbContextAsync();

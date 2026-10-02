@@ -218,6 +218,10 @@ public sealed class SecurityMonitorFlushService(
             if (pruned > 0)
                 logger.LogInformation("Security event retention pruned {Count} entries.", pruned);
         }
+        catch (Core.Security.ReadOnlyDemoException)
+        {
+            // Read-only demo: nothing is recorded, so there is nothing to prune.
+        }
         catch (Exception error)
         {
             logger.LogError(error, "Security event retention pruning failed.");

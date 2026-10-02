@@ -186,14 +186,25 @@ internal sealed class LegacyCloudRemoteFileStore(
         string protectedGrant = credentialVault.ProtectConnectionCredentials(connection, credentials);
         // Conditional on the version this session loaded: a connection disabled or
         // re-authorized meanwhile keeps that newer state and grant.
-        if (await repository.TryUpdateCredentialAsync(
+        bool persisted;
+        try
+        {
+            persisted = await repository.TryUpdateCredentialAsync(
                 connection.Id,
                 _expectedVersion,
                 protectedGrant,
                 protectedGrant.StartsWith("dp:v2:", StringComparison.Ordinal)
                     ? StorageConnection.CurrentProtectorPurposeVersion
                     : 1,
-                cancellationToken))
+                cancellationToken);
+        }
+        catch (Core.Security.ReadOnlyDemoException)
+        {
+            // Read-only demo: the rotated grant stays in memory for this session only,
+            // so browsing keeps working after an access-token refresh.
+            return;
+        }
+        if (persisted)
         {
             _expectedVersion++;
             cloudConnection.AcknowledgeCredentialChanges();

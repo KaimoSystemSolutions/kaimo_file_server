@@ -35,7 +35,20 @@ public sealed class PublicDownloadController(
             return BadRequest("The download link is invalid or has expired.");
 
         // Atomic policy gate: enabled + within window + not exhausted, plus one access consumed.
-        var link = await shareLinks.TryConsumeAccessAsync(download.Token);
+        Core.Domain.ShareLink? link;
+        try
+        {
+            link = await shareLinks.TryConsumeAccessAsync(download.Token);
+        }
+        catch (Core.Security.ReadOnlyDemoException)
+        {
+            // Read-only demo: the access counter cannot be persisted, so apply the same
+            // policy check without consuming an access.
+            link = await shareLinks.GetByTokenAsync(download.Token);
+            if (link is not null
+                && (link.Kind != Core.Domain.ShareLinkKind.Download || !link.IsCurrentlyActive(DateTime.UtcNow)))
+                link = null;
+        }
         if (link is null)
             return NotFound();
 

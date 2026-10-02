@@ -1121,4 +1121,116 @@ public class FileServiceTests
             a => a.HasAccessAsync(ctx, _shareId, It.IsAny<string>(), true, FilePermission.ListReadData),
             Times.Once);
     }
+
+    // ═══════════════════ ACL gates on secondary read/write paths ═══════════════════
+
+    [Fact]
+    public async Task FilterReadablePathsAsync_ReturnsOnlyAllowedNormalizedPaths()
+    {
+        var ctx = CreateContext();
+        _aclMock
+            .Setup(a => a.HasAccessBatchAsync(
+                ctx, _shareId, It.IsAny<IReadOnlyList<(string, bool)>>(), FilePermission.ListReadData))
+            .ReturnsAsync((UserContext _, Guid _, IReadOnlyList<(string Path, bool IsDir)> entries, FilePermission _) =>
+                entries.ToDictionary(e => e.Path, e => !e.Path.Contains("secret")));
+
+        var readable = await _sut.FilterReadablePathsAsync(
+            [("/docs/a.txt", false), ("docs\\secret.txt", false), ("/docs", true)], ctx);
+
+        Assert.True(readable.SetEquals(["docs/a.txt", "docs"]));
+        Assert.Contains("DOCS/A.TXT", readable); // case-insensitive like the share namespace
+    }
+
+    [Fact]
+    public async Task FilterReadablePathsAsync_Empty_SkipsAclLookup()
+    {
+        Assert.Empty(await _sut.FilterReadablePathsAsync([], CreateContext()));
+        _aclMock.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task ReadFileVersionAsync_WithoutReadAccess_Throws()
+    {
+        var versions = new Mock<IFileVersionService>();
+        var sut = new FileService(_storageMock.Object, _aclMock.Object, null, _shareId, versions.Object);
+        DenyAccess(FilePermission.ListReadData);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => sut.ReadFileVersionAsync("doc.txt", DateTime.UtcNow, CreateContext()));
+        versions.Verify(v => v.ReadVersionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTime>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ReadFileVersionAsync_WithReadAccess_ReadsFromThisShare()
+    {
+        var ts = new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+        var versions = new Mock<IFileVersionService>();
+        versions.Setup(v => v.ReadVersionAsync(_shareId, "dir/doc.txt", ts))
+            .ReturnsAsync(new MemoryStream([1, 2, 3]));
+        var sut = new FileService(_storageMock.Object, _aclMock.Object, null, _shareId, versions.Object);
+        AllowAccess(FilePermission.ListReadData);
+
+        await using var stream = await sut.ReadFileVersionAsync("/dir/doc.txt", ts, CreateContext());
+
+        Assert.Equal(3, stream.Length);
+    }
+
+    [Fact]
+    public async Task ReadFileVersionAsync_WithoutVersioning_NotSupported()
+    {
+        await Assert.ThrowsAsync<NotSupportedException>(
+            () => _sut.ReadFileVersionAsync("doc.txt", DateTime.UtcNow, CreateContext()));
+    }
+
+    [Fact]
+    public async Task OpenSnapshotAsync_WithoutReadAccess_Throws()
+    {
+        var versions = new Mock<IFileVersionService>();
+        var sut = new FileService(_storageMock.Object, _aclMock.Object, null, _shareId, versions.Object);
+        DenyAccess(FilePermission.ListReadData);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => sut.OpenSnapshotAsync("doc.txt", DateTime.UtcNow, CreateContext()));
+        versions.Verify(v => v.ReadVersionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTime>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OpenSnapshotAsync_WithReadAccess_ReturnsSessionOverVersion()
+    {
+        var ts = DateTime.UtcNow;
+        var versions = new Mock<IFileVersionService>();
+        versions.Setup(v => v.ReadVersionAsync(_shareId, "doc.txt", ts))
+            .ReturnsAsync(new MemoryStream([1]));
+        var sut = new FileService(_storageMock.Object, _aclMock.Object, null, _shareId, versions.Object);
+        AllowAccess(FilePermission.ListReadData);
+
+        await using var session = await sut.OpenSnapshotAsync("doc.txt", ts, CreateContext());
+
+        Assert.NotNull(session);
+        versions.Verify(v => v.ReadVersionAsync(_shareId, "doc.txt", ts), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetModifiedAtAsync_WithoutWriteAccess_Throws()
+    {
+        _storageMock.Setup(s => s.IsDirectoryAsync("doc.txt")).ReturnsAsync(false);
+        DenyAccess(FilePermission.CreateWriteData);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _sut.SetModifiedAtAsync("doc.txt", CreateContext(), DateTime.UtcNow));
+        _storageMock.Verify(s => s.SetModifiedDateAsync(It.IsAny<string>(), It.IsAny<DateTime>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SetModifiedAtAsync_WithWriteAccess_UpdatesExistingFile()
+    {
+        var when = new DateTime(2025, 5, 5, 0, 0, 0, DateTimeKind.Utc);
+        _storageMock.Setup(s => s.IsDirectoryAsync("doc.txt")).ReturnsAsync(false);
+        _storageMock.Setup(s => s.ExistsAsync("doc.txt")).ReturnsAsync(true);
+        AllowAccess(FilePermission.CreateWriteData);
+
+        await _sut.SetModifiedAtAsync("doc.txt", CreateContext(), when);
+
+        _storageMock.Verify(s => s.SetModifiedDateAsync("doc.txt", when), Times.Once);
+    }
 }

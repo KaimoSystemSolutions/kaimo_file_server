@@ -131,7 +131,9 @@ and the key-encryption certificate must always be backed up and restored togethe
 look-but-don't-touch demo (`src/Kaimo_File_Server.Infrastructure/ServiceCollectionExtensions.cs`):
 
 1. `DemoModeOptions.ReadOnly` lets front ends hide write actions.
-2. `ReadOnlyDemoSaveInterceptor` blocks every EF Core save.
+2. `ReadOnlyDemoSaveInterceptor` blocks every EF Core save with pending changes and every
+   non-query command that is not a plain `SELECT` (bulk `ExecuteUpdate`/`ExecuteDelete`,
+   raw SQL writes).
 3. `ReadOnlyDemoAclService` wraps `IAclService` and denies every permission with a non-read bit.
 
 The Host never runs in demo mode so migrations, seeding and backups keep working.

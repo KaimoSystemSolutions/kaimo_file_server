@@ -73,6 +73,14 @@ public abstract class DatabaseTestBase : IDisposable
     /// </summary>
     protected ApplicationDbContext NewContext() => DbFactory.CreateDbContext();
 
+    /// <summary>
+    /// A second factory over the same database with extra EF interceptors (e.g. the
+    /// read-only demo guard), so a test can seed through <see cref="DbFactory"/> and
+    /// then exercise production code under the interceptor.
+    /// </summary>
+    protected TestDbContextFactory FactoryWith(params Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor[] interceptors)
+        => new(_connection, interceptors);
+
     // ─────────────────────── Real repositories ───────────────────────
     // Every repository receives the production-shaped context factory. Because
     // every created context shares one connection, its SaveChanges is visible to

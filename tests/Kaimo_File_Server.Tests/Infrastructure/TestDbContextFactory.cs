@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Kaimo_File_Server.Tests.Infrastructure;
 
@@ -25,10 +26,11 @@ public sealed class TestDbContextFactory : IDbContextFactory<ApplicationDbContex
 {
     private readonly DbContextOptions<ApplicationDbContext> _options;
 
-    public TestDbContextFactory(SqliteConnection connection)
+    public TestDbContextFactory(SqliteConnection connection, params IInterceptor[] interceptors)
     {
         _options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(connection)
+            .AddInterceptors(interceptors)
             .Options;
     }
 

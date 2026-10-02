@@ -9,7 +9,7 @@ namespace Kaimo_File_Server.Core.Security;
 ///
 /// Registered only when <c>KAIMO_DEMO_READONLY=true</c>; otherwise this type never
 /// enters the container and the normal path is untouched. Pairs with the EF
-/// SaveChanges interceptor, which blocks all DB + settings writes.
+/// save/command interceptor, which blocks all DB + settings writes.
 /// </summary>
 public sealed class ReadOnlyDemoAclService : IAclService
 {
