@@ -311,10 +311,7 @@ public partial class ShareListViewModel
         if (name.StartsWith('.') || name.EndsWith('.'))
         { error = Resources.Web_ShareName_NoLeadingTrailingDot; return false; }
 
-        // "users" is the home-folder share and "user" the web route of a user's own home.
-        if (!SambaName.IsValidShareName(name)
-            || name.Equals(HomeDirectoryService.ShareName, StringComparison.OrdinalIgnoreCase)
-            || name.Equals("user", StringComparison.OrdinalIgnoreCase))
+        if (!SambaName.IsValidShareName(name) || IsReservedSystemShareName(name))
         {
             error = string.Format(Resources.Web_Validation_ReservedName, name);
             return false;
@@ -322,6 +319,11 @@ public partial class ShareListViewModel
 
         return true;
     }
+
+    // "users" is the home-folder share and "user" the web route of a user's own home.
+    private static bool IsReservedSystemShareName(string name)
+        => name.Equals(HomeDirectoryService.ShareName, StringComparison.OrdinalIgnoreCase)
+           || name.Equals("user", StringComparison.OrdinalIgnoreCase);
 
     private string? GetConfiguredPoolPath(string candidate)
     {

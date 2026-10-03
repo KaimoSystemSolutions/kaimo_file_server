@@ -90,7 +90,7 @@ public sealed class PublicUploadService(
                 : PublicUploadStatus.Unavailable);
         }
 
-        var fs = fileServices.CreateForShare(share.Id, share.Path);
+        var fs = fileServices.CreateForShare(share);
         var folder = ShareRelativePath.Normalize(link.RootRelativePath);
         string? target = null;
         try

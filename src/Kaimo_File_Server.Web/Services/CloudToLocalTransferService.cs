@@ -34,7 +34,7 @@ public sealed class CloudToLocalTransferService(
         {
             try
             {
-                var service = fileServiceFactory.CreateForShare(share.Id, share.Path);
+                var service = fileServiceFactory.CreateForShare(share);
                 if (await service.CanCreateAsync(string.Empty, actor))
                     result.Add(new LocalTransferTarget(share.Id, share.Name));
             }
@@ -63,7 +63,7 @@ public sealed class CloudToLocalTransferService(
             return new(false, R("Web_CloudAccess_Error_InvalidLocalPath"));
         var localShare = await shareRepository.GetByIdAsync(localShareId);
         if (localShare is null || !localShare.IsEnabled) return new(false, R("Web_CloudAccess_Error_LocalUnavailable"));
-        var local = fileServiceFactory.CreateForShare(localShare.Id, localShare.Path);
+        var local = fileServiceFactory.CreateForShare(localShare);
         if (!await local.CanCreateAsync(destination, actor)) return new(false, R("Web_CloudAccess_Error_LocalWriteDenied"));
 
         var connectionRecord = await connections.GetAsync(remoteShare.ConnectionId);

@@ -86,6 +86,11 @@ message AuthorizeReply {
   // unlinking it. False for denied requests, other RPCs, and deletes that
   // already target an entry below .RECYCLE_BIN.
   bool recycle_delete = 4;
+  // AuthorizeDelete with recycle_delete only: number of leading path segments
+  // that form the recycle root. 0 = <share>/.RECYCLE_BIN; 1 = the home-folder
+  // share, where every <userId> folder holds its own <userId>/.RECYCLE_BIN.
+  // The VFS fails closed for any other value.
+  uint32 recycle_root_depth = 5;
 }
 
 message AuthorizeOpenRequest {

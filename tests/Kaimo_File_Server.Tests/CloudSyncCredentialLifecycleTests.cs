@@ -193,7 +193,7 @@ public sealed class CloudSyncCredentialLifecycleTests
         var providers = new Mock<ICloudProviderFactory>();
         providers.Setup(f => f.CreateOrLoad(_share.Id, It.IsAny<SyncedFolder>())).Returns(_cloud.Object);
         var files = new Mock<IFileServiceFactory>();
-        files.Setup(f => f.CreateForShare(_share.Id, _share.Path)).Returns(Mock.Of<IFileService>());
+        files.Setup(f => f.CreateForShare(It.Is<ShareDefinition>(s => s.Id == _share.Id))).Returns(Mock.Of<IFileService>());
         return new CloudSyncExecutionService(
             shares.Object, definitions.Object, _connections.Object, _vault,
             Mock.Of<ILegacyCloudSyncMigrationService>(), providers.Object, files.Object,

@@ -65,4 +65,41 @@ public sealed class ShareEntryPolicyTests
     {
         Assert.False(ShareEntryPolicy.IsReservedForUserWrites(path));
     }
+
+    // rootDepth = 1: the home-folder share, one recycle bin per <userId>.
+
+    [Theory]
+    [InlineData("uid/.RECYCLE_BIN", ShareEntryKind.RecycleBin)]
+    [InlineData("uid/.recycle_bin/a/b.txt", ShareEntryKind.RecycleBin)]
+    [InlineData("uid/.kaimo-x", ShareEntryKind.Internal)]
+    [InlineData(".kaimo-x", ShareEntryKind.Internal)]         // share-root rules still hold
+    [InlineData("uid", ShareEntryKind.Regular)]
+    [InlineData("uid/docs/.RECYCLE_BIN", ShareEntryKind.Regular)]
+    public void Classify_WithRootDepth_AppliesRulesBelowTheRoot(string path, ShareEntryKind expected)
+    {
+        Assert.Equal(expected, ShareEntryPolicy.Classify(path, rootDepth: 1).Kind);
+    }
+
+    [Theory]
+    [InlineData("a/b.txt", 0, ".RECYCLE_BIN/a/b.txt")]
+    [InlineData("uid/a/b.txt", 1, "uid/.RECYCLE_BIN/a/b.txt")]
+    [InlineData("uid/b.txt", 1, "uid/.RECYCLE_BIN/b.txt")]
+    public void GetRecyclePath_PlacesTheItemBelowItsRecycleRoot(string path, int depth, string expected)
+    {
+        Assert.Equal(expected, ShareEntryPolicy.GetRecyclePath(path, depth));
+    }
+
+    [Fact]
+    public void TryNormalizeStrict_WithRootDepth_RejectsInternalNamespaceBelowTheRoot()
+    {
+        Assert.True(ShareRelativePath.TryNormalizeStrict("uid/.kaimo-x", out _));
+        Assert.False(ShareRelativePath.TryNormalizeStrict("uid/.kaimo-x", out _, rootDepth: 1));
+        Assert.True(ShareRelativePath.TryNormalizeStrict("uid/docs/.kaimo-x", out _, rootDepth: 1));
+    }
+
+    [Fact]
+    public void GetRecyclePath_ForTheRecycleRootItself_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() => ShareEntryPolicy.GetRecyclePath("uid", 1));
+    }
 }

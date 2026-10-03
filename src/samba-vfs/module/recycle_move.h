@@ -21,6 +21,27 @@
 
 #define KAIMO_RECYCLE_DIRECTORY ".RECYCLE_BIN"
 #define KAIMO_RECYCLE_DIRECTORY_MODE 02770
+/* Recycle root depth: 0 = <share>/.RECYCLE_BIN, 1 = <first>/.RECYCLE_BIN (the
+ * home-folder share, one recycle bin per user home). Anything else fails closed. */
+#define KAIMO_RECYCLE_MAX_ROOT_DEPTH 1
+
+/*
+ * Length of the recycle-root prefix of a logical path: its first root_depth
+ * components including their trailing '/'. Returns -1 when the path has no
+ * component below that root (it is the root itself or above it).
+ */
+static inline ptrdiff_t kaimo_recycle_root_length(
+	const char *path, unsigned int root_depth)
+{
+	const char *cursor = path;
+	for (unsigned int depth = 0; depth < root_depth; ++depth) {
+		const char *separator = strchr(cursor, '/');
+		if (separator == NULL)
+			return -1;
+		cursor = separator + 1;
+	}
+	return cursor - path;
+}
 
 static inline unsigned char kaimo_recycle_ascii_lower(unsigned char value)
 {
@@ -43,10 +64,15 @@ static inline bool kaimo_recycle_component_equal_ci(
 	return true;
 }
 
-static inline bool kaimo_recycle_path_is_inside(const char *path)
+static inline bool kaimo_recycle_path_is_inside(
+	const char *path, unsigned int root_depth)
 {
 	if (path == NULL)
 		return false;
+	ptrdiff_t root_length = kaimo_recycle_root_length(path, root_depth);
+	if (root_length < 0)
+		return false;
+	path += root_length;
 	const char *separator = strchr(path, '/');
 	size_t first_length = separator != NULL
 		? (size_t)(separator - path)
@@ -85,27 +111,42 @@ static inline int kaimo_recycle_open_child_directory(
 }
 
 /*
- * Opens (and, where absent, creates) .RECYCLE_BIN plus the source path's
- * parent hierarchy below it. Every component is traversed with O_NOFOLLOW,
- * so a client-created symlink cannot redirect a recycle move outside the
- * share. The returned descriptor belongs to the caller.
+ * Opens (and, where absent, creates) .RECYCLE_BIN below the source path's
+ * recycle root (its first root_depth components, which must already exist)
+ * plus the source path's remaining parent hierarchy below it. Every component
+ * is traversed with O_NOFOLLOW, so a client-created symlink cannot redirect a
+ * recycle move outside the share. The returned descriptor belongs to the caller.
  */
 static inline int kaimo_recycle_open_destination_parent(
-	int share_root_fd, const char *logical_source)
+	int share_root_fd, const char *logical_source, unsigned int root_depth)
 {
 	if (share_root_fd < 0 || logical_source == NULL ||
-	    logical_source[0] == '\0') {
+	    logical_source[0] == '\0' ||
+	    root_depth > KAIMO_RECYCLE_MAX_ROOT_DEPTH) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	int current_fd = kaimo_recycle_open_child_directory(
-		share_root_fd, KAIMO_RECYCLE_DIRECTORY);
+	int current_fd = fcntl(share_root_fd, F_DUPFD_CLOEXEC, 0);
 	if (current_fd < 0)
 		return -1;
 
+	unsigned int depth = 0;
 	const char *cursor = logical_source;
 	for (;;) {
+		if (depth == root_depth) {
+			/* The recycle bin sits directly below the recycle root. */
+			int bin_fd = kaimo_recycle_open_child_directory(
+				current_fd, KAIMO_RECYCLE_DIRECTORY);
+			int saved_errno = errno;
+			close(current_fd);
+			if (bin_fd < 0) {
+				errno = saved_errno;
+				return -1;
+			}
+			current_fd = bin_fd;
+		}
+
 		const char *separator = strchr(cursor, '/');
 		if (separator == NULL)
 			break;
@@ -120,8 +161,12 @@ static inline int kaimo_recycle_open_destination_parent(
 		char component[NAME_MAX + 1];
 		memcpy(component, cursor, length);
 		component[length] = '\0';
-		int next_fd = kaimo_recycle_open_child_directory(
-			current_fd, component);
+		/* The recycle root itself (e.g. a home folder) is never created here. */
+		int next_fd = depth < root_depth
+			? openat(current_fd, component,
+				 O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+			: kaimo_recycle_open_child_directory(
+				current_fd, component);
 		int saved_errno = errno;
 		close(current_fd);
 		if (next_fd < 0) {
@@ -130,6 +175,14 @@ static inline int kaimo_recycle_open_destination_parent(
 		}
 		current_fd = next_fd;
 		cursor = separator + 1;
+		++depth;
+	}
+
+	/* The source is its recycle root itself: there is no bin above it. */
+	if (depth < root_depth) {
+		close(current_fd);
+		errno = EINVAL;
+		return -1;
 	}
 
 	size_t leaf_length = strlen(cursor);
@@ -187,24 +240,49 @@ static inline int kaimo_recycle_candidate_leaf(
 	return 0;
 }
 
+/*
+ * Fallback for filesystems without RENAME_NOREPLACE (9p/drvfs under Docker
+ * Desktop, NFS, CIFS): refuse an existing destination, then rename.
+ * ponytail: check-then-rename is not atomic. Only a second recycle move onto the
+ * same bin entry in between could be replaced; clients cannot write into the
+ * reserved bin and each source path maps to its own bin path, so the window is
+ * practically closed. Wherever renameat2 works, the move stays atomic.
+ */
+static inline int kaimo_recycle_rename_checked(
+	int source_parent_fd, const char *source_leaf,
+	int destination_parent_fd, const char *destination_leaf)
+{
+	struct stat existing;
+	if (fstatat(destination_parent_fd, destination_leaf, &existing,
+		    AT_SYMLINK_NOFOLLOW) == 0) {
+		errno = EEXIST;
+		return -1;
+	}
+	if (errno != ENOENT)
+		return -1;
+	return renameat(source_parent_fd, source_leaf,
+			destination_parent_fd, destination_leaf);
+}
+
 static inline int kaimo_recycle_rename_noreplace(
 	int source_parent_fd, const char *source_leaf,
 	int destination_parent_fd, const char *destination_leaf)
 {
 #if defined(__linux__) && defined(SYS_renameat2) && defined(RENAME_NOREPLACE)
-	return (int)syscall(
+	int ret = (int)syscall(
 		SYS_renameat2,
 		source_parent_fd, source_leaf,
 		destination_parent_fd, destination_leaf,
 		RENAME_NOREPLACE);
-#else
-	(void)source_parent_fd;
-	(void)source_leaf;
-	(void)destination_parent_fd;
-	(void)destination_leaf;
-	errno = ENOTSUP;
-	return -1;
+	/* EINVAL/ENOSYS/ENOTSUP: the flag (or syscall) is unsupported here. */
+	if (ret == 0 ||
+	    (errno != EINVAL && errno != ENOSYS && errno != ENOTSUP &&
+	     errno != EOPNOTSUPP))
+		return ret;
 #endif
+	return kaimo_recycle_rename_checked(
+		source_parent_fd, source_leaf,
+		destination_parent_fd, destination_leaf);
 }
 
 #endif

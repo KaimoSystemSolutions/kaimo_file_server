@@ -116,6 +116,22 @@ public sealed class AuthzGrpcServiceDeleteTests : IDisposable
         Assert.True(reply.RecycleDelete);
     }
 
+    [Theory]
+    [InlineData("docs/report.txt", true)]               // → docs/.RECYCLE_BIN/report.txt
+    [InlineData("docs/.RECYCLE_BIN/report.txt", false)] // emptying the home's own bin
+    public async Task AuthorizeDelete_HomeShare_RecyclesPerHome(string path, bool recycle)
+    {
+        _share.IsRecycleEnabled = true;
+        _share.IsUserHomes = true;
+        Allow(path, isDirectory: false, FilePermission.Delete);
+
+        var reply = await AuthorizeAsync(path, isDirectory: false);
+
+        Assert.True(reply.Allow);
+        Assert.Equal(recycle, reply.RecycleDelete);
+        Assert.Equal(1u, reply.RecycleRootDepth);
+    }
+
     [Fact]
     public async Task AuthorizeDelete_ParentHasDeleteSubItems_IsAllowed()
     {

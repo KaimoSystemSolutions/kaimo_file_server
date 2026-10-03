@@ -28,7 +28,7 @@ public sealed class SyncQueryServiceTests
     {
         _shares.Setup(s => s.GetByIdAsync(_share.Id)).ReturnsAsync(_share);
         var factory = new Mock<IFileServiceFactory>();
-        factory.Setup(f => f.CreateForShare(_share.Id, _share.Path)).Returns(_fs.Object);
+        factory.Setup(f => f.CreateForShare(It.Is<ShareDefinition>(s => s.Id == _share.Id))).Returns(_fs.Object);
 
         var modified = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         _cursors.Setup(c => c.GetShareChangeStateAsync(_share.Id, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
@@ -80,6 +80,17 @@ public sealed class SyncQueryServiceTests
 
         // The folder entry itself was visible in its parent listing; its content is not.
         Assert.Equal(["secret", "open", "open/a.txt"], delta.Entries.Select(e => e.Path));
+    }
+
+    [Fact]
+    public async Task RecycleBin_IsNotSynced()
+    {
+        Children("", Dir(".RECYCLE_BIN"), File("a.txt"));
+
+        var delta = await _sut.EnumerateAsync(_share.Id, "", _user);
+
+        Assert.Equal(["a.txt"], delta.Entries.Select(e => e.Path));
+        _fs.Verify(f => f.ListAsync(".RECYCLE_BIN", _user), Times.Never);
     }
 
     [Fact]

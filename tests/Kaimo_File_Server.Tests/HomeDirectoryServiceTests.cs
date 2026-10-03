@@ -321,6 +321,24 @@ public sealed class HomeDirectoryServiceTests : IDisposable
         var share = Assert.Single(_shares);
         Assert.True(share.IsUserHomes);
         Assert.False(share.IsShareHidden);                   // listed on SMB/WebDAV
-        Assert.False(share.IsRecycleEnabled);
+        Assert.True(share.IsRecycleEnabled);                 // per home: <userId>/.RECYCLE_BIN
+        Assert.Equal(1, share.RecycleRootDepth);
+    }
+
+    [Fact]
+    public async Task Backfill_turns_the_recycle_bin_on_and_it_inherits_only_the_owner()
+    {
+        var alice = AddUser("alice");
+        var bob = AddUser("bob");
+        await _sut.ConfigureAsync(_root, alice.Id);
+        _shares.Single().IsRecycleEnabled = false;          // setup from before per-home recycle bins
+
+        await _sut.BackfillAsync();
+
+        Assert.True(_shares.Single().IsRecycleEnabled);
+        var bin = $"{HomeDirectoryService.HomePathOf(alice.Id)}/.RECYCLE_BIN";
+        Assert.True(await Can(alice, bin, true, FilePermission.ListReadData));
+        Assert.True(await Can(alice, $"{bin}/a.txt", false, FilePermission.Delete));
+        Assert.False(await Can(bob, bin, true, FilePermission.ListReadData));
     }
 }

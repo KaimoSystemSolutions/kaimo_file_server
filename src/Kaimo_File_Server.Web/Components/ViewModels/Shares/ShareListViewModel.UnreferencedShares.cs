@@ -184,11 +184,14 @@ public partial class ShareListViewModel
         }
     }
 
-    // Dot folders (.kaimo-moving-*, .RECYCLE_BIN, …), lost+found and links are never
-    // share candidates, neither for listing nor for a purge.
+    // Dot folders (.kaimo-moving-*, .RECYCLE_BIN, …), lost+found, links and reserved
+    // system names are never share candidates, neither for listing nor for a purge.
+    // A "users" folder without a share holds orphaned home folders: it is re-adopted by
+    // the home-folder setup and must never be purged from here.
     private static bool IsCandidateFolder(DirectoryInfo dir)
         => !dir.Name.StartsWith('.')
            && dir.Name != "lost+found"
+           && !IsReservedSystemShareName(dir.Name)
            && dir.LinkTarget is null;
 
     /// <summary>

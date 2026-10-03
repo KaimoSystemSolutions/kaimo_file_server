@@ -46,7 +46,32 @@ Per user with an enabled home:
 | Disable a home | Removes the user's three entries and sets `HomeDirectoryEnabled = false`; files stay on disk |
 | Re-enable | Restores the entries |
 | Global switch off | Disables the `users` share (`HomeDirectoryService.SetGloballyEnabledAsync`); every transport refuses a disabled share. Per-user state is kept |
-| Delete a home (`DeleteHomeAsync`) | Removes public links into it first, then the folder, metadata and ACL rows, file versions and the root entry; appends a `Deleted` change-log entry. The recycle bin is not used. An existing, enabled user immediately receives a new empty home |
+| Delete a home (`DeleteHomeAsync`) | Removes public links into it first, then the folder (including its recycle bin), metadata and ACL rows, file versions and the root entry; appends a `Deleted` change-log entry. The recycle bin is not used. An existing, enabled user immediately receives a new empty home |
+
+## Recycle bin
+
+The recycle bin is always enabled for the `users` share. `HomeDirectoryService` creates the share with
+it and `BackfillAsync` re-enables it on every start; share management never shows the share, so it
+cannot be switched off.
+
+Every home has its own bin at `users/<userId>/.RECYCLE_BIN`, so it needs no mount or special path on
+any transport: it is an ordinary folder inside the home. Deleting `<userId>/docs/a.txt` moves it to
+`<userId>/.RECYCLE_BIN/docs/a.txt`.
+
+- `ShareDefinition.RecycleRootDepth` is `1` for this share (`0` everywhere else).
+  `ShareEntryPolicy` applies its rules below that depth: `<userId>/.RECYCLE_BIN` is the recycle bin
+  and `<userId>/.kaimo-*` is internal. The share-root rules still apply as well.
+- `IFileServiceFactory.CreateForShare(ShareDefinition)` passes the depth to `FileService`.
+  `AuthorizeDelete` returns it to the Samba VFS as `recycle_root_depth`.
+- The bin lies inside the home, so it inherits the owner's home entries. The owner can browse it,
+  restore items (move them out) and empty it. Other users and administrators have no access.
+- Users cannot create or move items into the bin directly (reserved namespace). Deleting an entry
+  inside it is permanent.
+- On SMB and on macOS, the dot name makes the folder hidden by default. The web UI shows it with
+  the recycle-bin icon and the "empty recycle bin" action.
+- Recycled items count toward the size of the home.
+- The sync API never syncs a recycle bin: `delta` skips it, and the change feed reports a recycle
+  move as a delete of the old path and a restore as a subtree change at the new path.
 
 ## Exposure per transport
 
@@ -60,6 +85,10 @@ Per user with an enabled home:
 
 - The sync API refuses the share root `""` of `users` (delta, changes, wait, sync profiles), because
   its change log would expose names from other homes; clients sync `<userId>`.
-- The recycle bin is disabled for the share, since `.RECYCLE_BIN` would be shared by all users.
+- There is no share-root recycle bin, since it would be shared by all users; each home has its own
+  (see [Recycle bin](#recycle-bin)).
+- A `users` (or `user`) folder in a storage pool is never listed under unreferenced shares and can
+  never be purged there, even if no share references it. Such a folder holds orphaned homes, which
+  the home-folder setup re-adopts.
 - ACL editing is refused for the share; server-side syncs are not offered inside homes.
 - Public links into a home require the regular `ManageShareLinks` / `ManageUploadLinks` permissions.

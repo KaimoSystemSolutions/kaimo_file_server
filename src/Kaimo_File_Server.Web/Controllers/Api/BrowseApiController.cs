@@ -57,7 +57,7 @@ public sealed class BrowseApiController : ApiControllerBase
         try
         {
             if (await _homes.EnsureHomeAsync(user.User) is { } home)
-                visible.Add(new ShareDto(home.Share.Id, HomeFileBrowserViewModel.DisplayName, false, home.Path));
+                visible.Add(new ShareDto(home.Share.Id, HomeFileBrowserViewModel.DisplayName, home.Share.IsRecycleEnabled, home.Path));
         }
         catch (Exception ex)
         {
@@ -68,7 +68,7 @@ public sealed class BrowseApiController : ApiControllerBase
         {
             // The home-folder share is only offered as the caller's own "user" entry above.
             if (share.IsShareHidden || share.IsUserHomes) continue;
-            var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+            var fs = _fileServiceFactory.CreateForShare(share);
             if (await fs.CanListAsync(string.Empty, user))
                 visible.Add(new ShareDto(share.Id, share.Name, share.IsRecycleEnabled));
         }
@@ -224,7 +224,7 @@ public sealed class BrowseApiController : ApiControllerBase
             || !ShareRelativePath.TryNormalizeStrict(request.To, out var to, allowRoot: false))
             return ApiBadRequest("invalid_path", "Both 'from' and 'to' must be valid paths.");
 
-        var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        var fs = _fileServiceFactory.CreateForShare(share);
         var fingerprint = RequestFingerprint.Compute("POST", $"{shareId}/rename", from, to);
 
         return await ExecuteIdempotentAsync(user.User.Id, fingerprint, () => GuardAsync(async () =>
@@ -331,7 +331,7 @@ public sealed class BrowseApiController : ApiControllerBase
         if (!ShareRelativePath.TryNormalizeStrict(path ?? string.Empty, out var normalized, allowRoot))
             return (null, ApiBadRequest("invalid_path", "The path is not a valid share-relative path."));
 
-        var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        var fs = _fileServiceFactory.CreateForShare(share);
         return (new Resolved(user, share, fs, normalized), null);
     }
 

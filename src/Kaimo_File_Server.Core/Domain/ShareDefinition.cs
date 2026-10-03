@@ -74,6 +74,14 @@ namespace Kaimo_File_Server.Core.Domain
         /// </summary>
         public bool IsUserHomes { get; set; }
 
+        /// <summary>
+        /// Number of leading path segments that form a recycle root. 0 = one
+        /// <c>.RECYCLE_BIN</c> at the share root; 1 for the home-folder share, so every
+        /// home has its own <c>&lt;userId&gt;/.RECYCLE_BIN</c> that inherits the owner's
+        /// rights. See <see cref="Helpers.ShareEntryPolicy"/>.
+        /// </summary>
+        public int RecycleRootDepth => IsUserHomes ? 1 : 0;
+
         public CloudSettings CloudSettings { get; set; } = new CloudSettings(new Dictionary<string, SyncedFolder>());
 
         public ICloudConnection? CloudConnection { get; set; }

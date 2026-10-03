@@ -45,7 +45,7 @@ public sealed class PublicUploadLinkTests
             new User(_link.CreatedByUserId, "Creator", "creator", "hash", "nt"), [], [], []);
 
         _shares.Setup(s => s.GetByIdAsync(_share.Id)).ReturnsAsync(_share);
-        _fileServices.Setup(f => f.CreateForShare(_share.Id, _share.Path)).Returns(_fs.Object);
+        _fileServices.Setup(f => f.CreateForShare(It.Is<ShareDefinition>(s => s.Id == _share.Id))).Returns(_fs.Object);
         _contexts.Setup(c => c.CreateByUserIdAsync(_link.CreatedByUserId)).ReturnsAsync(_creator);
         _contexts.Setup(c => c.CreateByUsernameAsync("creator")).ReturnsAsync(_creator);
         _config.Setup(c => c.GetAsync(ShareLinkSettings.ConfigKey, It.IsAny<ShareLinkSettings>()))

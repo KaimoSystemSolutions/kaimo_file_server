@@ -296,7 +296,7 @@ public sealed class ExternalStorageSyncViewModel(
         await EnsureActorAsync();
         var share = await GetBrowsableShareAsync(localShareId);
         string normalized = ShareRelativePath.Normalize(path);
-        var items = await fileServices.CreateForShare(share.Id, share.Path)
+        var items = await fileServices.CreateForShare(share)
             .ListAsync(normalized, _actor!);
         return items
             .Where(item => item.IsDirectory)
@@ -337,7 +337,7 @@ public sealed class ExternalStorageSyncViewModel(
             throw new InvalidOperationException(Text(
                 "Web_ExternalStorage_PathInUse", "This local folder already has a sync."));
 
-        var metadata = await fileServices.CreateForShare(share.Id, share.Path)
+        var metadata = await fileServices.CreateForShare(share)
             .GetMetadataAsync(localPath, _actor!);
         if (!metadata.IsDirectory)
             throw new InvalidOperationException(Text(

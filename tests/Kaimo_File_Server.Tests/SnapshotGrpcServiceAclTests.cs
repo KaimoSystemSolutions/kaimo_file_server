@@ -42,7 +42,7 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
 
         _auth.Setup(a => a.ResolveUserContextAsync("alice")).ReturnsAsync(_user);
         _shares.Setup(s => s.GetByNameAsync("share")).ReturnsAsync(_share);
-        _factory.Setup(f => f.CreateForShare(_share.Id, _share.Path))
+        _factory.Setup(f => f.CreateForShare(It.Is<ShareDefinition>(s => s.Id == _share.Id)))
             .Returns(_files.Object);
         _versions.Setup(v => v.GetVersionsAsync(_share.Id, It.IsAny<string>()))
             .ReturnsAsync([]);
@@ -223,7 +223,7 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
             It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTime>()),
             Times.Never);
         _factory.Verify(f => f.CreateForShare(
-            It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
+            It.IsAny<ShareDefinition>()), Times.Never);
     }
 
     [Theory]

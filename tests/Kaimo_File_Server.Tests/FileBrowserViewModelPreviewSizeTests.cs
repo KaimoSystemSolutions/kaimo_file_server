@@ -44,7 +44,7 @@ public class FileBrowserViewModelPreviewSizeTests
     {
         _shareRepo.Setup(r => r.GetByNameAsync("share")).ReturnsAsync(_share);
         _fileServiceFactory
-            .Setup(f => f.CreateForShare(_share.Id, _share.Path))
+            .Setup(f => f.CreateForShare(It.Is<ShareDefinition>(s => s.Id == _share.Id)))
             .Returns(_fileService.Object);
         _fileService
             .Setup(s => s.ListAsync(It.IsAny<string>(), It.IsAny<UserContext>()))

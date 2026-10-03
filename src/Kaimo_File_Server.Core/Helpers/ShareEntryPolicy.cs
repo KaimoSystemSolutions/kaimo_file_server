@@ -21,7 +21,10 @@ public readonly record struct ShareEntryClassification(
 
 /// <summary>
 /// Central registry for reserved and specially presented share namespaces.
-/// Rules apply to the first share-relative path segment only.
+/// Rules apply to the first share-relative path segment. A share with a
+/// <c>rootDepth</c> &gt; 0 (the home-folder share, see
+/// <c>ShareDefinition.RecycleRootDepth</c>) additionally applies them to the first
+/// segment below that depth, so every home has its own <c>&lt;home&gt;/.RECYCLE_BIN</c>.
 /// </summary>
 public static class ShareEntryPolicy
 {
@@ -54,9 +57,43 @@ public static class ShareEntryPolicy
     private static readonly ShareEntryClassification Regular =
         new(ShareEntryKind.Regular, IsVisibleInFileBrowser: true);
 
-    public static ShareEntryClassification Classify(string? shareRelativePath)
+    public static ShareEntryClassification Classify(string? shareRelativePath, int rootDepth = 0)
     {
         var normalized = ShareRelativePath.Normalize(shareRelativePath);
+        var classification = ClassifyFirstSegment(normalized);
+        // Share-root rules always hold; a deeper root only adds reservations.
+        return classification.Kind == ShareEntryKind.Regular && rootDepth > 0
+            ? ClassifyFirstSegment(SplitRoot(normalized, rootDepth).Below)
+            : classification;
+    }
+
+    /// <summary>
+    /// Path an item lands on when moved to the recycle bin:
+    /// <c>&lt;root&gt;/.RECYCLE_BIN/&lt;rest&gt;</c>. Throws for the root itself (e.g. a
+    /// home folder), which has no recycle bin above it.
+    /// </summary>
+    public static string GetRecyclePath(string? shareRelativePath, int rootDepth = 0)
+    {
+        var (root, below) = SplitRoot(ShareRelativePath.Normalize(shareRelativePath), rootDepth);
+        if (below.Length == 0)
+            throw new InvalidOperationException(
+                $"'{shareRelativePath}' is a recycle root and cannot be recycled.");
+        return ShareRelativePath.Combine(ShareRelativePath.Combine(root, RecycleBinName), below);
+    }
+
+    // Splits off the first rootDepth segments; a shorter path is all root.
+    private static (string Root, string Below) SplitRoot(string normalized, int rootDepth)
+    {
+        if (rootDepth <= 0)
+            return ("", normalized);
+        string[] segments = normalized.Length == 0 ? [] : normalized.Split('/');
+        return segments.Length <= rootDepth
+            ? (normalized, "")
+            : (string.Join('/', segments[..rootDepth]), string.Join('/', segments[rootDepth..]));
+    }
+
+    private static ShareEntryClassification ClassifyFirstSegment(string normalized)
+    {
         if (normalized.Length == 0)
             return Regular;
 
@@ -83,20 +120,20 @@ public static class ShareEntryPolicy
         return Regular;
     }
 
-    public static bool IsVisibleInFileBrowser(string? shareRelativePath) =>
-        Classify(shareRelativePath).IsVisibleInFileBrowser;
+    public static bool IsVisibleInFileBrowser(string? shareRelativePath, int rootDepth = 0) =>
+        Classify(shareRelativePath, rootDepth).IsVisibleInFileBrowser;
 
-    public static bool IsInternalPath(string? shareRelativePath) =>
-        Classify(shareRelativePath).Kind == ShareEntryKind.Internal;
+    public static bool IsInternalPath(string? shareRelativePath, int rootDepth = 0) =>
+        Classify(shareRelativePath, rootDepth).Kind == ShareEntryKind.Internal;
 
-    public static bool IsRecycleBinPath(string? shareRelativePath) =>
-        Classify(shareRelativePath).Kind == ShareEntryKind.RecycleBin;
+    public static bool IsRecycleBinPath(string? shareRelativePath, int rootDepth = 0) =>
+        Classify(shareRelativePath, rootDepth).Kind == ShareEntryKind.RecycleBin;
 
     /// <summary>
     /// Returns whether a user-driven create, upload, replace, move, or rename
     /// would claim a namespace owned by Kaimo. Reading, restoring from, and
     /// deleting existing recycle-bin entries are separate operations.
     /// </summary>
-    public static bool IsReservedForUserWrites(string? shareRelativePath) =>
-        Classify(shareRelativePath).Kind != ShareEntryKind.Regular;
+    public static bool IsReservedForUserWrites(string? shareRelativePath, int rootDepth = 0) =>
+        Classify(shareRelativePath, rootDepth).Kind != ShareEntryKind.Regular;
 }

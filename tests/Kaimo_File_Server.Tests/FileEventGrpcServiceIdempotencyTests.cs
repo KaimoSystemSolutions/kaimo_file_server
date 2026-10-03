@@ -50,7 +50,7 @@ public sealed class FileEventGrpcServiceIdempotencyTests
                     received = copy.ToArray();
                 });
             var factory = new Mock<IFileServiceFactory>();
-            factory.Setup(x => x.CreateForShare(share.Id, share.Path))
+            factory.Setup(x => x.CreateForShare(It.Is<ShareDefinition>(s => s.Id == share.Id)))
                 .Returns(fileService.Object);
             var receipts = new Mock<ISambaLifecycleEventRepository>();
             receipts.SetupSequence(x => x.TryClaimAsync(
@@ -99,7 +99,7 @@ public sealed class FileEventGrpcServiceIdempotencyTests
         fileService.Setup(x => x.NotifyExternalDeleteAsync("old.txt", false))
             .Returns(Task.CompletedTask);
         var factory = new Mock<IFileServiceFactory>();
-        factory.Setup(x => x.CreateForShare(share.Id, share.Path))
+        factory.Setup(x => x.CreateForShare(It.Is<ShareDefinition>(s => s.Id == share.Id)))
             .Returns(fileService.Object);
         var receipts = new Mock<ISambaLifecycleEventRepository>();
         receipts.SetupSequence(x => x.TryClaimAsync(
@@ -151,7 +151,7 @@ public sealed class FileEventGrpcServiceIdempotencyTests
                 oldPath, newPath, isDirectory, eventId))
             .Returns(Task.CompletedTask);
         var factory = new Mock<IFileServiceFactory>();
-        factory.Setup(x => x.CreateForShare(share.Id, share.Path))
+        factory.Setup(x => x.CreateForShare(It.Is<ShareDefinition>(s => s.Id == share.Id)))
             .Returns(fileService.Object);
         var receipts = new Mock<ISambaLifecycleEventRepository>();
         receipts.Setup(x => x.TryClaimAsync(

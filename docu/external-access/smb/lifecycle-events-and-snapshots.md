@@ -78,6 +78,15 @@ creates the version from the capture, binds it to the authenticated user and rem
 target is not already inside it. The VFS module then moves the item atomically (no replace) to
 `.RECYCLE_BIN/<path>` (`src/samba-vfs/module/recycle_move.h`) and emits a rename event instead of a
 delete event. Web, WebDAV, API and SMB therefore share one recycle bin.
+On filesystems without `RENAME_NOREPLACE` (9p/drvfs under Docker Desktop, NFS, CIFS) the move
+falls back to "refuse an existing target, then rename", which is not atomic but never replaces an
+existing bin entry it can see. A failed recycle move is logged as `RECYCLE FAILED`; the SMB client
+only sees a failed close, so the file stays in place.
+
+The reply also carries `recycle_root_depth` (`ShareDefinition.RecycleRootDepth`): `0` places the bin
+at the share root, `1` (home-folder share only) places it below the first path segment, so
+`<userId>/a.txt` moves to `<userId>/.RECYCLE_BIN/a.txt`. The recycle root itself must already exist
+and is never created; the VFS rejects any other depth (fail closed).
 
 ## Previous Versions (@GMT snapshots)
 

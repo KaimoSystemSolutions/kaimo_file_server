@@ -1,4 +1,5 @@
-﻿using Kaimo_File_Server.Core.Security;
+﻿using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Storage;
@@ -17,8 +18,10 @@ namespace Kaimo_File_Server.Infrastructure.Services
                 ?? throw new ArgumentNullException(nameof(serviceProvider));
         }
 
-        public IFileService CreateForShare(Guid shareId, string sharePath)
+        public IFileService CreateForShare(ShareDefinition share)
         {
+            var shareId = share.Id;
+            var sharePath = share.Path;
             var storage = new FileSystemStorage(sharePath, shareId, _serviceProvider);
             var aclService = new AclService(_serviceProvider);
 
@@ -41,7 +44,8 @@ namespace Kaimo_File_Server.Infrastructure.Services
                 _serviceProvider.GetRequiredService<ILogger<FileService>>(),
                 _serviceProvider.GetRequiredService<ICloudSyncPathUpdater>(),
                 _serviceProvider.GetRequiredService<ICloudSyncOperationCoordinator>(),
-                changeLog);
+                changeLog,
+                share.RecycleRootDepth);
         }
     }
 }

@@ -33,7 +33,7 @@ public sealed class ShareZipDownloadController(
         if (share is null || !share.IsEnabled || actor is null)
             return NotFound();
 
-        var fs = fileServiceFactory.CreateForShare(share.Id, share.Path);
+        var fs = fileServiceFactory.CreateForShare(share);
 
         // ZipArchive writes its central directory synchronously; Kestrel forbids sync IO by
         // default. Allow it for this response so the archive can stream without buffering to disk.

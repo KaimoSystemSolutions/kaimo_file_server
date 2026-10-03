@@ -64,7 +64,7 @@ public class FileService : IFileService
             if (string.Equals(oldRel, newRel, StringComparison.Ordinal))
                 return;
 
-            EnsureUserWriteTargetAllowed(newRel);
+            _owner.EnsureUserWriteTargetAllowed(newRel);
             await using var operationLease =
                 await _owner.BeginPathMutationOrThrowAsync(oldRel, newRel, ct);
 
@@ -217,6 +217,8 @@ public class FileService : IFileService
     private readonly IFileChangeLog? _changeLog;
     private readonly ILogger<FileService> _logger;
     private readonly Guid _shareId;
+    // ShareDefinition.RecycleRootDepth: where reserved namespaces and the recycle bin live.
+    private readonly int _recycleRootDepth;
     private readonly SemaphoreSlim _searchSideEffectLock = new(1, 1);
 
     public FileService(
@@ -229,8 +231,10 @@ public class FileService : IFileService
     ILogger<FileService>? logger = null,
     ICloudSyncPathUpdater? cloudSyncPathUpdater = null,
     ICloudSyncOperationCoordinator? cloudSyncOperations = null,
-    IFileChangeLog? changeLog = null)
+    IFileChangeLog? changeLog = null,
+    int recycleRootDepth = 0)
     {
+        _recycleRootDepth = recycleRootDepth;
         _storage = storage;
         _acl = acl;
         _searchService = searchService;
@@ -618,8 +622,9 @@ public class FileService : IFileService
     private async Task<bool> CheckAccessAsync(string path, UserContext user, FilePermission permission)
     {
         var normalized = ShareRelativePath.Normalize(path);
-        if (IsUserWritePermission(permission) &&
-            ShareEntryPolicy.IsReservedForUserWrites(normalized))
+        if (IsInternalBelowRecycleRoot(normalized) ||
+            IsUserWritePermission(permission) &&
+            ShareEntryPolicy.IsReservedForUserWrites(normalized, _recycleRootDepth))
             return false;
         var isDir = await _storage.IsDirectoryAsync(normalized);
         return await _acl.HasAccessAsync(user, _shareId, normalized, isDir, permission);
@@ -636,19 +641,26 @@ public class FileService : IFileService
         if (IsUserWritePermission(permission))
             EnsureUserWriteTargetAllowed(normalizedPath);
 
-        if (!await _acl.HasAccessAsync(user, _shareId, normalizedPath, isDirectory, permission))
+        if (IsInternalBelowRecycleRoot(normalizedPath) ||
+            !await _acl.HasAccessAsync(user, _shareId, normalizedPath, isDirectory, permission))
             throw new UnauthorizedAccessException(
                 $"Access denied ({permission}) for '{normalizedPath}'");
     }
+
+    // Transports reject share-root .kaimo-* paths during strict normalization, which does not
+    // know the share; the per-home namespace (<userId>/.kaimo-*) is enforced here for every access.
+    private bool IsInternalBelowRecycleRoot(string normalizedPath) =>
+        _recycleRootDepth > 0 &&
+        ShareEntryPolicy.IsInternalPath(normalizedPath, _recycleRootDepth);
 
     private static bool IsUserWritePermission(FilePermission permission) =>
         (permission &
             (FilePermission.CreateWriteData |
              FilePermission.CreateAppendData)) != 0;
 
-    private static void EnsureUserWriteTargetAllowed(string normalizedPath)
+    private void EnsureUserWriteTargetAllowed(string normalizedPath)
     {
-        if (ShareEntryPolicy.IsReservedForUserWrites(normalizedPath))
+        if (ShareEntryPolicy.IsReservedForUserWrites(normalizedPath, _recycleRootDepth))
             throw new UnauthorizedAccessException(
                 $"Share path '{normalizedPath}' uses a reserved Kaimo namespace.");
     }
@@ -659,7 +671,7 @@ public class FileService : IFileService
     {
         var normalizedDir = ShareRelativePath.Normalize(directoryPath);
 
-        if (!ShareEntryPolicy.IsVisibleInFileBrowser(normalizedDir))
+        if (!ShareEntryPolicy.IsVisibleInFileBrowser(normalizedDir, _recycleRootDepth))
             throw new UnauthorizedAccessException(
                 $"Internal share path '{normalizedDir}' is not browser-visible.");
 
@@ -683,7 +695,7 @@ public class FileService : IFileService
                 Item: item,
                 Path: ShareRelativePath.Combine(normalizedDir, item.Name)))
             .Where(entry =>
-                ShareEntryPolicy.IsVisibleInFileBrowser(entry.Path))
+                ShareEntryPolicy.IsVisibleInFileBrowser(entry.Path, _recycleRootDepth))
             .ToList();
 
         var itemsToCheck = browserItems
@@ -723,7 +735,7 @@ public class FileService : IFileService
         var readable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (path, allowed) in accessMap)
         {
-            if (allowed)
+            if (allowed && !IsInternalBelowRecycleRoot(path))
                 readable.Add(path);
         }
 
@@ -741,7 +753,7 @@ public class FileService : IFileService
     public async Task<bool> CanCreateAsync(string path, UserContext user)
     {
         var normalized = ShareRelativePath.Normalize(path);
-        if (ShareEntryPolicy.IsReservedForUserWrites(normalized))
+        if (ShareEntryPolicy.IsReservedForUserWrites(normalized, _recycleRootDepth))
             return false;
         var parentPath = ShareRelativePath.GetParent(path);
         return await _acl.HasAccessAsync(user, _shareId, parentPath, true, FilePermission.CreateWriteData);
@@ -753,7 +765,7 @@ public class FileService : IFileService
     public async Task<bool> CanListAsync(string path, UserContext user)
     {
         var normalized = ShareRelativePath.Normalize(path);
-        if (!ShareEntryPolicy.IsVisibleInFileBrowser(normalized))
+        if (!ShareEntryPolicy.IsVisibleInFileBrowser(normalized, _recycleRootDepth))
             return false;
         return await _acl.HasAccessAsync(user, _shareId, normalized, true, FilePermission.ListReadData);
     }
@@ -929,14 +941,14 @@ public class FileService : IFileService
         await EnsureAccessAsync(user, normalized, isDir, FilePermission.Delete);
 
         var isAlreadyInRecycleBin =
-            ShareEntryPolicy.IsRecycleBinPath(normalized);
+            ShareEntryPolicy.IsRecycleBinPath(normalized, _recycleRootDepth);
 
         var absolutePath = ToAbsolutePath(normalized);
         
         if (isRecycleEnabled && !isAlreadyInRecycleBin)
         {
-            var recyclePath = ShareRelativePath.Combine(
-                ShareEntryPolicy.RecycleBinName, normalized);
+            var recyclePath = ShareEntryPolicy.GetRecyclePath(
+                normalized, _recycleRootDepth);
             // MoveAsync may append a timestamp suffix on a name collision in the
             // recycle bin — align the ACL with the path that actually landed on disk.
             var actualRecyclePath = await _storage.MoveAsync(normalized, recyclePath);
@@ -1028,8 +1040,9 @@ public class FileService : IFileService
         bool wantsCreate = mode is OpenMode.Create or OpenMode.OpenOrCreate
                                   or OpenMode.CreateOrTruncate or OpenMode.Supersede;
 
-        if ((wantsWrite || !exists && wantsCreate) &&
-            ShareEntryPolicy.IsReservedForUserWrites(normalized))
+        if (IsInternalBelowRecycleRoot(normalized) ||
+            (wantsWrite || !exists && wantsCreate) &&
+            ShareEntryPolicy.IsReservedForUserWrites(normalized, _recycleRootDepth))
             throw new UnauthorizedAccessException(
                 $"Share path '{normalized}' uses a reserved Kaimo namespace.");
 

@@ -97,7 +97,7 @@ public sealed class HomeDirectoryService(
         CreateSharedDirectory(path);
         var share = new ShareDefinition(
             ShareName, path, WellKnownGUIDs.DEPARTMENT_GLOBAL,
-            isEnabled: true, isShareHidden: false, isRecycleEnabled: false)
+            isEnabled: true, isShareHidden: false, isRecycleEnabled: true)
         {
             IsUserHomes = true
         };
@@ -244,11 +244,13 @@ public sealed class HomeDirectoryService(
         if (await GetHomesShareAsync() is not { } share)
             return;
 
-        // The share is listed on SMB/WebDAV (each user only sees their own folder inside).
-        // Share management cannot edit it, so heal a hidden flag from an earlier setup here.
-        if (share.IsShareHidden)
+        // The share is listed on SMB/WebDAV (each user only sees their own folder inside) and
+        // always recycles into <userId>/.RECYCLE_BIN (ShareDefinition.RecycleRootDepth).
+        // Share management cannot edit it, so heal flags from an earlier setup here.
+        if (share.IsShareHidden || !share.IsRecycleEnabled)
         {
             share.IsShareHidden = false;
+            share.IsRecycleEnabled = true;
             await shares.UpdateAsync(share);
         }
 

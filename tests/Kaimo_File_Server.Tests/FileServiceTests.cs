@@ -624,6 +624,59 @@ public class FileServiceTests
             s => s.DeleteAsync(It.IsAny<string>()), Times.Never);
     }
 
+    // ═══════════════════ Per-home recycle bin (recycleRootDepth = 1) ═══════════════════
+
+    private FileService CreateHomeSut()
+        => new(_storageMock.Object, _aclMock.Object, null, _shareId, recycleRootDepth: 1);
+
+    [Fact]
+    public async Task DeleteFileAsync_InHome_RecyclesIntoTheHomesOwnRecycleBin()
+    {
+        const string source = "uid/docs/doc.txt";
+        const string destination = "uid/.RECYCLE_BIN/docs/doc.txt";
+        _storageMock.Setup(s => s.IsDirectoryAsync(source)).ReturnsAsync(false);
+        _storageMock.Setup(s => s.MoveAsync(source, destination)).ReturnsAsync(destination);
+        AllowAccess(FilePermission.Delete);
+
+        await CreateHomeSut().DeleteFileAsync(source, CreateContext(), isRecycleEnabled: true);
+
+        _storageMock.Verify(s => s.MoveAsync(source, destination), Times.Once);
+        _aclMock.Verify(a => a.RenameAclPathAsync(_shareId, source, destination), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteFileAsync_InHomeRecycleBin_IsDeletedPermanently()
+    {
+        const string entry = "uid/.RECYCLE_BIN/doc.txt";
+        _storageMock.Setup(s => s.IsDirectoryAsync(entry)).ReturnsAsync(false);
+        AllowAccess(FilePermission.Delete);
+
+        await CreateHomeSut().DeleteFileAsync(entry, CreateContext(), isRecycleEnabled: true);
+
+        _storageMock.Verify(s => s.DeleteAsync(entry), Times.Once);
+        _storageMock.Verify(s => s.MoveAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateFileAsync_InHomeRecycleBin_IsRejectedAsReserved()
+    {
+        AllowAccess(FilePermission.CreateWriteData);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            CreateHomeSut().CreateFileAsync("uid/.RECYCLE_BIN/new.txt", CreateContext()));
+    }
+
+    [Fact]
+    public async Task GetMetadataAsync_InHomeInternalNamespace_IsDenied()
+    {
+        _storageMock.Setup(s => s.GetMetadataAsync("uid/.kaimo-x"))
+            .ReturnsAsync(new FileMetadata { Path = "uid/.kaimo-x", Name = ".kaimo-x" });
+        AllowAccess(FilePermission.ListReadData);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            CreateHomeSut().GetMetadataAsync("uid/.kaimo-x", CreateContext()));
+    }
+
     [Fact]
     public async Task NotifyExternalDeleteAsync_CleansMetadataAndVersions()
     {

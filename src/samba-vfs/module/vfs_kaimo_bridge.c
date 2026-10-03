@@ -291,13 +291,15 @@ static int kaimo_roundtrip(uint8_t operation,
 }
 
 /* Sends a framed request to kaimo_authd and validates the authorization reply.
- * OPEN ALLOW replies carry the exact normalized/attenuated access mask.
+ * OPEN ALLOW replies carry the exact normalized/attenuated access mask;
+ * DELETE ALLOW replies carry the recycle disposition and recycle root depth.
  * Return: 1 = ALLOW, 0 = DENY, -1 = infrastructure/sidecar error,
  * -2 = malformed protocol response (always fail closed). */
 static int kaimo_authz_send(uint8_t operation,
 			    const struct kaimo_local_request *request,
 			    uint32_t *granted_access,
-			    bool *recycle_delete)
+			    bool *recycle_delete,
+			    unsigned int *recycle_root_depth)
 {
 	struct kaimo_local_frame_header response;
 	uint8_t payload[4];
@@ -322,14 +324,19 @@ static int kaimo_authz_send(uint8_t operation,
 		} else if (operation == KAIMO_LOCAL_OP_DELETE_AUTH) {
 			struct kaimo_local_reader reader;
 			uint8_t parsed;
+			uint8_t depth;
 			kaimo_local_reader_init(&reader, payload,
 						response.payload_length);
 			if (recycle_delete == NULL ||
+			    recycle_root_depth == NULL ||
 			    !kaimo_local_reader_u8(&reader, &parsed) ||
 			    parsed > 1 ||
+			    !kaimo_local_reader_u8(&reader, &depth) ||
+			    depth > KAIMO_RECYCLE_MAX_ROOT_DEPTH ||
 			    !kaimo_local_reader_finished(&reader))
 				return -2;
 			*recycle_delete = parsed != 0;
+			*recycle_root_depth = depth;
 		} else if (response.payload_length != 0) {
 			return -2;
 		}
@@ -358,7 +365,7 @@ static bool kaimo_authz_connect(const char *service, const char *user)
 		return false;
 
 	int d = kaimo_authz_send(
-		KAIMO_LOCAL_OP_CONNECT, &request, NULL, NULL);
+		KAIMO_LOCAL_OP_CONNECT, &request, NULL, NULL, NULL);
 	if (d == -2) {
 		DBG_ERR("kaimo_bridge: malformed CONNECT authorization response, denied\n");
 		return false;
@@ -398,7 +405,7 @@ static bool kaimo_authz_open(const char *user, const char *share, const char *pa
 		return false;
 
 	int d = kaimo_authz_send(KAIMO_LOCAL_OP_OPEN, &request,
-				 granted_access, NULL);
+				 granted_access, NULL, NULL);
 	if (d == -2) {
 		DBG_ERR("kaimo_bridge: malformed OPEN authorization response, denied\n");
 		return false;
@@ -409,13 +416,15 @@ static bool kaimo_authz_open(const char *user, const char *share, const char *pa
 
 static bool kaimo_authz_delete(const char *user, const char *share,
 			       const char *path, bool is_directory,
-			       bool *recycle_delete)
+			       bool *recycle_delete,
+			       unsigned int *recycle_root_depth)
 {
-	if (recycle_delete == NULL) {
+	if (recycle_delete == NULL || recycle_root_depth == NULL) {
 		errno = EINVAL;
 		return false;
 	}
 	*recycle_delete = false;
+	*recycle_root_depth = 0;
 	struct kaimo_local_request request;
 	kaimo_request_init(&request);
 	kaimo_local_builder_string(&request.builder, user ? user : "");
@@ -426,7 +435,8 @@ static bool kaimo_authz_delete(const char *user, const char *share,
 		return false;
 
 	int d = kaimo_authz_send(
-		KAIMO_LOCAL_OP_DELETE_AUTH, &request, NULL, recycle_delete);
+		KAIMO_LOCAL_OP_DELETE_AUTH, &request, NULL, recycle_delete,
+		recycle_root_depth);
 	if (d == -2) {
 		DBG_ERR("kaimo_bridge: malformed DELETE authorization response, denied\n");
 		return false;
@@ -474,7 +484,7 @@ static bool kaimo_authz_rename(const char *user, const char *share,
 		return false;
 
 	int d = kaimo_authz_send(
-		KAIMO_LOCAL_OP_RENAME_AUTH, &request, NULL, NULL);
+		KAIMO_LOCAL_OP_RENAME_AUTH, &request, NULL, NULL, NULL);
 	if (d == -2) {
 		DBG_ERR("kaimo_bridge: malformed RENAME authorization response, denied\n");
 		return false;
@@ -1704,6 +1714,7 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 	}
 	bool isdir = (flags & AT_REMOVEDIR) != 0;
 	bool recycle_delete = false;
+	unsigned int recycle_root_depth = 0;
 	const char *logical = kaimo_canonical_share_path(handle, path);
 	if (kaimo_is_reserved_client_path(handle, path)) {
 		TALLOC_FREE(frame);
@@ -1716,7 +1727,8 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 	errno = 0;
 	if (ctx == NULL ||
 	    !kaimo_authz_delete(
-		    ctx->user, ctx->share, logical, isdir, &recycle_delete)) {
+		    ctx->user, ctx->share, logical, isdir, &recycle_delete,
+		    &recycle_root_depth)) {
 		int auth_errno = errno;
 		DBG_ERR("kaimo_bridge: DELETE DENIED path=[%s] user=[%s]\n",
 			logical, ctx != NULL ? ctx->user : "");
@@ -1728,9 +1740,11 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 
 	/* Defense in depth: the control plane already disables recycling below
 	 * .RECYCLE_BIN. Never create nested recycle-bin trees if peers temporarily
-	 * disagree during a rolling upgrade. */
+	 * disagree during a rolling upgrade. The share-root bin is checked for
+	 * every depth, matching ShareEntryPolicy. */
 	recycle_delete = recycle_delete &&
-		!kaimo_recycle_path_is_inside(logical);
+		!kaimo_recycle_path_is_inside(logical, 0) &&
+		!kaimo_recycle_path_is_inside(logical, recycle_root_depth);
 
 	if (recycle_delete) {
 		const char *source_leaf =
@@ -1761,10 +1775,14 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 		}
 		int destination_parent_fd =
 			kaimo_recycle_open_destination_parent(
-				share_root_fd, logical);
+				share_root_fd, logical, recycle_root_depth);
 		int saved_errno = errno;
 		close(share_root_fd);
 		if (destination_parent_fd < 0) {
+			/* The client only sees this as a failed close, so log it. */
+			DBG_ERR("kaimo_bridge: RECYCLE FAILED path=[%s] "
+				"(recycle bin not usable): %s\n",
+				logical, strerror(saved_errno));
 			TALLOC_FREE(frame);
 			errno = saved_errno;
 			return -1;
@@ -1792,6 +1810,10 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 
 		size_t logical_parent_length =
 			(size_t)(logical_leaf - logical);
+		/* Opening the destination proved the source lies below its recycle
+		 * root, so the root prefix is part of the parent path. */
+		size_t root_length = (size_t)kaimo_recycle_root_length(
+			logical, recycle_root_depth);
 		int ret = -1;
 		for (unsigned int attempt = 0; attempt < 10000; ++attempt) {
 			char candidate[NAME_MAX + 1];
@@ -1800,10 +1822,13 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 				    timestamp, attempt) != 0)
 				break;
 
+			/* <root>/.RECYCLE_BIN/<parent below root>/<candidate> */
 			char *actual_path = talloc_asprintf(
-				frame, "%s/%.*s%s",
+				frame, "%.*s%s/%.*s%s",
+				(int)root_length, logical,
 				KAIMO_RECYCLE_DIRECTORY,
-				(int)logical_parent_length, logical,
+				(int)(logical_parent_length - root_length),
+				logical + root_length,
 				candidate);
 			if (actual_path == NULL) {
 				errno = ENOMEM;
@@ -1844,6 +1869,9 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 				break;
 		}
 		saved_errno = ret == 0 ? 0 : errno;
+		if (ret != 0)
+			DBG_ERR("kaimo_bridge: RECYCLE FAILED path=[%s]: %s\n",
+				logical, strerror(saved_errno));
 		close(destination_parent_fd);
 		TALLOC_FREE(frame);
 		errno = saved_errno;

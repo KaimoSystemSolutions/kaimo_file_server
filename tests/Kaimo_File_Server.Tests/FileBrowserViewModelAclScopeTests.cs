@@ -46,7 +46,7 @@ public class FileBrowserViewModelAclScopeTests
         _shareRepo.Setup(r => r.GetByNameAsync("share")).ReturnsAsync(_share);
 
         _fileServiceFactory
-            .Setup(f => f.CreateForShare(_share.Id, _share.Path))
+            .Setup(f => f.CreateForShare(It.Is<ShareDefinition>(s => s.Id == _share.Id)))
             .Returns(_fileService.Object);
         _fileService
             .Setup(s => s.ListAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
@@ -148,7 +148,7 @@ public class FileBrowserViewModelAclScopeTests
         Assert.Empty(_sut.Items);
         Assert.False(_sut.CanManageAcls);
         _fileServiceFactory.Verify(
-            f => f.CreateForShare(It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
+            f => f.CreateForShare(It.IsAny<ShareDefinition>()), Times.Never);
         _fileService.Verify(
             s => s.ListAsync(It.IsAny<string>(), It.IsAny<UserContext>()), Times.Never);
         _mgmtAuth.Verify(

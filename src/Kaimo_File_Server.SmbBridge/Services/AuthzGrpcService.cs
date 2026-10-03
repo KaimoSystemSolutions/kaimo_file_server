@@ -1,4 +1,5 @@
 using Grpc.Core;
+using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
@@ -161,7 +162,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             return Deny($"unknown or disabled share '{request.Share}'");
 
         if (!TryResolveClientPath(
-                share.Path, request.Path, allowRoot: true,
+                share, request.Path, allowRoot: true,
                 out string normalized, out string full))
             return Deny($"invalid open path '{request.Path}'");
 
@@ -180,7 +181,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         bool wantsMaximum = (expanded & MaximumAllowed) != 0;
         uint specific = expanded & ~MaximumAllowed;
         bool reservedUserTarget =
-            ShareEntryPolicy.IsReservedForUserWrites(normalized);
+            ShareEntryPolicy.IsReservedForUserWrites(normalized, share.RecycleRootDepth);
 
         if (reservedUserTarget &&
             (!exists && request.WantsCreate ||
@@ -394,7 +395,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             return Deny($"unknown or disabled share '{request.Share}'");
 
         if (!TryResolveClientPath(
-                share.Path, request.Path, allowRoot: false,
+                share, request.Path, allowRoot: false,
                 out string normalized, out _))
             return Deny($"invalid delete path '{request.Path}'");
 
@@ -420,7 +421,8 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             Reason = reason,
             RecycleDelete = allow &&
                 share.IsRecycleEnabled &&
-                !ShareEntryPolicy.IsRecycleBinPath(normalized)
+                !ShareEntryPolicy.IsRecycleBinPath(normalized, share.RecycleRootDepth),
+            RecycleRootDepth = (uint)share.RecycleRootDepth
         };
     }
 
@@ -449,16 +451,16 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             return Deny($"unknown or disabled share '{request.Share}'");
 
         if (!TryResolveClientPath(
-                share.Path, request.SourcePath, allowRoot: false,
+                share, request.SourcePath, allowRoot: false,
                 out string source, out string sourceFull) ||
             !TryResolveClientPath(
-                share.Path, request.DestinationPath, allowRoot: false,
+                share, request.DestinationPath, allowRoot: false,
                 out string destination, out string destinationFull))
             return Deny("invalid rename path");
 
         if (string.Equals(source, destination, StringComparison.Ordinal))
             return Deny($"invalid rename '{source}' -> '{destination}'");
-        if (ShareEntryPolicy.IsReservedForUserWrites(destination))
+        if (ShareEntryPolicy.IsReservedForUserWrites(destination, share.RecycleRootDepth))
             return Deny(
                 $"rename denied: destination '{destination}' is a reserved Kaimo namespace");
 
@@ -562,7 +564,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     }
 
     private static bool TryResolveClientPath(
-        string shareRoot,
+        ShareDefinition share,
         string rawPath,
         bool allowRoot,
         out string normalized,
@@ -571,13 +573,14 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         absolute = "";
         if (!ShareRelativePath.TryNormalizeStrict(
                 rawPath, out normalized, allowRoot,
-                allowInternalNamespace: false))
+                allowInternalNamespace: false,
+                rootDepth: share.RecycleRootDepth))
             return false;
 
         try
         {
             absolute = ShareRelativePath.ToContainedAbsolutePath(
-                shareRoot, normalized, allowRoot,
+                share.Path, normalized, allowRoot,
                 allowInternalNamespace: false);
             return true;
         }

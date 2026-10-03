@@ -76,7 +76,7 @@ public sealed class PublicDownloadController(
             await notifications.PublishAsync(Core.Services.Notifications.NotificationEvents.LinkAccessed(
                 link.Id, link.DisplayName, link.CreatedByUserId, download.DownloadName), CancellationToken.None);
 
-        var fs = fileServiceFactory.CreateForShare(share.Id, share.Path);
+        var fs = fileServiceFactory.CreateForShare(share);
 
         Response.Headers[HeaderNames.XContentTypeOptions] = "nosniff";
         Response.Headers[HeaderNames.CacheControl] = "no-store";

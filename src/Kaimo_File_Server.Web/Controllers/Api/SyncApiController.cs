@@ -113,7 +113,7 @@ public sealed class SyncApiController : ApiControllerBase
             return ApiBadRequest("invalid_path", "RelativePath is not a valid share-relative path.");
 
         // The user must be able to list the chosen subtree to sync it.
-        var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        var fs = _fileServiceFactory.CreateForShare(share);
         if (IsHomesRoot(share, path)) return ApiForbidden();
         if (!await fs.CanListAsync(path, user)) return ApiForbidden();
 
@@ -152,7 +152,7 @@ public sealed class SyncApiController : ApiControllerBase
         var share = await _shares.GetByIdAsync(profile.ShareId);
         if (share is null || !share.IsEnabled) return ApiNotFound("Share not found.");
 
-        var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        var fs = _fileServiceFactory.CreateForShare(share);
         if (IsHomesRoot(share, path)) return ApiForbidden();
         if (!await fs.CanListAsync(path, user)) return ApiForbidden();
 
@@ -195,7 +195,7 @@ public sealed class SyncApiController : ApiControllerBase
         if (!ShareRelativePath.TryNormalizeStrict(path ?? string.Empty, out var root))
             return ApiBadRequest("invalid_path", "The path is not a valid share-relative path.");
 
-        var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        var fs = _fileServiceFactory.CreateForShare(share);
         if (IsHomesRoot(share, root)) return ApiForbidden();
         if (!await fs.CanListAsync(root, user)) return ApiForbidden();
 
@@ -226,7 +226,7 @@ public sealed class SyncApiController : ApiControllerBase
 
         // Same gate as delta/wait: list access on the watched subtree, so the feed cannot be used to
         // probe for hidden content.
-        var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        var fs = _fileServiceFactory.CreateForShare(share);
         if (IsHomesRoot(share, root)) return ApiForbidden();
         if (!await fs.CanListAsync(root, user)) return ApiForbidden();
 
@@ -242,7 +242,8 @@ public sealed class SyncApiController : ApiControllerBase
         // listable folder. Deleted / renamed-away entries (their ACL is gone) stay in, because they
         // fall under the caller-authorized root; this mirrors how delta only ever walks what the
         // caller can list.
-        var visible = await FilterVisibleAsync(fs, user, page);
+        var visible = await FilterVisibleAsync(
+            fs, user, HideRecycleBin(page, share.RecycleRootDepth));
 
         // Advance the cursor even when the page is empty or fully filtered, so the client never
         // re-requests the same range: last raw seq on this page, else the subtree head.
@@ -277,6 +278,43 @@ public sealed class SyncApiController : ApiControllerBase
     /// </summary>
     public static bool IsCursorStale(long since, long oldestSeq)
         => oldestSeq > 0 && since + 1 < oldestSeq;
+
+    /// <summary>
+    /// The recycle bin is not synced (delta skips it), so the feed hides it as well: moving an item
+    /// into the bin reaches the client as a delete of its old path, and restoring one as a subtree
+    /// change at its new path, which makes the client re-enumerate since the item was never part of
+    /// its tree. Entries entirely inside the bin are dropped.
+    /// </summary>
+    public static List<FileChangeLogEntry> HideRecycleBin(
+        IReadOnlyList<FileChangeLogEntry> entries, int recycleRootDepth)
+    {
+        var result = new List<FileChangeLogEntry>(entries.Count);
+        foreach (var e in entries)
+        {
+            bool inBin = ShareEntryPolicy.IsRecycleBinPath(e.Path, recycleRootDepth);
+            bool fromBin = e.ChangeType == FileChangeType.Renamed && e.OldPath is not null &&
+                ShareEntryPolicy.IsRecycleBinPath(e.OldPath, recycleRootDepth);
+            bool fromOutside = e.ChangeType == FileChangeType.Renamed && e.OldPath is not null && !fromBin;
+
+            if (!inBin && !fromBin)
+                result.Add(e);
+            else if (inBin && fromOutside)
+                result.Add(Rewrite(e, e.OldPath!, FileChangeType.Deleted));
+            else if (!inBin && fromBin)
+                result.Add(Rewrite(e, e.Path, FileChangeType.SubtreeChanged));
+        }
+        return result;
+
+        static FileChangeLogEntry Rewrite(FileChangeLogEntry e, string path, FileChangeType type) => new()
+        {
+            Seq = e.Seq,
+            ShareId = e.ShareId,
+            Path = path,
+            ChangeType = type,
+            IsDirectory = e.IsDirectory,
+            CreatedAtUtc = e.CreatedAtUtc,
+        };
+    }
 
     /// <summary>
     /// Drops change entries whose live target the caller may not list. Entries whose item no longer
@@ -335,7 +373,7 @@ public sealed class SyncApiController : ApiControllerBase
 
         // Only let a caller wait on a subtree they may list, so this cannot be
         // used to probe for the existence of hidden content.
-        var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        var fs = _fileServiceFactory.CreateForShare(share);
         if (IsHomesRoot(share, root)) return ApiForbidden();
         if (!await fs.CanListAsync(root, user)) return ApiForbidden();
 

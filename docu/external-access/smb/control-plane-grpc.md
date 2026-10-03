@@ -51,7 +51,7 @@ generates the C# server stubs and the C++ clients.
 | | `GetNtHash` | – (not allow-listed) | `IAuthenticationLookup` |
 | `AuthzService` | `AuthorizeConnect` | `kaimo_authd` | `IFileService` / `IAclService` share access, SMB and share enabled state |
 | | `AuthorizeOpen` | `kaimo_authd` | ACL evaluation of the requested SMB access mask; returns the granted mask |
-| | `AuthorizeDelete` | `kaimo_authd` | ACL `Delete` / parent `DeleteSubItems`; returns `recycle_delete` |
+| | `AuthorizeDelete` | `kaimo_authd` | ACL `Delete` / parent `DeleteSubItems`; returns `recycle_delete` and `recycle_root_depth` |
 | | `AuthorizeRename` | `kaimo_authd` | Source delete, destination create, replaced-target delete in one decision |
 | `EventService` | `NotifyClose`, `NotifyMkdir`, `NotifyDelete`, `NotifyRename` | `kaimo_authd` (spool) | `FileService.NotifyExternal*` (versions, ownership, ACL paths, change log) |
 | `ShareService` | `ListShares` | `kaimo_sharesync` | `IShareRepository`, `HomeDirectoryService` |

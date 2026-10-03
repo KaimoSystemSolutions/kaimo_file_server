@@ -129,7 +129,7 @@ public sealed class CloudSyncExecutionService(
                 AdvancedSettings = definition.AdvancedSettings
             };
 
-            var fileService = fileServices.CreateForShare(share.Id, share.Path);
+            var fileService = fileServices.CreateForShare(share);
 
             // Two-way runs always refresh the converged-state manifest so enabling
             // delete propagation later takes effect on the next run. The baseline

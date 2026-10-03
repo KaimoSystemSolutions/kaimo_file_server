@@ -10,7 +10,8 @@ namespace Kaimo_File_Server.Core.Services.Sync
     /// Default <see cref="ISyncQueryService"/>: a depth-first walk over
     /// <see cref="IFileService.ListAsync"/>, which already ACL-filters every
     /// directory. Directories the user cannot list are simply skipped, so the
-    /// enumeration never reveals anything the caller may not see.
+    /// enumeration never reveals anything the caller may not see. The recycle bin is
+    /// not synced: deleted items would otherwise flow straight back to the client.
     /// </summary>
     public sealed class SyncQueryService : ISyncQueryService
     {
@@ -45,7 +46,7 @@ namespace Kaimo_File_Server.Core.Services.Sync
                 ?? throw new KeyNotFoundException($"Share '{shareId}' does not exist.");
 
             string root = ShareRelativePath.Normalize(rootRelativePath);
-            var fileService = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+            var fileService = _fileServiceFactory.CreateForShare(share);
 
             // Capture the change token and the change-log head sequence BEFORE walking, so a change
             // that lands mid-walk is not missed: both are conservative, and the next
@@ -54,7 +55,7 @@ namespace Kaimo_File_Server.Core.Services.Sync
             var seqBefore = await _changeLog.GetHeadSeqAsync(shareId, root, ct);
 
             var entries = new List<SyncEntry>();
-            await WalkAsync(fileService, root, user, entries, ct);
+            await WalkAsync(fileService, root, share.RecycleRootDepth, user, entries, ct);
 
             return new SyncDelta(entries, stateBefore.ToToken(), seqBefore);
         }
@@ -62,6 +63,7 @@ namespace Kaimo_File_Server.Core.Services.Sync
         private static async Task WalkAsync(
             IFileService fileService,
             string directoryPath,
+            int recycleRootDepth,
             UserContext user,
             List<SyncEntry> sink,
             CancellationToken ct)
@@ -83,12 +85,14 @@ namespace Kaimo_File_Server.Core.Services.Sync
             {
                 if (sink.Count >= MaxEntries)
                     return;
+                if (ShareEntryPolicy.IsRecycleBinPath(item.Path, recycleRootDepth))
+                    continue;
 
                 sink.Add(new SyncEntry(
                     item.Path, item.IsDirectory, item.Size, item.ModifiedAt));
 
                 if (item.IsDirectory)
-                    await WalkAsync(fileService, item.Path, user, sink, ct);
+                    await WalkAsync(fileService, item.Path, recycleRootDepth, user, sink, ct);
             }
         }
     }

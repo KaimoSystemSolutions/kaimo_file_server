@@ -104,10 +104,11 @@ def serve_authorization(
                     response_status = STATUS_ALLOW
                     # Recycle the file delete, then permanently remove the now
                     # empty source directory. This exercises both unlinkat
-                    # dispositions in one live SMB session.
+                    # dispositions in one live SMB session. The second byte is
+                    # the recycle root depth (0 = share-root .RECYCLE_BIN).
                     delete_number = observed.count(OP_DELETE_AUTH)
                     response_payload = (
-                        b"\x01" if delete_number == 1 else b"\x00"
+                        b"\x01\x00" if delete_number == 1 else b"\x00\x00"
                     )
                 elif operation in {
                     OP_CONNECT,

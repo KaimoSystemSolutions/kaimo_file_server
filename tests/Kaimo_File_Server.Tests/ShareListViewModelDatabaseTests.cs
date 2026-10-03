@@ -524,6 +524,9 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         Directory.CreateDirectory(disabled.Path);
         Directory.CreateDirectory(Path.Combine(_storagePools[0], ".kaimo-moving-x"));
         Directory.CreateDirectory(Path.Combine(_storagePools[0], "lost+found"));
+        // Orphaned home folders (no IsUserHomes share yet) and the reserved web route name.
+        Directory.CreateDirectory(Path.Combine(_storagePools[0], "users"));
+        Directory.CreateDirectory(Path.Combine(_storagePools[1], "user"));
         var orphan = Path.Combine(_storagePools[1], "old");
         Directory.CreateDirectory(orphan);
         await File.WriteAllTextAsync(Path.Combine(orphan, "a.txt"), "12345");
@@ -557,6 +560,10 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         Assert.True(Directory.Exists(disabled.Path));
         Assert.False(await sut.PurgeUnreferencedFolderAsync(outside));
         Assert.True(Directory.Exists(outside));
+        var homes = Path.Combine(_storagePools[0], "users");
+        Directory.CreateDirectory(homes);
+        Assert.False(await sut.PurgeUnreferencedFolderAsync(homes));
+        Assert.True(Directory.Exists(homes));
 
         Assert.True(await sut.PurgeUnreferencedFolderAsync(orphan));
         Assert.False(Directory.Exists(orphan));

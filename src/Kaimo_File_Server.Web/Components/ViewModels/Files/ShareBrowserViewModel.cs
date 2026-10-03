@@ -224,7 +224,7 @@ public partial class ShareBrowserViewModel
             {
                 try
                 {
-                    var service = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+                    var service = _fileServiceFactory.CreateForShare(share);
                     ShareSizes[share.Id] = await service.GetDirectorySizeAsync("", actor);
                     OnStateChanged?.Invoke();
                 }

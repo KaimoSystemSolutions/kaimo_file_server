@@ -158,12 +158,15 @@ public static class ShareRelativePath
     /// into an apparently safe relative path. It also rejects control
     /// characters, traversal segments, and (by default) Kaimo's reserved
     /// <c>.kaimo-*</c> top-level namespaces. Single-dot segments are removed.
+    /// Pass <c>ShareDefinition.RecycleRootDepth</c> as <paramref name="rootDepth"/> so the
+    /// namespaces below a per-home root (<c>&lt;userId&gt;/.kaimo-*</c>) are rejected as well.
     /// </remarks>
     public static bool TryNormalizeStrict(
         string? path,
         out string normalized,
         bool allowRoot = true,
-        bool allowInternalNamespace = false)
+        bool allowInternalNamespace = false,
+        int rootDepth = 0)
     {
         normalized = "";
         if (path is null)
@@ -198,7 +201,7 @@ public static class ShareRelativePath
                    (path.Length == 0 || path == "." || path == "./");
 
         if (!allowInternalNamespace &&
-            ShareEntryPolicy.IsInternalPath(normalized))
+            ShareEntryPolicy.IsInternalPath(normalized, rootDepth))
         {
             normalized = "";
             return false;

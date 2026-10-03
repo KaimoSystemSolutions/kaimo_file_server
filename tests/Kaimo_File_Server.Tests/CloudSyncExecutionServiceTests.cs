@@ -166,7 +166,7 @@ public sealed class CloudSyncExecutionServiceTests
                     candidate.RemotePath == "/remote")))
             .Returns(connection.Object);
         var files = new Mock<IFileServiceFactory>();
-        files.Setup(factory => factory.CreateForShare(share.Id, share.Path))
+        files.Setup(factory => factory.CreateForShare(It.Is<ShareDefinition>(s => s.Id == share.Id)))
             .Returns(Mock.Of<IFileService>());
         var operations = new InMemoryCloudSyncOperationCoordinator(TimeProvider.System);
         var definitions = new Mock<ISyncDefinitionRepository>();

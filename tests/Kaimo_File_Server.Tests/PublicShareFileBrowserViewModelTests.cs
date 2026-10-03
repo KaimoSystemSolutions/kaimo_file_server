@@ -39,7 +39,7 @@ public class PublicShareFileBrowserViewModelTests
             .Setup(s => s.ListAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
             .ReturnsAsync(new List<FileMetadata>());
         var fileServiceFactory = new Mock<IFileServiceFactory>();
-        fileServiceFactory.Setup(f => f.CreateForShare(_share.Id, _share.Path)).Returns(fileService.Object);
+        fileServiceFactory.Setup(f => f.CreateForShare(It.Is<ShareDefinition>(s => s.Id == _share.Id))).Returns(fileService.Object);
 
         var userContexts = new Mock<IUserContextFactory>();
         userContexts

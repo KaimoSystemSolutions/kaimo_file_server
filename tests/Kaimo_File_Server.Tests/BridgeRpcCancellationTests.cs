@@ -144,7 +144,7 @@ public sealed class BridgeRpcCancellationTests
                 return Task.CompletedTask;
             });
         var factory = new Mock<Core.Services.File.IFileServiceFactory>();
-        factory.Setup(x => x.CreateForShare(share.Id, share.Path))
+        factory.Setup(x => x.CreateForShare(It.Is<Core.Domain.ShareDefinition>(s => s.Id == share.Id)))
             .Returns(files.Object);
         Guid eventId = Guid.NewGuid();
         var receipts = new Mock<ISambaLifecycleEventRepository>();

@@ -178,6 +178,28 @@ public sealed class ClientSyncApiTests
         Assert.Equal(expected, SyncApiController.IsCursorStale(since, oldestSeq));
     }
 
+    [Fact]
+    public void Change_feed_hides_the_home_recycle_bin()
+    {
+        FileChangeLogEntry Entry(long seq, FileChangeType type, string path, string? oldPath = null) =>
+            new() { Seq = seq, ChangeType = type, Path = path, OldPath = oldPath };
+
+        var result = SyncApiController.HideRecycleBin(
+        [
+            Entry(1, FileChangeType.Modified, "uid/a.txt"),
+            Entry(2, FileChangeType.Renamed, "uid/.RECYCLE_BIN/a.txt", "uid/a.txt"),  // recycled
+            Entry(3, FileChangeType.Deleted, "uid/.RECYCLE_BIN/b.txt"),               // purged
+            Entry(4, FileChangeType.Renamed, "uid/c.txt", "uid/.RECYCLE_BIN/c.txt"),  // restored
+        ], recycleRootDepth: 1);
+
+        Assert.Equal(
+            [(1L, FileChangeType.Modified, "uid/a.txt"),
+             (2L, FileChangeType.Deleted, "uid/a.txt"),
+             (4L, FileChangeType.SubtreeChanged, "uid/c.txt")],
+            result.Select(e => (e.Seq, e.ChangeType, e.Path)));
+        Assert.All(result.Skip(1), e => Assert.Null(e.OldPath));
+    }
+
     // ─────────────────── ItemTag (conditional-op validator) ───────────────────
 
     private static FileMetadata Meta(long size, DateTime modified, bool dir = false) =>

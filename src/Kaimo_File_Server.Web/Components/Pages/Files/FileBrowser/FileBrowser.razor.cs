@@ -218,13 +218,17 @@ public partial class FileBrowser
         }
     }
 
-    // Only the recycle-bin root itself (a top-level ".RECYCLE_BIN") gets the trash icon.
+    // Only the recycle-bin root itself (".RECYCLE_BIN" directly below the share's recycle
+    // root: the share root, or <userId> in the home-folder share) gets the trash icon.
     // Folders nested inside it are ordinary directories and keep the folder icon.
-    private static bool IsRecycleBinEntry(FileMetadata entry) =>
-        entry.IsDirectory &&
-        ShareRelativePath.GetDepth(entry.Path) == 1 &&
-        ShareEntryPolicy.Classify(entry.Path).Kind ==
-            ShareEntryKind.RecycleBin;
+    private bool IsRecycleBinEntry(FileMetadata entry)
+    {
+        var rootDepth = VM.CurrentShare?.RecycleRootDepth ?? 0;
+        return entry.IsDirectory &&
+               ShareRelativePath.GetDepth(entry.Path) == rootDepth + 1 &&
+               ShareEntryPolicy.Classify(entry.Path, rootDepth).Kind ==
+                   ShareEntryKind.RecycleBin;
+    }
 
     /// <summary>
     /// Whether the entry is the recycle-bin root folder — gates the

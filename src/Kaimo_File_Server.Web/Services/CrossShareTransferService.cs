@@ -41,7 +41,7 @@ public sealed class CrossShareTransferService(
         var targets = new List<CrossShareTransferTarget>();
         foreach (var share in await shareRepository.GetAllEnabledAsync())
         {
-            var local = fileServiceFactory.CreateForShare(share.Id, share.Path);
+            var local = fileServiceFactory.CreateForShare(share);
             if (await local.CanCreateAsync(string.Empty, actor))
                 targets.Add(new(new BrowserShareInfo(share.Id, share.Name, BrowserShareKind.Local)));
         }
@@ -136,7 +136,7 @@ public sealed class CrossShareTransferService(
             var share = await shareRepository.GetByIdAsync(info.Id)
                 ?? throw new UnauthorizedAccessException("The local share does not exist.");
             if (!share.IsEnabled) throw new UnauthorizedAccessException("The local share is disabled.");
-            var local = fileServiceFactory.CreateForShare(share.Id, share.Path);
+            var local = fileServiceFactory.CreateForShare(share);
             if (requireWrite ? !await local.CanCreateAsync(string.Empty, actor) : !await local.CanListAsync(string.Empty, actor))
                 throw new UnauthorizedAccessException("The local share is not accessible.");
             return new(local, share);

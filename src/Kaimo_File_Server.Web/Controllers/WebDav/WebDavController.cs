@@ -91,7 +91,7 @@ public sealed class WebDavController : ControllerBase
 
         var share = await GetVisibleShareAsync(shareName);
         if (share is null) return new StatusCodeResult(StatusCodes.Status404NotFound);
-        var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        var fs = _fileServiceFactory.CreateForShare(share);
 
         return await GuardAsync(async () =>
         {
@@ -129,7 +129,7 @@ public sealed class WebDavController : ControllerBase
             foreach (var share in await _shares.GetAllEnabledAsync())
             {
                 if (share.IsShareHidden) continue;
-                var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+                var fs = _fileServiceFactory.CreateForShare(share);
                 if (!await fs.CanListAsync(string.Empty, user)) continue;
                 entries.Add(new WebDavEntry(
                     BuildHref(share.Name, string.Empty, isCollection: true),
@@ -279,7 +279,7 @@ public sealed class WebDavController : ControllerBase
         var destShare = await GetVisibleShareAsync(destShareName);
         if (destShare is null)
             return new StatusCodeResult(StatusCodes.Status409Conflict);
-        var destFs = _fileServiceFactory.CreateForShare(destShare.Id, destShare.Path);
+        var destFs = _fileServiceFactory.CreateForShare(destShare);
 
         var overwrite = !string.Equals(
             Request.Headers["Overwrite"].ToString().Trim(), "F", StringComparison.OrdinalIgnoreCase);
@@ -423,7 +423,7 @@ public sealed class WebDavController : ControllerBase
         var share = await GetVisibleShareAsync(shareName);
         if (share is null) return (null, new StatusCodeResult(StatusCodes.Status404NotFound));
 
-        var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        var fs = _fileServiceFactory.CreateForShare(share);
         return (new Target(user, share, fs, relativePath), null);
     }
 

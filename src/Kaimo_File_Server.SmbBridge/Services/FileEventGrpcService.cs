@@ -129,7 +129,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
         var share = await _shares.ResolveEnabledShareAsync(
             request.Share, cancellationToken);
         if (share is null) return Fail();
-        var svc = _factory.CreateForShare(share.Id, share.Path);
+        var svc = _factory.CreateForShare(share);
 
         if (_cloudSyncOperations is not null &&
             !await _cloudSyncOperations.TryReserveExternalPathMutationAsync(
@@ -241,7 +241,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
                 share);
             return null;
         }
-        return _factory.CreateForShare(def.Id, def.Path);
+        return _factory.CreateForShare(def);
     }
 
     private static NotifyReply Ok() => new() { Ok = true };

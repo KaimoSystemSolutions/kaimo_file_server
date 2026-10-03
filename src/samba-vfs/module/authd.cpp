@@ -12,6 +12,7 @@
 // wait in a bounded queue; excess clients receive ERROR and are closed. Socket
 // receive/send deadlines ensure a client that sends nothing cannot pin a worker
 // indefinitely.
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cerrno>
@@ -461,6 +462,7 @@ static OpenResult do_open(const std::string& user, const std::string& share,
 struct DeleteResult {
     uint8_t status;
     bool recycle;
+    uint8_t recycle_root_depth;
 };
 
 static DeleteResult do_delete(const std::string& user, const std::string& share,
@@ -473,11 +475,13 @@ static DeleteResult do_delete(const std::string& user, const std::string& share,
     if (!st.ok()) {
         std::cerr << "kaimo_authd: AuthorizeDelete: "
                   << st.error_message() << std::endl;
-        return {KAIMO_LOCAL_STATUS_ERROR, false};
+        return {KAIMO_LOCAL_STATUS_ERROR, false, 0};
     }
+    // Forwarded verbatim (clamped to a byte); the VFS rejects unsupported depths.
     return {
         reply.allow() ? KAIMO_LOCAL_STATUS_ALLOW : KAIMO_LOCAL_STATUS_DENY,
-        reply.allow() && reply.recycle_delete()
+        reply.allow() && reply.recycle_delete(),
+        static_cast<uint8_t>(std::min<uint32_t>(reply.recycle_root_depth(), 0xFF))
     };
 }
 
@@ -833,9 +837,11 @@ static void handle_client(const ClientConnection& connection) {
             kaimo_local_reader_finished(&input)) {
             DeleteResult result = do_delete(user, share, first, path);
             status = result.status;
-            if (status == KAIMO_LOCAL_STATUS_ALLOW)
+            if (status == KAIMO_LOCAL_STATUS_ALLOW) {
                 kaimo_local_builder_u8(
                     &output, result.recycle ? 1 : 0);
+                kaimo_local_builder_u8(&output, result.recycle_root_depth);
+            }
         }
         break;
     case KAIMO_LOCAL_OP_RENAME_AUTH:

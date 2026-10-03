@@ -212,7 +212,7 @@ public sealed class ShareLinkService(
         if (share is null || !share.IsEnabled) return false;
 
         // Uploads run as the creator, so a link the creator could not write through is useless.
-        var fs = fileServices.CreateForShare(share.Id, share.Path);
+        var fs = fileServices.CreateForShare(share);
         try
         {
             // Probe a child path: checks create rights on the folder and the reserved-path policy

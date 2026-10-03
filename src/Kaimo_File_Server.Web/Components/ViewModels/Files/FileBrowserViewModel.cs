@@ -305,7 +305,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
                 return;
             }
 
-            _fileService = _fileServiceFactory.CreateForShare(CurrentShare.Id, CurrentShare.Path);
+            _fileService = _fileServiceFactory.CreateForShare(CurrentShare);
 
             var cleanSub = (subPath ?? "").Trim('/');
 

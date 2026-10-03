@@ -71,7 +71,7 @@ public sealed class ShareLinkCreatorTests
         var result = await controller.Download(ticket, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
-        fileServices.Verify(f => f.CreateForShare(It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
+        fileServices.Verify(f => f.CreateForShare(It.IsAny<ShareDefinition>()), Times.Never);
     }
 
     [Fact]

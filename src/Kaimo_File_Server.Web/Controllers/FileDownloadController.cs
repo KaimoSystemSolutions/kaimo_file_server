@@ -38,7 +38,7 @@ public sealed class FileDownloadController(
         if (!ShareRelativePath.TryNormalizeStrict(download.RelativePath, out var relative, allowRoot: false))
             return BadRequest("The download path is invalid.");
 
-        var fs = fileServiceFactory.CreateForShare(share.Id, share.Path);
+        var fs = fileServiceFactory.CreateForShare(share);
         try
         {
             var meta = await fs.GetMetadataAsync(relative, actor);

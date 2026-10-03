@@ -120,7 +120,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                 try
                 {
                     timestamps = await _fileServices
-                        .CreateForShare(share.Id, share.Path)
+                        .CreateForShare(share)
                         .GetFolderSnapshotTimestampsAsync(normalized, user)
                         .WaitAsync(cancellationToken);
                 }
@@ -135,7 +135,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             try
             {
                 timestamps = await _fileServices
-                    .CreateForShare(share.Id, share.Path)
+                    .CreateForShare(share)
                     .GetFolderSnapshotTimestampsAsync("", user)
                     .WaitAsync(cancellationToken);
             }
@@ -271,7 +271,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                 // P0-05: use the central ACL-aware path. It checks the requested
                 // directory with isDirectory=true and batch-filters every child.
                 under = await _fileServices
-                    .CreateForShare(share.Id, share.Path)
+                    .CreateForShare(share)
                     .GetFolderSnapshotAsync(
                         normalized, ts.Value, user, folderCancellation);
             }
