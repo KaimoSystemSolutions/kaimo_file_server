@@ -279,13 +279,15 @@ sidecars, scripts) need the `test-env` image to be rebuilt.
 
 ## Known findings
 
-Two defects in production code were found while writing the suite. They are recorded as tests
+There are currently no open findings. Defects found in production code are recorded as tests
 marked `xfail(strict=True)`; the reason is in the marker.
 
-| Finding | Test | Impact |
+Both defects found while writing the suite are fixed; their tests now pass without a marker:
+
+| Finding (fixed) | Test | Impact |
 |---|---|---|
-| A read-only grant does not stop truncation. When authd attenuates an open to read access, a client that opens with disposition `FILE_OVERWRITE_IF` (e.g. `smbclient put` onto an existing file) still gets the file truncated to 0 bytes before the write is rejected. `kaimo_create_file` must deny overwrite/supersede dispositions when the granted mask lacks `FILE_WRITE_DATA`. | `live/test_vfs_files.py::test_read_only_grant_prevents_truncation` | **Security**: data loss by a user who only has read permission. |
-| Samba 4.19 creates directories under a temporary name (`.::TMPNAME:D:…:<name>`) and then renames them. The `mkdirat` hook reports that internal path to the bridge as a `MKDIR` lifecycle event. | `live/test_vfs_files.py::test_mkdir_never_reports_samba_temporary_names` | Wrong path in the change log / events. |
+| A read-only grant does not stop truncation. When authd attenuates an open to read access, a client that opens with disposition `FILE_OVERWRITE_IF` (e.g. `smbclient put` onto an existing file) still gets the file truncated to 0 bytes before the write is rejected. **Fix:** `kaimo_create_file` denies supersede/overwrite dispositions when the granted mask lacks `FILE_WRITE_DATA` (`kaimo_authz_open_disposition_permitted` in `authz_reply.h`). | `live/test_vfs_files.py::test_read_only_grant_prevents_truncation` | **Security**: data loss by a user who only has read permission. |
+| Samba 4.19 creates directories under a temporary name (`.::TMPNAME:D:…:<name>`) and then renames them. The `mkdirat` hook reported that internal path to the bridge as a `MKDIR` event, and `renameat` sent it as a rename source for authorization and as a `RENAME` event. **Fix:** `mkdirat`, `renameat`, `unlinkat` and `readdir` pass these smbd-internal names (`IS_SMBD_TMPNAME`) straight through; clients cannot address them, and the create was already authorized in `kaimo_create_file`, which emits the `MKDIR` event for the final name. | `live/test_vfs_files.py::test_mkdir_never_reports_samba_temporary_names` | Wrong path in the change log / events. |
 
 When a fix lands, the corresponding test starts passing, `strict=True` turns that into a failure,
 and the `xfail` marker must be removed in the same change.
@@ -311,7 +313,7 @@ Both changes behave exactly as before in production.
 
   | Header | Logic |
   |---|---|
-  | `authz_reply.h` | Which response frames are acceptable, how an authorization reply decodes, final allow/deny per verdict and fail mode |
+  | `authz_reply.h` | Which response frames are acceptable, how an authorization reply decodes, final allow/deny per verdict and fail mode, whether a truncating create disposition is covered by the granted mask |
   | `snapshot_access.h` | `SNAPSHOT_RESOLVE` reply decoding, cache-relative path validation, lease scope, read-only open flags |
   | `close_capture.h` | Capture ID, stable-source check, chunked copy, atomic no-replace publish |
   | `vfs_env.h` | Parsing of deadline values and kill switches from the environment |

@@ -23,6 +23,7 @@
 
 #include "includes.h"
 #include "smbd/smbd.h"
+#include "smbd/globals.h" /* IS_SMBD_TMPNAME (mkdir_internal temporaries) */
 #include "include/ntioctl.h" /* struct shadow_copy_data / SHADOW_COPY_LABEL (@GMT) */
 #include "libcli/security/security.h"
 
@@ -65,6 +66,11 @@
 _Static_assert(KAIMO_SAMBA_SPECIFIC_ACCESS ==
 	       (SEC_STD_ALL | SEC_FILE_ALL),
 	       "OPEN access-mask contract diverged from Samba FILE_GENERIC_ALL");
+_Static_assert(KAIMO_FILE_SUPERSEDE == FILE_SUPERSEDE &&
+	       KAIMO_FILE_OVERWRITE == FILE_OVERWRITE &&
+	       KAIMO_FILE_OVERWRITE_IF == FILE_OVERWRITE_IF &&
+	       KAIMO_FILE_WRITE_DATA == FILE_WRITE_DATA,
+	       "truncating-disposition contract diverged from Samba");
 /* Snapshot handles may read data/EA/attributes, traverse/execute, read their
  * security descriptor, and synchronize. Every right that can mutate the
  * object or its namespace is excluded. MAXIMUM_ALLOWED is accepted as a
@@ -680,6 +686,18 @@ static bool kaimo_is_reserved_client_path(vfs_handle_struct *handle,
 	return strncmp(logical, ".kaimo-", 7) == 0;
 }
 
+/* Samba 4.19 mkdir_internal() creates a directory under a private name
+ * (".::TMPNAME:D:<server id>:<name>"), applies its ACL/attributes, renames it
+ * into place, and removes it again on rollback; dir.c hides and reaps stale
+ * ones. check_path_syntax() rejects such a name in every client path, so only
+ * smbd itself can address it. The directory create was already authorized in
+ * kaimo_create_file, which also emits the MKDIR event for the final name, so
+ * these internal steps pass through without authorization or events. */
+static bool kaimo_is_smbd_tmpname(const char *name)
+{
+	return name != NULL && IS_SMBD_TMPNAME(name, NULL);
+}
+
 static char *kaimo_snapshot_cache_abspath(TALLOC_CTX *mem_ctx,
 					  const char *relative)
 {
@@ -1182,6 +1200,16 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 			return NT_STATUS_ACCESS_DENIED;
 		}
 
+		if (!kaimo_authz_open_disposition_permitted(create_disposition,
+							    granted_access)) {
+			DBG_ERR("kaimo_bridge: CREATE DENIED path=[%s] user=[%s] "
+				"disp=%u truncates without FILE_WRITE_DATA "
+				"(granted=0x%08x)\n",
+				logical, ctx->user, (unsigned)create_disposition,
+				(unsigned)granted_access);
+			return NT_STATUS_ACCESS_DENIED;
+		}
+
 		/* Do not let Samba's broad POSIX identity recover rights that Kaimo
 		 * removed from a MAXIMUM_ALLOWED request. Generic bits are also
 		 * replaced by the exact specific mask returned by the control plane. */
@@ -1254,6 +1282,10 @@ static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 		 * independently rejected by all path-bearing hooks. */
 		if (strncmp(nm, ".kaimo-", 7) == 0)
 			continue;
+
+		/* smbd hides (and reaps stale) mkdir temporaries itself. */
+		if (kaimo_is_smbd_tmpname(nm))
+			return e;
 
 		TALLOC_CTX *frame = talloc_stackframe();
 		char *path = at_root
@@ -1391,6 +1423,8 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 		errno = EROFS;
 		return -1;
 	}
+	if (smb_fname != NULL && kaimo_is_smbd_tmpname(smb_fname->base_name))
+		return SMB_VFS_NEXT_UNLINKAT(handle, srcdir_fsp, smb_fname, flags);
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
 	TALLOC_CTX *frame = talloc_stackframe();
 	char *path = kaimo_join_path(frame, srcdir_fsp, smb_fname);
@@ -1601,6 +1635,10 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 		errno = EROFS;
 		return -1;
 	}
+	if (smb_fname_src != NULL &&
+	    kaimo_is_smbd_tmpname(smb_fname_src->base_name))
+		return SMB_VFS_NEXT_RENAMEAT(handle, srcdir_fsp, smb_fname_src,
+					     dstdir_fsp, smb_fname_dst, how);
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
 	TALLOC_CTX *frame = talloc_stackframe();
 	char *oldp = kaimo_join_path(frame, srcdir_fsp, smb_fname_src);
@@ -1728,6 +1766,8 @@ static int kaimo_mkdirat(vfs_handle_struct *handle,
 		errno = EROFS;
 		return -1;
 	}
+	if (smb_fname != NULL && kaimo_is_smbd_tmpname(smb_fname->base_name))
+		return SMB_VFS_NEXT_MKDIRAT(handle, dirfsp, smb_fname, mode);
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
 	TALLOC_CTX *frame = talloc_stackframe();
 	char *path = kaimo_join_path(frame, dirfsp, smb_fname);

@@ -175,6 +175,28 @@ void test_fail_mode_policy()
 	CHECK(!kaimo_authz_failopen_configured("true"));
 }
 
+void test_truncating_dispositions_need_write_data()
+{
+	const uint32_t read_only = 0x00120089;  // FILE_GENERIC_READ
+	const uint32_t write_data_only = KAIMO_FILE_WRITE_DATA;
+	const uint32_t truncating[] = {KAIMO_FILE_SUPERSEDE, KAIMO_FILE_OVERWRITE,
+				       KAIMO_FILE_OVERWRITE_IF};
+	for (uint32_t disposition : truncating) {
+		CHECK(!kaimo_authz_open_disposition_permitted(disposition, read_only));
+		CHECK(!kaimo_authz_open_disposition_permitted(disposition, 0));
+		// FILE_APPEND_DATA cannot stand in for FILE_WRITE_DATA.
+		CHECK(!kaimo_authz_open_disposition_permitted(disposition, 0x00000004));
+		CHECK(kaimo_authz_open_disposition_permitted(disposition, write_data_only));
+		CHECK(kaimo_authz_open_disposition_permitted(
+			disposition, KAIMO_SAMBA_SPECIFIC_ACCESS));
+	}
+	// FILE_OPEN, FILE_CREATE and FILE_OPEN_IF never truncate.
+	for (uint32_t disposition : {1U, 2U, 3U}) {
+		CHECK(kaimo_authz_open_disposition_permitted(disposition, read_only));
+		CHECK(kaimo_authz_open_disposition_permitted(disposition, 0));
+	}
+}
+
 }  // namespace
 
 int main()
@@ -184,6 +206,7 @@ int main()
 	test_delete_replies();
 	test_empty_allow_and_other_statuses();
 	test_fail_mode_policy();
+	test_truncating_dispositions_need_write_data();
 	std::cout << "authz reply tests passed" << std::endl;
 	return 0;
 }

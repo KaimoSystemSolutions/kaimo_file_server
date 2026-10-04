@@ -70,7 +70,7 @@ How an authorization reply becomes allow or deny (`module/authz_reply.h`, tested
 | Create a file | Request carries user, share, path, access mask, create/directory/listing flags | `test_open_request_carries_path_mask_and_intent` |
 | Read or create denied | `NT_STATUS_ACCESS_DENIED`; nothing downloaded; nothing created | `test_open_deny_blocks_read`, `test_open_deny_blocks_create` |
 | authd grants only read access (attenuated mask) | Writing through the handle is rejected; content unchanged | `test_granted_mask_blocks_writes_through_the_handle` |
-| Read-only grant, client overwrites with `FILE_OVERWRITE_IF` | Must not truncate the file – **currently fails, known finding** | `test_read_only_grant_prevents_truncation` (`xfail`) |
+| Read-only grant, client overwrites with `FILE_OVERWRITE_IF` | Denied before Samba can truncate (`SUPERSEDE`/`OVERWRITE`/`OVERWRITE_IF` need `FILE_WRITE_DATA` in the granted mask); content unchanged | `test_read_only_grant_prevents_truncation` |
 | Malformed `ALLOW` (missing mask, generic bit, `MAXIMUM_ALLOWED` bit, trailing byte, short mask) or unauthorized peer | Denied, logged `malformed OPEN authorization response` | `test_malformed_open_reply_fails_closed` |
 | Infrastructure error | Denied | `test_open_infrastructure_error_fails_closed` |
 
@@ -97,7 +97,7 @@ How an authorization reply becomes allow or deny (`module/authz_reply.h`, tested
 | `mkdir`, also nested | Authorized as create + directory; `MKDIR` event with user, share and path | `test_mkdir_emits_mkdir_event`, `test_mkdir_nested_path_event` |
 | `mkdir` denied | Nothing created, no event | `test_mkdir_denied_creates_nothing` |
 | Event rejected | Directory still created; logged `not durably accepted` | `test_mkdir_event_failure_does_not_fail_operation` |
-| Samba's internal temporary directory name | Must never be reported – **currently fails, known finding** | `test_mkdir_never_reports_samba_temporary_names` (`xfail`) |
+| Samba's internal temporary directory name (`.::TMPNAME:D:…`) | Never sent to authd: `mkdirat`, `renameat`, `unlinkat` and `readdir` pass it straight through; only the final name gets a `MKDIR` event | `test_mkdir_never_reports_samba_temporary_names` |
 
 ## Close capture (versioning after write)
 
@@ -272,7 +272,7 @@ Run in the build gate (optimized) and in the full suite (ASan/UBSan + coverage).
 
 | Test | Header | Covers |
 |---|---|---|
-| `test-authz-reply.cpp` | `authz_reply.h` | Response header acceptance, OPEN and DELETE reply decoding, empty `ALLOW` and other statuses, complete fail-mode policy |
+| `test-authz-reply.cpp` | `authz_reply.h` | Response header acceptance, OPEN and DELETE reply decoding, empty `ALLOW` and other statuses, complete fail-mode policy, truncating create dispositions require `FILE_WRITE_DATA` |
 | `test-close-capture.cpp` | `close_capture.h` | Capture ID randomness, source stability check, exact content publish, cleanup on every rejection, copy errors |
 | `test-decision-cache.cpp` | `decision_cache.h` | LRU eviction, byte budget, oversize entries skipped, expiry and statistics |
 | `test-event-spool.cpp` | `event_spool.h` | Enqueue, recovery after restart, retry vs. dead letter |

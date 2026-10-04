@@ -91,13 +91,6 @@ def test_granted_mask_blocks_writes_through_the_handle(s):
     assert content is not None and "XX" not in content, s.details(result, read_result)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="FINDING: an attenuated read-only grant does not stop FILE_OVERWRITE_IF; "
-           "Samba truncates the existing file before the write is rejected "
-           "(kaimo_create_file must deny overwrite/supersede dispositions when the "
-           "granted mask lacks FILE_WRITE_DATA).",
-)
 def test_read_only_grant_prevents_truncation(s):
     target = s.file("readonly.txt", "original\n")
     s.authd.on(P.OP_OPEN, read_only_grant("readonly.txt"))
@@ -246,12 +239,6 @@ def test_mkdir_nested_path_event(s):
     assert "parent/child" in {e["path"] for e in s.authd.seen(P.OP_MKDIR)}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="FINDING: Samba 4.19 creates directories under a temporary name "
-           "('.::TMPNAME:D:...:<name>') and renames them; the mkdirat hook reports "
-           "that internal path to the bridge as a lifecycle event.",
-)
 def test_mkdir_never_reports_samba_temporary_names(s):
     result = s.smb("mkdir newdir")
     assert result.returncode == 0, s.details(result)

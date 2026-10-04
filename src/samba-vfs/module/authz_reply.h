@@ -125,6 +125,32 @@ static inline bool kaimo_authz_permits(enum kaimo_authz_verdict verdict,
 	}
 }
 
+/* MS-SMB2 CreateDisposition values that truncate an existing file, and the
+ * right they consume (vfs_kaimo_bridge.c asserts parity with Samba). */
+#define KAIMO_FILE_SUPERSEDE 0U
+#define KAIMO_FILE_OVERWRITE 4U
+#define KAIMO_FILE_OVERWRITE_IF 5U
+#define KAIMO_FILE_WRITE_DATA 0x00000002U
+
+/*
+ * Samba truncates an existing file for SUPERSEDE/OVERWRITE(_IF) inside the
+ * open itself, judged only by POSIX permissions, before the handle's access
+ * mask is ever consulted. The granted mask must therefore carry
+ * FILE_WRITE_DATA for these dispositions, or a read-only grant destroys data.
+ */
+static inline bool kaimo_authz_open_disposition_permitted(
+	uint32_t create_disposition, uint32_t granted_access)
+{
+	switch (create_disposition) {
+	case KAIMO_FILE_SUPERSEDE:
+	case KAIMO_FILE_OVERWRITE:
+	case KAIMO_FILE_OVERWRITE_IF:
+		return (granted_access & KAIMO_FILE_WRITE_DATA) != 0;
+	default:
+		return true;
+	}
+}
+
 /* KAIMO_AUTHZ_FAILOPEN=1 (only the leading '1' is significant). */
 static inline bool kaimo_authz_failopen_configured(const char *value)
 {
