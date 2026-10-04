@@ -60,6 +60,13 @@ Every way a client reaches the server from outside. All of them converge on the 
 | [Mail notifications](subsystems/mail-notifications.md) | Outbox, dispatcher, rules, templates |
 | [User home folders](subsystems/user-home-folders.md) | The `users` system share and its ACL layout |
 
+### Testing
+
+| Document | Content |
+|---|---|
+| [Samba VFS test suite](testing/samba-vfs-test-suite.md) | Test layers, harness and fakes, failure detection, coverage gates, CI, known findings and gaps |
+| [Samba VFS test catalog](testing/samba-vfs-test-catalog.md) | What is caught, scenario by scenario, with the test that proves it |
+
 ### Operations
 
 | Document | Content |

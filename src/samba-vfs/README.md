@@ -85,20 +85,73 @@ Hooks and what they call:
 
 ## Testing
 
-- **Component/unit tests** in [`tests/`](tests): C++ for the header libraries
-  (`test-local-protocol`, `test-decision-cache`, `test-event-spool`,
-  `test-recycle-move`, `test-rename-event`, `test-share-path`,
-  `test-snapshot-enumeration`, `test-sync-json`), Python for the live VFS/authd
-  behavior (`test-vfs-connect-status`, `test-vfs-io-deadline`,
-  `test-vfs-operation-compatibility`, `test-vfs-snapshot-readonly`,
-  `test-authd-*`), and shell for the reconcilers (`test-sync-*`,
-  `test-revocation-policy`, `test-operational-credentials`).
-- **CI gate** [`.github/workflows/samba-vfs-compatibility.yml`](../../.github/workflows/samba-vfs-compatibility.yml)
-  runs on every `src/samba-vfs/**` change: builds Samba + `kaimo_bridge` from the
-  verified pinned source, asserts the `smbd` version and VFS ABI, then exercises
-  the real stack with `full_audit` through connect / mkdir / create / write /
-  read / rename / unlink / rmdir / list / close and requires an audit record for
-  each.
+Everything runs inside Docker builds of [`Dockerfile.vfs`](Dockerfile.vfs); nothing
+needs a running container, a .NET bridge or a Windows client. There are two levels.
+The design of the suite and a scenario-by-scenario list of what it catches are documented in
+[`docu/testing/`](../../docu/testing/samba-vfs-test-suite.md).
+
+**1. Build gate (stage `build-runtime`, always on).** Runs on every
+`docker compose build kaimo_samba` and in the first job of the CI workflow. A
+failure breaks the image build:
+
+- every C++ component test `tests/test-*.cpp` (picked up automatically);
+- the shell reconciler tests (`tests/test-sync-*`, `test-revocation-policy`,
+  `test-authd-supervisor`, `test-operational-credentials`,
+  `test-event-spool-permissions`);
+- `verify-samba-build.sh` (pinned version and VFS ABI) and the live
+  `test-vfs-operation-compatibility.py` matrix (real smbd + module + `full_audit`).
+
+**2. Full suite with coverage (stages `test-env` → `coverage` → `coverage-report`).**
+Never part of the runtime image. [`tests/run-suite.sh`](tests/run-suite.sh) rebuilds
+the module, the sidecars and the C++ tests with gcov (C++ tests additionally with
+ASan/UBSan), wraps every shell script with kcov, then runs:
+
+| Suite | What it drives |
+|---|---|
+| `tests/test-*.cpp` | header libraries incl. the decision logic extracted from the module (`authz_reply.h`, `snapshot_access.h`, `close_capture.h`, `vfs_env.h`) |
+| `tests/live/test_vfs_*.py` | real smbd + `kaimo_bridge` against a scriptable fake authd ([`kaimo_testlib.py`](tests/kaimo_testlib.py)): allow/deny, every malformed reply, fail-open/closed, listing filter, reserved namespace, recycle bin, rename TOCTOU, close capture, snapshots, kill switches, deadlines |
+| `tests/live/test_authd_bridge.py`, `test_sidecar_sync.py` | the real `kaimo_authd` and `kaimo_*sync` binaries over mTLS against a fake gRPC bridge ([`kaimo_fakebridge.py`](tests/kaimo_fakebridge.py)) |
+| `tests/live/test_standalone_runtime.py` | the self-contained `test-authd-*.py` scripts |
+| `tests/test-*.sh`, `tests/shell/test-*.sh` | reconcilers, health checks, entrypoint, PKI generation |
+| `tests/python/` | `kaimo-samba-log-forwarder.py` |
+
+The protocol constants of the Python harness are parsed from
+[`module/local_protocol.h`](module/local_protocol.h), so a protocol bump cannot
+silently desynchronize the tests again.
+
+Run it locally (only Docker needed; the Samba base is cached after the first build):
+
+```bash
+cd src/samba-vfs
+docker buildx build -f Dockerfile.vfs --target coverage-report --output type=local,dest=./coverage-out .
+```
+
+Reports: `coverage-out/summary.md` (per area and per file), `gcovr/index.html`
+(C/C++), `kcov/merged/index.html` (bash), `python/html/index.html`, JUnit XML in
+`junit/`, and `status.txt`. For quick iteration build the `test-env` target once and
+mount the test tree:
+
+```bash
+docker buildx build -f Dockerfile.vfs --target test-env --load -t kaimo-samba-test .
+docker run --rm -v "$PWD/tests:/opt/kaimo-tests/tests" kaimo-samba-test \
+  bash -c 'cd /opt/kaimo-tests/tests && python3.12 -m pytest -q live/test_vfs_connect.py'
+```
+
+The live suites need the resolved interpreter (`python3.12`): authd only trusts a
+root peer whose process name matches its configured executable.
+
+**CI.** [`.github/workflows/samba-vfs-compatibility.yml`](../../.github/workflows/samba-vfs-compatibility.yml)
+runs on every `src/samba-vfs/**` change. Job 1 is the build gate above. Job 2
+builds `coverage-report`, publishes `summary.md` as the job summary, uploads all
+reports as the `samba-vfs-test-reports` artifact and fails on any test failure or
+on a coverage area below [`tests/quality-gates.json`](tests/quality-gates.json).
+Raise those minimums when coverage grows (ratchet); never lower them to make a
+change pass.
+
+Known findings are kept as `xfail(strict=True)` tests in `tests/live/` with the
+reason in the marker; fixing the code turns them into hard failures until the
+marker is removed.
+
 - **.NET side** is covered by the solution's unit tests
   ([`../../tests`](../../tests)).
 - **Manual release checks** (not automated): Windows Explorer "Previous Versions"

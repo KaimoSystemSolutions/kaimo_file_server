@@ -369,3 +369,6 @@ MigrationBackup/
 FodyWeavers.xsd
 /mappings/data
 /.idea/.idea.Kaimo_File_Server_Core/.idea
+
+# Samba VFS test suite reports (docker buildx ... --output dest=./coverage-out)
+/src/samba-vfs/coverage-out/

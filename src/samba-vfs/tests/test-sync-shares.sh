@@ -208,6 +208,32 @@ if bash "$SUT" >/dev/null 2>&1; then
     echo "FAIL: failed setparm mutation reported success."
     fail=1
 fi
+
+# Removing a stale share and repairing directory ownership are mutations too.
+export NET_FAIL_COMMAND="" NET_FAIL_PARAMETER=""
+jq -n --arg path "$WORK/pool02/stale" \
+    '{version:1,shares:[{name:"stale-share",path:$path,hidden:false}]}' \
+    >"$DESIRED_SHARES"
+if ! bash "$SUT" >/dev/null 2>&1; then
+    echo "FAIL: could not establish a share for the removal-failure case."
+    fail=1
+fi
+printf '%s\n' '{"version":1,"shares":[]}' >"$DESIRED_SHARES"
+export NET_FAIL_COMMAND=delshare
+if bash "$SUT" >/dev/null 2>&1; then
+    echo "FAIL: failed delshare mutation reported success."
+    fail=1
+fi
+export NET_FAIL_COMMAND=""
+jq -n --arg path "$WORK/pool02/regrouped" \
+    '{version:1,shares:[{name:"regrouped",path:$path,hidden:false}]}' \
+    >"$DESIRED_SHARES"
+if CHGRP_EXIT_CODE=1 bash "$SUT" >/dev/null 2>&1; then
+    echo "FAIL: failed storage group assignment reported success."
+    fail=1
+fi
+printf '%s\n' '{"version":1,"shares":[]}' >"$DESIRED_SHARES"
+bash "$SUT" >/dev/null 2>&1
 unset NET_FAIL_COMMAND NET_FAIL_PARAMETER
 
 # Invalid names, control characters, duplicate names, and storage-root escapes

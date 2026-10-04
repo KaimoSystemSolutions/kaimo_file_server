@@ -161,23 +161,10 @@ COPY module/authsync.cpp ./
 COPY module/authd.cpp ./
 COPY module/sharesync.cpp ./
 COPY module/configsync.cpp ./
-COPY module/bridge_channel.h ./
-COPY module/decision_cache.h ./
-COPY module/event_spool.h ./
-COPY module/local_protocol.h ./
-COPY module/snapshot_enumeration.h ./
-COPY module/rename_event.h ./
-COPY module/recycle_move.h ./
-COPY module/sync_json.h ./
-COPY tests/test-decision-cache.cpp ./
-COPY tests/test-event-spool.cpp ./
-COPY tests/test-local-protocol.cpp ./
-COPY tests/test-snapshot-enumeration.cpp ./
-COPY tests/test-rename-event.cpp ./
-COPY tests/test-recycle-move.cpp ./
-COPY module/share_path.h ./
-COPY tests/test-share-path.cpp ./
-COPY tests/test-sync-json.cpp ./
+# Header libraries and their standalone component tests (all of them; a new
+# tests/test-*.cpp is picked up automatically and gates the image build).
+COPY module/*.h ./
+COPY tests/kaimo_check.h tests/test-*.cpp ./
 RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && protoc --grpc_out=. --plugin=protoc-gen-grpc="$(which grpc_cpp_plugin)" kaimo_smb_bridge.proto \
     && g++ -std=c++17 -O2 \
@@ -200,38 +187,12 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
        $(pkg-config --cflags grpc++ protobuf) \
        $(pkg-config --libs grpc++ protobuf) \
        -o /usr/local/bin/kaimo_configsync \
-    && g++ -std=c++17 -O2 -pthread -I. \
-       test-decision-cache.cpp -o /tmp/test-decision-cache \
-    && /tmp/test-decision-cache \
-    && rm /tmp/test-decision-cache \
-    && g++ -std=c++17 -O2 -pthread -I. \
-       test-event-spool.cpp -o /tmp/test-event-spool \
-    && /tmp/test-event-spool \
-    && rm /tmp/test-event-spool \
-    && g++ -std=c++17 -O2 -pthread -I. \
-       test-local-protocol.cpp -o /tmp/test-local-protocol \
-    && /tmp/test-local-protocol \
-    && rm /tmp/test-local-protocol \
-    && g++ -std=c++17 -O2 -I. \
-       test-snapshot-enumeration.cpp -o /tmp/test-snapshot-enumeration \
-    && /tmp/test-snapshot-enumeration \
-    && rm /tmp/test-snapshot-enumeration \
-    && g++ -std=c++17 -O2 -I. \
-       test-rename-event.cpp -o /tmp/test-rename-event \
-    && /tmp/test-rename-event \
-    && rm /tmp/test-rename-event \
-    && g++ -std=c++17 -O2 -I. \
-       test-recycle-move.cpp -o /tmp/test-recycle-move \
-    && /tmp/test-recycle-move \
-    && rm /tmp/test-recycle-move \
-    && g++ -std=c++17 -O2 -I. \
-       test-share-path.cpp -o /tmp/test-share-path \
-    && /tmp/test-share-path \
-    && rm /tmp/test-share-path \
-    && g++ -std=c++17 -O2 -I. \
-       test-sync-json.cpp -o /tmp/test-sync-json \
-    && /tmp/test-sync-json \
-    && rm /tmp/test-sync-json \
+    && for test_source in test-*.cpp; do \
+           g++ -std=c++17 -O2 -pthread -I. "$test_source" -o /tmp/component-test \
+           && /tmp/component-test \
+           && rm /tmp/component-test \
+           || exit 1; \
+       done \
     && test -x /usr/local/bin/kaimo_authsync \
     && test -x /usr/local/bin/kaimo_authd \
     && test -x /usr/local/bin/kaimo_sharesync \
@@ -241,7 +202,7 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
 # This is the layer that reruns on a module edit -> a single object + relink.
 # The installed .so is located by name (not a hardcoded path) and overwritten.
 WORKDIR /build/samba-source
-COPY module/vfs_kaimo_bridge.c module/local_protocol.h module/recycle_move.h module/rename_event.h module/share_path.h module/snapshot_enumeration.h source3/modules/
+COPY module/vfs_kaimo_bridge.c module/local_protocol.h module/authz_reply.h module/close_capture.h module/recycle_move.h module/rename_event.h module/share_path.h module/snapshot_access.h module/snapshot_enumeration.h module/vfs_env.h source3/modules/
 RUN PYTHONHASHSEED=1 ./buildtools/bin/waf build --targets=vfs_kaimo_bridge \
     && built="bin/modules/vfs/kaimo_bridge.so" \
     && dest="$(find /opt/samba -name '*kaimo_bridge*.so' | head -n1)" \
@@ -278,8 +239,6 @@ COPY tests/test-authd-supervisor.sh /tmp/test-authd-supervisor.sh
 COPY tests/test-operational-credentials.sh /tmp/test-operational-credentials.sh
 COPY tests/test-event-spool-permissions.sh /tmp/test-event-spool-permissions.sh
 COPY entrypoint.sh /tmp/phase0-entrypoint.sh
-COPY tests/test-vfs-io-deadline.py /usr/local/bin/test-vfs-io-deadline.py
-COPY tests/test-vfs-snapshot-readonly.py /usr/local/bin/test-vfs-snapshot-readonly.py
 COPY tests/test-vfs-operation-compatibility.py /tmp/test-vfs-operation-compatibility.py
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
                        /usr/local/bin/prepare-event-spool.sh \
@@ -302,8 +261,6 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
                        /tmp/test-operational-credentials.sh \
                        /tmp/test-event-spool-permissions.sh \
                        /tmp/phase0-entrypoint.sh \
-                       /usr/local/bin/test-vfs-io-deadline.py \
-                       /usr/local/bin/test-vfs-snapshot-readonly.py \
                        /tmp/test-vfs-operation-compatibility.py \
     && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
              /usr/local/bin/prepare-event-spool.sh \
@@ -318,8 +275,6 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
              /usr/local/bin/authd-health.sh \
              /usr/local/bin/smbd-health.sh \
              /tmp/verify-samba-build.sh \
-             /usr/local/bin/test-vfs-io-deadline.py \
-             /usr/local/bin/test-vfs-snapshot-readonly.py \
     && SYNC_USERS_SUT=/usr/local/bin/sync-users.sh bash /tmp/test-sync-users.sh \
     && SYNC_SHARES_SUT=/usr/local/bin/sync-shares.sh bash /tmp/test-sync-shares.sh \
     && SYNC_CONFIG_SUT=/usr/local/bin/sync-config.sh bash /tmp/test-sync-config.sh \
@@ -388,6 +343,60 @@ RUN set -eux; \
     test -s /runtime/runtime-packages.txt; \
     du -sh /runtime/opt/samba /runtime/usr/local/bin; \
     cat /runtime/runtime-packages.txt
+
+# ---------- Test-only stages (never part of the runtime image) ----------
+# `docker buildx build --target coverage-report --output type=local,dest=out`
+# runs the complete suite against an instrumented build and exports the
+# reports. These stages sit before `runtime` so that an untargeted build (e.g.
+# `docker compose build`) still produces the production image and skips them.
+
+# kcov is not packaged for Ubuntu 24.04; build a pinned release once (cached).
+FROM ubuntu:24.04 AS kcov
+ENV DEBIAN_FRONTEND=noninteractive
+ARG KCOV_VERSION=43
+ARG KCOV_SHA256=4cbba86af11f72de0c7514e09d59c7927ed25df7cebdad087f6d3623213b95bf
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       ca-certificates wget cmake g++ make python3 pkg-config \
+       binutils-dev libcurl4-openssl-dev libdw-dev libelf-dev libiberty-dev libssl-dev zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN set -eu; \
+    wget -q "https://github.com/SimonKagstrom/kcov/archive/refs/tags/v${KCOV_VERSION}.tar.gz" -O /tmp/kcov.tgz; \
+    printf '%s  %s\n' "$KCOV_SHA256" /tmp/kcov.tgz | sha256sum -c -; \
+    mkdir /tmp/kcov; tar -xzf /tmp/kcov.tgz --strip-components=1 -C /tmp/kcov; \
+    cmake -S /tmp/kcov -B /tmp/kcov/build -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=/opt/kcov; \
+    cmake --build /tmp/kcov/build -j"$(nproc)"; \
+    cmake --install /tmp/kcov/build; \
+    /opt/kcov/bin/kcov --version
+
+# test-env: everything the suite needs, without running it. Useful for local
+# iteration: `docker buildx build --target test-env --load -t kaimo-samba-test .`
+# then `docker run --rm -v "$PWD/tests:/opt/kaimo-tests/tests" kaimo-samba-test
+#   bash /opt/kaimo-tests/tests/run-suite.sh` (or pytest on a single file).
+FROM build-runtime AS test-env
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       gcovr python3-pytest python3-coverage python3-grpcio python3-protobuf \
+       binutils-dev libcurl4-openssl-dev libdw-dev libelf-dev libssl-dev zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=kcov /opt/kcov /opt/kcov
+COPY module/ /opt/kaimo-tests/module/
+COPY protos/ /opt/kaimo-tests/protos/
+COPY tests/ /opt/kaimo-tests/tests/
+COPY *.sh *.py /opt/kaimo-tests/scripts/
+RUN find /opt/kaimo-tests -type f \( -name '*.sh' -o -name '*.py' \) \
+        -exec sed -i 's/\r$//' {} + \
+    && chmod 0755 /opt/kaimo-tests/scripts/*
+
+FROM test-env AS coverage
+# 0 (default): a failing test fails the build. CI passes 1 to export the
+# reports anyway and fails the job afterwards from coverage-out/status.txt.
+ARG KAIMO_SUITE_SOFT_FAIL=0
+RUN KAIMO_SUITE_SOFT_FAIL="$KAIMO_SUITE_SOFT_FAIL" bash /opt/kaimo-tests/tests/run-suite.sh
+
+FROM scratch AS coverage-report
+COPY --from=coverage /coverage/ /
 
 # ---------- Stage 4: slim production runtime ----------
 FROM ubuntu:24.04 AS runtime

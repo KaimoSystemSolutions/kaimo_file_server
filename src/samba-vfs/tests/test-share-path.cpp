@@ -1,4 +1,4 @@
-#include <cassert>
+#include "kaimo_check.h"
 #include <cstring>
 #include <iostream>
 
@@ -7,7 +7,7 @@
 static void expect_path(const char *connectpath, const char *path,
 			const char *expected)
 {
-	assert(std::strcmp(
+	CHECK(std::strcmp(
 		       kaimo_share_path_canonical(connectpath, path),
 		       expected) == 0);
 }

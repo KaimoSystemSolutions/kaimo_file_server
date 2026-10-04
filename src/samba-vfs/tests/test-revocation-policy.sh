@@ -79,6 +79,15 @@ if ! bash "$REVOKER" "startup" >/dev/null \
 fi
 unset SMBD_RUNNING
 
+if NET_LIST_EXIT_CODE=3 bash "$REVOKER" "unlistable" >/dev/null 2>&1; then
+    echo "FAIL: revocation succeeded although registry shares could not be enumerated."
+    exit 1
+fi
+if SMBCONTROL_EXIT_CODE=1 bash "$REVOKER" "unclosable" >/dev/null 2>&1; then
+    echo "FAIL: revocation succeeded although a share could not be closed."
+    exit 1
+fi
+
 export KAIMO_SYNC_RUNNER="$WORK/bin/runner"
 export KAIMO_SESSION_REVOKER="$WORK/bin/revoker"
 if ! bash "$CYCLE" users /bin/true >/dev/null \

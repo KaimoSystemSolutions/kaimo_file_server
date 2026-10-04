@@ -94,7 +94,9 @@ def run_claim_as(
     return result
 
 
-UNTRUSTED_CLIENT = r"""
+# The client runs in a separate interpreter, so the protocol version is
+# injected explicitly instead of resolving a name from this module.
+UNTRUSTED_CLIENT = f"PROTOCOL_VERSION = {PROTOCOL_VERSION}\n" + r"""
 import socket, struct, sys
 path, claimed = sys.argv[1], sys.argv[2]
 header = struct.Struct("!4sBBBBI")

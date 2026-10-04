@@ -43,3 +43,61 @@ jobs:
           tags: kaimo-samba-vfs-compatibility:${{ github.sha }}
           cache-from: type=gha,scope=samba-vfs-compatibility
           cache-to: type=gha,mode=max,scope=samba-vfs-compatibility
+
+  test-suite-coverage:
+    name: Full test suite and coverage gates
+    # Reuses the Samba build cached by the first job instead of compiling
+    # Samba twice in parallel on a cold cache.
+    needs: pinned-build-and-live-matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Runs src/samba-vfs/tests/run-suite.sh against instrumented binaries:
+      # C++ component tests (ASan/UBSan), live smbd + VFS + fake authd matrix,
+      # real sidecars against a fake gRPC bridge, shell and Python helpers.
+      # KAIMO_SUITE_SOFT_FAIL=1 exports the reports even when tests fail; the
+      # verdict is taken from coverage-out/status.txt below.
+      - name: Run test suite with coverage
+        uses: docker/build-push-action@v7
+        with:
+          context: ./src/samba-vfs
+          file: ./src/samba-vfs/Dockerfile.vfs
+          target: coverage-report
+          build-args: |
+            KAIMO_SUITE_SOFT_FAIL=1
+          outputs: type=local,dest=coverage-out
+          cache-from: |
+            type=gha,scope=samba-vfs-compatibility
+            type=gha,scope=samba-vfs-coverage
+          cache-to: type=gha,mode=max,scope=samba-vfs-coverage
+
+      - name: Publish coverage summary
+        if: always()
+        run: |
+          if [ -f coverage-out/summary.md ]; then
+            cat coverage-out/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No coverage summary was produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: samba-vfs-test-reports
+          path: coverage-out/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enforce test results and coverage gates
+        run: |
+          status="$(cat coverage-out/status.txt 2>/dev/null || echo 'failed: no status produced')"
+          echo "Suite status: $status"
+          [ "$status" = "passed" ]

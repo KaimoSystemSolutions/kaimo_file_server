@@ -396,6 +396,17 @@ else
 fi
 unset PDBEDIT_LIST_EXTRA_STDOUT
 
+# 12) A failing `pdbedit -L` leaves the passdb state unknown: fail before any
+# local mutation instead of treating it as an empty user list.
+if PDBEDIT_LIST_EXIT_CODE=1 bash "$SUT" >/dev/null 2>&1 \
+    || ! cmp -s "$WORK/passdb-before-malformed-list" "$PASSDB_FILE" \
+    || ! cmp -s "$WORK/state-before-malformed-list" \
+        "$KAIMO_SYNC_STATE_DIR/managed-users"; then
+    echo "FAIL: failed pdbedit listing was accepted or mutated state"; fail=1
+else
+    note "ok: failed pdbedit listing fails before local mutation"
+fi
+
 if [ "$fail" -eq 0 ]; then
     echo "PASS: sync-users.sh securely reconciles Kaimo users to desired state."
     exit 0

@@ -1,0 +1,47 @@
+{
+  "_comment": "Coverage ratchet for tests/run-suite.sh. Minimums sit just below the measured values (2026-10-04: module 76.6/48.0, headers 90.4/76.7, authd 87.8/70.7, sync 94.2/93.1, shell 76.1, python 99.3/97.8). Raise them as coverage grows; never lower them to make a change pass. When raising them, also update the quality gates table in docu/testing/samba-vfs-test-suite.md.",
+  "report_only": false,
+  "areas": [
+    {
+      "name": "VFS module (vfs_kaimo_bridge.c)",
+      "source": "gcovr",
+      "files": ["module/vfs_kaimo_bridge.c"],
+      "min_line": 75,
+      "min_branch": 46
+    },
+    {
+      "name": "Header libraries",
+      "source": "gcovr",
+      "files": ["module/*.h"],
+      "min_line": 89,
+      "min_branch": 75
+    },
+    {
+      "name": "authd sidecar",
+      "source": "gcovr",
+      "files": ["module/authd.cpp"],
+      "min_line": 86,
+      "min_branch": 69
+    },
+    {
+      "name": "Sync clients",
+      "source": "gcovr",
+      "files": ["module/authsync.cpp", "module/sharesync.cpp", "module/configsync.cpp"],
+      "min_line": 93,
+      "min_branch": 91
+    },
+    {
+      "name": "Shell scripts",
+      "source": "kcov",
+      "files": ["*.sh"],
+      "min_line": 75
+    },
+    {
+      "name": "Python helpers",
+      "source": "python",
+      "files": ["*.py"],
+      "min_line": 98,
+      "min_branch": 96
+    }
+  ]
+}

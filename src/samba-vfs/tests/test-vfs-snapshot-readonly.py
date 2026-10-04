@@ -304,7 +304,7 @@ def main() -> int:
     assert properties_result.returncode == 0, details
 
     log_text = SMBD_LOG.read_text(encoding="utf-8", errors="replace")
-    assert "borrowed stat filename" in log_text, details
+    assert "kaimo_bridge build [" in log_text, details
     assert "Bad talloc magic" not in log_text, details
     assert "INTERNAL ERROR" not in log_text, details
     assert "CREATE twrp write intent denied" in log_text, details

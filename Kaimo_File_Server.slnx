@@ -23,12 +23,16 @@
     <Folder Name="module">
       <File Path="src/samba-vfs/module/authd.cpp" />
       <File Path="src/samba-vfs/module/authsync.cpp" />
+      <File Path="src/samba-vfs/module/authz_reply.h" />
       <File Path="src/samba-vfs/module/bridge_channel.h" />
+      <File Path="src/samba-vfs/module/close_capture.h" />
       <File Path="src/samba-vfs/module/configsync.cpp" />
       <File Path="src/samba-vfs/module/decision_cache.h" />
       <File Path="src/samba-vfs/module/local_protocol.h" />
+      <File Path="src/samba-vfs/module/snapshot_access.h" />
       <File Path="src/samba-vfs/module/sync_json.h" />
       <File Path="src/samba-vfs/module/sharesync.cpp" />
+      <File Path="src/samba-vfs/module/vfs_env.h" />
       <File Path="src/samba-vfs/module/vfs_kaimo_bridge.c" />
     </Folder>
     <Folder Name="patches">
@@ -38,20 +42,64 @@
       <File Path="src/samba-vfs/protos/kaimo_smb_bridge.proto" />
     </Folder>
     <Folder Name="tests">
+      <File Path="src/samba-vfs/tests/run-suite.sh" />
+      <File Path="src/samba-vfs/tests/quality-gates.json" />
+      <File Path="src/samba-vfs/tests/kaimo_check.h" />
+      <File Path="src/samba-vfs/tests/kaimo_testlib.py" />
+      <File Path="src/samba-vfs/tests/kaimo_fakebridge.py" />
       <File Path="src/samba-vfs/tests/test-authd-capacity.py" />
       <File Path="src/samba-vfs/tests/test-authd-peer-security.py" />
       <File Path="src/samba-vfs/tests/test-authd-protocol.py" />
       <File Path="src/samba-vfs/tests/test-authd-smb-peer.py" />
+      <File Path="src/samba-vfs/tests/test-authd-supervisor.sh" />
+      <File Path="src/samba-vfs/tests/test-authz-reply.cpp" />
+      <File Path="src/samba-vfs/tests/test-close-capture.cpp" />
       <File Path="src/samba-vfs/tests/test-decision-cache.cpp" />
+      <File Path="src/samba-vfs/tests/test-event-spool.cpp" />
       <File Path="src/samba-vfs/tests/test-local-protocol.cpp" />
+      <File Path="src/samba-vfs/tests/test-local-protocol-edges.cpp" />
+      <File Path="src/samba-vfs/tests/test-recycle-move.cpp" />
+      <File Path="src/samba-vfs/tests/test-rename-event.cpp" />
+      <File Path="src/samba-vfs/tests/test-revocation-policy.sh" />
+      <File Path="src/samba-vfs/tests/test-share-path.cpp" />
+      <File Path="src/samba-vfs/tests/test-snapshot-access.cpp" />
+      <File Path="src/samba-vfs/tests/test-snapshot-enumeration.cpp" />
       <File Path="src/samba-vfs/tests/test-sync-users.sh" />
       <File Path="src/samba-vfs/tests/test-sync-config.sh" />
       <File Path="src/samba-vfs/tests/test-sync-runner.sh" />
       <File Path="src/samba-vfs/tests/test-sync-shares.sh" />
       <File Path="src/samba-vfs/tests/test-sync-json.cpp" />
-      <File Path="src/samba-vfs/tests/test-vfs-connect-status.py" />
-      <File Path="src/samba-vfs/tests/test-vfs-io-deadline.py" />
-      <File Path="src/samba-vfs/tests/test-vfs-snapshot-readonly.py" />
+      <File Path="src/samba-vfs/tests/test-vfs-env.cpp" />
+      <File Path="src/samba-vfs/tests/test-vfs-operation-compatibility.py" />
+      <Folder Name="live">
+        <File Path="src/samba-vfs/tests/live/conftest.py" />
+        <File Path="src/samba-vfs/tests/live/test_authd_bridge.py" />
+        <File Path="src/samba-vfs/tests/live/test_sidecar_sync.py" />
+        <File Path="src/samba-vfs/tests/live/test_standalone_runtime.py" />
+        <File Path="src/samba-vfs/tests/live/test_vfs_connect.py" />
+        <File Path="src/samba-vfs/tests/live/test_vfs_deadlines.py" />
+        <File Path="src/samba-vfs/tests/live/test_vfs_delete_rename.py" />
+        <File Path="src/samba-vfs/tests/live/test_vfs_environment.py" />
+        <File Path="src/samba-vfs/tests/live/test_vfs_failopen.py" />
+        <File Path="src/samba-vfs/tests/live/test_vfs_files.py" />
+        <File Path="src/samba-vfs/tests/live/test_vfs_kill_switches.py" />
+        <File Path="src/samba-vfs/tests/live/test_vfs_snapshots.py" />
+        <File Path="src/samba-vfs/tests/live/test_vfs_socket_path.py" />
+      </Folder>
+      <Folder Name="python">
+        <File Path="src/samba-vfs/tests/python/test_log_forwarder.py" />
+      </Folder>
+      <Folder Name="shell">
+        <File Path="src/samba-vfs/tests/shell/test-entrypoint-vfs.sh" />
+        <File Path="src/samba-vfs/tests/shell/test-generate-control-plane-certs.sh" />
+        <File Path="src/samba-vfs/tests/shell/test-health-checks.sh" />
+        <File Path="src/samba-vfs/tests/shell/test-sync-config-branches.sh" />
+      </Folder>
+      <Folder Name="tools">
+        <File Path="src/samba-vfs/tests/tools/build-vfs-module-coverage.py" />
+        <File Path="src/samba-vfs/tests/tools/check-coverage.py" />
+        <File Path="src/samba-vfs/tests/tools/gcov_flush_on_signal.h" />
+      </Folder>
     </Folder>
   </Folder>
   <Project Path="docker-compose.dcproj">

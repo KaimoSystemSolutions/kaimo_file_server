@@ -42,10 +42,14 @@
 #endif
 
 #include "local_protocol.h"
+#include "authz_reply.h"
+#include "close_capture.h"
 #include "recycle_move.h"
 #include "rename_event.h"
 #include "share_path.h"
+#include "snapshot_access.h"
 #include "snapshot_enumeration.h"
+#include "vfs_env.h"
 
 #undef DBGC_CLASS
 #define DBGC_CLASS DBGC_VFS
@@ -56,9 +60,11 @@
 #define KAIMO_VFS_EVENT_TIMEOUT_MS_DEFAULT 250U
 #define KAIMO_VFS_TIMEOUT_MS_MIN 10U
 #define KAIMO_VFS_TIMEOUT_MS_MAX 60000U
-/* Samba 4.19.5 FILE_GENERIC_ALL after generic expansion. OPEN replies may
- * contain only these specific file/directory and standard access bits. */
-#define KAIMO_SAMBA_SPECIFIC_ACCESS 0x001f01ffU
+/* KAIMO_SAMBA_SPECIFIC_ACCESS (authz_reply.h) mirrors Samba's expanded
+ * FILE_GENERIC_ALL; fail the build if the pinned Samba ever disagrees. */
+_Static_assert(KAIMO_SAMBA_SPECIFIC_ACCESS ==
+	       (SEC_STD_ALL | SEC_FILE_ALL),
+	       "OPEN access-mask contract diverged from Samba FILE_GENERIC_ALL");
 /* Snapshot handles may read data/EA/attributes, traverse/execute, read their
  * security descriptor, and synchronize. Every right that can mutate the
  * object or its namespace is excluded. MAXIMUM_ALLOWED is accepted as a
@@ -149,8 +155,7 @@ static bool kaimo_attach_snapshot_lease(vfs_handle_struct *handle,
  * error), e.g. for availability-over-security dev setups. */
 static bool kaimo_failmode_allow(void)
 {
-	const char *fo = getenv("KAIMO_AUTHZ_FAILOPEN");
-	return fo != NULL && fo[0] == '1';
+	return kaimo_authz_failopen_configured(getenv("KAIMO_AUTHZ_FAILOPEN"));
 }
 
 static void kaimo_request_init(struct kaimo_local_request *request)
@@ -175,21 +180,15 @@ static uint32_t kaimo_read_timeout_ms(
 	const char *name, uint32_t default_value)
 {
 	const char *configured = getenv(name);
-	char *end = NULL;
-	unsigned long parsed;
+	bool invalid = false;
+	uint32_t value = kaimo_vfs_parse_timeout_ms(
+		configured, default_value, KAIMO_VFS_TIMEOUT_MS_MIN,
+		KAIMO_VFS_TIMEOUT_MS_MAX, &invalid);
 
-	if (configured == NULL || configured[0] == '\0')
-		return default_value;
-	errno = 0;
-	parsed = strtoul(configured, &end, 10);
-	if (errno != 0 || end == configured || *end != '\0' ||
-	    parsed < KAIMO_VFS_TIMEOUT_MS_MIN ||
-	    parsed > KAIMO_VFS_TIMEOUT_MS_MAX) {
+	if (invalid)
 		DBG_WARNING("kaimo_bridge: invalid %s=[%s], using %u ms\n",
 			    name, configured, default_value);
-		return default_value;
-	}
-	return (uint32_t)parsed;
+	return value;
 }
 
 static int kaimo_authd_connect(
@@ -268,13 +267,8 @@ static int kaimo_roundtrip(uint8_t operation,
 		close(fd);
 		return (saved_errno == EPROTO || saved_errno == EMSGSIZE) ? -2 : -1;
 	}
-	if (response->kind != KAIMO_LOCAL_KIND_RESPONSE ||
-	    (response->operation != operation &&
-	     !(response->operation == KAIMO_LOCAL_OP_NONE &&
-	       (response->status == KAIMO_LOCAL_STATUS_ERROR ||
-		response->status == KAIMO_LOCAL_STATUS_OVERLOADED ||
-		response->status == KAIMO_LOCAL_STATUS_UNAUTHORIZED_PEER))) ||
-	    response->payload_length > payload_capacity) {
+	if (!kaimo_authz_response_header_acceptable(
+		    response, operation, payload_capacity)) {
 		close(fd);
 		errno = EPROTO;
 		return -2;
@@ -290,69 +284,26 @@ static int kaimo_roundtrip(uint8_t operation,
 	return 0;
 }
 
-/* Sends a framed request to kaimo_authd and validates the authorization reply.
- * OPEN ALLOW replies carry the exact normalized/attenuated access mask;
- * DELETE ALLOW replies carry the recycle disposition and recycle root depth.
- * Return: 1 = ALLOW, 0 = DENY, -1 = infrastructure/sidecar error,
- * -2 = malformed protocol response (always fail closed). */
-static int kaimo_authz_send(uint8_t operation,
-			    const struct kaimo_local_request *request,
-			    uint32_t *granted_access,
-			    bool *recycle_delete,
-			    unsigned int *recycle_root_depth)
+/* Sends a framed request to kaimo_authd and decodes the authorization reply
+ * (authz_reply.h). A transport failure is UNAVAILABLE; a framing violation
+ * is MALFORMED and always fails closed. */
+static enum kaimo_authz_verdict kaimo_authz_send(
+	uint8_t operation, const struct kaimo_local_request *request,
+	uint32_t *granted_access, bool *recycle_delete,
+	unsigned int *recycle_root_depth)
 {
 	struct kaimo_local_frame_header response;
 	uint8_t payload[4];
 	int result = kaimo_roundtrip(operation, request, &response,
 				     payload, sizeof(payload),
 				     kaimo_auth_timeout_ms);
+	if (result == -2)
+		return KAIMO_AUTHZ_MALFORMED;
 	if (result != 0)
-		return result;
-
-	if (response.status == KAIMO_LOCAL_STATUS_ALLOW) {
-		if (operation == KAIMO_LOCAL_OP_OPEN) {
-			struct kaimo_local_reader reader;
-			uint32_t parsed;
-			kaimo_local_reader_init(&reader, payload,
-						response.payload_length);
-			if (granted_access == NULL ||
-			    !kaimo_local_reader_u32(&reader, &parsed) ||
-			    !kaimo_local_reader_finished(&reader) ||
-			    (parsed & ~KAIMO_SAMBA_SPECIFIC_ACCESS) != 0)
-				return -2;
-			*granted_access = parsed;
-		} else if (operation == KAIMO_LOCAL_OP_DELETE_AUTH) {
-			struct kaimo_local_reader reader;
-			uint8_t parsed;
-			uint8_t depth;
-			kaimo_local_reader_init(&reader, payload,
-						response.payload_length);
-			if (recycle_delete == NULL ||
-			    recycle_root_depth == NULL ||
-			    !kaimo_local_reader_u8(&reader, &parsed) ||
-			    parsed > 1 ||
-			    !kaimo_local_reader_u8(&reader, &depth) ||
-			    depth > KAIMO_RECYCLE_MAX_ROOT_DEPTH ||
-			    !kaimo_local_reader_finished(&reader))
-				return -2;
-			*recycle_delete = parsed != 0;
-			*recycle_root_depth = depth;
-		} else if (response.payload_length != 0) {
-			return -2;
-		}
-		return 1;
-	}
-	if (response.status == KAIMO_LOCAL_STATUS_DENY &&
-	    response.payload_length == 0)
-		return 0;
-	if ((response.status == KAIMO_LOCAL_STATUS_ERROR ||
-	     response.status == KAIMO_LOCAL_STATUS_OVERLOADED) &&
-	    response.payload_length == 0)
-		return -1;
-	if (response.status == KAIMO_LOCAL_STATUS_UNAUTHORIZED_PEER &&
-	    response.payload_length == 0)
-		return -2;
-	return -2;
+		return KAIMO_AUTHZ_UNAVAILABLE;
+	return kaimo_authz_decode_reply(
+		operation, response.status, payload, response.payload_length,
+		granted_access, recycle_delete, recycle_root_depth);
 }
 
 static bool kaimo_authz_connect(const char *service, const char *user)
@@ -364,18 +315,15 @@ static bool kaimo_authz_connect(const char *service, const char *user)
 	if (!kaimo_request_ready("CONNECT", &request))
 		return false;
 
-	int d = kaimo_authz_send(
+	enum kaimo_authz_verdict d = kaimo_authz_send(
 		KAIMO_LOCAL_OP_CONNECT, &request, NULL, NULL, NULL);
-	if (d == -2) {
+	bool fail_open = kaimo_failmode_allow();
+	if (d == KAIMO_AUTHZ_MALFORMED)
 		DBG_ERR("kaimo_bridge: malformed CONNECT authorization response, denied\n");
-		return false;
-	}
-	if (d < 0) {
+	else if (d == KAIMO_AUTHZ_UNAVAILABLE)
 		DBG_WARNING("kaimo_bridge: authd unreachable (connect), fail-%s\n",
-			    kaimo_failmode_allow() ? "open" : "closed");
-		return kaimo_failmode_allow();
-	}
-	return d == 1;
+			    fail_open ? "open" : "closed");
+	return kaimo_authz_permits(d, KAIMO_LOCAL_OP_CONNECT, fail_open);
 }
 
 static bool kaimo_authz_open(const char *user, const char *share, const char *path,
@@ -404,14 +352,12 @@ static bool kaimo_authz_open(const char *user, const char *share, const char *pa
 	if (!kaimo_request_ready("OPEN", &request))
 		return false;
 
-	int d = kaimo_authz_send(KAIMO_LOCAL_OP_OPEN, &request,
-				 granted_access, NULL, NULL);
-	if (d == -2) {
+	enum kaimo_authz_verdict d = kaimo_authz_send(
+		KAIMO_LOCAL_OP_OPEN, &request, granted_access, NULL, NULL);
+	if (d == KAIMO_AUTHZ_MALFORMED)
 		DBG_ERR("kaimo_bridge: malformed OPEN authorization response, denied\n");
-		return false;
-	}
-	if (d < 0) return kaimo_failmode_allow();
-	return d == 1;
+	return kaimo_authz_permits(d, KAIMO_LOCAL_OP_OPEN,
+				   kaimo_failmode_allow());
 }
 
 static bool kaimo_authz_delete(const char *user, const char *share,
@@ -434,24 +380,18 @@ static bool kaimo_authz_delete(const char *user, const char *share,
 	if (!kaimo_request_ready("DELETEAUTH", &request))
 		return false;
 
-	int d = kaimo_authz_send(
+	enum kaimo_authz_verdict d = kaimo_authz_send(
 		KAIMO_LOCAL_OP_DELETE_AUTH, &request, NULL, recycle_delete,
 		recycle_root_depth);
-	if (d == -2) {
+	if (d == KAIMO_AUTHZ_MALFORMED)
 		DBG_ERR("kaimo_bridge: malformed DELETE authorization response, denied\n");
-		return false;
-	}
-	if (d < 0) {
-		/* Delete authorization now also carries the permanent-vs-recycle
-		 * disposition. Guessing "permanent" during a control-plane outage
-		 * could irreversibly bypass an enabled recycle bin, so this operation
-		 * must fail closed even when ordinary authorization is configured to
-		 * fail open. */
+	else if (d == KAIMO_AUTHZ_UNAVAILABLE)
+		/* Never fail-open: the reply carries the permanent-vs-recycle
+		 * disposition (see kaimo_authz_permits). */
 		DBG_WARNING("kaimo_bridge: authd unreachable (delete), fail-closed "
 			    "because recycle disposition is unknown\n");
-		return false;
-	}
-	return d == 1;
+	return kaimo_authz_permits(d, KAIMO_LOCAL_OP_DELETE_AUTH,
+				   kaimo_failmode_allow());
 }
 
 static bool kaimo_authz_rename(const char *user, const char *share,
@@ -483,18 +423,15 @@ static bool kaimo_authz_rename(const char *user, const char *share,
 	if (!kaimo_request_ready("RENAMEAUTH", &request))
 		return false;
 
-	int d = kaimo_authz_send(
+	enum kaimo_authz_verdict d = kaimo_authz_send(
 		KAIMO_LOCAL_OP_RENAME_AUTH, &request, NULL, NULL, NULL);
-	if (d == -2) {
+	bool fail_open = kaimo_failmode_allow();
+	if (d == KAIMO_AUTHZ_MALFORMED)
 		DBG_ERR("kaimo_bridge: malformed RENAME authorization response, denied\n");
-		return false;
-	}
-	if (d < 0) {
+	else if (d == KAIMO_AUTHZ_UNAVAILABLE)
 		DBG_WARNING("kaimo_bridge: authd unreachable (rename), fail-%s\n",
-			    kaimo_failmode_allow() ? "open" : "closed");
-		return kaimo_failmode_allow();
-	}
-	return d == 1;
+			    fail_open ? "open" : "closed");
+	return kaimo_authz_permits(d, KAIMO_LOCAL_OP_RENAME_AUTH, fail_open);
 }
 
 /* Read an object relative to the exact directory handle Samba will pass to
@@ -520,8 +457,7 @@ static int kaimo_rename_stat(vfs_handle_struct *handle,
 
 static bool kaimo_list_filter_enabled(void)
 {
-	const char *v = getenv("KAIMO_LIST_FILTER");
-	return !(v != NULL && v[0] == '0'); /* default: on */
+	return kaimo_vfs_switch_enabled(getenv("KAIMO_LIST_FILTER"));
 }
 
 /* Best-effort notification to kaimo_authd (no response expected by this
@@ -579,8 +515,7 @@ static bool kaimo_twrp_to_gmt(NTTIME twrp, char *out, size_t out_sz)
  * snapshots fail closed; they must never fall through to live share content. */
 static bool kaimo_snapshot_openat_enabled(void)
 {
-	const char *v = getenv("KAIMO_SNAPSHOT_OPENAT");
-	return !(v != NULL && v[0] == '0');
+	return kaimo_vfs_switch_enabled(getenv("KAIMO_SNAPSHOT_OPENAT"));
 }
 
 static bool kaimo_snapshot_create_is_readonly(
@@ -630,23 +565,18 @@ static uint32_t kaimo_snapshot_granted_access(
 static bool kaimo_snapshot_open_how_readonly(
 	const struct vfs_open_how *input, struct vfs_open_how *output)
 {
-	int unsafe_flags = O_CREAT | O_EXCL | O_TRUNC | O_APPEND;
-	if (input == NULL || output == NULL ||
-	    (input->flags & O_ACCMODE) != O_RDONLY ||
-	    (input->flags & unsafe_flags) != 0
-#ifdef O_TMPFILE
-	    || (input->flags & O_TMPFILE) == O_TMPFILE
-#endif
-	    ) {
+	int flags;
+	if (input == NULL || output == NULL) {
 		errno = EROFS;
 		return false;
 	}
+	if (!kaimo_snapshot_open_flags_readonly(input->flags, &flags))
+		return false;
 
 	/* Defence in depth: even after rejecting write intent, never forward a
 	 * create/truncate/append bit to a lower VFS module. */
 	*output = *input;
-	output->flags &= ~(O_ACCMODE | unsafe_flags);
-	output->flags |= O_RDONLY;
+	output->flags = flags;
 	output->mode = 0;
 	return true;
 }
@@ -681,44 +611,15 @@ static int kaimo_snapresolve_rel(struct kaimo_conn_ctx *ctx, const char *gmt,
 		payload, sizeof(payload));
 	if (result != 0)
 		return -1;
-	if (response.status == KAIMO_LOCAL_STATUS_NOT_FOUND &&
-	    response.payload_length == 0)
-		return 0;
-	if (response.status != KAIMO_LOCAL_STATUS_OK)
-		return -1;
 
-	struct kaimo_local_reader reader;
-	const uint8_t *cache_path;
-	uint32_t cache_path_length;
-	const uint8_t *lease_id;
-	uint32_t lease_id_length;
-	uint64_t version_size;
-	kaimo_local_reader_init(&reader, payload, response.payload_length);
-	if (!kaimo_local_reader_string(
-	     &reader, &cache_path, &cache_path_length) ||
-	    !kaimo_local_reader_u64(&reader, &version_size) ||
-	    !kaimo_local_reader_string(
-	     &reader, &lease_id, &lease_id_length) ||
-	    !kaimo_local_reader_finished(&reader) ||
-	    cache_path_length == 0 || lease_id_length == 0)
-		return -1;
-	(void)version_size;
-
-	if ((size_t)cache_path_length >= outsz) {
-		DBG_WARNING("kaimo_bridge: SNAPRESOLVE cache path too large, denied\n");
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-	memcpy(out, cache_path, cache_path_length);
-	out[cache_path_length] = '\0';
-	if ((size_t)lease_id_length >= lease_outsz) {
-		DBG_WARNING("kaimo_bridge: SNAPRESOLVE lease id too large, denied\n");
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-	memcpy(lease_out, lease_id, lease_id_length);
-	lease_out[lease_id_length] = '\0';
-	return 1;
+	errno = 0;
+	result = kaimo_snapshot_resolve_decode(
+		response.status, payload, response.payload_length,
+		out, outsz, lease_out, lease_outsz);
+	if (result < 0 && errno == ENAMETOOLONG)
+		DBG_WARNING("kaimo_bridge: SNAPRESOLVE cache path or lease id "
+			    "too large, denied\n");
+	return result;
 }
 
 static void kaimo_snaplease_release(struct kaimo_conn_ctx *ctx,
@@ -779,31 +680,6 @@ static bool kaimo_is_reserved_client_path(vfs_handle_struct *handle,
 	return strncmp(logical, ".kaimo-", 7) == 0;
 }
 
-/* The bridge response crosses an unauthenticated control-plane boundary today,
- * so never treat it as an arbitrary path. Only non-empty relative paths without
- * empty/dot components are accepted before the fixed local cache root is joined. */
-static bool kaimo_cache_relative_path_valid(const char *path)
-{
-	if (path == NULL || path[0] == '\0' || path[0] == '/' ||
-	    strchr(path, '\\') != NULL)
-		return false;
-	for (const unsigned char *p = (const unsigned char *)path; *p != '\0'; p++) {
-		if (*p < 0x20 || *p == 0x7f) return false;
-	}
-
-	const char *component = path;
-	for (;;) {
-		const char *slash = strchr(component, '/');
-		size_t len = slash != NULL
-			? (size_t)(slash - component) : strlen(component);
-		if (len == 0 || (len == 1 && component[0] == '.') ||
-		    (len == 2 && component[0] == '.' && component[1] == '.'))
-			return false;
-		if (slash == NULL) return true;
-		component = slash + 1;
-	}
-}
-
 static char *kaimo_snapshot_cache_abspath(TALLOC_CTX *mem_ctx,
 					  const char *relative)
 {
@@ -833,25 +709,17 @@ static char *kaimo_snapshot_cache_abspath(TALLOC_CTX *mem_ctx,
 static int kaimo_snapshot_lease_acquire(TALLOC_CTX *mem_ctx,
 					const char *cache_relative)
 {
-	const char *first;
-	const char *second;
+	ptrdiff_t scope_length;
 	char *lease_relative;
 	char *lease_absolute;
 	struct stat st;
 	int fd;
 
-	if (!kaimo_cache_relative_path_valid(cache_relative)) {
-		errno = EACCES;
+	scope_length = kaimo_snapshot_lease_scope_length(cache_relative);
+	if (scope_length < 0)
 		return -1;
-	}
-	first = strchr(cache_relative, '/');
-	second = first != NULL ? strchr(first + 1, '/') : NULL;
-	if (first == NULL || second == NULL || second == first + 1) {
-		errno = EACCES;
-		return -1;
-	}
 	lease_relative = talloc_asprintf(
-		mem_ctx, "%.*s/%s", (int)(second - cache_relative),
+		mem_ctx, "%.*s/%s", (int)scope_length,
 		cache_relative, KAIMO_SNAPSHOT_LEASE_FILE);
 	if (lease_relative == NULL) {
 		errno = ENOMEM;
@@ -1412,64 +1280,17 @@ static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 	}
 }
 
-static bool kaimo_random_capture_id(char id[33])
-{
-	uint8_t random_bytes[16];
-	size_t offset = 0;
-	static const char hex[] = "0123456789abcdef";
-
-	while (offset < sizeof(random_bytes)) {
-		ssize_t result = getrandom(
-			random_bytes + offset, sizeof(random_bytes) - offset, 0);
-		if (result < 0 && errno == EINTR)
-			continue;
-		if (result <= 0)
-			return false;
-		offset += (size_t)result;
-	}
-	for (size_t i = 0; i < sizeof(random_bytes); i++) {
-		id[i * 2] = hex[random_bytes[i] >> 4];
-		id[i * 2 + 1] = hex[random_bytes[i] & 0x0f];
-	}
-	id[32] = '\0';
-	return true;
-}
-
-static bool kaimo_capture_source_stable(const struct stat *before,
-					const struct stat *after)
-{
-	return before->st_dev == after->st_dev &&
-	       before->st_ino == after->st_ino &&
-	       before->st_size == after->st_size &&
-	       before->st_mtim.tv_sec == after->st_mtim.tv_sec &&
-	       before->st_mtim.tv_nsec == after->st_mtim.tv_nsec &&
-	       before->st_ctim.tv_sec == after->st_ctim.tv_sec &&
-	       before->st_ctim.tv_nsec == after->st_ctim.tv_nsec;
-}
-
-/* Capture the exact inode behind the closing Samba handle, never a reopened
- * pathname. FICLONE gives a constant-time CoW snapshot where available. The
- * fallback copies with pread so it cannot disturb Samba's file position and
- * rejects a source whose size/timestamps changed during the copy. */
+/* Capture the exact inode behind the closing Samba handle (close_capture.h)
+ * into <share>/.kaimo-close-captures and return talloc copies of its id and
+ * absolute path. The capture is withdrawn again if those copies fail. */
 static bool kaimo_capture_close_content(
 	vfs_handle_struct *handle, files_struct *fsp, TALLOC_CTX *mem_ctx,
 	char **capture_id_out, char **capture_path_out)
 {
-	char capture_id[33];
-	char *capture_dir_path = NULL;
-	char *temporary_name = NULL;
-	char *final_name = NULL;
-	char *final_path = NULL;
-	struct stat before;
-	struct stat after;
-	struct stat reopened;
-	int samba_fd = -1;
-	int source_fd = -1;
-	int directory_fd = -1;
-	int capture_fd = -1;
-	bool copied = false;
-	uint8_t *buffer = NULL;
-	int saved_errno = 0;
+	char capture_id[KAIMO_CLOSE_CAPTURE_ID_BYTES + 1];
+	char final_path[PATH_MAX];
+	char *capture_dir_path;
+	int samba_fd;
 
 	*capture_id_out = NULL;
 	*capture_path_out = NULL;
@@ -1479,159 +1300,25 @@ static bool kaimo_capture_close_content(
 		return false;
 	}
 	samba_fd = fsp_get_io_fd(fsp);
-	if (samba_fd < 0) {
-		errno = EBADF;
-		return false;
-	}
-	if (fstat(samba_fd, &before) != 0)
-		return false;
-	if (!S_ISREG(before.st_mode)) {
-		errno = EINVAL;
-		return false;
-	}
-	/* A client may have requested a write-only handle. Reopening this procfd
-	 * obtains a readable description of the same already-resolved inode; it
-	 * does not resolve the mutable share pathname. Verify identity before use. */
-	char procfd_path[64];
-	int procfd_length = snprintf(
-		procfd_path, sizeof(procfd_path), "/proc/self/fd/%d", samba_fd);
-	if (procfd_length <= 0 || (size_t)procfd_length >= sizeof(procfd_path)) {
-		errno = EOVERFLOW;
-		return false;
-	}
-	source_fd = open(procfd_path, O_RDONLY | O_CLOEXEC);
-	if (source_fd < 0)
-		return false;
-	if (fstat(source_fd, &reopened) != 0) {
-		int reopen_errno = errno;
-		close(source_fd);
-		errno = reopen_errno;
-		return false;
-	}
-	if (reopened.st_dev != before.st_dev ||
-	    reopened.st_ino != before.st_ino) {
-		if (source_fd >= 0)
-			close(source_fd);
-		errno = ESTALE;
-		return false;
-	}
-	if (!kaimo_random_capture_id(capture_id))
-		goto done;
-
 	capture_dir_path = talloc_asprintf(
 		mem_ctx, "%s/%s", handle->conn->connectpath,
 		KAIMO_CLOSE_CAPTURE_DIR);
-	temporary_name = talloc_asprintf(
-		mem_ctx, ".%s.%lld.tmp", capture_id,
-		(long long)getpid());
-	final_name = talloc_asprintf(mem_ctx, "%s.cap", capture_id);
-	final_path = talloc_asprintf(
-		mem_ctx, "%s/%s", capture_dir_path, final_name);
-	if (capture_dir_path == NULL || temporary_name == NULL ||
-	    final_name == NULL || final_path == NULL) {
+	if (capture_dir_path == NULL) {
 		errno = ENOMEM;
 		return false;
 	}
-
-	directory_fd = open(
-		capture_dir_path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
-	if (directory_fd < 0)
-		goto done;
-	capture_fd = openat(
-		directory_fd, temporary_name,
-		O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0440);
-	if (capture_fd < 0)
-		goto done;
-
-#ifdef FICLONE
-	if (ioctl(capture_fd, FICLONE, source_fd) == 0) {
-		copied = true;
-	} else if (ftruncate(capture_fd, 0) != 0) {
-		goto done;
-	}
-#endif
-	if (!copied) {
-		const size_t buffer_size = 128 * 1024;
-		buffer = talloc_array(mem_ctx, uint8_t, buffer_size);
-		if (buffer == NULL) {
-			errno = ENOMEM;
-			goto done;
-		}
-		off_t cursor = 0;
-		while (cursor < before.st_size) {
-			size_t requested = (size_t)MIN(
-				(off_t)buffer_size, before.st_size - cursor);
-			ssize_t count = pread(source_fd, buffer, requested, cursor);
-			if (count < 0 && errno == EINTR)
-				continue;
-			if (count <= 0) {
-				errno = count == 0 ? EIO : errno;
-				goto done;
-			}
-			size_t written = 0;
-			while (written < (size_t)count) {
-				ssize_t result = pwrite(
-					capture_fd, buffer + written,
-					(size_t)count - written,
-					cursor + (off_t)written);
-				if (result < 0 && errno == EINTR)
-					continue;
-				if (result <= 0) {
-					errno = result == 0 ? EIO : errno;
-					goto done;
-				}
-				written += (size_t)result;
-			}
-			cursor += count;
-		}
-	}
-
-	if (fstat(source_fd, &after) != 0 ||
-	    !kaimo_capture_source_stable(&before, &after)) {
-		errno = EBUSY;
-		goto done;
-	}
-	if (fchmod(capture_fd, 0440) != 0 || fsync(capture_fd) != 0)
-		goto done;
-	if (close(capture_fd) != 0) {
-		capture_fd = -1;
-		goto done;
-	}
-	capture_fd = -1;
-
-	/* linkat is an atomic no-replace publication; the random final name cannot
-	 * overwrite an existing capture even under a compromised local peer. */
-	if (linkat(
-	     directory_fd, temporary_name, directory_fd, final_name, 0) != 0)
-		goto done;
-	if (unlinkat(directory_fd, temporary_name, 0) != 0)
-		goto done;
-	if (fsync(directory_fd) != 0)
-		goto done;
+	if (!kaimo_close_capture(samba_fd, capture_dir_path, capture_id,
+				 final_path, sizeof(final_path)))
+		return false;
 
 	*capture_id_out = talloc_strdup(mem_ctx, capture_id);
 	*capture_path_out = talloc_strdup(mem_ctx, final_path);
 	if (*capture_id_out == NULL || *capture_path_out == NULL) {
+		unlink(final_path);
 		errno = ENOMEM;
-		goto done;
+		return false;
 	}
-	close(directory_fd);
-	close(source_fd);
 	return true;
-
-done:
-	saved_errno = errno;
-	if (capture_fd >= 0)
-		close(capture_fd);
-	if (source_fd >= 0)
-		close(source_fd);
-	if (directory_fd >= 0) {
-		unlinkat(directory_fd, temporary_name, 0);
-		unlinkat(directory_fd, final_name, 0);
-		close(directory_fd);
-	}
-	errno = saved_errno;
-	return false;
 }
 
 /* ---- Close hook: written file -> versioning/index/ownership (Phase 3) ---- */
@@ -2332,7 +2019,7 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 /* Build marker: bump on every module change so the running image can be
  * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
  * a rebuild actually picked up the latest source vs. served a cached layer. */
-#define KAIMO_BRIDGE_BUILD "2026-07-28g descriptor-bound close captures"
+#define KAIMO_BRIDGE_BUILD "2026-10-04a unit-testable decision headers"
 
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)

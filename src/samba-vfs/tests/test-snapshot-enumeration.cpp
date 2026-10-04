@@ -1,7 +1,7 @@
 #include "snapshot_enumeration.h"
 
 #include <array>
-#include <cassert>
+#include "kaimo_check.h"
 #include <cerrno>
 #include <cstdint>
 #include <string>
@@ -19,10 +19,10 @@ static std::vector<uint8_t> response(
 	kaimo_local_builder builder;
 	kaimo_local_builder_init(
 		&builder, payload.data(), payload.size());
-	assert(kaimo_local_builder_u32(&builder, advertised_count));
+	CHECK(kaimo_local_builder_u32(&builder, advertised_count));
 	for (uint32_t i = 0; i < actual_count; ++i)
-		assert(kaimo_local_builder_string(&builder, token));
-	assert(builder.valid);
+		CHECK(kaimo_local_builder_string(&builder, token));
+	CHECK(builder.valid);
 	payload.resize(builder.length);
 	return payload;
 }
@@ -31,9 +31,9 @@ static void expect_valid(
 	const std::vector<uint8_t>& payload, uint32_t expected_count)
 {
 	uint32_t count = UINT32_MAX;
-	assert(kaimo_snapshot_enumeration_validate(
+	CHECK(kaimo_snapshot_enumeration_validate(
 		payload.data(), payload.size(), &count));
-	assert(count == expected_count);
+	CHECK(count == expected_count);
 }
 
 static void expect_invalid(
@@ -41,16 +41,16 @@ static void expect_invalid(
 {
 	uint32_t count = UINT32_MAX;
 	errno = 0;
-	assert(!kaimo_snapshot_enumeration_validate(
+	CHECK(!kaimo_snapshot_enumeration_validate(
 		payload.data(), payload.size(), &count));
-	assert(count == 0);
-	assert(errno == expected_errno);
+	CHECK(count == 0);
+	CHECK(errno == expected_errno);
 }
 
 int main()
 {
-	assert(KAIMO_LOCAL_MAX_SNAPSHOT_ENUMERATION_PAYLOAD == 57348U);
-	assert(KAIMO_LOCAL_MAX_SNAPSHOT_ENUMERATION_PAYLOAD <=
+	CHECK(KAIMO_LOCAL_MAX_SNAPSHOT_ENUMERATION_PAYLOAD == 57348U);
+	CHECK(KAIMO_LOCAL_MAX_SNAPSHOT_ENUMERATION_PAYLOAD <=
 	       KAIMO_LOCAL_MAX_RESPONSE_PAYLOAD);
 	expect_valid(response(0, 0), 0);
 	expect_valid(response(1, 1), 1);
@@ -80,12 +80,12 @@ int main()
 
 	uint32_t count = 0;
 	errno = 0;
-	assert(!kaimo_snapshot_enumeration_validate(nullptr, 0, &count));
-	assert(errno == EPROTO);
+	CHECK(!kaimo_snapshot_enumeration_validate(nullptr, 0, &count));
+	CHECK(errno == EPROTO);
 	errno = 0;
 	auto valid = response(0, 0);
-	assert(!kaimo_snapshot_enumeration_validate(
+	CHECK(!kaimo_snapshot_enumeration_validate(
 		valid.data(), valid.size(), nullptr));
-	assert(errno == EINVAL);
+	CHECK(errno == EINVAL);
 	return 0;
 }

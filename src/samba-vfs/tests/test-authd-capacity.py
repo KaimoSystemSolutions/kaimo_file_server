@@ -18,6 +18,7 @@ WORKERS = 2
 QUEUE_CAPACITY = 3
 CLIENT_COUNT = 40
 HEADER = struct.Struct("!4sBBBBI")
+PROTOCOL_VERSION = 4
 
 
 def proc_count(pid: int, name: str) -> int:
@@ -92,7 +93,7 @@ def main() -> int:
                     )
                     if (
                         magic == b"KAIM"
-                        and version == 1
+                        and version == PROTOCOL_VERSION
                         and operation == 0
                         and kind == 2
                         and status == 6

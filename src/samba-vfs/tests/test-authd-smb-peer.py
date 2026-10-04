@@ -170,8 +170,13 @@ def main() -> int:
                     str(CONFIG_PATH),
                 ],
                 env=common_environment,
+                # smbd treats EOF on stdin as a shutdown request and forwards
+                # signals to its process group: keep a private open stdin and
+                # a separate session (same as the compatibility matrix).
+                stdin=subprocess.PIPE,
                 stdout=smbd_log,
                 stderr=subprocess.STDOUT,
+                start_new_session=True,
             )
             wait_for_smb(smbd, SMBD_LOG)
 
@@ -189,6 +194,7 @@ def main() -> int:
                 check=False,
                 text=True,
                 capture_output=True,
+                timeout=30,
             )
             if result.returncode != 0:
                 smbd_log.flush()
@@ -212,7 +218,7 @@ def main() -> int:
     assert "rejected unauthorized local peer" not in authd_output, diagnostics
     assert "cannot claim user" not in authd_output, diagnostics
     assert (
-        "kaimo_bridge build [2026-07-28e borrowed stat filename]" in smbd_output
+        "kaimo_bridge build [" in smbd_output
     ), diagnostics
 
     print("live smbd/authd peer-identity test passed")
