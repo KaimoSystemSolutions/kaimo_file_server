@@ -2,6 +2,7 @@ using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Infrastructure.Repositories;
 
@@ -39,10 +40,26 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
         await db.SaveChangesAsync();
     }
 
-    public async Task<bool> RotateAsync(RefreshToken current, RefreshToken replacement)
+    public Task<bool> RotateAsync(RefreshToken current, RefreshToken replacement)
+        => _dbFactory.ExecuteResilientAsync(db => RotateCoreAsync(db, current, replacement));
+
+    private static async Task<bool> RotateCoreAsync(
+        ApplicationDbContext db, RefreshToken current, RefreshToken replacement)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync();
         await using var tx = await db.Database.BeginTransactionAsync();
+
+        // A replayed attempt whose first COMMIT went through (acknowledgement lost) finds
+        // this exact rotation already done. Re-inserting the replacement would fail on its
+        // key and reject a refresh that actually succeeded.
+        if (await db.RefreshTokens.AnyAsync(
+                t => t.Id == current.Id && t.ReplacedByTokenId == replacement.Id))
+        {
+            db.GetDatabaseLogger().LogWarning(
+                "Refresh token {TokenId} was already rotated to {ReplacementId} by an attempt whose commit " +
+                "acknowledgement was lost; the replay reports the rotation as successful.",
+                current.Id, replacement.Id);
+            return true;
+        }
 
         // Insert first so the FK-style link target exists, then revoke conditionally:
         // only the rotation that still sees RevokedAtUtc == null may win.

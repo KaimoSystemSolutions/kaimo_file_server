@@ -39,6 +39,11 @@
     color: var(--danger);
 }
 
+/* The Host stopped reporting: the last status is unverified, not necessarily broken. */
+.settings-page ::deep .service-status--unreachable {
+    color: var(--warning);
+}
+
 /* Toggle switches use the shared global .toggle-switch styles in app.css (same as share
    settings); the former scoped ::deep copy conflicted with the global rule and misaligned
    the knob when checked (round knob sliding out to the bottom-right instead of the squared

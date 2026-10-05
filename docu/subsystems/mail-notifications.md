@@ -40,8 +40,16 @@ only in the Web process, because only the Web process holds the Data Protection 
 SMTP password (and the SmbBridge has no outbound network).
 
 - Polls every 10 s and is woken immediately when the Web process itself published.
-- Claims events with a 2-minute lease; a failed event is retried up to 5 times.
-- Renders one `mail_deliveries` row per recipient once and stores it (audit and retry).
+- Claims events with a 2-minute lease; a failed event is retried up to 5 times. An event that
+  exceeded the limit without ever reaching the error handler (the process stopped or the lease
+  expired while handling it) is set to `Failed` instead of being claimed again after every restart.
+- Renders one `mail_deliveries` row per recipient once and stores it (audit and retry). The
+  deliveries and the event completion are committed in one transaction, so a crash in between
+  cannot render the same event twice. Completion first updates the event only if it is still
+  `Processing` and stores the deliveries only when that matched, so neither a replay after a lost
+  commit acknowledgement nor a concurrent completion can duplicate deliveries or send a finished
+  event back to `Pending`. A replayed event insert or claim recognizes its own earlier write instead
+  of storing the event twice or leaving it stuck.
 - An address receives the mail of one event only once, even if several rules match.
 - Respects `MaxMailsPerMinute`. Failed deliveries are retried after 1, 2, 4 … minutes (capped at
   6 h); after 8 attempts, or on a permanent rejection, a delivery becomes `Dead`.

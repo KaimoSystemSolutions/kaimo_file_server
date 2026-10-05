@@ -82,34 +82,32 @@ public class ConfigRepository : IConfigRepository
     // ── Write ──────────────────────────────────
 
     /// <summary>Sets a single config value. Creates or updates.</summary>
-    public async Task SetAsync<T>(string key, T value)
-    {
-        await using var db = await _dbFactory.CreateDbContextAsync();
-
-        var serialized = Serialize(value);
-
-        var setting = await db.ConfigSettings.FindAsync(key);
-        if (setting is null)
-        {
-            db.ConfigSettings.Add(new ConfigSetting
-            {
-                Key = key,
-                Value = serialized,
-                UpdatedAt = DateTime.UtcNow
-            });
-        }
-        else
-        {
-            setting.Value = serialized;
-            setting.UpdatedAt = DateTime.UtcNow;
-        }
-
-        await db.SaveChangesAsync();
-        _cache.Remove($"cfg:{key}");
-    }
+    public Task SetAsync<T>(string key, T value)
+        => SetManyAsync(new Dictionary<string, object> { [key] = Serialize(value) });
 
     /// <summary>Sets multiple config values in a single transaction.</summary>
     public async Task SetManyAsync(Dictionary<string, object> values)
+    {
+        // Web, Host and Bridge all write this table. If another process inserts one of
+        // the keys between our read and our insert, the unique key rejects the batch;
+        // the second attempt then sees that row and updates it instead.
+        for (int attempt = 0; ; attempt++)
+        {
+            try
+            {
+                await UpsertAsync(values);
+                break;
+            }
+            catch (DbUpdateException) when (attempt == 0)
+            {
+            }
+        }
+
+        foreach (var key in values.Keys)
+            _cache.Remove($"cfg:{key}");
+    }
+
+    private async Task UpsertAsync(Dictionary<string, object> values)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
 
@@ -136,8 +134,6 @@ public class ConfigRepository : IConfigRepository
                     UpdatedAt = DateTime.UtcNow
                 });
             }
-
-            _cache.Remove($"cfg:{key}");
         }
 
         await db.SaveChangesAsync();

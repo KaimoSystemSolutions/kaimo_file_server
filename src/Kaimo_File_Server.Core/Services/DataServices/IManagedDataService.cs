@@ -50,4 +50,16 @@ public static class DataServiceKeys
 
     /// <summary>String: last reported <see cref="DataServiceStatus"/>.</summary>
     public static string StatusKey(string serviceKey) => $"services.{serviceKey}.status";
+
+    /// <summary>
+    /// UTC timestamp the Host reconciler refreshes periodically. A reported status is only
+    /// trustworthy while this is recent; once it goes stale the Host is not running.
+    /// </summary>
+    public const string HostHeartbeatKey = "runtime.host.heartbeat";
+
+    /// <summary>How often the Host refreshes <see cref="HostHeartbeatKey"/>.</summary>
+    public static readonly TimeSpan HostHeartbeatInterval = TimeSpan.FromSeconds(30);
+
+    /// <summary>Age after which the Host counts as unreachable (three missed heartbeats).</summary>
+    public static readonly TimeSpan HostHeartbeatStaleAfter = TimeSpan.FromSeconds(90);
 }

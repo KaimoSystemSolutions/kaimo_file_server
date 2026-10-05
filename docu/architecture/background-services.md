@@ -13,12 +13,12 @@ Related: [System overview](system-overview.md) · [Storage and persistence](stor
 
 | Service | Purpose |
 |---|---|
-| `DataServiceReconciler` | Every 5 s, applies the desired state `services.{key}.enabled` from `config_settings` to each `IManagedDataService` and writes back `services.{key}.status`. For SMB, `SambaSmbControlService` reflects the flag; the bridge enforces it by denying tree connects while SMB is disabled |
-| `DatabaseBackupSchedulerService` | One `pg_dump` per day inside a configured local-time window, with catch-up after downtime; woken immediately when backup settings change |
+| `DataServiceReconciler` | Every 5 s, applies the desired state `services.{key}.enabled` from `config_settings` to each `IManagedDataService` and writes back `services.{key}.status`. A separate loop refreshes `runtime.host.heartbeat` every 30 s (5 s after a failed write), independent of reconcile passes; from it the Web settings page detects an unreachable Host. For SMB, `SambaSmbControlService` reflects the flag; the bridge enforces it by denying tree connects while SMB is disabled |
+| `DatabaseBackupSchedulerService` | One `pg_dump` per day inside a configured local-time window, with catch-up after downtime. Polls every minute and caches the settings for 30 s, so a settings change takes effect within about 90 s |
 | `VersionStorageReconcilerService` | Moves version blobs from the legacy application-data store into the pools of their shares and follows shares moved to another pool (shortly after start, then daily) |
 
 Before the services start, the Host runs the writable-directory preflight, `MigrateSeedAndBackupAsync`
-(optional restore, pre-migration backup, migrations, seeding) and initializes the Elasticsearch index
+(optional restore, pre-migration backup, migrations, seeding, ready marker for Web and bridge) and initializes the Elasticsearch index
 mapping.
 
 ### Web (`src/Kaimo_File_Server.Web/Program.cs`)

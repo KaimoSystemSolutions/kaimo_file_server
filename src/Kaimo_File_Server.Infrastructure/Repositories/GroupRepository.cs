@@ -63,24 +63,29 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
                     $"Group {id} is a protected system group and cannot be deleted.");
             }
 
-            await using var db = await dbFactory.CreateDbContextAsync();
-
-            var group = await db.Groups.FindAsync(id);
-            if (group == null)
+            await dbFactory.ExecuteResilientAsync(async db =>
             {
-                return;
-            }
+                // One transaction: a failure part-way must not leave orphaned links.
+                await using var tx = await db.Database.BeginTransactionAsync();
 
-            // No FK cascade reaches these: user_groups links by a plain Guid, and
-            // PrincipalId is polymorphic user-or-group. Remove every link the group
-            // held, or its id keeps showing up as a member / role- and grant-holder
-            // after the group is gone.
-            await db.UserGroups.Where(ug => ug.GroupId == id).ExecuteDeleteAsync();
-            await db.ScopedRoleAssignments.Where(a => a.PrincipalId == id).ExecuteDeleteAsync();
-            await db.CloudAccessGrants.Where(g => g.PrincipalId == id).ExecuteDeleteAsync();
+                var group = await db.Groups.FindAsync(id);
+                if (group == null)
+                {
+                    return;
+                }
 
-            db.Groups.Remove(group);
-            await db.SaveChangesAsync();
+                // No FK cascade reaches these: user_groups links by a plain Guid, and
+                // PrincipalId is polymorphic user-or-group. Remove every link the group
+                // held, or its id keeps showing up as a member / role- and grant-holder
+                // after the group is gone.
+                await db.UserGroups.Where(ug => ug.GroupId == id).ExecuteDeleteAsync();
+                await db.ScopedRoleAssignments.Where(a => a.PrincipalId == id).ExecuteDeleteAsync();
+                await db.CloudAccessGrants.Where(g => g.PrincipalId == id).ExecuteDeleteAsync();
+
+                db.Groups.Remove(group);
+                await db.SaveChangesAsync();
+                await tx.CommitAsync();
+            });
         }
 
         /// <inheritdoc />

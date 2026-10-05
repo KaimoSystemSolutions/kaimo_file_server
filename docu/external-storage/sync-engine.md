@@ -44,7 +44,14 @@ flowchart LR
    them off the request thread and reports progress.
 3. **Coordination.** `DatabaseCloudSyncOperationCoordinator` keeps a per-share operation lease in
    `config_settings`, visible to Web and SmbBridge alike, so path edits, deletes and concurrent runs
-   on the same share exclude each other.
+   on the same share exclude each other. A run that finds the share busy is dropped (`Busy`); it
+   never interrupts the running one. The lease is renewed every minute (lifetime 5 minutes) and has
+   an absolute lifetime of 6 hours: a few minutes before that, while the lease is still valid, the
+   running sync is stopped and ends as `Interrupted`. Such a run is neither recorded as failed nor
+   notified; its last successful run stays unchanged, so the scheduler starts it again and the new run
+   continues from the state already transferred. A sync whose heartbeat failed for longer than the
+   lease lifetime (e.g. its process lost the database) may be taken over after expiry; it then stops
+   the same way instead of overlapping with the new owner.
 4. **Execution.** `CloudSyncExecutionService` (`src/Kaimo_File_Server.Infrastructure/Clouds/`) loads
    the definition, decrypts the connection grant, opens a provider session and runs the transfer as
    `RunAsUserId`. Browse-capable providers go through the generic engine

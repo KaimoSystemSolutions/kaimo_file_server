@@ -60,9 +60,12 @@ public sealed class LegacyCloudSyncMigrationService(
         }
     }
 
-    private async Task ImportAsync(CancellationToken cancellationToken)
+    private Task ImportAsync(CancellationToken cancellationToken)
+        => dbFactory.ExecuteResilientAsync(
+            db => ImportCoreAsync(db, cancellationToken), cancellationToken);
+
+    private async Task ImportCoreAsync(ApplicationDbContext db, CancellationToken cancellationToken)
     {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var shares = await db.ShareDefinitions.ToListAsync(cancellationToken);
         var allDefinitions = await db.SyncDefinitions.ToListAsync(cancellationToken);

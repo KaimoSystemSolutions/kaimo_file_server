@@ -2,6 +2,7 @@ using Kaimo_File_Server.Core.Domain.Notifications;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Infrastructure.Repositories;
 
@@ -10,11 +11,44 @@ public sealed class NotificationRepository(IDbContextFactory<ApplicationDbContex
 {
     // -- Outbox --
 
-    public async Task AddEventAsync(NotificationEvent notification, CancellationToken ct = default)
+    public Task AddEventAsync(NotificationEvent notification, CancellationToken ct = default)
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        db.NotificationEvents.Add(notification);
-        await db.SaveChangesAsync(ct);
+        bool attempted = false;
+        return dbFactory.ExecuteResilientAsync(async db =>
+        {
+            bool isReplay = attempted;
+            attempted = true;
+
+            // A replay may follow a COMMIT whose acknowledgement was lost. Inserting again would
+            // store a second event under a new Seq and mail every recipient twice. The event has
+            // no client-side key, so the replay looks for the identical row instead (same type,
+            // timestamp to the microsecond, actor, subjects and payload).
+            if (isReplay)
+            {
+                var existingSeq = await db.NotificationEvents.AsNoTracking()
+                    .Where(e => e.Type == notification.Type
+                                && e.OccurredAtUtc == notification.OccurredAtUtc
+                                && e.ActorUserId == notification.ActorUserId
+                                && e.SubjectUserIdsJson == notification.SubjectUserIdsJson
+                                && e.PayloadJson == notification.PayloadJson)
+                    .Select(e => (long?)e.Seq)
+                    .FirstOrDefaultAsync(ct);
+                if (existingSeq is { } seq)
+                {
+                    db.GetDatabaseLogger().LogWarning(
+                        "Notification event {Type} was already stored as {Seq} by an attempt whose commit " +
+                        "acknowledgement was lost; the replay does not insert it again.",
+                        notification.Type, seq);
+                    notification.Seq = seq;
+                    return;
+                }
+            }
+
+            // Never reuse an identity value a failed attempt may have written back.
+            notification.Seq = 0;
+            db.NotificationEvents.Add(notification);
+            await db.SaveChangesAsync(ct);
+        }, ct);
     }
 
     public async Task<List<NotificationEvent>> ClaimEventsAsync(
@@ -43,6 +77,19 @@ public sealed class NotificationRepository(IDbContextFactory<ApplicationDbContex
                     .SetProperty(e => e.Status, NotificationEventStatus.Processing)
                     .SetProperty(e => e.LeaseUntilUtc, leaseUntilUtc)
                     .SetProperty(e => e.AttemptCount, e => e.AttemptCount + 1), ct);
+            // A replayed statement (lost acknowledgement) finds the event already claimed with
+            // exactly this lease and matches no row. The lease timestamp identifies this call,
+            // so that is our claim, not a competitor's.
+            if (updated == 0 && await db.NotificationEvents.AnyAsync(
+                    e => e.Seq == seq
+                         && e.Status == NotificationEventStatus.Processing
+                         && e.LeaseUntilUtc == leaseUntilUtc, ct))
+            {
+                db.GetDatabaseLogger().LogWarning(
+                    "Claim of notification event {Seq} was already applied by a statement whose " +
+                    "acknowledgement was lost; it is kept as claimed.", seq);
+                updated = 1;
+            }
             if (updated == 1) claimed.Add(seq);
         }
 
@@ -53,25 +100,61 @@ public sealed class NotificationRepository(IDbContextFactory<ApplicationDbContex
     }
 
     public async Task CompleteEventAsync(
-        long seq, NotificationEventStatus status, string? error, CancellationToken ct = default)
+        long seq, NotificationEventStatus status, string? error, CancellationToken ct = default,
+        DateTime? claimedLeaseUntilUtc = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await db.NotificationEvents.Where(e => e.Seq == seq)
+        if (await UpdateEventStatusAsync(db, seq, status, error, claimedLeaseUntilUtc, ct) == 0)
+            db.GetDatabaseLogger().LogWarning(
+                "Completing notification event {Seq} as {Status} matched no claimed event: it was already " +
+                "completed, or the statement was replayed after a lost acknowledgement.", seq, status);
+    }
+
+    public Task CompleteEventWithDeliveriesAsync(
+        long seq, IReadOnlyCollection<MailDelivery> deliveries, NotificationEventStatus status, CancellationToken ct = default,
+        DateTime? claimedLeaseUntilUtc = null)
+        => dbFactory.ExecuteResilientAsync(async db =>
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            // Complete first: the conditional update row-locks the event, so a concurrent or
+            // replayed completion waits for this commit and then matches no row. Deliveries are
+            // therefore stored exactly once; a replay whose first COMMIT went through
+            // (acknowledgement lost) neither inserts them again nor sends the event back to Pending.
+            if (await UpdateEventStatusAsync(db, seq, status, null, claimedLeaseUntilUtc, ct) == 0)
+            {
+                db.GetDatabaseLogger().LogWarning(
+                    "Notification event {Seq} was no longer claimed by this dispatcher when its {Count} deliveries " +
+                    "were stored: an earlier attempt already committed them (lost acknowledgement), or the lease " +
+                    "expired and the event was re-claimed or completed elsewhere. Nothing was stored again.",
+                    seq, deliveries.Count);
+                return;
+            }
+
+            if (deliveries.Count > 0)
+            {
+                db.MailDeliveries.AddRange(deliveries);
+                await db.SaveChangesAsync(ct);
+            }
+            await tx.CommitAsync(ct);
+        }, ct);
+
+    // Only a claimed (Processing) event can be completed: a late or replayed completion must
+    // never turn an event that already reached Done/Skipped/Failed back into Pending. With the
+    // claim's lease value, only the claim that is still current may complete it: once a lease
+    // expired and the event was re-claimed, the former holder's completion matches nothing.
+    private static Task<int> UpdateEventStatusAsync(
+        ApplicationDbContext db, long seq, NotificationEventStatus status, string? error,
+        DateTime? claimedLeaseUntilUtc, CancellationToken ct)
+        => db.NotificationEvents
+            .Where(e => e.Seq == seq && e.Status == NotificationEventStatus.Processing)
+            .Where(e => claimedLeaseUntilUtc == null || e.LeaseUntilUtc == claimedLeaseUntilUtc)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(e => e.Status, status)
                 .SetProperty(e => e.LeaseUntilUtc, (DateTime?)null)
                 .SetProperty(e => e.LastError, Truncate(error))
                 .SetProperty(e => e.ProcessedAtUtc, status == NotificationEventStatus.Pending ? null : DateTime.UtcNow), ct);
-    }
 
     // -- Deliveries --
-
-    public async Task AddDeliveriesAsync(IEnumerable<MailDelivery> deliveries, CancellationToken ct = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        db.MailDeliveries.AddRange(deliveries);
-        await db.SaveChangesAsync(ct);
-    }
 
     public async Task<List<MailDelivery>> ClaimDueDeliveriesAsync(
         int max, DateTime nowUtc, TimeSpan staleAfter, CancellationToken ct = default)
@@ -99,6 +182,17 @@ public sealed class NotificationRepository(IDbContextFactory<ApplicationDbContex
                     .SetProperty(d => d.Status, MailDeliveryStatus.Sending)
                     // Marks when sending started; drives the stale-Sending recovery above.
                     .SetProperty(d => d.NextAttemptUtc, nowUtc), ct);
+            // A replayed statement (lost acknowledgement) finds the delivery already in Sending
+            // with exactly this call's start time and matches no row. That is our claim; treating
+            // it as lost would park the mail until the stale-Sending recovery picks it up.
+            if (updated == 0 && await db.MailDeliveries.AnyAsync(
+                    d => d.Id == id && d.Status == MailDeliveryStatus.Sending && d.NextAttemptUtc == nowUtc, ct))
+            {
+                db.GetDatabaseLogger().LogWarning(
+                    "Claim of mail delivery {DeliveryId} was already applied by a statement whose " +
+                    "acknowledgement was lost; it is kept as claimed.", id);
+                updated = 1;
+            }
             if (updated == 1) claimed.Add(id);
         }
 

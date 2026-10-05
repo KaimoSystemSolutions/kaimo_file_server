@@ -99,6 +99,91 @@ public sealed class CloudSyncExecutionServiceTests
     }
 
     [Fact]
+    public async Task RunAsync_LeaseEndingDuringTransfer_StopsAsInterruptedWithoutFailure()
+    {
+        var share = new ShareDefinition("docs", "/data/docs");
+        var definition = new SyncDefinition
+        {
+            ConnectionId = Guid.NewGuid(),
+            LocalShareId = share.Id,
+            LocalPath = "projects",
+            RemotePath = "/nightly",
+            Mode = SyncMode.Pull
+        };
+        var storageConnection = new StorageConnection
+        {
+            Id = definition.ConnectionId,
+            ProviderId = "rsync-ssh",
+            Name = "Rsync test",
+            State = StorageConnectionState.Ready
+        };
+        var shares = new Mock<IShareRepository>();
+        shares.Setup(repository => repository.GetByIdAsync(share.Id)).ReturnsAsync(share);
+        var definitions = new Mock<ISyncDefinitionRepository>();
+        definitions.Setup(repository => repository.GetBySharePathAsync(
+                share.Id, "projects", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(definition);
+        var storageConnections = new Mock<IStorageConnectionRepository>();
+        storageConnections.Setup(repository => repository.GetAsync(
+                storageConnection.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(storageConnection);
+
+        // The transfer runs until its token fires; the lease then ends (lifetime cap reached).
+        using var leaseEnded = new CancellationTokenSource();
+        var optimized = new Mock<IOptimizedStorageSync>();
+        optimized.Setup(candidate => candidate.SynchronizeAsync(
+                It.IsAny<OptimizedSyncRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(async (OptimizedSyncRequest _, CancellationToken token) =>
+            {
+                leaseEnded.Cancel();
+                await Task.Delay(Timeout.Infinite, token);
+                return (IReadOnlyList<string>)[];
+            });
+        var session = new Mock<IStorageSession>();
+        session.SetupGet(candidate => candidate.OptimizedSync).Returns(optimized.Object);
+        var provider = new Mock<IStorageConnectionProvider>();
+        provider.SetupGet(candidate => candidate.Capabilities).Returns(
+            StorageProviderCapabilities.Sync | StorageProviderCapabilities.OptimizedSync);
+        provider.Setup(candidate => candidate.OpenSessionAsync(
+                storageConnection, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session.Object);
+        var catalog = new Mock<IStorageConnectionProviderCatalog>();
+        catalog.Setup(candidate => candidate.GetRequired("rsync-ssh")).Returns(provider.Object);
+        var lease = new Mock<ICloudSyncOperationLease>();
+        lease.SetupGet(candidate => candidate.LeaseLost).Returns(leaseEnded.Token);
+        var operations = new Mock<ICloudSyncOperationCoordinator>();
+        operations.Setup(candidate => candidate.TryBeginSyncAsync(
+                share.Id, "projects", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(lease.Object);
+        var notifications = new Mock<Core.Services.Notifications.INotificationPublisher>();
+        var sut = new CloudSyncExecutionService(
+            shares.Object,
+            definitions.Object,
+            storageConnections.Object,
+            Mock.Of<ICredentialVault>(),
+            Mock.Of<ILegacyCloudSyncMigrationService>(),
+            Mock.Of<ICloudProviderFactory>(),
+            Mock.Of<IFileServiceFactory>(),
+            operations.Object,
+            catalog.Object,
+            notifications: notifications.Object);
+        var actor = new UserContext(
+            new User(Guid.NewGuid(), "Admin", "admin", "hash", "nt"), [], [], []);
+
+        var result = await sut.RunAsync(share.Id, "projects", actor);
+
+        // Neither failed nor completed: the sync stays due and resumes on its next run.
+        Assert.Equal(CloudSyncExecutionResult.Interrupted, result);
+        definitions.Verify(repository => repository.MarkFailedAsync(
+            It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        definitions.Verify(repository => repository.MarkCompletedAsync(
+            It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlyList<SyncFailure>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        notifications.VerifyNoOtherCalls();
+        lease.Verify(candidate => candidate.DisposeAsync(), Times.Once);
+    }
+
+    [Fact]
     public async Task RunAsync_HoldsSharedCoordinatorLeaseAndPersistsNarrowState()
     {
         var share = new ShareDefinition("docs", "/data/docs");

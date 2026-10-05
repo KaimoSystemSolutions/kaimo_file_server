@@ -31,7 +31,13 @@ public enum CloudSyncExecutionResult
     Completed,
     CompletedWithErrors,
     Busy,
-    Missing
+    Missing,
+
+    /// <summary>
+    /// The operation lease ended while transferring (absolute lifetime reached, or taken over
+    /// after expiry). Not a failure: the sync stays due and resumes on its next run.
+    /// </summary>
+    Interrupted
 }
 
 public sealed class CloudSyncExecutionService(
@@ -62,6 +68,12 @@ public sealed class CloudSyncExecutionService(
 
         await using (operationLease)
         {
+            // Only the transfer observes the end of the lease (absolute lifetime reached, or lost
+            // to another process): it stops instead of overlapping with another owner, and the
+            // run ends as Interrupted, neither recorded as failed nor notified. The last
+            // successful run stays unchanged, so the scheduler starts it again and it resumes.
+            using var transferCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, operationLease.LeaseLost);
             cancellationToken.ThrowIfCancellationRequested();
             await legacyMigration.EnsureMigratedAsync(cancellationToken);
             var share = await shares.GetByIdAsync(shareId);
@@ -87,15 +99,15 @@ public sealed class CloudSyncExecutionService(
             }
             if (storageProvider?.Capabilities.HasFlag(StorageProviderCapabilities.OptimizedSync) == true)
             {
-                await RunOptimizedAsync(
+                return await RunOptimizedAsync(
                     storageProvider,
                     storageConnection,
                     share,
                     definition,
                     normalizedPath,
                     reportProgress,
-                    cancellationToken);
-                return CloudSyncExecutionResult.Completed;
+                    cancellationToken,
+                    transferCancellation.Token);
             }
             if (storageProvider?.Capabilities.HasFlag(StorageProviderCapabilities.DirectFileAccess) == true
                 || storageProvider?.Capabilities.HasFlag(StorageProviderCapabilities.RequiresHostMount) == true)
@@ -156,11 +168,15 @@ public sealed class CloudSyncExecutionService(
                     previousManifest,
                     reportProgress,
                     failures,
-                    cancellationToken);
+                    transferCancellation.Token);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
+            }
+            catch (OperationCanceledException) when (operationLease.LeaseLost.IsCancellationRequested)
+            {
+                return CloudSyncExecutionResult.Interrupted;
             }
             catch (Exception exception)
             {
@@ -276,14 +292,15 @@ public sealed class CloudSyncExecutionService(
         }
     }
 
-    private async Task RunOptimizedAsync(
+    private async Task<CloudSyncExecutionResult> RunOptimizedAsync(
         IStorageConnectionProvider provider,
         StorageConnection connection,
         ShareDefinition share,
         SyncDefinition definition,
         string normalizedLocalPath,
         Action<string?, int>? reportProgress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CancellationToken transferToken)
     {
         if (definition.Mode == SyncMode.TwoWay)
             throw new NotSupportedException(
@@ -314,12 +331,17 @@ public sealed class CloudSyncExecutionService(
                 ?? throw new NotSupportedException(
                     "The storage provider did not expose its advertised optimized synchronization contract.");
             reportProgress?.Invoke(null, 0);
-            receivedFiles = await optimizedSync.SynchronizeAsync(request, cancellationToken) ?? [];
+            receivedFiles = await optimizedSync.SynchronizeAsync(request, transferToken) ?? [];
             reportProgress?.Invoke(null, 100);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (OperationCanceledException) when (transferToken.IsCancellationRequested)
+        {
+            // Only the operation lease ended (see RunAsync).
+            return CloudSyncExecutionResult.Interrupted;
         }
         catch (Exception exception)
         {
@@ -349,6 +371,7 @@ public sealed class CloudSyncExecutionService(
         // per-file search-index hooks fired. Feed exactly the files rsync reported
         // as received (from --itemize-changes) to the index — no full-share rescan.
         await IndexReceivedFilesAsync(receivedFiles, cancellationToken);
+        return CloudSyncExecutionResult.Completed;
     }
 
     /// <summary>

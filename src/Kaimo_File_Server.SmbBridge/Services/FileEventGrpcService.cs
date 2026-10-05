@@ -19,6 +19,8 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 public sealed class FileEventGrpcService : EventService.EventServiceBase
 {
     private const string CloseCaptureDirectory = ".kaimo-close-captures";
+    private static readonly TimeSpan EventLeaseDuration = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan EventLeaseRenewalInterval = TimeSpan.FromSeconds(30);
     private readonly IFileServiceFactory _factory;
     private readonly IShareRepository _shares;
     private readonly IAuthenticationLookup _auth;
@@ -164,7 +166,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
         CancellationToken cancellationToken)
     {
         var claim = await _events.TryClaimAsync(
-            eventId, eventType, TimeSpan.FromMinutes(2), cancellationToken);
+            eventId, eventType, EventLeaseDuration, cancellationToken);
         if (claim == SambaEventClaimResult.AlreadyCompleted) return true;
         if (claim != SambaEventClaimResult.Acquired)
         {
@@ -176,7 +178,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
         try
         {
-            await handler();
+            await RunWithLeaseHeartbeatAsync(eventId, handler);
             // Once the non-cooperative lifecycle handler has committed its side
             // effects, completion is a correctness write and must survive client
             // cancellation. Releasing the receipt here could let a retry duplicate
@@ -193,6 +195,58 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
             await _events.ReleaseAsync(
                 eventId, error.Message, CancellationToken.None);
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Keeps the event lease alive while the handler runs. Without it, a handler that
+    /// outlives the lease could be re-claimed by a Samba retry and run twice at once.
+    /// </summary>
+    private async Task RunWithLeaseHeartbeatAsync(Guid eventId, Func<Task> handler)
+    {
+        using var stop = new CancellationTokenSource();
+        var heartbeat = RenewLeaseLoopAsync(eventId, stop.Token);
+        try
+        {
+            await handler();
+        }
+        finally
+        {
+            await stop.CancelAsync();
+            await heartbeat;
+        }
+    }
+
+    private async Task RenewLeaseLoopAsync(Guid eventId, CancellationToken stopToken)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(EventLeaseRenewalInterval);
+            while (await timer.WaitForNextTickAsync(stopToken))
+            {
+                try
+                {
+                    if (!await _events.RenewAsync(eventId, EventLeaseDuration, stopToken))
+                    {
+                        // Once expired, a re-claimed lease looks alive again; renewing it
+                        // would extend another handler's claim, so stop here.
+                        _logger.LogWarning(
+                            "Lease for lifecycle event {EventId} expired while its handler was still running; " +
+                            "a Samba retry may process the event concurrently.", eventId);
+                        return;
+                    }
+                }
+                catch (Exception error) when (error is not OperationCanceledException)
+                {
+                    // A transient database error must not end the heartbeat; the next
+                    // tick retries well before the lease runs out.
+                    _logger.LogWarning(error, "Lease renewal for lifecycle event {EventId} failed.", eventId);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The handler finished.
         }
     }
 

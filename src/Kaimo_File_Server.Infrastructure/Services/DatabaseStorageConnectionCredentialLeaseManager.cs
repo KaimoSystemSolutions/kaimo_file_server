@@ -54,7 +54,14 @@ public sealed class DatabaseStorageConnectionCredentialLeaseManager(
             {
                 // A concurrent insert or active owner won. A fresh-context check
                 // avoids leaking the failed tracked entity into later work.
-                return null;
+                // The row may also carry this call's own lease: the reclaim or insert was
+                // replayed by the execution strategy after its acknowledgement was lost.
+                // The lease id is unique to this call, so that row is ours.
+                await using var checkDb = await dbFactory.CreateDbContextAsync(cancellationToken);
+                if (!await checkDb.StorageConnectionCredentialLeases.AnyAsync(
+                        lease => lease.ConnectionId == connectionId && lease.LeaseId == leaseId,
+                        cancellationToken))
+                    return null;
             }
         }
 

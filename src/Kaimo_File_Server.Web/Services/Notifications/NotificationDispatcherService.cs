@@ -144,17 +144,35 @@ public sealed class NotificationDispatcherService(
         {
             try
             {
+                // The claim already counted this attempt. An event above the limit never reached
+                // the catch below on its earlier attempts: the process stopped while handling it,
+                // or its lease ran out first. Park it as Failed instead of re-claiming it forever.
+                // Inside the try, so a database error here does not abandon the rest of the batch.
+                if (notification.AttemptCount > MaxEventAttempts)
+                {
+                    logger.LogWarning(
+                        "Notification event {Seq} ({Type}) was claimed {Attempts} times without completing; parked as failed.",
+                        notification.Seq, notification.Type, notification.AttemptCount);
+                    await repository.CompleteEventAsync(notification.Seq, NotificationEventStatus.Failed,
+                        "Exceeded the maximum number of attempts without completing " +
+                        "(the process stopped or the processing lease expired).", ct,
+                        claimedLeaseUntilUtc: notification.LeaseUntilUtc);
+                    continue;
+                }
+
+                // The claim's stored lease identifies this claim: if it expired while the event
+                // was being rendered and the event was re-claimed, this completion is discarded.
                 var created = await BuildDeliveriesAsync(notification, environment, resolver, ct);
-                if (created.Count > 0) await repository.AddDeliveriesAsync(created, ct);
-                await repository.CompleteEventAsync(notification.Seq,
-                    created.Count > 0 ? NotificationEventStatus.Done : NotificationEventStatus.Skipped, null, ct);
+                await repository.CompleteEventWithDeliveriesAsync(notification.Seq, created,
+                    created.Count > 0 ? NotificationEventStatus.Done : NotificationEventStatus.Skipped, ct,
+                    claimedLeaseUntilUtc: notification.LeaseUntilUtc);
             }
             catch (Exception ex) when (!ct.IsCancellationRequested)
             {
                 logger.LogWarning(ex, "Processing notification event {Seq} ({Type}) failed", notification.Seq, notification.Type);
                 await repository.CompleteEventAsync(notification.Seq,
                     notification.AttemptCount >= MaxEventAttempts ? NotificationEventStatus.Failed : NotificationEventStatus.Pending,
-                    ex.Message, ct);
+                    ex.Message, ct, claimedLeaseUntilUtc: notification.LeaseUntilUtc);
             }
         }
     }

@@ -81,10 +81,24 @@ Restore is a startup operation performed by the Host:
 3. Restart the stack (at least the Host). On startup the Host:
    - restores the dump with `pg_restore --clean --if-exists` (this **overwrites** the current
      database);
+   - clears the ready marker that came with the dump (see [Readiness gating](#readiness-gating)), so
+     a Web or bridge process that starts meanwhile waits for this run instead of trusting the
+     backup's state;
    - applies newer migrations on top, bringing an older dump to the current schema;
+   - seeds and writes the ready marker again;
    - writes a marker file `<dump>.done` next to the backup.
 4. Because of the marker, the same file is not restored again on the next start. Delete the marker to
    restore the same file again, and clear `KAIMO_DB_RESTORE_FROM` for normal operation.
+
+Web and SmbBridge that keep running during the restore are not stopped by it and work against the
+replaced data with up to 10 minutes of cached settings. Restart the whole stack, not only the Host,
+so every process starts from the restored state.
+
+The dump also carries runtime rows of the moment it was taken: the Host heartbeat
+(`runtime.host.heartbeat`, refreshed within 30 s) and cloud-sync operation leases
+(`runtime.cloud-sync-operation.*`). A restored lease is not renewed by anyone; it expires after at
+most 5 minutes (an external path reservation after its own short lifetime), until then the share
+counts as busy.
 
 ### Manual restore
 
@@ -92,10 +106,34 @@ Restore is a startup operation performed by the Host:
 pg_restore --clean --if-exists --no-owner --no-privileges -h <db-host> -U <user> -d <database> /path/to/kaimo_20260819-221000_premigration.dump
 ```
 
+A manual restore bypasses the Host's startup sequence, so the restored ready marker is the one of the
+backup's run. Stop Web and SmbBridge before restoring and restart the Host afterwards: it migrates the
+restored data to its own schema, seeds and rewrites the marker, and Web and SmbBridge wait for that
+when they start again.
+
 ## Readiness gating
 
-Only the Host migrates. Web and SmbBridge call `WaitForDatabaseReadyAsync`, which polls until no
-migrations are pending, and continue only then. This in-process wait is the readiness guarantee
-regardless of container start order. `docker-compose.yml` declares the Host dependency with
-`condition: service_started` as an ordering hint only; a `service_healthy` gate would stall
-debugger-attached development runs in which the Host entrypoint is replaced.
+Only the Host migrates and seeds. Web and SmbBridge call `WaitForDatabaseReadyAsync`, which polls
+until
+
+1. no migrations of their build are pending, and
+2. the ready marker `system.schema.ready` in `config_settings` holds the last migration id of their
+   build.
+
+The Host clears the marker as soon as it holds the migration lock, again right after a startup
+restore and again after migrating, and writes it as the very last startup step, after seeding. A
+process that starts while the Host migrates, restores or seeds therefore waits, even when a release
+changed seeding without adding a migration. Seeding runs on every Host start and is idempotent: it
+only adds what is missing (system department, groups and roles, bootstrap admin, default settings,
+NT-hash key canary; demo data only with `Seed:DemoData=true`), so on an established installation it
+finishes in moments.
+
+An image that finds applied migrations it does not know is older than the database schema; it stops
+at once with an explicit error instead of writing to a newer schema. Otherwise the wait times out
+after 10 minutes. With `restart: unless-stopped` both show up as a restart loop until the Host is
+healthy or the images match; check the container logs.
+
+This in-process wait is the readiness guarantee regardless of container start order.
+`docker-compose.yml` declares the Host dependency with `condition: service_started` as an ordering
+hint only; a `service_healthy` gate would stall debugger-attached development runs in which the Host
+entrypoint is replaced.

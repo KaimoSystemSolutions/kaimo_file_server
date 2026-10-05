@@ -10771,6 +10771,51 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die SMB protocol settings saved. Samba applies them within a few seconds; [...] ähnelt.
+        /// </summary>
+        public static string Web_Settings_SmbProtocolSaved {
+            get {
+                return ResourceManager.GetString("Web_Settings_SmbProtocolSaved", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Host not reachable ähnelt.
+        /// </summary>
+        public static string Web_Settings_Data_StatusHostUnreachable {
+            get {
+                return ResourceManager.GetString("Web_Settings_Data_StatusHostUnreachable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The Host process has not reported since {0}. [...] ähnelt.
+        /// </summary>
+        public static string Web_Settings_Data_HostUnreachableHint {
+            get {
+                return ResourceManager.GetString("Web_Settings_Data_HostUnreachableHint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The Host process has not reported yet. [...] ähnelt.
+        /// </summary>
+        public static string Web_Settings_Data_HostNeverReportedHint {
+            get {
+                return ResourceManager.GetString("Web_Settings_Data_HostNeverReportedHint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The service status could not be read. [...] ähnelt.
+        /// </summary>
+        public static string Web_Settings_Data_StatusRefreshFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_Data_StatusRefreshFailed", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die SMB is being enabled. The change is applied by the service within a few seconds. ähnelt.
         /// </summary>
         public static string Web_Settings_SmbEnabled {

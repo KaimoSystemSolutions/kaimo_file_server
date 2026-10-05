@@ -3,12 +3,27 @@
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject AssetProvider Icons
 @inject NavigationManager Nav
+@inject DateFormatService DateFmt
+@implements IDisposable
 
 <div class="detail-section">
     <span class="detail-label">@R("Web_Settings_Data_Title")</span>
     <p class="settings-description">@R("Web_Settings_Data_Description")</p>
+    @if (VM.HostUnreachable)
+    {
+        <div class="warning-banner" role="status">@(VM.HostLastSeenUtc is null
+            ? R("Web_Settings_Data_HostNeverReportedHint")
+            : string.Format(R("Web_Settings_Data_HostUnreachableHint"), DateFmt.FormatDateTime(VM.HostLastSeenUtc)))</div>
+    }
     <div class="service-row">
-        <div class="service-info"><span class="service-name">SMB / CIFS</span><span class="service-status service-status--@VM.SmbStatus.ToLowerInvariant()">@StatusLabel(VM.SmbStatus)</span></div>
+        @if (VM.HostUnreachable)
+        {
+            <div class="service-info"><span class="service-name">SMB / CIFS</span><span class="service-status service-status--unreachable">@R("Web_Settings_Data_StatusHostUnreachable")</span></div>
+        }
+        else
+        {
+            <div class="service-info"><span class="service-name">SMB / CIFS</span><span class="service-status service-status--@VM.SmbStatus.ToLowerInvariant()">@StatusLabel(VM.SmbStatus)</span></div>
+        }
         <label class="toggle-switch" title="@R("Web_Settings_Data_SmbToggle")"><input type="checkbox" @bind="VM.SmbEnabled" /><span class="toggle-slider"></span></label>
     </div>
     <div class="service-row">
@@ -38,7 +53,48 @@
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
-    private async Task SaveServices() { await VM.SaveDataServicesAsync(); StateHasChanged(); }
+    private CancellationTokenSource? _statusPoll;
+
+    private async Task SaveServices()
+    {
+        bool saved = await VM.SaveDataServicesAsync();
+        StateHasChanged();
+        if (saved) await PollSmbStatusAsync();
+    }
+
+    // The Host applies the SMB toggle on its next reconcile tick (every 5 s). Poll briefly
+    // so the page shows the real outcome, or the unreachable Host, instead of a stale status.
+    private async Task PollSmbStatusAsync()
+    {
+        _statusPoll?.Cancel();
+        _statusPoll?.Dispose();
+        _statusPoll = new CancellationTokenSource();
+        var token = _statusPoll.Token;
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        try
+        {
+            while (DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(1500), token);
+                bool refreshed = await VM.RefreshDataServiceStatusAsync();
+                // The page may have been left while the refresh was running.
+                token.ThrowIfCancellationRequested();
+                StateHasChanged();
+                // A failed read is shown as an error; polling on would only repeat it.
+                if (!refreshed || VM.SmbStatusMatchesDesired || VM.HostUnreachable) return;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Page left or a newer save started its own poll.
+        }
+    }
+
+    public void Dispose()
+    {
+        _statusPoll?.Cancel();
+        _statusPoll?.Dispose();
+    }
     private async Task SaveProtocol() { await VM.SaveSmbProtocolAsync(); StateHasChanged(); }
     private async Task Refresh() { await VM.RefreshDataServiceStatusAsync(); StateHasChanged(); }
     private static string StatusLabel(string status) => status switch { "Running" => R("Web_Settings_Data_StatusRunning"), "Stopped" => R("Web_Settings_Data_StatusStopped"), "Starting" => R("Web_Settings_Data_StatusStarting"), "Stopping" => R("Web_Settings_Data_StatusStopping"), "Faulted" => R("Web_Settings_Data_StatusFaulted"), _ => R("Web_Settings_Data_StatusUnknown") };

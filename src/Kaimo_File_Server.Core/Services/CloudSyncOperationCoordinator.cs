@@ -37,7 +37,16 @@ public interface ICloudSyncOperationCoordinator
         CancellationToken cancellationToken = default);
 }
 
-public interface ICloudSyncOperationLease : IAsyncDisposable;
+public interface ICloudSyncOperationLease : IAsyncDisposable
+{
+    /// <summary>
+    /// Cancelled once the lease ends while the holder is still working: shortly before it
+    /// reaches its absolute lifetime cap, or after it was lost to another process (it expired
+    /// and was taken over). Cooperative holders stop instead of overlapping with another
+    /// owner. Leases that cannot end this way never cancel it.
+    /// </summary>
+    CancellationToken LeaseLost => CancellationToken.None;
+}
 
 /// <summary>
 /// Raised when a namespace mutation overlaps a currently active cloud sync.

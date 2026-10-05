@@ -90,9 +90,14 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         }
 
         /// <inheritdoc />
-        public async Task DeleteAsync(Guid id)
+        public Task DeleteAsync(Guid id)
+            => dbFactory.ExecuteResilientAsync(db => DeleteCoreAsync(db, id));
+
+        private static async Task DeleteCoreAsync(ApplicationDbContext db, Guid id)
         {
-            await using var db = await dbFactory.CreateDbContextAsync();
+            // One transaction: a failure part-way must not leave a user whose
+            // memberships are already gone, or orphaned links to a deleted user.
+            await using var tx = await db.Database.BeginTransactionAsync();
 
             var user = await db.Users.FindAsync(id);
             if (user == null)
@@ -111,6 +116,7 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
 
             db.Users.Remove(user);
             await db.SaveChangesAsync();
+            await tx.CommitAsync();
         }
 
         // --------------------------------------------
@@ -185,9 +191,13 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         }
 
         /// <inheritdoc />
-        public async Task UpdatePasswordAsync(Guid userId, string passwordHash, string ntHash, bool changedByUser = false)
+        public Task UpdatePasswordAsync(Guid userId, string passwordHash, string ntHash, bool changedByUser = false)
+            => dbFactory.ExecuteResilientAsync(
+                db => UpdatePasswordCoreAsync(db, userId, passwordHash, ntHash, changedByUser));
+
+        private static async Task UpdatePasswordCoreAsync(
+            ApplicationDbContext db, Guid userId, string passwordHash, string ntHash, bool changedByUser)
         {
-            await using var db = await dbFactory.CreateDbContextAsync();
             await using var tx = await db.Database.BeginTransactionAsync();
 
             // A new security stamp invalidates every web and client-API JWT issued before

@@ -107,6 +107,23 @@ public sealed class MailNotificationTests : DatabaseTestBase
     // ───────────────────────── Dispatcher ─────────────────────────
 
     [Fact]
+    public async Task Event_ThatStoppedTheProcessOnEveryAttempt_IsParkedAsFailed_NotReclaimedForever()
+    {
+        // The claim counts each attempt; an event already at the limit was claimed and then
+        // never completed, i.e. the process died while handling it.
+        var notification = NotificationEvents.UploadReceived(Guid.NewGuid(), "Bewerbungen", Guid.NewGuid(), "cv.pdf", 1);
+        notification.AttemptCount = NotificationDispatcherService.MaxEventAttempts;
+        await _repo.AddEventAsync(notification);
+
+        await _dispatcher.ProcessEventsAsync(default);
+
+        await using var db = NewContext();
+        var stored = await db.NotificationEvents.AsNoTracking().SingleAsync();
+        Assert.Equal(NotificationEventStatus.Failed, stored.Status);
+        Assert.Empty(await DeliveriesAsync());
+    }
+
+    [Fact]
     public async Task Event_WithEnabledRule_IsRenderedForContextRecipient_AndSentOnceSmtpIsConfigured()
     {
         var creator = SeedMailUser("erika", "erika@example.com");

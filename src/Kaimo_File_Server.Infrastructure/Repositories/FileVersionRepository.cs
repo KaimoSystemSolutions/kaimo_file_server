@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using System.Data;
+using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Infrastructure.Repositories
 {
@@ -166,23 +167,58 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             return removed;
         }
 
-        public async Task<List<FileVersion>> RenamePathAsync(
+        // Runs under the execution strategy, so a serialization failure (40001) or a
+        // dropped connection replays the whole unit on a fresh context.
+        public Task<List<FileVersion>> RenamePathAsync(
             Guid shareId,
             string oldPath,
             string newPath,
             Guid? sambaLifecycleEventId = null)
         {
-            await using var db = await _dbFactory.CreateDbContextAsync();
+            var plan = new RenamePlan();
+            return _dbFactory.ExecuteResilientAsync(
+                db => RenamePathCoreAsync(db, shareId, oldPath, newPath, sambaLifecycleEventId, plan));
+        }
 
-            // Serializable isolation also closes the rare overlap where an
-            // expired event lease is reclaimed while the prior worker commits.
+        /// <summary>
+        /// The rows the first attempt of a rename without event receipt read before it wrote:
+        /// source versions with their original paths, and the destination versions it displaces.
+        /// </summary>
+        private sealed class RenamePlan
+        {
+            public Dictionary<Guid, string>? SourcePaths;
+            public List<FileVersion>? Displaced;
+        }
+
+        private static async Task<List<FileVersion>> RenamePathCoreAsync(
+            ApplicationDbContext db,
+            Guid shareId,
+            string oldPath,
+            string newPath,
+            Guid? sambaLifecycleEventId,
+            RenamePlan plan)
+        {
+            // One transaction, so a failure between removing the displaced rows and moving the
+            // source never leaves half a rename behind. Serializable isolation also closes the
+            // rare overlap where an expired event lease is reclaimed while the prior worker commits.
             await using var transaction = sambaLifecycleEventId.HasValue
-                ? await db.Database.BeginTransactionAsync(
-                    IsolationLevel.Serializable)
-                : null;
+                ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable)
+                : await db.Database.BeginTransactionAsync();
             SambaLifecycleEventReceipt? receipt = null;
             if (sambaLifecycleEventId.HasValue)
             {
+                // Row-lock the receipt as the very first statement. The bridge renews the
+                // event lease on this row every 30 s; without the lock a renewal committing
+                // mid-transaction fails the checkpoint write below with a serialization
+                // error (40001), and a rename that always outlasts the renewal interval
+                // would never get through. With the lock the renewal waits until commit, so
+                // a conflict is only possible here, where a retry costs nothing.
+                await db.SambaLifecycleEventReceipts
+                    .Where(eventReceipt => eventReceipt.EventId == sambaLifecycleEventId.Value)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(eventReceipt => eventReceipt.LeaseUntilUtc,
+                            eventReceipt => eventReceipt.LeaseUntilUtc));
+
                 receipt = await db.SambaLifecycleEventReceipts.SingleOrDefaultAsync(
                     eventReceipt => eventReceipt.EventId == sambaLifecycleEventId.Value);
                 if (receipt is null ||
@@ -197,40 +233,76 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
                 // reinterpret the now-empty source as a fresh replace rename.
                 if (receipt.RenameVersionsCompletedAtUtc.HasValue)
                 {
-                    await transaction!.CommitAsync();
+                    await transaction.CommitAsync();
                     return [];
                 }
             }
 
-            var oldPrefix = oldPath.Length == 0 ? "" : oldPath + "/";
-            var newPrefix = newPath.Length == 0 ? "" : newPath + "/";
-
-            var sourceQuery = db.Set<FileVersion>().Where(v => v.ShareId == shareId);
-            sourceQuery = oldPath.Length == 0
-                ? sourceQuery
-                : sourceQuery.Where(v => v.FilePath == oldPath || v.FilePath.StartsWith(oldPrefix));
-            var source = await sourceQuery.ToListAsync();
-
-            var sourceIds = source.Select(v => v.Id).ToHashSet();
-            var destinationQuery = db.Set<FileVersion>().Where(v => v.ShareId == shareId);
-            destinationQuery = newPath.Length == 0
-                ? destinationQuery
-                : destinationQuery.Where(v => v.FilePath == newPath || v.FilePath.StartsWith(newPrefix));
-            var displaced = await destinationQuery
-                .Where(v => !sourceIds.Contains(v.Id))
-                .ToListAsync();
-
-            if (displaced.Count > 0)
+            List<FileVersion> source;
+            List<FileVersion> displaced;
+            Dictionary<Guid, string> sourcePaths;
+            if (receipt is null && plan.SourcePaths is not null)
             {
-                db.Set<FileVersion>().RemoveRange(displaced);
+                // Replay without a checkpoint. It may follow a COMMIT whose acknowledgement was
+                // lost (versions already moved, displaced rows already gone) or a real rollback
+                // (nothing applied); the current rows cannot tell the two apart. Re-applying the
+                // first attempt's plan by row id is correct in both cases: moving a row that
+                // already carries its new path and deleting a row that is gone change nothing.
+                // The displaced versions are returned either way, so their blobs are removed.
+                db.GetDatabaseLogger().LogWarning(
+                    "Replaying version rename {OldPath} -> {NewPath} in share {ShareId} with the rows its first " +
+                    "attempt read ({Moved} moved, {Displaced} displaced).",
+                    oldPath, newPath, shareId, plan.SourcePaths.Count, plan.Displaced!.Count);
+                sourcePaths = plan.SourcePaths;
+                var sourceIds = sourcePaths.Keys.ToList();
+                source = await db.Set<FileVersion>().Where(v => sourceIds.Contains(v.Id)).ToListAsync();
+                var displacedIds = plan.Displaced.Select(v => v.Id).ToList();
+                db.Set<FileVersion>().RemoveRange(
+                    await db.Set<FileVersion>().Where(v => displacedIds.Contains(v.Id)).ToListAsync());
                 await db.SaveChangesAsync();
+                displaced = plan.Displaced;
+            }
+            else
+            {
+                var oldPrefix = oldPath.Length == 0 ? "" : oldPath + "/";
+                var newPrefix = newPath.Length == 0 ? "" : newPath + "/";
+
+                var sourceQuery = db.Set<FileVersion>().Where(v => v.ShareId == shareId);
+                sourceQuery = oldPath.Length == 0
+                    ? sourceQuery
+                    : sourceQuery.Where(v => v.FilePath == oldPath || v.FilePath.StartsWith(oldPrefix));
+                source = await sourceQuery.ToListAsync();
+                sourcePaths = source.ToDictionary(v => v.Id, v => v.FilePath);
+
+                var sourceIds = sourcePaths.Keys.ToHashSet();
+                var destinationQuery = db.Set<FileVersion>().Where(v => v.ShareId == shareId);
+                destinationQuery = newPath.Length == 0
+                    ? destinationQuery
+                    : destinationQuery.Where(v => v.FilePath == newPath || v.FilePath.StartsWith(newPrefix));
+                displaced = await destinationQuery
+                    .Where(v => !sourceIds.Contains(v.Id))
+                    .ToListAsync();
+
+                // Recorded before the first write, so it exists whenever a COMMIT may have happened.
+                if (receipt is null)
+                {
+                    plan.SourcePaths = sourcePaths;
+                    plan.Displaced = displaced;
+                }
+
+                if (displaced.Count > 0)
+                {
+                    db.Set<FileVersion>().RemoveRange(displaced);
+                    await db.SaveChangesAsync();
+                }
             }
 
             foreach (var version in source)
             {
-                version.FilePath = version.FilePath == oldPath
+                var original = sourcePaths[version.Id];
+                version.FilePath = original == oldPath
                     ? newPath
-                    : newPath + version.FilePath.Substring(oldPath.Length);
+                    : newPath + original.Substring(oldPath.Length);
             }
 
             if (source.Count > 0)
@@ -240,9 +312,9 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             {
                 receipt.RenameVersionsCompletedAtUtc = DateTime.UtcNow;
                 await db.SaveChangesAsync();
-                await transaction!.CommitAsync();
             }
 
+            await transaction.CommitAsync();
             return displaced;
         }
 

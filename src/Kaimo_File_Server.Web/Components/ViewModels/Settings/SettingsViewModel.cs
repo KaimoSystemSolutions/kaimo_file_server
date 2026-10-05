@@ -182,13 +182,12 @@ public partial class SettingsViewModel
                 SmbProtocol = await _config.GetAsync(
                     SmbProtocolSettings.ConfigKey, SmbProtocolSettings.Default());
                 SmbProtocol.Normalize();
-                // Status is written by the host process → read fresh, not cached.
-                SmbStatus = await _config.GetFreshAsync(
-                    DataServiceKeys.StatusKey("smb"), "Unbekannt");
 
                 WebDavEnabled = await _config.GetBoolAsync(WebDavOptions.EnabledKey, false);
                 WebDavRequireHttps = await _config.GetBoolAsync(WebDavOptions.RequireHttpsKey, true);
-                WebDavStatus = await _config.GetFreshAsync(WebDavOptions.StatusKey, "Unbekannt");
+
+                // Statuses and the Host heartbeat are written by other processes → read fresh.
+                await RefreshDataServiceStatusAsync();
             }
         }
         catch (Exception ex)

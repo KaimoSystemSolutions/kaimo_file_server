@@ -115,6 +115,10 @@ public sealed class ShareLinkRepository : IShareLinkRepository
         // Single atomic, guarded UPDATE: the database evaluates the window + count
         // predicate and the increment together, so concurrent downloads can never
         // push AccessCount past MaxAccessCount. Portable across PostgreSQL and SQLite.
+        // ponytail: the retrying execution strategy replays this increment if only its
+        // acknowledgement was lost, so one access can count twice (or be refused as the last
+        // slot). Same for the upload reserve/release below. Add a per-request receipt if link
+        // quotas ever have to be exact.
         int affected = await db.ShareLinks
             .Where(l => l.TokenHash == hash
                         && l.Kind == ShareLinkKind.Download

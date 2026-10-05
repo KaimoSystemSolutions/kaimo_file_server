@@ -19,10 +19,23 @@ public interface INotificationRepository
     /// </summary>
     Task<List<NotificationEvent>> ClaimEventsAsync(int max, DateTime leaseUntilUtc, CancellationToken ct = default);
 
-    Task CompleteEventAsync(long seq, NotificationEventStatus status, string? error, CancellationToken ct = default);
+    /// <summary>
+    /// Completes a claimed event. With <paramref name="claimedLeaseUntilUtc"/> (the lease the
+    /// claim stored), only that claim may complete it, never one whose lease already expired.
+    /// </summary>
+    Task CompleteEventAsync(long seq, NotificationEventStatus status, string? error, CancellationToken ct = default,
+        DateTime? claimedLeaseUntilUtc = null);
+
+    /// <summary>
+    /// Stores the rendered <paramref name="deliveries"/> and completes the event in one
+    /// transaction, so a crash in between can never leave deliveries behind for an event that
+    /// is later re-claimed and rendered a second time (duplicate mails).
+    /// </summary>
+    Task CompleteEventWithDeliveriesAsync(
+        long seq, IReadOnlyCollection<MailDelivery> deliveries, NotificationEventStatus status, CancellationToken ct = default,
+        DateTime? claimedLeaseUntilUtc = null);
 
     // -- Deliveries --
-    Task AddDeliveriesAsync(IEnumerable<MailDelivery> deliveries, CancellationToken ct = default);
 
     /// <summary>
     /// Atomically claims up to <paramref name="max"/> pending/failed deliveries that are due,

@@ -64,6 +64,7 @@ Every way a client reaches the server from outside. All of them converge on the 
 
 | Document | Content |
 |---|---|
+| [Database tests](testing/database-tests.md) | Sqlite default suite, opt-in PostgreSQL tests (`KAIMO_TEST_PG`) for retries, isolation and locks |
 | [Samba VFS test suite](testing/samba-vfs-test-suite.md) | Test layers, harness and fakes, failure detection, coverage gates, CI, known findings and gaps |
 | [Samba VFS test catalog](testing/samba-vfs-test-catalog.md) | What is caught, scenario by scenario, with the test that proves it |
 

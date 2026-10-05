@@ -41,6 +41,8 @@ namespace Kaimo_File_Server.Host
         {
             _logger.LogDebug(LogEvents.ReconcilerStarted, LogMessages.ReconcilerStarted, _services.Count());
 
+            var heartbeat = HeartbeatLoopAsync(stoppingToken);
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
@@ -61,6 +63,8 @@ namespace Kaimo_File_Server.Host
                     break;
                 }
             }
+
+            await heartbeat;
 
             // Graceful shutdown: stop everything that is still running.
             foreach (var service in _services)
@@ -104,6 +108,47 @@ namespace Kaimo_File_Server.Host
                 }
 
                 await PersistStatusIfChangedAsync(config, service);
+            }
+        }
+
+        /// <summary>
+        /// Liveness signal for the Web UI. Runs on its own loop, so neither a failed nor a
+        /// slow reconcile pass (e.g. a Samba start that takes minutes) makes the Host look
+        /// unreachable; the UI shows "Host not reachable" only when this goes stale.
+        /// A failed write is retried after the short poll interval instead of a full period.
+        /// </summary>
+        private async Task HeartbeatLoopAsync(CancellationToken stoppingToken)
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var delay = DataServiceKeys.HostHeartbeatInterval;
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var config = scope.ServiceProvider.GetRequiredService<IConfigRepository>();
+                    // Shutdown does not wait for the write: with the database gone, its retries
+                    // could outlast Docker's stop grace period and cut the graceful Samba stop.
+                    await config.SetAsync(DataServiceKeys.HostHeartbeatKey, DateTime.UtcNow)
+                        .WaitAsync(stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Writing the Host heartbeat failed.");
+                    delay = PollInterval;
+                }
+
+                try
+                {
+                    await Task.Delay(delay, stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
             }
         }
 

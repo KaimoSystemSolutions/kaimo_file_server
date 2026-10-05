@@ -36,8 +36,10 @@ namespace Kaimo_File_Server.Infrastructure
         public static IServiceCollection AddInfrastructure(
             this IServiceCollection services, IConfiguration configuration)
         {
-            var connectionString = configuration.GetConnectionString("Default")
-                ?? "Host=kaimo_file_server_db;Database=kaimo_file_server;Username=kaimo_test_user;Password=change_me";
+            var connectionString = BuildConnectionString(
+                configuration.GetConnectionString("Default")
+                    ?? "Host=kaimo_file_server_db;Database=kaimo_file_server;Username=kaimo_test_user;Password=change_me",
+                configuration["KAIMO_LOG_SOURCE"]);
 
             // Read-only demo mode: set KAIMO_DEMO_READONLY=true on a PUBLIC-facing
             // process (Web/SmbBridge) to turn it into a look-but-don't-touch demo.
@@ -51,7 +53,7 @@ namespace Kaimo_File_Server.Infrastructure
             // -- EF Core --
             services.AddDbContextFactory<ApplicationDbContext>(options =>
             {
-                options.UseNpgsql(connectionString);
+                UseKaimoNpgsql(options, connectionString);
                 if (readOnlyDemo)
                     options.AddInterceptors(new Persistence.ReadOnlyDemoSaveInterceptor());
             });
@@ -153,6 +155,55 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddSingleton<ICloudProviderFactory, CloudProviderFactory>();
 
             return services;
+        }
+
+        /// <summary>
+        /// Host, Web and Bridge talk only through this database, so a DB restart or a
+        /// dropped pooled connection must not surface as a user-facing error. Transient
+        /// failures are retried; explicit transactions therefore have to run through
+        /// DbContextFactoryExtensions.ExecuteResilientAsync. Shared with the PostgreSQL
+        /// tests so they run under exactly the production retry behavior.
+        /// Every retry is logged as a warning with its cause: EF reports it only at Information,
+        /// which the default "Warning" level hides, and a retried statement may already have been
+        /// committed once (lost acknowledgement), so each one must be traceable.
+        /// </summary>
+        internal static void UseKaimoNpgsql(DbContextOptionsBuilder options, string connectionString)
+            => options
+                .UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure(
+                    maxRetryCount: 3,
+                    maxRetryDelay: TimeSpan.FromSeconds(5),
+                    errorCodesToAdd: null))
+                .ConfigureWarnings(warnings => warnings.Log(
+                    (Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ExecutionStrategyRetrying, LogLevel.Warning)));
+
+        /// <summary>
+        /// Adds connection defaults that every process needs but an operator rarely sets:
+        /// kernel TCP keepalives so half-open connections (DB restart, NAT/bridge timeouts) are
+        /// detected instead of hanging, also while a command is waiting for its result (Npgsql's
+        /// own "Keepalive" only sends queries over idle connections), and an application name
+        /// per container so <c>pg_stat_activity</c> shows which process holds a connection.
+        /// Values that are already present in the configured connection string always win.
+        /// </summary>
+        internal static string BuildConnectionString(string connectionString, string? processName)
+        {
+            var builder = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+            // Check the raw string, not the builder's properties: their defaults are also valid
+            // explicit operator choices. Npgsql's own builder answers ContainsKey for every valid
+            // keyword, so a generic builder is used; keys are compared without spaces because
+            // Npgsql accepts both "Tcp Keepalive" and "TcpKeepAlive".
+            var configured = new System.Data.Common.DbConnectionStringBuilder { ConnectionString = connectionString }
+                .Keys.Cast<string>()
+                .Select(key => key.Replace(" ", string.Empty))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (!configured.Overlaps(["TcpKeepalive", "TcpKeepaliveTime", "TcpKeepaliveInterval"]))
+            {
+                builder.TcpKeepAlive = true;
+                builder.TcpKeepAliveTime = 30;
+                builder.TcpKeepAliveInterval = 10;
+            }
+            if (string.IsNullOrEmpty(builder.ApplicationName) && !string.IsNullOrWhiteSpace(processName))
+                builder.ApplicationName = "kaimo-" + processName;
+            return builder.ConnectionString;
         }
 
         /// <summary>
@@ -270,10 +321,29 @@ namespace Kaimo_File_Server.Infrastructure
                     {
                         await db.Database.ExecuteSqlRawAsync(
                             "SELECT pg_advisory_lock(hashtext('kaimo_file_server_migrations'))");
+                        // The lock belongs to this session. If the connection breaks, the retrying
+                        // strategy silently reopens a new one without the lock; checked below.
+                        int lockSession = await GetBackendPidAsync(db);
+
+                        // Withdraw the previous run's ready marker as early as possible, so a
+                        // Web/Bridge starting alongside this Host waits for this run's seed
+                        // instead of trusting the last one. Only possible once the schema
+                        // exists; on a fresh database there is no marker to withdraw.
+                        // ponytail: a non-owner that checks before this Host has connected
+                        // still passes on the old marker; put the build version into the
+                        // marker if releases start to change seeding without a migration.
+                        if ((await db.Database.GetAppliedMigrationsAsync()).Any())
+                            await WriteSchemaReadyMarkerAsync(db, string.Empty);
 
                         // 1) One-shot startup restore (if requested via config),
                         //    before any migration. A .done marker prevents a repeat.
                         bool justRestored = await TryRestoreOnStartupAsync(host, logger);
+
+                        // The restored data carries the ready marker of the backup's run. Withdraw
+                        // it again, or a Web/Bridge starting now would trust it before this run's
+                        // seed. (While the restore itself runs, a non-owner may still briefly see it.)
+                        if (justRestored && (await db.Database.GetAppliedMigrationsAsync()).Any())
+                            await WriteSchemaReadyMarkerAsync(db, string.Empty);
 
                         // 2) Pre-migration safety backup: only when there is
                         //    existing data (applied migrations) AND pending changes.
@@ -291,8 +361,15 @@ namespace Kaimo_File_Server.Infrastructure
                         }
 
                         // 3) Migrate + seed.
+                        await EnsureMigrationLockHeldAsync(db, lockSession);
                         await db.Database.MigrateAsync();
                         logger.LogInformation(LogEvents.DatabaseReady, LogMessages.DatabaseReady);
+
+                        // Withdraw the ready marker for the duration of the seed. A release can
+                        // change seeding without adding a migration; Web/Bridge (re)started now
+                        // must not run against a half-seeded database. Not possible earlier:
+                        // config_settings does not exist before the first migration.
+                        await WriteSchemaReadyMarkerAsync(db, string.Empty);
 
                         // Before the seeder stores the first NT hashes with the configured key.
                         Security.AesGcmNtHashProtector.ValidateKeyStrength(
@@ -314,11 +391,27 @@ namespace Kaimo_File_Server.Infrastructure
                         {
                             logger.LogWarning(ex, "Home-folder backfill failed");
                         }
+
+                        // 4) Ready marker, written last: Web and SmbBridge start only once it
+                        //    names the schema version they were built for, i.e. after the
+                        //    seed, not merely after the migrations.
+                        await EnsureMigrationLockHeldAsync(db, lockSession);
+                        await WriteSchemaReadyMarkerAsync(
+                            db, db.Database.GetMigrations().LastOrDefault() ?? string.Empty);
                     }
                     finally
                     {
-                        await db.Database.ExecuteSqlRawAsync(
-                            "SELECT pg_advisory_unlock(hashtext('kaimo_file_server_migrations'))");
+                        // Best effort: when the database is gone the session (and with it the
+                        // lock) is gone too. An unlock error must not replace the real failure.
+                        try
+                        {
+                            await db.Database.ExecuteSqlRawAsync(
+                                "SELECT pg_advisory_unlock(hashtext('kaimo_file_server_migrations'))");
+                        }
+                        catch (Exception unlockError)
+                        {
+                            logger.LogWarning(unlockError, "Releasing the migration lock failed.");
+                        }
                         await db.Database.CloseConnectionAsync();
                     }
 
@@ -327,7 +420,7 @@ namespace Kaimo_File_Server.Infrastructure
                 // Only retry failures that Npgsql classifies as transient (for
                 // example while PostgreSQL is still starting). Migration and
                 // seeding errors must surface immediately with their true cause.
-                catch (Npgsql.NpgsqlException ex) when (ex.IsTransient)
+                catch (Exception ex) when (IsTransientDatabaseFailure(ex))
                 {
                     if (attempt == maxRetries)
                         throw new InvalidOperationException(
@@ -341,13 +434,99 @@ namespace Kaimo_File_Server.Infrastructure
         }
 
         /// <summary>
+        /// A database failure that waiting can fix. Operations that run under the retrying
+        /// execution strategy (LINQ queries, SaveChanges, MigrateAsync) report an exhausted
+        /// transient failure as <see cref="Microsoft.EntityFrameworkCore.Storage.RetryLimitExceededException"/>,
+        /// which derives from <see cref="Exception"/>, not from <see cref="Npgsql.NpgsqlException"/>.
+        /// </summary>
+        internal static bool IsTransientDatabaseFailure(Exception ex)
+            => ex is Npgsql.NpgsqlException { IsTransient: true }
+                or Microsoft.EntityFrameworkCore.Storage.RetryLimitExceededException
+                or MigrationLockLostException;
+
+        private static Task<int> GetBackendPidAsync(ApplicationDbContext db)
+            => db.Database.SqlQuery<int>($"SELECT pg_backend_pid() AS \"Value\"").SingleAsync();
+
+        /// <summary>
+        /// Throws <see cref="MigrationLockLostException"/> when the connection was reopened since
+        /// the migration lock was taken, i.e. the lock is gone. The startup loop then runs the
+        /// whole (idempotent) sequence again under a freshly acquired lock.
+        /// ponytail: compares backend PIDs, so a reconnect that happens to get the same PID
+        /// goes unnoticed; query pg_locks for the held advisory lock if a second Host is ever run.
+        /// </summary>
+        private static async Task EnsureMigrationLockHeldAsync(ApplicationDbContext db, int lockSession)
+        {
+            int session = await GetBackendPidAsync(db);
+            if (session != lockSession)
+                throw new MigrationLockLostException(
+                    $"The database connection was re-established (session {lockSession} -> {session}); " +
+                    "the migration lock was lost and is acquired again.");
+        }
+
+        /// <summary>
+        /// <c>config_settings</c> key the Host writes after migrating and seeding. Its value
+        /// is the last migration id of the Host's build.
+        /// </summary>
+        internal const string SchemaReadyKey = "system.schema.ready";
+
+        // Written without change tracking: the Host calls this several times on one context, and
+        // a startup restore in between replaces the table, so a tracked row would be stale.
+        private static async Task WriteSchemaReadyMarkerAsync(ApplicationDbContext db, string value)
+        {
+            var now = DateTime.UtcNow;
+            var updated = await db.ConfigSettings
+                .Where(s => s.Key == SchemaReadyKey)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.Value, value)
+                    .SetProperty(x => x.UpdatedAt, now));
+            if (updated > 0)
+                return;
+
+            var marker = new Configuration.ConfigSetting { Key = SchemaReadyKey, Value = value, UpdatedAt = now };
+            db.ConfigSettings.Add(marker);
+            await db.SaveChangesAsync();
+            db.Entry(marker).State = EntityState.Detached;
+        }
+
+        /// <summary>
+        /// Readiness of a non-owner process against the current database state.
+        /// Returns <c>null</c> when ready, otherwise the reason to keep waiting. Throws
+        /// <see cref="SchemaVersionMismatchException"/> when the database already carries
+        /// migrations this build does not know: an older image must never write to a newer
+        /// schema, and waiting cannot fix it.
+        /// </summary>
+        internal static async Task<string?> CheckSchemaReadyAsync(ApplicationDbContext db)
+        {
+            var known = db.Database.GetMigrations().ToList();
+            var applied = (await db.Database.GetAppliedMigrationsAsync()).ToList();
+            var unknown = applied.Except(known, StringComparer.Ordinal).ToList();
+            if (unknown.Count > 0)
+                throw new SchemaVersionMismatchException(
+                    "This container image is older than the database schema (unknown migrations: " +
+                    string.Join(", ", unknown) + "). Update it to the same version as the Host.");
+
+            var pending = known.Except(applied, StringComparer.Ordinal).Count();
+            if (pending > 0)
+                return $"{pending} migration(s) pending";
+
+            var marker = await db.ConfigSettings.AsNoTracking()
+                .Where(s => s.Key == SchemaReadyKey)
+                .Select(s => s.Value)
+                .FirstOrDefaultAsync();
+            var expected = known.LastOrDefault() ?? string.Empty;
+            return string.Equals(marker, expected, StringComparison.Ordinal)
+                ? null
+                : "seeding not finished yet";
+        }
+
+        /// <summary>
         /// Non-owner processes (Web, SmbBridge): wait until the Host has applied
-        /// all migrations, then continue. Never migrates or seeds. Polls the
-        /// migration state (no pending migrations) until the Host is done. This is
-        /// the single, orchestration-independent readiness guarantee — it works
-        /// regardless of Docker Compose ordering. Times out after 10 minutes.
-        /// Then verifies this process holds the same NT-hash key as the stored
-        /// data (<see cref="Security.NtHashKeyCanary"/>) and throws otherwise.
+        /// all migrations and finished seeding (ready marker), then continue. Never
+        /// migrates or seeds. This is the single, orchestration-independent readiness
+        /// guarantee — it works regardless of Docker Compose ordering. Fails at once
+        /// when this image is older than the schema; otherwise times out after
+        /// 10 minutes. Then verifies this process holds the same NT-hash key as the
+        /// stored data (<see cref="Security.NtHashKeyCanary"/>) and throws otherwise.
         /// </summary>
         public static async Task WaitForDatabaseReadyAsync(this IHost host)
         {
@@ -363,18 +542,19 @@ namespace Kaimo_File_Server.Infrastructure
                 {
                     using var scope = host.Services.CreateScope();
                     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                    var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
-                    if (pending.Count == 0)
+                    var waitReason = await CheckSchemaReadyAsync(db);
+                    if (waitReason is null)
                     {
                         logger.LogInformation(LogEvents.DatabaseReady, LogMessages.DatabaseReady);
                         break;
                     }
 
                     logger.LogInformation(
-                        "Waiting for the database owner (Host) to finish migrations ({Count} pending).",
-                        pending.Count);
+                        "Waiting for the database owner (Host): {Reason}.", waitReason);
                 }
-                catch (Exception ex) when (ex is Npgsql.NpgsqlException or InvalidOperationException)
+                catch (Exception ex) when (ex is Npgsql.NpgsqlException
+                                           || IsTransientDatabaseFailure(ex)
+                                           || ex is InvalidOperationException and not SchemaVersionMismatchException)
                 {
                     logger.LogInformation(
                         "Waiting for the database to become reachable: {Message}", ex.Message);
@@ -382,8 +562,8 @@ namespace Kaimo_File_Server.Infrastructure
 
                 if (DateTimeOffset.UtcNow > deadline)
                     throw new InvalidOperationException(
-                        "Database was not ready (migrations still pending) after waiting. " +
-                        "Ensure the Host process is running and able to migrate.");
+                        "Database was not ready (migrations pending or seeding not finished) after waiting. " +
+                        "Ensure the Host process is running, able to migrate, and on the same version.");
 
                 await Task.Delay(pollDelay);
             }
@@ -541,4 +721,10 @@ namespace Kaimo_File_Server.Infrastructure
             return result;
         }
     }
+
+    /// <summary>The session holding the migration lock was lost; startup retries the sequence.</summary>
+    public sealed class MigrationLockLostException(string message) : Exception(message);
+
+    /// <summary>The database schema is newer than this build; the process must not start.</summary>
+    public sealed class SchemaVersionMismatchException(string message) : InvalidOperationException(message);
 }

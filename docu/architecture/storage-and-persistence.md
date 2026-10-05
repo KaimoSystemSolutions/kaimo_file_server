@@ -121,7 +121,14 @@ per share and evicted by TTL (`Snapshots__Cache__*` settings). Details:
 `file_change_log` (`FileChangeLogEntry`, `src/Kaimo_File_Server.Core/Domain/ClientSync/FileChangeLogEntry.cs`)
 is an append-only feed with one row per mutation:
 
-- `Seq` is a globally monotonic identity, used as an opaque cursor.
+- `Seq` is a globally monotonic identity, used as an opaque cursor. Web, bridge and Host append
+  concurrently; `FileChangeLogRepository.AppendAsync` takes a transaction-scoped advisory lock
+  around the insert, so commit order equals `Seq` order. A reader that has passed `Seq` N can
+  therefore never miss a lower `Seq` that commits later.
+- When a COMMIT succeeds but its acknowledgement is lost, the retry strategy appends the entry a
+  second time under a new `Seq`. This is accepted: create, modify and delete entries are path-based
+  and re-apply harmlessly; only a duplicated rename that lands after a later opposite rename can
+  leave a stale search hit until the next reindex.
 - Each row records `ShareId`, `Path`, `OldPath` (renames), `ChangeType`
   (`Created`, `Modified`, `Deleted`, `Renamed`, `SubtreeChanged`), `IsDirectory` and, when cheaply
   available, size and modification time.

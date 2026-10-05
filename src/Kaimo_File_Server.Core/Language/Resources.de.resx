@@ -4243,7 +4243,7 @@
     <value>SMB-Protokoll &amp; Sicherheit</value>
   </data>
   <data name="Web_Settings_Data_ProtocolDescription" xml:space="preserve">
-    <value>Legt fest, welche SMB-Dialekte ausgehandelt werden und ob Signierung bzw. Verschlüsselung erzwungen werden. SMB 1 ist aus Sicherheitsgründen dauerhaft deaktiviert. Änderungen werden beim nächsten Neustart des SMB-Dienstes wirksam.</value>
+    <value>Legt fest, welche SMB-Dialekte ausgehandelt werden und ob Signierung bzw. Verschlüsselung erzwungen werden. SMB 1 ist aus Sicherheitsgründen dauerhaft deaktiviert. Änderungen gelten innerhalb weniger Sekunden für neue Verbindungen; bereits offene Verbindungen behalten ihre ausgehandelten Einstellungen, bis sie neu aufgebaut werden.</value>
   </data>
   <data name="Web_Settings_Data_MinVersion" xml:space="preserve">
     <value>Mindestversion</value>
@@ -5507,5 +5507,20 @@
   </data>
   <data name="Web_Notifications_RetryQueued" xml:space="preserve">
     <value>Die E-Mail wird in Kürze erneut gesendet.</value>
+  </data>
+  <data name="Web_Settings_SmbProtocolSaved" xml:space="preserve">
+    <value>SMB-Protokolleinstellungen gespeichert. Samba übernimmt sie innerhalb weniger Sekunden; bereits offene Verbindungen behalten ihre ausgehandelten Einstellungen, bis sie neu aufgebaut werden.</value>
+  </data>
+  <data name="Web_Settings_Data_StatusHostUnreachable" xml:space="preserve">
+    <value>Host nicht erreichbar</value>
+  </data>
+  <data name="Web_Settings_Data_HostUnreachableHint" xml:space="preserve">
+    <value>Der Host-Prozess hat sich seit {0} nicht gemeldet. Der angezeigte SMB-Status ist möglicherweise veraltet, und Änderungen werden erst übernommen, wenn der Host wieder läuft.</value>
+  </data>
+  <data name="Web_Settings_Data_HostNeverReportedHint" xml:space="preserve">
+    <value>Der Host-Prozess hat sich noch nicht gemeldet. Der angezeigte SMB-Status ist möglicherweise veraltet, und Änderungen werden erst übernommen, sobald der Host läuft.</value>
+  </data>
+  <data name="Web_Settings_Data_StatusRefreshFailed" xml:space="preserve">
+    <value>Der Dienststatus konnte nicht gelesen werden. Die Datenbank ist möglicherweise kurzzeitig nicht erreichbar; bitte gleich erneut versuchen.</value>
   </data>
 </root>

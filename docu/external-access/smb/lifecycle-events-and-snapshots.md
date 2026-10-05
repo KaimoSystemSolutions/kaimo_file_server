@@ -58,6 +58,13 @@ results are identical to a web upload or rename (`src/Kaimo_File_Server.SmbBridg
 
 Every event carries a stable `event_id`. The bridge records processed IDs in
 `samba_lifecycle_event_receipts` before applying effects, so a redelivered event is a no-op.
+A claim is a 2-minute lease that the bridge renews every 30 s while the handler runs, so a long
+handler (e.g. versioning a large close capture) is never re-claimed by a Samba retry and run twice.
+An already expired lease is never renewed; the bridge logs the lost lease and stops renewing. The
+rename handler's serializable transaction row-locks its receipt first, so a renewal waits for its
+commit instead of forcing a serialization failure and a replay of the whole rename. The renewal is a
+compare-and-swap on the lease value it read before waiting, so if a Samba retry re-claimed the event
+in the meantime, the renewal matches nothing and never extends the new claim.
 Handlers are additionally safe to repeat: a delete of an absent item succeeds, a rename that already
 reached its destination succeeds, and a rename never deletes the destination's version history.
 `SambaEventReceiptCleanupService` removes receipts older than `LifecycleEvents__ReceiptRetentionDays`

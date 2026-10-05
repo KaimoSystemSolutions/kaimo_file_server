@@ -4309,7 +4309,7 @@
     <value>SMB protocol &amp; security</value>
   </data>
   <data name="Web_Settings_Data_ProtocolDescription" xml:space="preserve">
-    <value>Defines which SMB dialects are negotiated and whether signing or encryption are enforced. SMB 1 is permanently disabled for security reasons. Changes take effect the next time the SMB service restarts.</value>
+    <value>Defines which SMB dialects are negotiated and whether signing or encryption are enforced. SMB 1 is permanently disabled for security reasons. Changes are applied within a few seconds to new connections; connections that are already open keep their negotiated settings until they reconnect.</value>
   </data>
   <data name="Web_Settings_Data_MinVersion" xml:space="preserve">
     <value>Minimum version</value>
@@ -5573,5 +5573,20 @@
   </data>
   <data name="Web_Notifications_RetryQueued" xml:space="preserve">
     <value>The mail is sent again shortly.</value>
+  </data>
+  <data name="Web_Settings_SmbProtocolSaved" xml:space="preserve">
+    <value>SMB protocol settings saved. Samba applies them within a few seconds; connections that are already open keep their negotiated settings until they reconnect.</value>
+  </data>
+  <data name="Web_Settings_Data_StatusHostUnreachable" xml:space="preserve">
+    <value>Host not reachable</value>
+  </data>
+  <data name="Web_Settings_Data_HostUnreachableHint" xml:space="preserve">
+    <value>The Host process has not reported since {0}. The SMB status shown may be outdated and changes are applied only once the Host is running again.</value>
+  </data>
+  <data name="Web_Settings_Data_HostNeverReportedHint" xml:space="preserve">
+    <value>The Host process has not reported yet. The SMB status shown may be outdated and changes are applied only once the Host is running.</value>
+  </data>
+  <data name="Web_Settings_Data_StatusRefreshFailed" xml:space="preserve">
+    <value>The service status could not be read. The database may be temporarily unreachable; please try again shortly.</value>
   </data>
 </root>

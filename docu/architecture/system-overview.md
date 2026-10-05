@@ -97,9 +97,9 @@ sequenceDiagram
     DB->>DB: healthy (pg_isready)
     PKI->>PKI: generate CA + certificates (once)
     H->>H: writable-directory preflight
-    H->>DB: optional restore, pre-migration backup, migrate, seed
+    H->>DB: optional restore, pre-migration backup, migrate, seed, ready marker
     H->>H: ensure Elasticsearch index mapping
-    B->>DB: WaitForDatabaseReadyAsync (poll until no pending migrations)
+    B->>DB: WaitForDatabaseReadyAsync (poll until migrated and ready marker set)
     W->>DB: WaitForDatabaseReadyAsync
     S->>B: authd + sync jobs connect over mTLS
 ```
@@ -107,7 +107,25 @@ sequenceDiagram
 Compose uses `service_started` (not `service_healthy`) for the Host dependency. The real ordering
 guarantee is in-process: `WaitForDatabaseReadyAsync` in
 `src/Kaimo_File_Server.Infrastructure/ServiceCollectionExtensions.cs` blocks Web and bridge until the
-Host has applied all migrations. Only the Host ever migrates.
+Host has applied all migrations **and** finished seeding. The Host signals the latter through the
+`system.schema.ready` key in `config_settings`: as soon as it holds the migration lock (again right
+after a startup restore, whose data carries the backup's marker, and again after migrating) it clears
+the key, and as the final step under the lock it writes its last migration id. The migration lock is a
+session-level advisory lock; before migrating and before writing the marker the Host verifies that its
+connection was not silently re-established (which would have dropped the lock) and otherwise restarts
+the startup sequence under a fresh lock. A Web or bridge process that starts while the Host seeds therefore waits even when the
+release changed seeding without adding a migration. Only a process that checks before the Host has
+connected at all still passes on the previous run's marker. A Web or bridge image that finds applied migrations it does not know is older than
+the schema; it stops at once with an explicit error instead of writing to a newer schema. Only the
+Host ever migrates.
+
+Host, bridge, Web, Samba, PostgreSQL and Elasticsearch run with `restart: unless-stopped`, so the
+stack comes back after a reboot or Docker restart, and a process that exits during startup (e.g. the
+10-minute readiness timeout) comes back on its own. The flip side: a failure that waiting cannot fix
+shows up as a restart loop, not as a stopped container. If the Host fails after migrating (e.g. a seeder
+error or an invalid NT-hash key), the ready marker stays cleared, so a Web or bridge process that
+restarts in the meantime waits 10 minutes, exits and starts over until the Host is fixed. An image older
+than the schema exits at once on every start. Check the container logs when a service keeps restarting.
 
 Host and Web run with `umask 0002` so files they create stay group-writable for the shared storage
 group used by Samba.
@@ -157,6 +175,57 @@ over gRPC. All other coordination goes through PostgreSQL:
   indexer and the client sync API) and `notification_events` (consumed by the mail dispatcher).
 - **Single-owner workers**: schema migrations and backups run only in the Host; Elasticsearch writes
   and mail dispatch run only in Web. See [Background services](background-services.md).
+- **Liveness**: the Host refreshes `runtime.host.heartbeat` every 30 s on a loop of its own, so a
+  slow reconcile pass (e.g. a long Samba start) does not make it look dead. Shutdown does not wait
+  for a pending heartbeat write, so an unreachable database cannot delay the graceful Samba stop. The Web settings page
+  shows "Host not reachable" once it is older than 90 s (or missing), instead of the last SMB status
+  the Host wrote.
+
+### Channel robustness
+
+- **Connection**: every process uses Npgsql with `EnableRetryOnFailure` (3 retries, up to 5 s), kernel
+  TCP keepalives (`Tcp Keepalive`, first probe after 30 s idle, then every 10 s; left untouched when the
+  connection string sets any `Tcp Keepalive*` key), which also detect a dead peer while a command waits
+  for its result, and `Application Name=kaimo-<source>` for `pg_stat_activity`. Code that opens an
+  explicit transaction must run it through `DbContextFactoryExtensions.ExecuteResilientAsync`
+  (`Infrastructure/Persistence/`), which replays the whole unit on a fresh context; its cancellation
+  token also cancels the backoff between attempts. Once the retries are exhausted EF throws
+  `RetryLimitExceededException` (a plain `Exception`); the startup waits treat it as transient.
+- **Logging**: every retry is logged as a warning with its cause (EF's `ExecutionStrategyRetrying`,
+  raised from Information because the default level is Warning), every replayed unit additionally as
+  "Replaying database unit of work <method> (attempt n)", and every replay that finds its effect already
+  committed names what it found. Category: `Kaimo_File_Server.Infrastructure.Database`.
+- **Replay idempotency**: a replay can follow a COMMIT that succeeded but whose acknowledgement was
+  lost. This applies to whole units run through `ExecuteResilientAsync` and to single auto-committed
+  statements, which the strategy retries as well. Writes whose duplicate would matter therefore check
+  whether their effect is already committed: cloud-sync and credential lease acquisition accept their
+  own lease id, cloud-sync lease renewal accepts the value it just wrote, token rotation accepts its own
+  replacement, a notification event insert looks for the identical row, notification and Samba event
+  claims recognize their own lease timestamp, mail delivery claims their own start time, Samba event
+  completion accepts an already completed receipt, notification completion updates the `Processing`
+  event first (row lock) and stores deliveries only if it matched (it never moves a finished event back
+  to `Pending`), and a rename without event receipt replays exactly the rows its first attempt read
+  (moves and deletes by row id), which is correct whether that attempt committed or rolled back and
+  always reports the displaced versions for blob removal.
+  Other plain inserts and the share-link access/upload counters are at-least-once on a lost
+  acknowledgement; the warning log shows when that happened. The change-log append is the deliberate
+  exception (see [Storage and persistence](storage-and-persistence.md#change-log)).
+- **Leases** (cloud-sync operation lease in `config_settings`, credential lease, Samba event
+  receipts) are renewed by a heartbeat that survives transient database errors. Renew and release
+  are compare-and-swap updates on the value read before, so a former owner can never overwrite or
+  delete a lease another process has taken over after expiry, even when the update first waits for a
+  row lock. An expired Samba lease is never revived. When a holder finds its lease lost, it logs a
+  warning and stops renewing. A cloud sync additionally stops its transfer
+  (`ICloudSyncOperationLease.LeaseLost`) and ends as `Interrupted` (not failed, no notification). The
+  cloud-sync lease also signals `LeaseLost` a few minutes before its absolute 6-hour lifetime, while it
+  is still valid, so a long sync stops before anything could take it over and resumes on its next
+  run. A notification completion carries the claim's lease value and is discarded once the event was
+  re-claimed. Samba lifecycle handlers and share moves are not cooperative and keep running, so there
+  the overlap is only reported. Releasing is best effort; an unreleased lease expires.
+- **Lease acquisition** treats a serialization failure or duplicate key as contention: it retries
+  twice after 20 ms and then reports the share busy, instead of going through the execution
+  strategy's backoff of seconds. Connection failures still go to the strategy.
+- **Config writes** are upserts: a concurrent insert of the same key turns into an update.
 
 ## Logging
 

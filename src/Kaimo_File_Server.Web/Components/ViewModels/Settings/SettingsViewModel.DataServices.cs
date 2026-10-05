@@ -17,8 +17,8 @@ public partial class SettingsViewModel
 
     /// <summary>
     /// SMB protocol/security options (dialect range, signing, encryption) —
-    /// working copy edited on the Datendienste tab. Applied by the SMB host on
-    /// the next (re)start of the service.
+    /// working copy edited on the Datendienste tab. Applied within seconds to new
+    /// SMB connections.
     /// </summary>
     public SmbProtocolSettings SmbProtocol { get; private set; } = SmbProtocolSettings.Default();
 
@@ -89,18 +89,52 @@ public partial class SettingsViewModel
         }
     }
 
-    /// <summary>Re-reads the reported status of the SMB service from the config store.</summary>
-    public async Task RefreshDataServiceStatusAsync()
+    /// <summary>Last Host heartbeat (UTC), or <c>null</c> if the Host never reported one.</summary>
+    public DateTime? HostLastSeenUtc { get; private set; }
+
+    /// <summary>
+    /// The Host process (which runs the SMB reconciler) has not reported recently, so
+    /// <see cref="SmbStatus"/> is only the last value it wrote and may be outdated.
+    /// </summary>
+    public bool HostUnreachable { get; private set; }
+
+    /// <summary>
+    /// Re-reads the reported status of the SMB service from the config store. Never throws:
+    /// it runs from UI event handlers and the post-save poll, where an unhandled database
+    /// error would terminate the Blazor circuit. Returns false (and sets
+    /// <see cref="ErrorMessage"/>) when the store could not be read.
+    /// </summary>
+    public async Task<bool> RefreshDataServiceStatusAsync()
     {
-        if (!CanManageDataServices) return;
-        SmbStatus = await _config.GetFreshAsync(DataServiceKeys.StatusKey("smb"), "Unbekannt");
-        WebDavStatus = await _config.GetFreshAsync(WebDavOptions.StatusKey, "Unbekannt");
+        if (!CanManageDataServices) return true;
+        try
+        {
+            SmbStatus = await _config.GetFreshAsync(DataServiceKeys.StatusKey("smb"), "Unbekannt");
+            WebDavStatus = await _config.GetFreshAsync(WebDavOptions.StatusKey, "Unbekannt");
+            HostLastSeenUtc = await _config.GetFreshAsync<DateTime?>(DataServiceKeys.HostHeartbeatKey, null);
+            HostUnreachable = HostLastSeenUtc is not { } lastSeen
+                || DateTime.UtcNow - lastSeen.ToUniversalTime() > DataServiceKeys.HostHeartbeatStaleAfter;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Reading the data service status failed");
+            ErrorMessage = Resources.Web_Settings_Data_StatusRefreshFailed;
+            return false;
+        }
     }
 
     /// <summary>
+    /// The SMB status the Host should report once it has applied <see cref="SmbEnabled"/>.
+    /// The settings page polls until it appears instead of only promising it.
+    /// </summary>
+    public bool SmbStatusMatchesDesired =>
+        SmbStatus == (SmbEnabled ? DataServiceStatus.Running : DataServiceStatus.Stopped).ToString();
+
+    /// <summary>
     /// Persists the SMB protocol/security options (dialect range, signing,
-    /// encryption). Changes are applied by the SMB host on the next (re)start of
-    /// the service — a running server is not reconfigured live.
+    /// encryption). Samba's config sync pulls them within seconds and reloads its
+    /// configuration; only new connections negotiate with the new settings.
     /// </summary>
     public async Task<bool> SaveSmbProtocolAsync()
     {
@@ -127,8 +161,7 @@ public partial class SettingsViewModel
                 SmbProtocol.MinVersion, SmbProtocol.MaxVersion,
                 SmbProtocol.RequireSigning, SmbProtocol.RequireEncryption,
                 SmbProtocol.EnableWsDiscovery, SmbProtocol.EnableAuditLog);
-            SuccessMessage = "SMB-Protokolleinstellungen gespeichert. " +
-                "Sie werden beim nächsten Neustart des SMB-Dienstes wirksam.";
+            SuccessMessage = Resources.Web_Settings_SmbProtocolSaved;
             return true;
         }
         catch (Exception ex)
