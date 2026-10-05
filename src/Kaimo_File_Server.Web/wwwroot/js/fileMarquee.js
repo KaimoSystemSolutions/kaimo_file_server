@@ -263,6 +263,30 @@ window.fileMarquee = (() => {
             void dotNetRef.invokeMethodAsync('SelectAllFiles');
         }, options);
 
+        // Arrow Up/Down move the selection (Shift extends it), Enter opens it,
+        // Backspace goes one level up. Page-level like Escape/Ctrl+A: the list
+        // element is re-created on every folder load and focus often sits on a
+        // toolbar button or body. Widgets with their own key handling (text fields,
+        // dialogs, menus, tabs, the inline ACL editor) keep their native behavior.
+        document.addEventListener('keydown', async event => {
+            if (!['ArrowUp', 'ArrowDown', 'Enter', 'Backspace'].includes(event.key)) return;
+            if (event.ctrlKey || event.metaKey || event.altKey) return;
+            // Enter/Backspace act once per press, so holding them never cascades.
+            if (event.repeat && (event.key === 'Enter' || event.key === 'Backspace')) return;
+            // A focused button or link activates itself on Enter.
+            if (event.key === 'Enter' && event.target.closest?.('button, a')) return;
+            if (event.target.closest?.('input, textarea, select, [contenteditable="true"], .modal-backdrop, ' +
+                '[role="dialog"], [role="listbox"], [role="menu"], [role="tablist"], .file-row-acl-expand-wrap, .acl-panel')) return;
+            if (!document.querySelector(selector)) return; // still loading or error view
+            event.preventDefault();
+
+            const result = await dotNetRef.invokeMethodAsync('OnListNavigationKey', event.key, event.shiftKey);
+            if (!result || result.index < 0) return;
+            const row = document.querySelector(`${selector} .file-grid-row[data-path="${CSS.escape(result.path)}"]`);
+            if (row) row.scrollIntoView({ block: 'nearest' });
+            else scrollToIndex(selector, result.index, result.itemHeight, result.hasParent);
+        }, options);
+
         host.addEventListener('click', event => {
             if (!suppressClick) return;
             suppressClick = false;

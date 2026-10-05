@@ -112,10 +112,13 @@ public partial class FileBrowser
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!_jsInitialized && _fileDropZone.Id is not null)
+        // Every folder load swaps the list for the loading view and back, so the list
+        // is a new DOM element afterwards. Re-bind the JS helpers to each new element;
+        // otherwise the marquee keeps listening on the detached one.
+        if (_fileDropZone.Id is not null && _fileDropZone.Id != _jsInitializedForId)
         {
-            _jsInitialized = true;
-            _dotNetRef = DotNetObjectReference.Create(this);
+            _jsInitializedForId = _fileDropZone.Id;
+            _dotNetRef ??= DotNetObjectReference.Create(this);
             if (VM.Capabilities.CanUpload)
                 await JS.InvokeVoidAsync("initFileUpload", "#file-drop-zone");
             await JS.InvokeVoidAsync("fileMarquee.initialize", "#file-selection-area", _dotNetRef);

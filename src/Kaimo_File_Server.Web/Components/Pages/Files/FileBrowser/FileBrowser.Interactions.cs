@@ -47,7 +47,7 @@ public partial class FileBrowser
     private ShareLinkDialog _shareLinkDialogComponent = default!;
 
     private ElementReference _fileDropZone;
-    private bool _jsInitialized = false;
+    private string? _jsInitializedForId; // ElementReference.Id of the list the JS helpers are bound to
     
     private SyncDialog? _syncDialogComponent;
     
@@ -110,18 +110,26 @@ public partial class FileBrowser
     public HashSet<FileMetadata> getSelectedItems()
         => _selectedItems;
 
+    // Range anchor (Shift start point) and keyboard cursor, shared by mouse and arrow keys.
+    private FileMetadata? _anchorItem;
+    private FileMetadata? _cursorItem;
+
     private void OnItemClick(MouseEventArgs e, FileMetadata item)
     {
         if (e.CtrlKey || e.MetaKey)
         {
             if (!_selectedItems.Remove(item))
                 _selectedItems.Add(item);
+            _anchorItem = item;
         }
         else if (e.ShiftKey && _selectedItems.Count > 0)
         {
-            var allItems = VM.Directories.Cast<FileMetadata>().Concat(VM.Files).ToList();
-            var lastSelected = _selectedItems.Last();
-            var idxStart = allItems.IndexOf(lastSelected);
+            // Range over the visible (sorted) order, starting at the anchor.
+            var allItems = SortedEntries;
+            var anchor = _anchorItem is not null && _selectedItems.Contains(_anchorItem)
+                ? _anchorItem
+                : _selectedItems.Last();
+            var idxStart = allItems.IndexOf(anchor);
             var idxEnd = allItems.IndexOf(item);
             if (idxStart >= 0 && idxEnd >= 0)
             {
@@ -130,6 +138,7 @@ public partial class FileBrowser
                 for (int i = from; i <= to; i++)
                     _selectedItems.Add(allItems[i]);
             }
+            _anchorItem = anchor;
         }
         else
         {
@@ -140,7 +149,65 @@ public partial class FileBrowser
                 _selectedItems.Clear();
                 _selectedItems.Add(item);
             }
+            _anchorItem = item;
         }
+        _cursorItem = item;
+    }
+
+    /// <summary>
+    /// Keyboard navigation of the focused file list: ArrowUp/ArrowDown move the
+    /// selection (Shift extends it from the anchor), Enter opens the single selected
+    /// entry like a double-click, Backspace opens the parent folder. Returns the new
+    /// cursor row so JavaScript can scroll it into view.
+    /// </summary>
+    [JSInvokable]
+    public async Task<object?> OnListNavigationKey(string key, bool shift)
+    {
+        if (IsOverlayOpen)
+            return null;
+
+        if (key == "Enter")
+        {
+            if (_selectedItems.Count == 1)
+                await InvokeAsync(() => OnItemActivate(_selectedItems.First()));
+            return null;
+        }
+
+        if (key == "Backspace")
+        {
+            if (VM.HasParent)
+                await InvokeAsync(NavigateUp);
+            return null;
+        }
+
+        var entries = SortedEntries;
+        if (entries.Count == 0)
+            return null;
+
+        // Continue from the cursor while it is still selected, otherwise from the
+        // last selected entry (e.g. a search hit or marquee), otherwise from the top.
+        var cursor = _cursorItem is not null && _selectedItems.Contains(_cursorItem)
+            ? _cursorItem
+            : _selectedItems.LastOrDefault();
+        var current = cursor is null ? -1 : entries.IndexOf(cursor);
+        var next = Math.Clamp(current + (key == "ArrowDown" ? 1 : -1), 0, entries.Count - 1);
+        _cursorItem = entries[next];
+
+        var anchorIndex = _anchorItem is null ? -1 : entries.IndexOf(_anchorItem);
+        if (!shift || anchorIndex < 0 || !_selectedItems.Contains(_anchorItem!))
+        {
+            _anchorItem = _cursorItem;
+            anchorIndex = next;
+        }
+
+        _selectedItems.Clear();
+        if (shift)
+            _selectedItems.UnionWith(entries.GetRange(Math.Min(anchorIndex, next), Math.Abs(next - anchorIndex) + 1));
+        else
+            _selectedItems.Add(_cursorItem);
+
+        await InvokeAsync(StateHasChanged);
+        return new { path = RowKey(_cursorItem), index = next, itemHeight = ItemHeightPx, hasParent = VM.HasParent };
     }
 
     private void OnListBackgroundClick(MouseEventArgs e) => _selectedItems.Clear();
