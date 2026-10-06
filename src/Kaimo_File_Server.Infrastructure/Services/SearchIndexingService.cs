@@ -236,6 +236,11 @@ public sealed class SearchIndexingService(
         {
             return Task.FromResult(Stream.Null);
         }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            // Deleted/renamed before we got here: let the search service treat it as vanished.
+            return Task.FromException<Stream>(ex);
+        }
     }
 
     private static async Task Sleep(TimeSpan delay, CancellationToken ct)

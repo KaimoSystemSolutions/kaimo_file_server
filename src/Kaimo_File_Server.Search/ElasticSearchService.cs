@@ -68,6 +68,11 @@ public class ElasticSearchService : ISearchService
         {
             await IndexDocumentIfNotExistsAsync(absolutePath, fileData, ct);
         }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            // Deleted/renamed before the indexer got to it; the following log entry handles it.
+            _logger.LogDebug("File vanished before indexing: {Path}", absolutePath);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Indexing failed for {Path}", absolutePath);
@@ -78,17 +83,17 @@ public class ElasticSearchService : ISearchService
     {
         try
         {
-            var response = await _client.DeleteByQueryAsync<FileDocument>(IndexName, d => d
-                    .Query(q => q
-                        .Term(t => t
-                            .Field("absolutePath")
-                            .Value(absolutePath)
-                        )
-                    )
-            );
+            // Delete by id (id == hash(absolutePath)), not by query: delete-by-query only sees
+            // refreshed segments, so a file indexed <1s earlier was missed and left orphaned.
+            var response = await _client.DeleteAsync<FileDocument>(
+                GetStableId(absolutePath), d => d.Index(IndexName));
 
-            if (response.Deleted == 0)
-                _logger.LogWarning("No document found for path '{Path}'", absolutePath);
+            if (response.Result == Result.NotFound)
+                // Never indexed (hidden path, pre-existing file, vanished before indexing) — fine.
+                _logger.LogDebug("No document found for path '{Path}'", absolutePath);
+            else if (!response.IsValidResponse)
+                _logger.LogError("Deletion failed for {Path}: {Error}",
+                    absolutePath, response.DebugInformation);
             else
                 _logger.LogDebug("Removed document for '{Path}' from the index", absolutePath);
         }
@@ -184,6 +189,10 @@ public class ElasticSearchService : ISearchService
             {
                 string prefix = absolutePath.TrimEnd(Path.DirectorySeparatorChar)
                                 + Path.DirectorySeparatorChar;
+
+                // delete-by-query only sees refreshed segments; refresh first so children
+                // indexed moments ago are not left orphaned.
+                await _client.Indices.RefreshAsync(IndexName);
 
                 var response = await _client.DeleteByQueryAsync<FileDocument>(IndexName, d => d
                     .Query(q => q
