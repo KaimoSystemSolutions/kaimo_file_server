@@ -265,6 +265,50 @@ public sealed class CloudSyncReconciliationTests
         Assert.True(local.HasFile("sub/child.txt"));
     }
 
+    [Fact]
+    public async Task TwoWay_FolderDeletedMidRun_IsNotResurrected_AndDeletionReachesRemoteNextRun()
+    {
+        var remote = new InMemoryRemote();
+        remote.PutDir("/backup");
+        remote.PutDir("/backup/run1");
+        remote.PutFile("/backup/pull.txt", "remote", Time(20)); // remote newer: would pull
+        remote.PutFile("/backup/push.txt", "remote", Time(10)); // local newer: would push
+        remote.PutFile("/backup/remote-only.txt", "r", Time(10));
+        remote.PutDir("/backup/remote-only-dir");
+        var local = new InMemoryFileService();
+        local.PutDir("backup");
+        local.PutDir("backup/run1");
+        local.PutFile("backup/pull.txt", "local", Time(10));
+        local.PutFile("backup/push.txt", "local", Time(20));
+        local.PutFile("backup/local-only.txt", "l", Time(10));
+        // The folder is listed, then deleted while the run walks its children.
+        local.AfterList = dir => { if (dir == "backup") local.RemoveDir("backup"); };
+
+        var failures = new List<SyncFailure>();
+        var options = new CloudSyncTransferOptions(new CloudSyncAdvancedSettings { SyncDeletions = true });
+
+        var manifest = await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.TwoWay, options,
+            previousManifest: null, reportProgress: null, failures: failures);
+
+        // No per-item noise, and pulls/folder creates did not resurrect the folder.
+        Assert.Empty(failures);
+        Assert.False(local.DirExists("backup"));
+        Assert.False(remote.HasFile("/backup/local-only.txt"));
+        Assert.Contains("/backup", manifest!.Paths);
+
+        local.AfterList = null;
+        await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.TwoWay, options,
+            previousManifest: manifest, reportProgress: null, failures: failures);
+
+        // The next run propagates the local deletion to the remote.
+        Assert.Empty(failures);
+        Assert.False(remote.HasFile("/backup/pull.txt"));
+        Assert.False(remote.HasFile("/backup/remote-only.txt"));
+        Assert.False(local.DirExists("backup"));
+    }
+
     private static DateTime Time(int minute) =>
         new(2026, 1, 1, 0, minute, 0, DateTimeKind.Utc);
 
@@ -381,8 +425,30 @@ public sealed class CloudSyncReconciliationTests
 
         public List<(string Path, bool Recycle)> Deletions { get; } = [];
 
+        // Invoked after each successful listing; lets a test delete a folder
+        // between its listing and the processing of its children (mid-run delete).
+        public Action<string>? AfterList { get; set; }
+
         public void PutFile(string path, string content, DateTime modified)
             => _files[Normalize(path)] = (System.Text.Encoding.UTF8.GetBytes(content), modified);
+
+        public void PutDir(string path) => _dirs.Add(Normalize(path));
+
+        public void RemoveDir(string path)
+        {
+            string key = Normalize(path);
+            _dirs.RemoveWhere(d => d == key || d.StartsWith(key + "/", StringComparison.Ordinal));
+            foreach (var file in _files.Keys
+                         .Where(f => f.StartsWith(key + "/", StringComparison.Ordinal)).ToList())
+                _files.Remove(file);
+        }
+
+        public bool DirExists(string path)
+        {
+            string key = Normalize(path);
+            return key.Length == 0 || _dirs.Contains(key)
+                || _files.Keys.Any(f => f.StartsWith(key + "/", StringComparison.Ordinal));
+        }
 
         public void RemoveFile(string path) => _files.Remove(Normalize(path));
 
@@ -396,6 +462,8 @@ public sealed class CloudSyncReconciliationTests
         public Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user)
         {
             string key = Normalize(directoryPath);
+            if (!DirExists(key))
+                throw new DirectoryNotFoundException($"Directory '{key}' does not exist.");
             var items = new List<FileMetadata>();
             foreach (var (file, value) in _files.Where(f => Parent(f.Key) == key))
                 items.Add(new FileMetadata
@@ -405,11 +473,17 @@ public sealed class CloudSyncReconciliationTests
                 });
             foreach (var dir in _dirs.Where(d => Parent(d) == key))
                 items.Add(new FileMetadata { Name = NameOf(dir), Path = dir, IsDirectory = true });
+            AfterList?.Invoke(key);
             return Task.FromResult(items);
         }
 
         public Task<Stream> ReadFileAsync(string path, UserContext user)
-            => Task.FromResult<Stream>(new MemoryStream(_files[Normalize(path)].Data));
+            => _files.TryGetValue(Normalize(path), out var entry)
+                ? Task.FromResult<Stream>(new MemoryStream(entry.Data))
+                : throw new FileNotFoundException($"'{path}' not found");
+
+        public Task<FileMetadata> GetMetadataAsync(string path, UserContext user)
+            => Task.FromResult(new FileMetadata { Path = Normalize(path), IsDirectory = DirExists(path) });
 
         public Task WriteFileAsync(string path, Stream data, UserContext user, CancellationToken ct = default)
         {
@@ -462,7 +536,6 @@ public sealed class CloudSyncReconciliationTests
         public Task<bool> CanListAsync(string path, UserContext user) => throw new NotSupportedException();
         public string ToAbsolutePath(string path) => throw new NotSupportedException();
         public Task CreateFileAsync(string path, UserContext user) => throw new NotSupportedException();
-        public Task<FileMetadata> GetMetadataAsync(string path, UserContext user) => throw new NotSupportedException();
         public Task RenameAsync(string oldPath, string newPath, UserContext user) => throw new NotSupportedException();
         public Task UnzipAsync(string zipPath, string targetPath, UserContext user) => throw new NotSupportedException();
         public Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format, UserContext user) => throw new NotSupportedException();

@@ -295,6 +295,14 @@ public interface ICloudConnection
         {
             throw;
         }
+        catch (SyncDirectoryMissingException) when (!isRoot)
+        {
+            // The subfolder was removed after its parent was listed (e.g. deleted
+            // while this run walks the tree). Not a failure: the parent already
+            // recorded it in the manifest, so the next run reconciles it like any
+            // other deletion instead of reporting one error per vanished child.
+            return;
+        }
         catch (Exception exception) when (!isRoot)
         {
             failures?.Add(new SyncFailure(localDir, SyncFailureOperation.List, exception.Message));
@@ -417,8 +425,19 @@ public interface ICloudConnection
 
                 if (remote!.IsDirectory)
                 {
+                    // Creating the folder would also recreate a parent deleted
+                    // locally mid-run (see LocalParentExistsAsync); skip it then.
+                    bool parentGone = false;
                     if (await TryTransferAsync(failures, localChild, SyncFailureOperation.CreateDirectory,
-                            () => fileService.CreateDirectoryAsync(localChild, user), cancellationToken))
+                            async () =>
+                            {
+                                if (!await LocalParentExistsAsync(fileService, user, localChild))
+                                {
+                                    parentGone = true;
+                                    return;
+                                }
+                                await fileService.CreateDirectoryAsync(localChild, user);
+                            }, cancellationToken) && !parentGone)
                     {
                         newManifest?.Paths.Add(localChild);
                         await SyncDirectory(
@@ -538,11 +557,24 @@ public interface ICloudConnection
         CancellationToken cancellationToken)
     {
         syncProgress.Update($"Pushing {displayName}...");
+        bool vanished = false;
         bool ok = await TryTransferAsync(failures, localChild, SyncFailureOperation.Upload, async () =>
         {
-            await using var stream = options.LimitUpload(await fileService.ReadFileAsync(localChild, user));
+            Stream source;
+            try
+            {
+                source = await fileService.ReadFileAsync(localChild, user);
+            }
+            catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+            {
+                // Deleted locally after its directory was listed. Not a failure:
+                // the next run reconciles the deletion against the manifest.
+                vanished = true;
+                return;
+            }
+            await using var stream = options.LimitUpload(source);
             await UploadAsync(remoteChild, stream, modifiedAt, cancellationToken);
-        }, cancellationToken);
+        }, cancellationToken) && !vanished;
 
         if (ok)
         {
@@ -573,8 +605,15 @@ public interface ICloudConnection
         CancellationToken cancellationToken)
     {
         syncProgress.Update($"Pulling {displayName}...");
+        bool vanished = false;
         bool ok = await TryTransferAsync(failures, localChild, SyncFailureOperation.Download, async () =>
         {
+            if (!await LocalParentExistsAsync(fileService, user, localChild))
+            {
+                vanished = true;
+                return;
+            }
+
             // Open a write handle and stream the download directly into it. The
             // session's dispose runs the same ownership/change-log and search-index
             // hooks as WriteFileAsync. Versioning is skipped: the remote copy is the
@@ -593,7 +632,7 @@ public interface ICloudConnection
             // Stamp the source modification time so pull change-detection keeps
             // working on the next run (mirrors the former SetModifiedAtAsync call).
             await session.SetTimesAsync(new FileTimes(null, modifiedAt, null), cancellationToken);
-        }, cancellationToken);
+        }, cancellationToken) && !vanished;
 
         if (ok)
         {
@@ -602,6 +641,19 @@ public interface ICloudConnection
         }
         return ok;
     }
+
+    /// <summary>
+    /// Local writes recreate missing parent folders, so a folder deleted locally
+    /// while a run walks the tree would be resurrected holding only the items
+    /// pulled into it, and the deletion would never reach the remote. Callers
+    /// skip the write when this returns false; the next run then propagates the
+    /// deletion via the manifest.
+    /// </summary>
+    // ponytail: check-then-write leaves a tiny race; a no-create-parents write
+    // mode in the storage layer would close it if it ever matters.
+    private static async Task<bool> LocalParentExistsAsync(
+        IFileService fileService, UserContext user, string localChild)
+        => (await fileService.GetMetadataAsync(ShareRelativePath.GetParent(localChild), user)).IsDirectory;
 
     /// <summary>
     /// Classifies an exception as a transient fault worth retrying. Definitive
@@ -690,6 +742,12 @@ public interface ICloudConnection
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            // Deleted locally mid-run; the caller already recorded it in the
+            // manifest, so the next run removes the just-created remote folder.
+            return;
         }
         catch (Exception exception)
         {
