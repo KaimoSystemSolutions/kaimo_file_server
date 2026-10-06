@@ -1,7 +1,4 @@
 using Kaimo_File_Server.Infrastructure.Clouds;
-using Kaimo_File_Server.Web.Services;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Configuration;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -125,37 +122,6 @@ public sealed class GoogleIdentityConfigurationTests
         {
             File.Delete(credentialFile);
         }
-    }
-
-    [Fact]
-    public void AuthorizationRequest_UsesOpaqueStatePkceAndConfiguredScope()
-    {
-        var identity = Load(new Dictionary<string, string?>
-        {
-            ["ExternalStorage:Google:ClientId"] = "client.apps.googleusercontent.com",
-            ["ExternalStorage:Google:ClientSecret"] = "secret",
-            ["ExternalStorage:Google:ExternalBaseUrl"] = "https://files.example.test"
-        });
-        var service = new GoogleOAuthService(
-            identity,
-            new GoogleOAuthClientFactory(identity),
-            new EphemeralDataProtectionProvider());
-
-        var start = service.BeginAuthorization("opaque-state", GoogleDriveScopeProfile.ReadOnly);
-        var uri = new Uri(start.AuthorizationUri);
-        var query = QueryHelpers.ParseQuery(uri.Query);
-
-        Assert.Equal("opaque-state", query["state"]);
-        Assert.Equal("S256", query["code_challenge_method"]);
-        Assert.False(string.IsNullOrWhiteSpace(query["code_challenge"]));
-        Assert.Equal("offline", query["access_type"]);
-        Assert.Equal("consent", query["prompt"]);
-        Assert.Equal("https://www.googleapis.com/auth/drive.readonly", query["scope"]);
-        Assert.Equal(
-            "https://files.example.test/api/google/callback",
-            query["redirect_uri"]);
-        Assert.DoesNotContain("secret", start.AuthorizationUri, StringComparison.Ordinal);
-        Assert.DoesNotContain("secret", start.ProtectedContext, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -282,7 +282,6 @@ builder.Services.AddSingleton<AssetProvider>();
 builder.Services.AddSingleton<ICloudAuthorizationTicketStore, CloudAuthorizationTicketStore>();
 builder.Services.AddSingleton<IOneDriveDeviceAuthorizationService, OneDriveDeviceAuthorizationService>();
 builder.Services.AddSingleton<IDropboxAuthorizationService, DropboxAuthorizationService>();
-builder.Services.AddSingleton<GoogleOAuthService>();
 builder.Services.AddSingleton<ICredentialVault, DataProtectionCredentialVault>();
 builder.Services.AddExternalStorageProviders(applicationDataPath);
 builder.Services.AddScoped<IStorageConnectionProvider>(services =>

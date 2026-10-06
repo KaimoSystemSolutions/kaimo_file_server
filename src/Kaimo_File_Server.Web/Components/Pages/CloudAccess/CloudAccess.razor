@@ -603,8 +603,7 @@ else
     {
         if (_connectionProvider != "onedrive")
             throw new ArgumentException(R("Web_CloudAccess_Provider_Select"));
-        var url = await VM.CreateOneDriveConnectionAsync(_connectionName);
-        Nav.NavigateTo(url, forceLoad: true);
+        await StartAuthorizationAsync(await VM.CreateOneDriveConnectionAsync(_connectionName));
     });
 
     private Task ConnectionChangedAsync(ChangeEventArgs e)
@@ -800,9 +799,16 @@ else
 
     private async Task AuthorizeConnectionAsync(StorageConnection connection) => await RunAsync(async () =>
     {
-        var url = await VM.AuthorizeConnectionAsync(connection.Id);
-        Nav.NavigateTo(url, forceLoad: true);
+        await StartAuthorizationAsync(await VM.AuthorizeConnectionAsync(connection.Id));
     });
+
+    // POSTs the single-use ticket in a form body (keeps the secret out of the URL).
+    private async Task StartAuthorizationAsync(InteractiveAuthorization authorization)
+        => await JS.InvokeVoidAsync(
+            "kaimoPostConnect",
+            $"/api/cloud-access/{authorization.Endpoint}/connect",
+            authorization.ConnectionId,
+            authorization.Ticket);
 
     private static bool IsReady(StorageConnection connection)
         => connection.State == StorageConnectionState.Ready;

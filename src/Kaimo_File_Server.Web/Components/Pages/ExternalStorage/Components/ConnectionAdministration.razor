@@ -288,10 +288,10 @@ else
     {
         if (SelectedProviderUsesInteractiveAuthorization)
         {
-            string uri = SelectedProvider!.AuthorizationModes.Contains(StorageAuthorizationMode.DeviceCode)
+            var authorization = SelectedProvider!.AuthorizationModes.Contains(StorageAuthorizationMode.DeviceCode)
                 ? await VM.CreateOneDriveConnectionAsync(_name)
                 : await VM.CreateDropboxConnectionAsync(_name);
-            Nav.NavigateTo(uri, forceLoad: true);
+            await StartAuthorizationAsync(authorization);
         }
         else
         {
@@ -313,7 +313,15 @@ else
             _selected = VM.Connections.FirstOrDefault(connection => connection.Name == _name);
         }
     });
-    private async Task AuthorizeAsync() => await ActAsync(async () => Nav.NavigateTo(await VM.AuthorizeConnectionAsync(_selected!.Id), forceLoad: true));
+    private async Task AuthorizeAsync() => await ActAsync(async () => await StartAuthorizationAsync(await VM.AuthorizeConnectionAsync(_selected!.Id)));
+
+    // POSTs the single-use ticket in a form body (keeps the secret out of the URL).
+    private async Task StartAuthorizationAsync(InteractiveAuthorization authorization)
+        => await JS.InvokeVoidAsync(
+            "kaimoPostConnect",
+            $"/api/cloud-access/{authorization.Endpoint}/connect",
+            authorization.ConnectionId,
+            authorization.Ticket);
     private async Task TestAsync()
     {
         _testSucceeded = _testFailed = false;

@@ -75,8 +75,14 @@ public sealed class CloudAccessOneDriveController(
         return new EmptyResult();
     }
 
-    [HttpGet("connect")]
-    public async Task<IActionResult> Connect(Guid connectionId, string ticket)
+    // POST, not GET: the single-use ticket is a secret and travels in the form
+    // body so it never lands in the URL (browser history, proxy/access logs).
+    // The web session cookie is intentionally not honored on controllers, so the
+    // unguessable ticket in the body is itself the anti-CSRF proof; antiforgery
+    // token validation (which needs the session) is therefore not applicable.
+    [HttpPost("connect")]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> Connect([FromForm] Guid connectionId, [FromForm] string ticket)
     {
         var connection = await connections.GetAsync(connectionId);
         if (connection is null || !string.Equals(connection.ProviderId, "onedrive", StringComparison.OrdinalIgnoreCase))
@@ -95,14 +101,19 @@ public sealed class CloudAccessOneDriveController(
         }
         catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
         {
+            // Log the real cause server-side; return only a generic message so
+            // internal exception text never leaks into the redirect URL/history.
             logger.LogWarning(exception, "Unable to start OneDrive authorization for Cloud Access connection {ConnectionId}", connectionId);
-            return Redirect(ConnectionsPage(error: exception.Message));
+            return Redirect(ConnectionsPage(error: R("Web_CloudSync_Device_Failed")));
         }
     }
 
-    [HttpGet("device-status")]
+    // POST with the session secret in the body (see Connect). The browser polls
+    // this endpoint, so it must not be a cacheable, prefetchable GET.
+    [HttpPost("device-status")]
+    [IgnoreAntiforgeryToken]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public async Task<IActionResult> DeviceStatus(string session)
+    public async Task<IActionResult> DeviceStatus([FromForm] string session)
     {
         var result = await deviceAuthorization.PollAsync(session);
         if (result.State == OneDriveDevicePollState.Pending)
@@ -158,8 +169,8 @@ public sealed class CloudAccessOneDriveController(
         var waiting = html.Encode(R("Web_CloudSync_Device_Waiting"));
         var cancel = html.Encode(R("Web_Button_Cancel"));
         var failed = JsonSerializer.Serialize(R("Web_CloudSync_Device_Failed"));
-        var statusUrl = JsonSerializer.Serialize(
-            "/api/cloud-access/onedrive/device-status?session=" + Uri.EscapeDataString(authorization.SessionId));
+        var statusUrl = JsonSerializer.Serialize("/api/cloud-access/onedrive/device-status");
+        var sessionId = JsonSerializer.Serialize(authorization.SessionId);
         return $$$"""
             <!doctype html><html lang="{{{language}}}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
             <title>{{{title}}} - Kaimo Files</title><style>
@@ -170,7 +181,7 @@ public sealed class CloudAccessOneDriveController(
             </style></head><body><main><h1>{{{title}}}</h1><p>{{{instructions}}}</p>
             <code>{{{html.Encode(authorization.UserCode)}}}</code><a class="button" href="{{{html.Encode(authorization.VerificationUri)}}}" target="_blank" rel="noopener noreferrer">{{{openMicrosoft}}}</a>
             <p id="status">{{{waiting}}}</p><a class="cancel" href="/cloud-access">{{{cancel}}}</a></main><script nonce="{{{cspNonce}}}">
-            const u={{{statusUrl}}},s=document.getElementById('status'),f={{{failed}}};async function p(){try{const r=await fetch(u,{cache:'no-store',credentials:'same-origin'}),j=await r.json();if(j.state==='complete'){location.replace(j.redirect);return}if(j.state==='failed'){s.textContent=j.message||f;s.className='error';return}setTimeout(p,Math.max(1,j.retryAfterSeconds||{{{authorization.PollIntervalSeconds}}})*1000)}catch(e){s.textContent=f;s.className='error'}}setTimeout(p,{{{authorization.PollIntervalSeconds}}}*1000)
+            const u={{{statusUrl}}},session={{{sessionId}}},s=document.getElementById('status'),f={{{failed}}};async function p(){try{const body=new URLSearchParams({session:session});const r=await fetch(u,{method:'POST',cache:'no-store',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body}),j=await r.json();if(j.state==='complete'){location.replace(j.redirect);return}if(j.state==='failed'){s.textContent=j.message||f;s.className='error';return}setTimeout(p,Math.max(1,j.retryAfterSeconds||{{{authorization.PollIntervalSeconds}}})*1000)}catch(e){s.textContent=f;s.className='error'}}setTimeout(p,{{{authorization.PollIntervalSeconds}}}*1000)
             </script></body></html>
             """;
     }

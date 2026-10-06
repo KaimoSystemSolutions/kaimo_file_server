@@ -180,7 +180,7 @@ public sealed class CloudAccessViewModel
         finally { IsLoading = false; }
     }
 
-    public async Task<string> CreateOneDriveConnectionAsync(string name)
+    public async Task<InteractiveAuthorization> CreateOneDriveConnectionAsync(string name)
     {
         await EnsureCanManageConnectionsAsync();
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200)
@@ -197,14 +197,14 @@ public sealed class CloudAccessViewModel
         await _connections.SaveAsync(connection);
         var ticket = await _tickets.IssueAsync(
             connection.Id, string.Empty, "onedrive-access", _actor.User.Id);
-        return $"/api/cloud-access/onedrive/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
+        return new InteractiveAuthorization("onedrive", connection.Id, ticket);
     }
 
     /// <summary>
     /// Creates a pending Dropbox connection and returns the authorization page URL.
     /// Dropbox uses PKCE with only a public application key; no secret is stored.
     /// </summary>
-    public async Task<string> CreateDropboxConnectionAsync(string name)
+    public async Task<InteractiveAuthorization> CreateDropboxConnectionAsync(string name)
     {
         await EnsureCanManageConnectionsAsync();
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200)
@@ -220,7 +220,7 @@ public sealed class CloudAccessViewModel
         await _connections.SaveAsync(connection);
         var ticket = await _tickets.IssueAsync(
             connection.Id, string.Empty, "dropbox-access", _actor.User.Id);
-        return $"/api/cloud-access/dropbox/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
+        return new InteractiveAuthorization("dropbox", connection.Id, ticket);
     }
 
     /// <summary>
@@ -306,7 +306,7 @@ public sealed class CloudAccessViewModel
         await LoadAsync();
     }
 
-    public async Task<string> AuthorizeConnectionAsync(Guid connectionId)
+    public async Task<InteractiveAuthorization> AuthorizeConnectionAsync(Guid connectionId)
     {
         var connection = await GetManagedConnectionAsync(connectionId);
         var provider = _providerCatalog?.GetRequired(connection.ProviderId);
@@ -325,7 +325,7 @@ public sealed class CloudAccessViewModel
         };
         var ticket = await _tickets.IssueAsync(
             connection.Id, string.Empty, purpose, _actor!.User.Id);
-        return $"/api/cloud-access/{endpoint}/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
+        return new InteractiveAuthorization(endpoint, connection.Id, ticket);
     }
 
     /// <summary>Updates the display name of a managed provider connection.</summary>
@@ -848,3 +848,10 @@ public sealed class CloudAccessViewModel
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 }
+
+/// <summary>
+/// Parameters for launching a provider's interactive authorization page. The
+/// ticket is a single-use secret, so it is POSTed in a form body rather than
+/// placed in the navigation URL where it would land in logs and history.
+/// </summary>
+public sealed record InteractiveAuthorization(string Endpoint, Guid ConnectionId, string Ticket);

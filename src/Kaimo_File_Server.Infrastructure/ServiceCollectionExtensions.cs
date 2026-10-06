@@ -147,7 +147,6 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddSingleton(MicrosoftIdentityConfiguration.FromConfiguration(configuration));
             services.AddSingleton(GoogleIdentityConfiguration.FromConfiguration(configuration));
             services.AddSingleton(DropboxIdentityConfiguration.FromConfiguration(configuration));
-            services.AddSingleton<GoogleOAuthClientFactory>();
             services.AddSingleton<GoogleWorkspaceCredentialFactory>();
             services.AddSingleton<ICloudProvider, GoogleDriveProvider>();
             services.AddSingleton<ICloudProvider, OneDriveProvider>();

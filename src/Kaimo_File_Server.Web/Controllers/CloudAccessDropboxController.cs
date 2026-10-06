@@ -29,8 +29,14 @@ public sealed class CloudAccessDropboxController(
     IHttpClientFactory httpClientFactory,
     ILogger<CloudAccessDropboxController> logger) : ControllerBase
 {
-    [HttpGet("connect")]
-    public async Task<IActionResult> Connect(Guid connectionId, string ticket)
+    // POST, not GET: the single-use ticket is a secret and travels in the form
+    // body so it never lands in the URL (browser history, proxy/access logs).
+    // The web session cookie is intentionally not honored on controllers, so the
+    // unguessable ticket in the body is itself the anti-CSRF proof; antiforgery
+    // token validation (which needs the session) is therefore not applicable.
+    [HttpPost("connect")]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> Connect([FromForm] Guid connectionId, [FromForm] string ticket)
     {
         var connection = await connections.GetAsync(connectionId);
         if (connection is null || !string.Equals(connection.ProviderId, "dropbox", StringComparison.OrdinalIgnoreCase))
@@ -52,14 +58,18 @@ public sealed class CloudAccessDropboxController(
         }
         catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
         {
+            // Log the real cause server-side; return only a generic message so
+            // internal exception text never leaks into the redirect URL/history.
             logger.LogWarning(exception, "Unable to start Dropbox authorization for connection {ConnectionId}", connectionId);
-            return Redirect(ConnectionsPage(error: exception.Message));
+            return Redirect(ConnectionsPage(error: R("Web_CloudAccess_Dropbox_Failed")));
         }
     }
 
-    [HttpGet("submit")]
+    // POST with the session secret and pasted code in the body (see Connect).
+    [HttpPost("submit")]
+    [IgnoreAntiforgeryToken]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public async Task<IActionResult> Submit(string session, string code)
+    public async Task<IActionResult> Submit([FromForm] string session, [FromForm] string code)
     {
         var result = await dropboxAuthorization.CompleteAsync(session, code);
         if (result.State == DropboxAuthorizationState.Failed)
@@ -157,7 +167,7 @@ public sealed class CloudAccessDropboxController(
             <button class="submit" id="submit" type="button">{{{submit}}}</button>
             <p id="status"></p><a class="cancel" href="/cloud-access">{{{cancel}}}</a></main><script nonce="{{{cspNonce}}}">
             const url={{{submitUrl}}},session={{{sessionId}}},s=document.getElementById('status'),b=document.getElementById('submit'),i=document.getElementById('code'),f={{{failed}}},w={{{waiting}}},req={{{codeRequired}}};
-            b.addEventListener('click',async()=>{const code=i.value.trim();if(!code){s.textContent=req;s.className='error';return}b.disabled=true;s.className='';s.textContent=w;try{const q=url+'?session='+encodeURIComponent(session)+'&code='+encodeURIComponent(code);const r=await fetch(q,{cache:'no-store',credentials:'same-origin'});const j=await r.json();if(j.state==='complete'){location.replace(j.redirect);return}s.textContent=j.message||f;s.className='error';b.disabled=false}catch(e){s.textContent=f;s.className='error';b.disabled=false}});
+            b.addEventListener('click',async()=>{const code=i.value.trim();if(!code){s.textContent=req;s.className='error';return}b.disabled=true;s.className='';s.textContent=w;try{const body=new URLSearchParams({session:session,code:code});const r=await fetch(url,{method:'POST',cache:'no-store',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body});const j=await r.json();if(j.state==='complete'){location.replace(j.redirect);return}s.textContent=j.message||f;s.className='error';b.disabled=false}catch(e){s.textContent=f;s.className='error';b.disabled=false}});
             i.addEventListener('keydown',e=>{if(e.key==='Enter')b.click()});
             </script></body></html>
             """;
