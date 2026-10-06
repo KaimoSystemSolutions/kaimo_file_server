@@ -42,6 +42,9 @@ public class AclService : IAclService
     /// <summary>
     /// Checks access against an already-loaded ACL list (no DB access).
     /// Does NOT include department defaults — use the async methods for full evaluation.
+    /// An absent or empty ACL denies (fail-closed), matching <see cref="EvaluateAccess"/>
+    /// on the async enforcement path: the two evaluators must never disagree on the
+    /// no-ACL case, so this can never become an accidental allow-all.
     /// </summary>
     public bool HasAccess(UserContext? userContext, FileMetadata file, FilePermission permission)
     {
@@ -50,7 +53,7 @@ public class AclService : IAclService
 
         var acl = file.Acl;
         if (acl == null || acl.Count == 0)
-            return true;
+            return false;
 
         var userPrincipalIds = CollectPrincipalIds(userContext);
         return EvaluateExplicitOnly(acl, userPrincipalIds, permission);

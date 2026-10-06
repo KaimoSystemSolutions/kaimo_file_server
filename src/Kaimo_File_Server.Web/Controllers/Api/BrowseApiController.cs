@@ -153,6 +153,15 @@ public sealed class BrowseApiController : ApiControllerBase
         if (string.IsNullOrEmpty(resolved!.Path))
             return ApiBadRequest("invalid_path", "A file path is required.");
 
+        // The body is the raw file content. A form content-type makes MVC's form value provider
+        // read and drain Request.Body during model binding, so WriteFileAsync would persist an
+        // EMPTY file and still return 200 — a silent, destructive overwrite. Reject it outright;
+        // a raw upload is never a form.
+        if (Request.HasFormContentType)
+            return ApiBadRequest("unsupported_content_type",
+                "Upload body must be raw file bytes, not a form "
+                + "(Content-Type must not be multipart/form-data or application/x-www-form-urlencoded).");
+
         var fingerprint = RequestFingerprint.Compute(
             "PUT", $"{shareId}/{resolved.Path}", "len:" + (Request.ContentLength?.ToString() ?? "?"));
 

@@ -48,13 +48,14 @@ public class AclServiceTests
     }
 
     [Fact]
-    public void HasAccess_EmptyAcl_ReturnsTrue()
+    public void HasAccess_EmptyAcl_ReturnsFalse()
     {
-        Assert.True(_sut.HasAccess(CreateContext(), CreateFile(acl: []), FilePermission.ListReadData));
+        // Fail-closed: no explicit grant means no access, consistent with the async path.
+        Assert.False(_sut.HasAccess(CreateContext(), CreateFile(acl: []), FilePermission.ListReadData));
     }
 
     [Fact]
-    public void HasAccess_NullAcl_ReturnsTrue()
+    public void HasAccess_NullAcl_ReturnsFalse()
     {
         var file = new FileMetadata
         {
@@ -67,7 +68,8 @@ public class AclServiceTests
             ModifiedAt = DateTime.UtcNow,
             Acl = null!
         };
-        Assert.True(_sut.HasAccess(CreateContext(), file, FilePermission.ListReadData));
+        // Fail-closed: an absent ACL denies rather than granting access to everyone.
+        Assert.False(_sut.HasAccess(CreateContext(), file, FilePermission.ListReadData));
     }
 
     // ═══════════════════ Allow via User / Group / Role ═══════════════════
