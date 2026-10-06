@@ -122,7 +122,9 @@ public class UserListViewModel
         var token = _jwt.GenerateToken(
             context.User.Id, context.User.Username, context.User.Name,
             context.Roles.Select(r => r.Name), securityStamp: context.User.SecurityStamp);
-        await provider.StoreTokenInLocalStorageAsync(token);
+        if (!await provider.StoreSessionTokenAsync(token))
+            _logger.LogWarning("Could not renew the session cookie after the password change; " +
+                               "this session ends at the next revalidation");
     }
 
     private void InvalidateCachedWebDavLogins(Guid userId)

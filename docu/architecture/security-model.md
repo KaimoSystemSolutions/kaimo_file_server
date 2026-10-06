@@ -37,7 +37,7 @@ flowchart LR
 
 | Channel | Mechanism | Implementation |
 |---|---|---|
-| Web UI (Blazor Server) | Username/password → JWT held in browser `localStorage`; logout revokes the token ID (`jti`) in `revoked_web_tokens` | `src/Kaimo_File_Server.Web/Services/JwtTokenService.cs`, `JwtAuthenticationStateProvider.cs` |
+| Web UI (Blazor Server) | Username/password → JWT in the HttpOnly session cookie `__Host-kaimo_session` (see [Web session](#web-session)); logout revokes the token ID (`jti`) in `revoked_web_tokens` | `src/Kaimo_File_Server.Web/Services/JwtTokenService.cs`, `JwtAuthenticationStateProvider.cs`, `WebSessionCookie.cs` |
 | REST API `/api/v1` | Device-scoped JWT bearer + rotating refresh tokens | `src/Kaimo_File_Server.Web/Controllers/Api/AuthApiController.cs`, `Services/Api/ApiTokenService.cs` |
 | WebDAV `/dav` | HTTP Basic (verified against the user store) or the device-scoped JWT bearer | `src/Kaimo_File_Server.Web/Controllers/WebDav/WebDavBasicAuthenticationHandler.cs` |
 | SMB | NTLMv2 by Samba against NT hashes provisioned from the database | [SMB control plane](../external-access/smb/control-plane-grpc.md) |
@@ -58,9 +58,44 @@ Common rules:
 - **Bearer validation.** `BearerTokenValidation.ValidateAsync` (`src/Kaimo_File_Server.Web/Services/BearerTokenValidation.cs`)
   runs on every bearer-authenticated request: the token must be device-scoped (the web login token is
   not accepted), the device active, the account enabled and the security stamp current.
+- **Web session validation.** `WebSessionValidation` (`src/Kaimo_File_Server.Web/Services/WebSessionValidation.cs`)
+  is the counterpart for the web token: not device-scoped, unexpired, `jti` not revoked, account
+  enabled, security stamp current. It runs when the Blazor connection is established and periodically
+  for the circuit's lifetime (`app.session.revalidationSeconds`, default 30 s).
 - **Security monitor.** `SecurityMonitor` records every credential check (web, API, WebDAV) and counts
   API/WebDAV requests per client into `login_attempts` and `client_activity`.
 - There is no directory-service (LDAP/Active Directory/Kerberos) integration; all accounts are local.
+
+### Web session
+
+The web login JWT is never readable by script. It lives in the cookie `__Host-kaimo_session` with
+`HttpOnly`, `Secure`, `SameSite=Strict` and `Path=/` (the `__Host-` prefix forbids a `Domain`
+attribute and non-HTTPS writes). Its expiry equals the token's `exp` (`Jwt:ExpirationHours`).
+
+- **Setting the cookie.** Login runs over the Blazor circuit, which cannot set cookies. After the
+  credentials are verified the circuit issues a single-use, 30-second ticket (`WebSessionTicketStore`)
+  and the page posts it with a same-origin `fetch` to `POST /auth/session` (`WebSessionController`),
+  which sets the cookie. `POST /auth/logout` clears it after the circuit has revoked the `jti`. Both
+  endpoints require HTTPS, an `Origin` naming this server and `Sec-Fetch-Site: same-origin` (when
+  sent), and a JSON body — this rules out login CSRF and cross-site sign-out.
+- **Where the cookie counts.** The default authentication scheme is a policy scheme
+  (`WebSessionCookie.SelectScheme`): the `WebSession` scheme reads the cookie **only on the Blazor hub
+  (`/_blazor`)**; every other path, including `/api/v1` and `/dav`, keeps the header-based schemes and
+  never reads the cookie. The circuit receives the hub user through
+  `IHostEnvironmentAuthenticationStateProvider` on connect and reconnect.
+- **CSRF / cross-site WebSocket hijacking.** All state changes in the web UI run over the hub.
+  `SameSite=Strict` keeps the cookie off cross-site requests; because other ports and subdomains of the
+  same host are *same-site*, the hub additionally rejects foreign `Origin` headers (extra public
+  origins behind a Host-rewriting proxy: `Web:AllowedOrigins`).
+- **XSS.** A script injection can no longer exfiltrate the session token. It could still act through
+  the open circuit while the page is open, so the nonce-based Content-Security-Policy remains the
+  primary XSS defence.
+- **Plain HTTP.** Browser requests on HTTP are redirected to HTTPS (`HttpsRedirection:HttpsPort`,
+  default `Kestrel:HttpsPort`); `/api/v1` and `/dav` are not redirected.
+
+The client API and WebDAV are unaffected: their credentials (Authorization header) are never sent by
+a browser on its own, the API has no CORS policy and accepts JSON bodies only, and `/dav` rejects
+cross-site browser requests (see [WebDAV](../external-access/webdav.md#response-hardening)).
 
 ## File authorization (ACL)
 
@@ -116,7 +151,8 @@ and the key-encryption certificate must always be backed up and restored togethe
 
 - Kestrel serves HTTP on 8080 and HTTPS on 8443 with a self-signed, automatically renewed certificate
   (`src/Kaimo_File_Server.Web/Services/Https/`), replaceable by an uploaded certificate. HSTS is
-  enabled outside Development.
+  enabled outside Development. Browser requests on HTTP are redirected to HTTPS; the client API
+  (`/api/v1`) and WebDAV (`/dav`) are exempt.
 - `SecurityHeadersMiddleware` (`src/Kaimo_File_Server.Web/DynamicHelpers/SecurityHeadersMiddleware.cs`)
   sets a Content-Security-Policy, `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`.
 - `ForwardedHeadersSetup` trusts `X-Forwarded-For`/`-Proto` only from configured

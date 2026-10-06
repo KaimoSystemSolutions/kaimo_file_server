@@ -15,9 +15,10 @@ using Xunit;
 namespace Kaimo_File_Server.Tests;
 
 /// <summary>
-/// Covers the session-revalidation behaviour of <see cref="JwtAuthenticationStateProvider"/>: a
-/// valid token still yields an authenticated session only while the account is enabled, and a user
-/// disabled/removed mid-session is dropped to anonymous (while the token is left in localStorage).
+/// Covers the session behaviour of <see cref="JwtAuthenticationStateProvider"/>: a session cookie
+/// still yields an authenticated circuit only while the account is enabled, a user disabled/removed
+/// mid-session is dropped to anonymous, and an in-circuit login only counts once the browser has
+/// stored the HttpOnly session cookie.
 /// </summary>
 public class JwtAuthenticationStateProviderTests
 {
@@ -25,7 +26,14 @@ public class JwtAuthenticationStateProviderTests
     private const string Stamp = "stamp-at-login";
 
     private readonly Mock<IRevokedWebTokenRepository> _revoked = new();
+    private readonly List<string> _jsPosts = new();
     private string? _token;
+    private bool _cookieStored = true;
+
+    // Set by CreateProvider for Connect().
+    private JwtTokenService _jwt = null!;
+    private IUserRepository _users = null!;
+    private string _currentToken = null!;
 
     private User? _dbUser;
     private bool _dbThrows;
@@ -44,6 +52,8 @@ public class JwtAuthenticationStateProviderTests
             .Build();
         var jwt = new JwtTokenService(config, NullLogger<JwtTokenService>.Instance);
         var token = _token ?? jwt.GenerateToken(UserId, "alice", "Alice", new[] { "User" }, securityStamp: Stamp);
+        _jwt = jwt;
+        _currentToken = token;
 
         var repo = new Mock<IUserRepository>();
         repo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>()))
@@ -62,14 +72,20 @@ public class JwtAuthenticationStateProviderTests
                 .Returns(() => Task.FromResult(_configuredSeconds!.Value));
             services.AddScoped(_ => configRepo.Object);
         }
+        _users = repo.Object;
         var scopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
 
         var js = new Mock<IJSRuntime>();
-        js.Setup(j => j.InvokeAsync<string?>("localStorage.getItem", It.IsAny<object?[]?>()))
-            .Returns(new ValueTask<string?>(token));
+        js.Setup(j => j.InvokeAsync<bool>("kaimoSession.post", It.IsAny<object?[]?>()))
+            .Returns<string, object?[]?>((_, args) =>
+            {
+                _jsPosts.Add((string)args![0]!);
+                return new ValueTask<bool>(_cookieStored);
+            });
 
         return new JwtAuthenticationStateProvider(
-            js.Object, jwt, scopeFactory, NullLogger<JwtAuthenticationStateProvider>.Instance)
+            js.Object, jwt, new WebSessionTicketStore(), scopeFactory,
+            NullLogger<JwtAuthenticationStateProvider>.Instance)
         {
             // Keep the background loop from firing on its own — tests drive revalidation explicitly.
             RevalidationInterval = TimeSpan.FromHours(1),
@@ -82,50 +98,123 @@ public class JwtAuthenticationStateProviderTests
     private static bool IsAuthenticated(AuthenticationState state)
         => state.User.Identity?.IsAuthenticated == true;
 
+    /// <summary>
+    /// Simulates a circuit connecting with the session cookie: the WebSession scheme validates the
+    /// token (signature + <see cref="WebSessionValidation"/>; an exception fails authentication) and
+    /// the circuit host hands the resulting user to the provider.
+    /// </summary>
+    private async Task<AuthenticationState> Connect(JwtAuthenticationStateProvider provider)
+    {
+        var principal = _jwt.ValidateToken(_currentToken);
+        string? failure;
+        try { failure = await WebSessionValidation.CheckAsync(principal, _users, _revoked.Object); }
+        catch { failure = "exception"; }
+
+        var user = failure is null ? principal! : new ClaimsPrincipal(new ClaimsIdentity());
+        provider.SetAuthenticationState(Task.FromResult(new AuthenticationState(user)));
+        return await provider.GetAuthenticationStateAsync();
+    }
+
     // ─────────────── Session establishment ───────────────
 
     [Fact]
-    public async Task GetAuthenticationStateAsync_ValidToken_EnabledUser_IsAuthenticated()
+    public async Task Connect_ValidCookie_EnabledUser_IsAuthenticated()
     {
         using var f = CreateProvider(enabled: true);
 
-        var state = await f.GetAuthenticationStateAsync();
+        var state = await Connect(f);
 
         Assert.True(IsAuthenticated(state));
         Assert.Equal("alice", state.User.Identity?.Name);
     }
 
     [Fact]
-    public async Task GetAuthenticationStateAsync_ValidToken_DisabledUser_IsAnonymous()
+    public async Task Connect_ValidCookie_DisabledUser_IsAnonymous()
     {
         using var f = CreateProvider(enabled: false);
 
-        var state = await f.GetAuthenticationStateAsync();
-
-        Assert.False(IsAuthenticated(state));
+        Assert.False(IsAuthenticated(await Connect(f)));
     }
 
     [Fact]
-    public async Task GetAuthenticationStateAsync_ValidToken_DeletedUser_IsAnonymous()
+    public async Task Connect_ValidCookie_DeletedUser_IsAnonymous()
     {
         var f = CreateProvider(enabled: true);
         using var _ = f;
         _dbUser = null; // account removed
 
-        var state = await f.GetAuthenticationStateAsync();
-
-        Assert.False(IsAuthenticated(state));
+        Assert.False(IsAuthenticated(await Connect(f)));
     }
 
     [Fact]
-    public async Task GetAuthenticationStateAsync_DbError_AllowsOnValidToken()
+    public async Task Connect_NoCookie_IsAnonymous()
     {
         using var f = CreateProvider(enabled: true);
-        _dbThrows = true; // transient outage at session start
 
-        var state = await f.GetAuthenticationStateAsync();
+        Assert.False(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+    }
 
-        Assert.True(IsAuthenticated(state)); // fail-open on transient DB error
+    [Fact]
+    public async Task Reconnect_WithoutValidCookie_InterruptsSession()
+    {
+        using var f = CreateProvider(enabled: true);
+        Assert.True(IsAuthenticated(await Connect(f)));
+
+        AuthenticationState? pushed = null;
+        f.AuthenticationStateChanged += task => pushed = task.GetAwaiter().GetResult();
+
+        // Signed out in another tab: the reconnecting hub request carries no valid cookie.
+        f.SetAuthenticationState(Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))));
+
+        Assert.NotNull(pushed);
+        Assert.False(IsAuthenticated(pushed!));
+        Assert.False(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+    }
+
+    [Fact]
+    public async Task Reconnect_AsDifferentUser_InterruptsSession()
+    {
+        using var f = CreateProvider(enabled: true);
+        Assert.True(IsAuthenticated(await Connect(f)));
+
+        // Another tab signed in as someone else and overwrote the shared cookie.
+        var other = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()), new Claim(ClaimTypes.Name, "bob")],
+            "test"));
+        f.SetAuthenticationState(Task.FromResult(new AuthenticationState(other)));
+
+        Assert.False(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+    }
+
+    [Fact]
+    public async Task Reconnect_AsSameUser_KeepsSession()
+    {
+        using var f = CreateProvider(enabled: true);
+        Assert.True(IsAuthenticated(await Connect(f)));
+
+        Assert.True(IsAuthenticated(await Connect(f)));
+    }
+
+    [Fact]
+    public async Task StoreSessionTokenAsync_CookieStored_AuthenticatesCircuit()
+    {
+        using var f = CreateProvider(enabled: true);
+
+        Assert.True(await f.StoreSessionTokenAsync(_currentToken));
+
+        Assert.Equal(["/auth/session"], _jsPosts);
+        Assert.True(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+    }
+
+    [Fact]
+    public async Task StoreSessionTokenAsync_CookieRefused_StaysAnonymous()
+    {
+        _cookieStored = false; // e.g. page served over plain HTTP
+        using var f = CreateProvider(enabled: true);
+
+        Assert.False(await f.StoreSessionTokenAsync(_currentToken));
+
+        Assert.False(IsAuthenticated(await f.GetAuthenticationStateAsync()));
     }
 
     // ─────────────── Periodic revalidation ───────────────
@@ -134,7 +223,7 @@ public class JwtAuthenticationStateProviderTests
     public async Task RevalidateOnceAsync_UserBecomesDisabled_InterruptsSession()
     {
         using var f = CreateProvider(enabled: true);
-        Assert.True(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+        Assert.True(IsAuthenticated(await Connect(f)));
 
         AuthenticationState? pushed = null;
         f.AuthenticationStateChanged += task => pushed = task.GetAwaiter().GetResult();
@@ -151,7 +240,7 @@ public class JwtAuthenticationStateProviderTests
     public async Task RevalidateOnceAsync_UserStillEnabled_KeepsSession()
     {
         using var f = CreateProvider(enabled: true);
-        Assert.True(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+        Assert.True(IsAuthenticated(await Connect(f)));
 
         bool notified = false;
         f.AuthenticationStateChanged += _ => notified = true;
@@ -166,7 +255,7 @@ public class JwtAuthenticationStateProviderTests
     public async Task RevalidateOnceAsync_TransientDbError_KeepsSession()
     {
         using var f = CreateProvider(enabled: true);
-        Assert.True(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+        Assert.True(IsAuthenticated(await Connect(f)));
 
         bool notified = false;
         f.AuthenticationStateChanged += _ => notified = true;
@@ -198,14 +287,14 @@ public class JwtAuthenticationStateProviderTests
         using var f = CreateProvider(enabled: true);
         _dbUser = MakeUser(enabled: true, stamp: "stamp-after-password-change");
 
-        Assert.False(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+        Assert.False(IsAuthenticated(await Connect(f)));
     }
 
     [Fact]
     public async Task PasswordChange_DuringSession_InterruptsOnRevalidation()
     {
         using var f = CreateProvider(enabled: true);
-        Assert.True(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+        Assert.True(IsAuthenticated(await Connect(f)));
 
         _dbUser = MakeUser(enabled: true, stamp: "stamp-after-password-change");
         await f.RevalidateOnceAsync();
@@ -221,7 +310,7 @@ public class JwtAuthenticationStateProviderTests
         _token = legacy;
         using var f = CreateProvider(enabled: true);
 
-        Assert.False(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+        Assert.False(IsAuthenticated(await Connect(f)));
     }
 
     [Fact]
@@ -238,14 +327,15 @@ public class JwtAuthenticationStateProviderTests
 
         using (var first = CreateProvider(enabled: true))
         {
-            Assert.True(IsAuthenticated(await first.GetAuthenticationStateAsync()));
+            Assert.True(IsAuthenticated(await Connect(first)));
             await first.LogoutAsync();
         }
+        Assert.Equal(["/auth/logout"], _jsPosts); // cookie cleared by the endpoint
 
-        // Same token replayed (e.g. copied out of the browser before logout).
+        // Same cookie replayed (e.g. copied out of the browser before logout).
         using var second = CreateProvider(enabled: true);
         Assert.Single(revoked);
-        Assert.False(IsAuthenticated(await second.GetAuthenticationStateAsync()));
+        Assert.False(IsAuthenticated(await Connect(second)));
     }
 
     [Fact]
@@ -255,7 +345,7 @@ public class JwtAuthenticationStateProviderTests
             .GenerateToken(UserId, "alice", "Alice", new[] { "User" },
                 securityStamp: Stamp, lifetime: TimeSpan.FromSeconds(3));
         using var f = CreateProvider(enabled: true);
-        Assert.True(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+        Assert.True(IsAuthenticated(await Connect(f)));
 
         await Task.Delay(TimeSpan.FromSeconds(3.5)); // past exp; within the validator's clock skew
         await f.RevalidateOnceAsync();

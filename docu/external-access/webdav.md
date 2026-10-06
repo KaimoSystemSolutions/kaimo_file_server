@@ -117,6 +117,11 @@ flag with a five-second cache.
 
 - `GET` serves `application/octet-stream` with `X-Content-Type-Options: nosniff`, so stored HTML
   never renders against the application origin.
-- DAV endpoints carry no antiforgery metadata; Basic and Bearer credentials are not ambient, so a
-  browser cannot be induced into an authenticated cross-site DAV write.
+- DAV endpoints carry no antiforgery metadata. Bearer credentials are not ambient, but a browser that
+  once answered the Basic prompt re-sends those credentials automatically — also on requests another
+  site triggers. Such requests are rejected: `WebDavEnabledMiddleware` answers `403` to every request
+  whose `Sec-Fetch-Site` is `cross-site` or `same-site` (native clients send no such header). In
+  addition, every state-changing DAV method is a non-simple request that would need a CORS preflight,
+  which the server never grants, and there is no `POST` handler. The web session cookie is never read
+  on `/dav`.
 - Failed Basic attempts go through the login throttle and the security monitor.

@@ -11,23 +11,28 @@ using Microsoft.JSInterop;
 namespace Kaimo_File_Server.Web.Services;
 
 /// <summary>
-/// Blazor AuthenticationStateProvider that reads and validates the JWT token directly from
-/// localStorage (via IJSRuntime).
+/// Blazor AuthenticationStateProvider for the web session. The session JWT lives in the
+/// HttpOnly <see cref="WebSessionCookie"/> — never in script-readable storage:
+///   • When a circuit connects (or reconnects), the <see cref="WebSessionCookie.SchemeName"/>
+///     scheme authenticates the Blazor hub request from the cookie, already applying
+///     <see cref="WebSessionValidation"/>, and the circuit host hands the resulting user to
+///     <see cref="SetAuthenticationState"/>.
+///   • A login inside a running circuit (<see cref="StoreSessionTokenAsync"/>) has the page post
+///     a one-time ticket to <c>/auth/session</c>, which sets the cookie.
 ///
 /// A valid, unexpired token is not sufficient on its own: when the account is disabled (or deleted),
 /// its password changes (security stamp) or the token is signed out after it was issued, the
-/// active session must end quickly. To that end the provider
-/// re-checks the account's <c>IsEnabled</c> flag in the database
-///   • once when a session is (re)established in <see cref="GetAuthenticationStateAsync"/>, and
-///   • periodically for the lifetime of the circuit (<see cref="RevalidationInterval"/>).
-/// When the account is no longer active the circuit drops to anonymous immediately. The token
-/// itself is intentionally left in localStorage — the session is interrupted, and any attempt to
-/// re-establish it re-runs the same DB check, so a disabled user cannot get back in.
+/// active session must end quickly. The provider therefore re-checks the session periodically for
+/// the lifetime of the circuit (<see cref="RevalidationInterval"/>) and drops the circuit to
+/// anonymous as soon as the account is no longer active. The cookie is left in place — any attempt
+/// to re-establish the session re-runs the same checks, so a disabled user cannot get back in.
 /// </summary>
-public class JwtAuthenticationStateProvider : AuthenticationStateProvider, IDisposable
+public class JwtAuthenticationStateProvider : AuthenticationStateProvider,
+    IHostEnvironmentAuthenticationStateProvider, IDisposable
 {
     private readonly IJSRuntime _js;
     private readonly JwtTokenService _jwtService;
+    private readonly WebSessionTicketStore _tickets;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<JwtAuthenticationStateProvider> _logger;
 
@@ -48,102 +53,102 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider, IDisp
     public JwtAuthenticationStateProvider(
         IJSRuntime js,
         JwtTokenService jwtService,
+        WebSessionTicketStore tickets,
         IServiceScopeFactory scopeFactory,
         ILogger<JwtAuthenticationStateProvider> logger)
     {
         _js = js;
         _jwtService = jwtService;
+        _tickets = tickets;
         _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
-    public override async Task<AuthenticationState> GetAuthenticationStateAsync()
-    {
-        if (_cachedPrincipal is not null)
-            return new AuthenticationState(_cachedPrincipal);
+    public override Task<AuthenticationState> GetAuthenticationStateAsync()
+        => Task.FromResult(_cachedPrincipal is null ? _anonymous : new AuthenticationState(_cachedPrincipal));
 
+    /// <summary>
+    /// Called by the circuit host with the user of the Blazor hub connection — on connect and on
+    /// every reconnect. That user was authenticated from the session cookie and validated by
+    /// <see cref="WebSessionValidation"/>; an absent or rejected cookie yields an anonymous user.
+    /// </summary>
+    public void SetAuthenticationState(Task<AuthenticationState> authenticationStateTask)
+    {
+        _ = ApplyHostStateAsync(authenticationStateTask);
+    }
+
+    private async Task ApplyHostStateAsync(Task<AuthenticationState> authenticationStateTask)
+    {
+        ClaimsPrincipal user;
         try
         {
-            var token = await _js.InvokeAsync<string?>("localStorage.getItem", "auth_token");
-
-            if (string.IsNullOrEmpty(token))
-            {
-                _logger.LogDebug("No token found in localStorage");
-                return _anonymous;
-            }
-
-            var principal = _jwtService.ValidateToken(token);
-
-            if (principal is null)
-            {
-                _logger.LogInformation("Token invalid or expired, removing it");
-                try { await _js.InvokeVoidAsync("localStorage.removeItem", "auth_token"); } catch { }
-                return _anonymous;
-            }
-
-            // A still-valid token is not enough: an account disabled/removed since the token was
-            // issued must not be able to (re)establish a session. Transient DB errors fail open —
-            // the app is unusable without the DB anyway, and the periodic loop catches a real
-            // deactivation once the DB is reachable again.
-            try
-            {
-                if (!await IsAccountActiveAsync(principal))
-                {
-                    _logger.LogInformation(
-                        "Token valid but account disabled/removed — denying session for {User}",
-                        principal.Identity?.Name);
-                    return _anonymous;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "Could not verify account status at session start; allowing on valid token");
-            }
-
-            _logger.LogDebug("Token valid for: {Username}", principal.Identity?.Name);
-            _cachedPrincipal = principal;
-            StartRevalidationLoop();
-            return new AuthenticationState(principal);
-        }
-        catch (InvalidOperationException)
-        {
-            // JS interop not available (should not happen with prerender: false)
-            return _anonymous;
-        }
-        catch (Exception ex) when (ex is TaskCanceledException or JSDisconnectedException)
-        {
-            // The browser did not answer (interop timeout or disconnect). Not cached, so the
-            // next call retries once the client is responsive again.
-            _logger.LogWarning("Browser did not respond while loading the auth state ({Reason})",
-                ex.GetType().Name);
-            return _anonymous;
+            user = (await authenticationStateTask).User;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while loading the auth state");
-            return _anonymous;
+            _logger.LogWarning(ex, "Could not read the authentication state of the Blazor connection");
+            return;
+        }
+
+        if (user.Identity?.IsAuthenticated == true && _cachedPrincipal is not null
+            && _cachedPrincipal.FindFirstValue(ClaimTypes.NameIdentifier) != user.FindFirstValue(ClaimTypes.NameIdentifier))
+        {
+            // Reconnected as a different account (another tab signed in over the shared cookie).
+            // The circuit's UI state belongs to the previous user, so it must not silently switch.
+            _logger.LogInformation("Blazor connection now carries a different user — interrupting session");
+            InterruptSession();
+        }
+        else if (user.Identity?.IsAuthenticated == true)
+        {
+            _logger.LogDebug("Web session established for: {Username}", user.Identity.Name);
+            _cachedPrincipal = user;
+            StartRevalidationLoop();
+            NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(user)));
+        }
+        else if (_cachedPrincipal is not null)
+        {
+            // Reconnected without a valid cookie (signed out in another tab, expired, revoked).
+            InterruptSession();
         }
     }
 
-    public async Task StoreTokenInLocalStorageAsync(string token)
+    /// <summary>
+    /// Starts a session inside the running circuit: has the browser exchange a one-time ticket for
+    /// the HttpOnly session cookie, then switches the circuit to the token's user. Returns false
+    /// when the cookie could not be set (e.g. the page is not served over HTTPS) — the session
+    /// would not survive a reload then, so the caller treats it as a failed sign-in.
+    /// </summary>
+    public async Task<bool> StoreSessionTokenAsync(string token)
     {
-        await _js.InvokeVoidAsync("localStorage.setItem", "auth_token", token);
-
         var principal = _jwtService.ValidateToken(token);
-        if (principal is not null)
+        if (principal is null
+            || !long.TryParse(principal.FindFirst(JwtRegisteredClaimNames.Exp)?.Value, out var exp))
+            return false;
+
+        var ticket = _tickets.Issue(new WebSessionTicket(token, DateTimeOffset.FromUnixTimeSeconds(exp)));
+        bool stored;
+        try
         {
-            _logger.LogInformation("Login successful for: {Username}", principal.Identity?.Name);
-            _cachedPrincipal = principal;
-            StartRevalidationLoop();
-            NotifyAuthenticationStateChanged(
-                Task.FromResult(new AuthenticationState(principal)));
+            stored = await _js.InvokeAsync<bool>("kaimoSession.post", "/auth/session", new { ticket });
         }
-        else
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException
+                                       or TaskCanceledException or InvalidOperationException)
         {
-            _cachedPrincipal = null;
-            NotifyAuthenticationStateChanged(Task.FromResult(_anonymous));
+            _logger.LogWarning("Browser did not complete the session handoff ({Reason})", ex.GetType().Name);
+            stored = false;
         }
+
+        if (!stored)
+        {
+            _logger.LogWarning("The session cookie could not be set for {Username}", principal.Identity?.Name);
+            return false;
+        }
+
+        _logger.LogInformation("Login successful for: {Username}", principal.Identity?.Name);
+        _cachedPrincipal = principal;
+        StartRevalidationLoop();
+        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(principal)));
+        return true;
     }
 
     public async Task LogoutAsync()
@@ -151,7 +156,7 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider, IDisp
         _logger.LogInformation("Logout performed");
         StopRevalidationLoop();
         await RevokeCurrentTokenAsync(_cachedPrincipal);
-        try { await _js.InvokeVoidAsync("localStorage.removeItem", "auth_token"); } catch { }
+        try { await _js.InvokeAsync<bool>("kaimoSession.post", "/auth/logout", null); } catch { }
         _cachedPrincipal = null;
         NotifyAuthenticationStateChanged(Task.FromResult(_anonymous));
     }
@@ -168,10 +173,14 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider, IDisp
         if (principal is null)
             return;
 
-        bool active;
+        string? failure;
         try
         {
-            active = await IsAccountActiveAsync(principal);
+            using var scope = _scopeFactory.CreateScope();
+            failure = await WebSessionValidation.CheckAsync(
+                principal,
+                scope.ServiceProvider.GetRequiredService<IUserRepository>(),
+                scope.ServiceProvider.GetRequiredService<IRevokedWebTokenRepository>());
         }
         catch (Exception ex)
         {
@@ -181,44 +190,18 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider, IDisp
             return;
         }
 
-        if (!active)
+        if (failure is not null)
         {
             _logger.LogInformation(
-                "Account for {User} is disabled/removed — interrupting session", principal.Identity?.Name);
+                "Session of {User} is no longer valid ({Reason}) — interrupting session",
+                principal.Identity?.Name, failure);
             InterruptSession();
         }
     }
 
     /// <summary>
-    /// Whether the session's token is still acceptable: not expired, not signed out, the
-    /// account exists and is enabled, and the token carries the account's current security
-    /// stamp (so a password change ends every session established before it).
-    /// </summary>
-    private async Task<bool> IsAccountActiveAsync(ClaimsPrincipal principal)
-    {
-        var idValue = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!Guid.TryParse(idValue, out var userId))
-            return false; // malformed/foreign token → not a valid session
-
-        // The circuit outlives the token check at connect time; end it once the token expires.
-        if (long.TryParse(principal.FindFirst(JwtRegisteredClaimNames.Exp)?.Value, out var exp)
-            && DateTimeOffset.FromUnixTimeSeconds(exp) <= DateTimeOffset.UtcNow)
-            return false;
-
-        using var scope = _scopeFactory.CreateScope();
-        var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-        var user = await users.GetByIdAsync(userId);
-        if (user is not { IsEnabled: true } || !JwtTokenService.HasCurrentSecurityStamp(principal, user))
-            return false;
-
-        var jti = principal.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
-        return string.IsNullOrEmpty(jti)
-            || !await scope.ServiceProvider.GetRequiredService<IRevokedWebTokenRepository>().IsRevokedAsync(jti);
-    }
-
-    /// <summary>
-    /// Records the session token as signed out on the server, so a copy of it (e.g. taken
-    /// from the browser) cannot establish a session again before it expires.
+    /// Records the session token as signed out on the server, so a copy of the cookie cannot
+    /// establish a session again before it expires.
     /// </summary>
     private async Task RevokeCurrentTokenAsync(ClaimsPrincipal? principal)
     {
@@ -240,7 +223,7 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider, IDisp
         }
     }
 
-    /// <summary>Drops the session to anonymous. The token is left in localStorage on purpose.</summary>
+    /// <summary>Drops the session to anonymous. The cookie is left in place on purpose.</summary>
     private void InterruptSession()
     {
         _cachedPrincipal = null;

@@ -127,22 +127,53 @@ builder.Services.AddHttpClient("CloudAccessDropbox", client =>
 
 // -- JWT --
 builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.AddSingleton<WebSessionTicketStore>();
 builder.Services.AddScoped<JwtAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
     sp.GetRequiredService<JwtAuthenticationStateProvider>());
 
-// -- JWT bearer authentication for the client REST API (/api/v1). Uses the SAME
-//    validation parameters as the Blazor token path (JwtTokenService) so the two
-//    can never drift apart. The Blazor localStorage flow is unaffected — it does
-//    not depend on this handler, and its token is not accepted here. --
-// Validated eagerly here (not only in the lazily created JwtTokenService) so the bearer
-// handler can never run with a weak, well-known or development-only signing secret.
+// -- Authentication. Two JWT schemes share the SAME validation parameters (JwtTokenService)
+//    so they can never drift apart:
+//      • Bearer     — device-scoped tokens in the Authorization header (client API, WebDAV).
+//      • WebSession — the web login token in the HttpOnly session cookie, honored on the
+//                     Blazor hub ONLY (WebSessionCookie.SelectScheme). The API and WebDAV never
+//                     read the cookie, so an ambient browser credential cannot forge requests
+//                     there; BearerTokenValidation additionally rejects any non-device token. --
+// Validated eagerly here (not only in the lazily created JwtTokenService) so the handlers
+// can never run with a weak, well-known or development-only signing secret.
 var apiJwtSecret = JwtTokenService.ValidateSecret(
     builder.Configuration["Jwt:Secret"],
     allowDevelopmentSecret: builder.Environment.IsDevelopment());
 var apiJwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "KaimoFileServer";
 builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddAuthentication(WebSessionCookie.PolicySchemeName)
+    .AddPolicyScheme(WebSessionCookie.PolicySchemeName, null, options =>
+        options.ForwardDefaultSelector = WebSessionCookie.SelectScheme)
+    .AddJwtBearer(WebSessionCookie.SchemeName, options =>
+    {
+        options.TokenValidationParameters =
+            JwtTokenService.CreateValidationParameters(apiJwtSecret, apiJwtIssuer);
+        options.Events = new JwtBearerEvents
+        {
+            // The token comes from the cookie only — never from a header or the query string.
+            OnMessageReceived = context =>
+            {
+                var token = context.Request.Cookies[WebSessionCookie.Name];
+                if (string.IsNullOrEmpty(token))
+                    context.NoResult(); // otherwise the handler would fall back to the header
+                else
+                    context.Token = token;
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = WebSessionValidation.ValidateAsync,
+            // An invalid session just means an anonymous circuit (login page); no 401 header.
+            OnChallenge = context =>
+            {
+                context.HandleResponse();
+                return Task.CompletedTask;
+            }
+        };
+    })
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters =
@@ -172,12 +203,19 @@ builder.Services
 builder.Services.AddSingleton<WebDavOptions>();
 builder.Services.AddSingleton<WebDavLockManager>();
 
-// Honor X-Forwarded-Proto/-For so `services.webdav.requireHttps` sees the real
-// scheme and the login lockout sees the real client behind a reverse proxy.
-// Only peers in ForwardedHeaders:KnownNetworks/KnownProxies are trusted
-// (default: loopback + private ranges, i.e. a proxy in the same Docker network).
+// Honor X-Forwarded-Proto/-For so the HTTPS redirect, HSTS, the session cookie endpoints
+// and `services.webdav.requireHttps` see the real scheme and the login lockout sees the
+// real client behind a reverse proxy. Only peers in ForwardedHeaders:KnownNetworks/
+// KnownProxies are trusted (default: loopback only, see ForwardedHeadersSetup).
 builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(
     options => ForwardedHeadersSetup.Configure(options, builder.Configuration));
+
+// Browsers are redirected from plain HTTP to HTTPS (the session cookie is Secure-only).
+// The port is the PUBLIC HTTPS port — set HttpsRedirection:HttpsPort when the container's
+// 8443 is published under another port or a reverse proxy terminates TLS on 443.
+builder.Services.AddHttpsRedirection(options =>
+    options.HttpsPort = builder.Configuration.GetValue<int?>("HttpsRedirection:HttpsPort")
+                        ?? builder.Configuration.GetValue("Kestrel:HttpsPort", 8443));
 
 // Security overview: records every credential check (web, API, WebDAV) and counts
 // API/WebDAV requests per client, persisted in batches by the flush service.
@@ -507,6 +545,20 @@ await search.InitializeAsync();
 // carries the security headers (CSP, nosniff, referrer and framing policy).
 app.UseMiddleware<SecurityHeadersMiddleware>();
 
+// Resolve the real client scheme/IP from the reverse proxy before anything reads
+// Request.IsHttps (HSTS, the HTTPS redirect, the session cookie endpoints and the
+// WebDAV Basic handler's HTTPS requirement all depend on it).
+app.UseForwardedHeaders();
+
+// Browsers on plain HTTP are sent to HTTPS: the session cookie is Secure-only and the
+// password must not cross the network in clear text. The client API and WebDAV are
+// excluded — native clients do not follow redirects for uploads, and WebDAV has its
+// own HTTPS requirement (services.webdav.requireHttps).
+app.UseWhen(
+    context => !context.Request.Path.StartsWithSegments("/api/v1")
+               && !context.Request.Path.StartsWithSegments(WebDavPathResolver.Prefix),
+    branch => branch.UseHttpsRedirection());
+
 if (app.Environment.IsDevelopment())
 {
     app.UseStaticFiles();
@@ -536,15 +588,28 @@ else
     }
 }
 
-// Resolve the real client scheme/IP from the reverse proxy before anything reads
-// Request.IsHttps (the WebDAV Basic handler's HTTPS requirement depends on it).
-app.UseForwardedHeaders();
-
 // Count API/WebDAV requests per real client address (after the forwarded headers).
 app.UseMiddleware<SecurityMonitorMiddleware>();
 
+// The Blazor hub authenticates from the session cookie. SameSite=Strict keeps the cookie
+// off cross-site requests, but other ports/subdomains of the same host are "same-site";
+// rejecting foreign Origins closes that gap (cross-site WebSocket hijacking). Placed before
+// authentication so a rejected request never costs a token validation and DB lookups.
+var allowedHubOrigins = WebSessionCookie.ReadAllowedOrigins(builder.Configuration);
+app.UseWhen(
+    context => context.Request.Path.StartsWithSegments(WebSessionCookie.BlazorHubPath),
+    branch => branch.Use(async (context, next) =>
+    {
+        if (!WebSessionCookie.IsAllowedOrigin(context.Request, allowedHubOrigins))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+        await next(context);
+    }));
+
 // Authenticate/authorize before antiforgery and endpoints so [Authorize] API
-// controllers see the JWT-derived principal. Blazor keeps its own cascading auth.
+// controllers see the JWT-derived principal and the Blazor hub sees the session user.
 app.UseAuthentication();
 app.UseAuthorization();
 

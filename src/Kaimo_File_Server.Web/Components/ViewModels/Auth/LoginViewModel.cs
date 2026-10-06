@@ -65,10 +65,17 @@ public class LoginViewModel
                     var token = _jwtService.GenerateToken(
                         context.User.Id, context.User.Username, context.User.Name, roleNames,
                         securityStamp: context.User.SecurityStamp);
-                    await _authState.StoreTokenInLocalStorageAsync(token);
-
                     // Remove the password from memory immediately.
                     Password = "";
+
+                    // Without the session cookie the sign-in would not survive a reload
+                    // (e.g. the page is served over plain HTTP, where Secure cookies are refused).
+                    if (!await _authState.StoreSessionTokenAsync(token))
+                    {
+                        ErrorMessage = Resources.Web_Login_Failed;
+                        return false;
+                    }
+
                     IsAuthenticated = true;
                     return true;
 

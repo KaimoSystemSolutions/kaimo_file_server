@@ -212,11 +212,21 @@ indefinitely.
 
 ## 🔓 Plain HTTP port 8081
 
-Port `8081` serves the web UI, API and WebDAV **without encryption**: passwords
-and login tokens cross the network in clear text. Use it only behind a reverse
-proxy that terminates TLS, or in a network you fully trust. For direct access
-use `https://<host>:8443`, or remove the `8081` mapping from
+Port `8081` is unencrypted. Browsers opening the web UI there are redirected
+to HTTPS (`https://<host>:8443`), because the login session cookie is only
+ever sent over HTTPS. If you publish HTTPS under a different port, set
+`HttpsRedirection__HttpsPort` on the `web` service to that port.
+
+The client API (`/api/v1`) and WebDAV (`/dav`) are **not** redirected on
+`8081`: their credentials cross the network in clear text there. Use it only
+in a network you fully trust, or remove the `8081` mapping from
 `docker-compose.yml` if you do not need it.
+
+**Behind a reverse proxy** that forwards to `8081`, the proxy must be trusted
+(see above) and send `X-Forwarded-Proto: https` — otherwise every page request
+is redirected again (redirect loop). If the proxy rewrites the `Host` header,
+also list the public URL so the browser connection is accepted:
+`Web__AllowedOrigins: https://files.example.com`.
 
 ## 🩺 Troubleshooting
 

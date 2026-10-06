@@ -192,6 +192,8 @@ services:
       <<: *dotnet-environment
       KAIMO_LOG_SOURCE: web
       Jwt__Secret: ${JWT_SECRET:-}
+      # Public HTTPS port browsers on the plain-HTTP port are redirected to.
+      HttpsRedirection__HttpsPort: ${WEB_HTTPS_PORT:-8443}
     volumes:
       - *storage-pool-01
       - *storage-pool-02

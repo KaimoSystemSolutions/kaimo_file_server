@@ -6,6 +6,11 @@ namespace Kaimo_File_Server.Web.Controllers.WebDav;
 /// is in-process, the enabled flag is read directly (five-second cache) rather
 /// than through a reconciler, so toggling it on the settings page takes effect
 /// within seconds without a restart.
+///
+/// It also rejects cross-site browser requests: a browser that once answered the Basic
+/// prompt for <c>/dav</c> re-sends those credentials automatically, even on requests
+/// triggered by another site. Native WebDAV clients send no <c>Sec-Fetch-Site</c> header
+/// and are unaffected.
 /// </summary>
 public sealed class WebDavEnabledMiddleware
 {
@@ -27,6 +32,19 @@ public sealed class WebDavEnabledMiddleware
             return;
         }
 
+        if (IsCrossSiteBrowserRequest(context.Request))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+
         await _next(context);
+    }
+
+    /// <summary>A browser request initiated by another origin (typed URLs and bookmarks send "none").</summary>
+    internal static bool IsCrossSiteBrowserRequest(HttpRequest request)
+    {
+        string? site = request.Headers["Sec-Fetch-Site"];
+        return !string.IsNullOrEmpty(site) && site != "same-origin" && site != "none";
     }
 }

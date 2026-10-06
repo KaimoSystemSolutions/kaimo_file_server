@@ -36,8 +36,8 @@ public sealed class CloudAccessDropboxController(
         if (connection is null || !string.Equals(connection.ProviderId, "dropbox", StringComparison.OrdinalIgnoreCase))
             return NotFound("Cloud Access connection not found.");
         // The single-use ticket is the authorization proof: it is issued only after
-        // the ManageConnections check and is bound to this connection. The Blazor
-        // localStorage JWT is not present on this full-page navigation, so the
+        // the ManageConnections check and is bound to this connection. The web
+        // session cookie is honored on the Blazor hub only (not on controllers), so the
         // session is intentionally not required here (see the download endpoint).
         if (!await tickets.IsValidAsync(
                 ticket, connectionId, string.Empty, "dropbox-access"))
