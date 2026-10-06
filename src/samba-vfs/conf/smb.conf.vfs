@@ -3,6 +3,13 @@
     server string = Kaimo Samba Spike (VFS)
     server role = standalone server
     map to guest = never
+    # Block anonymous/null sessions outright. `map to guest = never` only stops
+    # bad-credential logins from falling back to guest; it does NOT stop a true
+    # null session (empty user AND password) from binding to IPC$ and enumerating
+    # share names pre-auth. Share authorization lives in the VFS (AuthorizeConnect),
+    # not in Samba share ACLs, so `access based share enum` has nothing to filter
+    # for an anonymous caller. The app has no guest/anonymous use case.
+    restrict anonymous = 2
     log level = 2
     logging = stdout
 
