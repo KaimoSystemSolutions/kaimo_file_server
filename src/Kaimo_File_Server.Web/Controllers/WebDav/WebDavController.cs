@@ -178,6 +178,13 @@ public sealed class WebDavController : ControllerBase
         if (IsLockedByOther(target!))
             return Locked();
 
+        // A PUT body is the raw resource. A form Content-Type makes MVC's form value provider
+        // drain Request.Body during model binding, so WriteFileAsync below would persist an
+        // EMPTY file and report success — a silent, destructive overwrite. A raw PUT is never
+        // a form, so reject it outright instead of truncating the target.
+        if (Request.HasFormContentType)
+            return new StatusCodeResult(StatusCodes.Status415UnsupportedMediaType);
+
         return await GuardAsync(async () =>
         {
             // The parent collection must exist (WebDAV: 409 otherwise).
