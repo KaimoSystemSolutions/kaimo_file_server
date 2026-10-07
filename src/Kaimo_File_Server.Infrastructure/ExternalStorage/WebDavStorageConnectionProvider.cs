@@ -272,6 +272,28 @@ internal sealed class WebDavRemoteFileStore(
         await EnsureSuccessOrThrowAsync(response, cancellationToken);
     }
 
+    /// <summary>
+    /// Sets the mtime the way the Windows WebDAV redirector does (PROPPATCH
+    /// <c>Win32LastModifiedTime</c>), honored by IIS and Kaimo itself. Servers that store it
+    /// only as a dead property (e.g. Nextcloud) keep the upload time.
+    /// </summary>
+    public async Task TrySetModifiedTimeAsync(
+        string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
+    {
+        string body = $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <d:propertyupdate xmlns:d="DAV:" xmlns:z="urn:schemas-microsoft-com:">
+              <d:set><d:prop><z:Win32LastModifiedTime>{modifiedUtc.ToUniversalTime():R}</z:Win32LastModifiedTime></d:prop></d:set>
+            </d:propertyupdate>
+            """;
+        using var request = new HttpRequestMessage(new HttpMethod("PROPPATCH"), ResolveFileUri(path))
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/xml")
+        };
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken);
+        await EnsureSuccessOrThrowAsync(response, cancellationToken);
+    }
+
     public async Task CreateDirectoryAsync(string path, CancellationToken cancellationToken = default)
     {
         Uri requestUri = ResolveFileUri(path, trailingSlash: true);

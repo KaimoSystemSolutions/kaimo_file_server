@@ -109,7 +109,11 @@ public sealed class DropboxConnection : ICloudConnection, IAsyncDisposable
                     name,
                     itemPath,
                     size,
-                    ParseDropboxDate(entry, "server_modified")));
+                    // client_modified is the mtime our push sets (and desktop clients
+                    // preserve); server_modified is merely the upload time.
+                    GetOptionalString(entry, "client_modified") is not null
+                        ? ParseDropboxDate(entry, "client_modified")
+                        : ParseDropboxDate(entry, "server_modified")));
             }
 
             if (!root.TryGetProperty("has_more", out var hasMore) || !hasMore.GetBoolean())

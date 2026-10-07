@@ -309,6 +309,29 @@ public sealed class CloudSyncReconciliationTests
         Assert.False(local.DirExists("backup"));
     }
 
+    [Theory]
+    [InlineData(800, "bbbb", false)]   // second-precision provider rounding: same file
+    [InlineData(-800, "bbbb", false)]
+    [InlineData(3000, "bbbb", true)]   // a real change
+    [InlineData(-3000, "bbbb", true)]
+    [InlineData(800, "bbbbbb", true)]  // inside the window, but the size proves a change
+    [InlineData(-800, "bbbbbb", true)]
+    public async Task TwoWay_ModifiedTimeTolerance_IgnoresProviderRounding(
+        int remoteOffsetMs, string remoteContent, bool transfers)
+    {
+        var remote = new InMemoryRemote();
+        remote.PutFile("/a.txt", remoteContent, Time(10).AddMilliseconds(remoteOffsetMs));
+        var local = new InMemoryFileService();
+        local.PutFile("a.txt", "aaaa", Time(10));
+
+        await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.TwoWay,
+            new CloudSyncTransferOptions(new CloudSyncAdvancedSettings()), previousManifest: null);
+
+        // Whichever direction ran, both sides end with the same content.
+        Assert.Equal(transfers, local.ReadText("a.txt") == remote.ReadText("/a.txt"));
+    }
+
     private static DateTime Time(int minute) =>
         new(2026, 1, 1, 0, minute, 0, DateTimeKind.Utc);
 
@@ -349,6 +372,9 @@ public sealed class CloudSyncReconciliationTests
         public void RemoveFile(string path) => _files.Remove(Normalize(path));
 
         public bool HasFile(string path) => _files.ContainsKey(Normalize(path));
+
+        public string ReadText(string path)
+            => System.Text.Encoding.UTF8.GetString(_files[Normalize(path)].Data);
 
         public Task UploadAsync(string path, Stream data, DateTime modifiedTime, CancellationToken ct = default)
         {
@@ -486,10 +512,13 @@ public sealed class CloudSyncReconciliationTests
             => Task.FromResult(new FileMetadata { Path = Normalize(path), IsDirectory = DirExists(path) });
 
         public Task WriteFileAsync(string path, Stream data, UserContext user, CancellationToken ct = default)
+            => WriteFileAsync(path, data, user, modifiedAtUtc: null, ct);
+
+        public Task WriteFileAsync(string path, Stream data, UserContext user, DateTime? modifiedAtUtc, CancellationToken ct = default)
         {
             using var ms = new MemoryStream();
             data.CopyTo(ms);
-            _files[Normalize(path)] = (ms.ToArray(), DateTime.UnixEpoch);
+            _files[Normalize(path)] = (ms.ToArray(), modifiedAtUtc ?? DateTime.UnixEpoch);
             return Task.CompletedTask;
         }
 

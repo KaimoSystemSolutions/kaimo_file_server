@@ -100,6 +100,79 @@ public sealed class FileServiceChangeLogTests
     }
 
     [Fact]
+    public async Task WriteFileAsync_WithNewerSourceMtime_StampsItBeforeTheChangeLogStat()
+    {
+        // The feed entry stats the file, so the source mtime must be stamped first.
+        var source = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var stamped = source.AddDays(-1); // the overwritten copy is older
+        _storage.Setup(s => s.IsDirectoryAsync("docs/a.txt")).ReturnsAsync(false);
+        _storage.Setup(s => s.ExistsAsync("docs/a.txt")).ReturnsAsync(true);
+        _storage.Setup(s => s.SetModifiedDateAsync("docs/a.txt", source))
+            .Callback(() => stamped = source).Returns(Task.CompletedTask);
+        _storage.Setup(s => s.GetMetadataAsync("docs/a.txt"))
+            .ReturnsAsync(() => new FileMetadata { Size = 7, ModifiedAt = stamped });
+
+        await _sut.WriteFileAsync("/docs/a.txt", Stream.Null, Ctx(), source);
+
+        Assert.Equal(source, Single().ModifiedAtUtc);
+    }
+
+    [Theory]
+    [InlineData(0)]   // same mtime: would keep the item tag although the content changed
+    [InlineData(-60)] // older mtime: would move the server time backwards
+    public async Task WriteFileAsync_OverwriteWithNotNewerSourceMtime_KeepsTheWriteTime(int offsetSeconds)
+    {
+        var current = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        _storage.Setup(s => s.IsDirectoryAsync("docs/a.txt")).ReturnsAsync(false);
+        _storage.Setup(s => s.ExistsAsync("docs/a.txt")).ReturnsAsync(true);
+        _storage.Setup(s => s.GetMetadataAsync("docs/a.txt"))
+            .ReturnsAsync(new FileMetadata { Size = 7, ModifiedAt = current });
+
+        await _sut.WriteFileAsync("/docs/a.txt", Stream.Null, Ctx(), current.AddSeconds(offsetSeconds));
+
+        _storage.Verify(s => s.SetModifiedDateAsync(It.IsAny<string>(), It.IsAny<DateTime>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task WriteFileAsync_NewFileWithOldSourceMtime_StampsIt()
+    {
+        var source = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        _storage.Setup(s => s.IsDirectoryAsync("docs/a.txt")).ReturnsAsync(false);
+        _storage.Setup(s => s.ExistsAsync("docs/a.txt")).ReturnsAsync(false);
+
+        await _sut.WriteFileAsync("/docs/a.txt", Stream.Null, Ctx(), source);
+
+        _storage.Verify(s => s.SetModifiedDateAsync("docs/a.txt", source), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetModifiedAtAsync_AppendsModifiedWithTheNewTime()
+    {
+        var when = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        _storage.Setup(s => s.IsDirectoryAsync("docs/a.txt")).ReturnsAsync(false);
+        _storage.Setup(s => s.ExistsAsync("docs/a.txt")).ReturnsAsync(true);
+        _storage.Setup(s => s.GetMetadataAsync("docs/a.txt"))
+            .ReturnsAsync(new FileMetadata { Size = 7, ModifiedAt = when });
+
+        await _sut.SetModifiedAtAsync("/docs/a.txt", Ctx(), when);
+
+        var e = Single();
+        Assert.Equal(FileChangeType.Modified, e.ChangeType);
+        Assert.Equal(when, e.ModifiedAtUtc);
+    }
+
+    [Fact]
+    public async Task WriteFileAsync_WithoutSourceMtime_DoesNotTouchTheTime()
+    {
+        _storage.Setup(s => s.IsDirectoryAsync("docs/a.txt")).ReturnsAsync(false);
+        _storage.Setup(s => s.ExistsAsync("docs/a.txt")).ReturnsAsync(true);
+
+        await _sut.WriteFileAsync("/docs/a.txt", Stream.Null, Ctx());
+
+        _storage.Verify(s => s.SetModifiedDateAsync(It.IsAny<string>(), It.IsAny<DateTime>()), Times.Never);
+    }
+
+    [Fact]
     public async Task CreateDirectoryAsync_AppendsCreatedDirectory()
     {
         await _sut.CreateDirectoryAsync("/docs/new", Ctx());

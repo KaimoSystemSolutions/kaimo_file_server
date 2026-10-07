@@ -86,6 +86,27 @@ paths that existed after the last converged run (`SyncDefinitionRuntime.LastSync
   cannot delete fails the run instead of resurrecting the item.
 - `.RECYCLE_BIN` and `.kaimo-*` entries are excluded from reconciliation (`ShareEntryPolicy`).
 
+## Change detection and modification times
+
+A file present on both sides is compared by modification time; the newer copy wins (Pull/Push
+only ever transfer in their own direction).
+
+- **Tolerance 2 s.** Times within 2 s count as equal, because Dropbox, SFTP v3 and WebDAV
+  `getlastmodified` keep whole seconds (FAT two). Inside that window a **size mismatch** still
+  counts as a change and the raw time order picks the direction. Accepted limit: an edit on both
+  sides within 2 s that keeps the size is not detected until the next edit.
+- **Pull** stamps the remote mtime on the local file. **Push** hands the local mtime to the
+  provider: OneDrive, Google Drive and Dropbox (`client_modified`) store it; SFTP sets it after
+  the upload; WebDAV sends a best-effort `PROPPATCH Win32LastModifiedTime` (honored by IIS and
+  Kaimo, ignored by e.g. Nextcloud). Where the provider keeps the upload time instead (SMB,
+  Nextcloud, legacy), a two-way run downloads a pushed file once more on the next run.
+- **Dropbox lists `client_modified`** (the mtime the uploader set) instead of `server_modified`.
+  Release note: files that came from the Dropbox desktop client and were pulled before this change
+  still carry the newer `server_modified` locally, so a TwoWay/Push run re-uploads them once (no
+  data loss; creates a new Dropbox revision). `client_modified` comes from the uploading client's
+  clock.
+- Creation times are not synchronized.
+
 ## Legacy import
 
 Older installations stored sync mappings and provider grants as JSON inside

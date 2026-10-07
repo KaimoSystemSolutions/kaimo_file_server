@@ -104,7 +104,6 @@ public class FileService : IFileService
             var isDirty = _handle.IsDirty;
             var isDir = _handle.IsDirectory;
             var deleting = _handle.DeleteOnClose;
-            var length = _handle.Length;
 
             // === Pre-close hooks (need the open stream) ===
             // Versioning: snapshot the file content while the stream is still open.
@@ -145,9 +144,9 @@ public class FileService : IFileService
                 {
                     // Content was written and closed — record it for the client change feed. A new
                     // file already logged its Created at open; this marks the content as Modified.
-                    await _owner.AppendChangeAsync(
-                        FileChangeType.Modified, rel, isDirectory: false,
-                        size: length, modifiedAtUtc: DateTime.UtcNow);
+                    // Stat the closed file rather than stamping "now", so a time set via
+                    // SetTimesAsync (cloud pull) matches what delta and the item tag report.
+                    await _owner.AppendFileUpsertAsync(FileChangeType.Modified, rel);
 
                     // Re-open through storage for search indexing — closed stream
                     // means no race with the SMB session. The Task<Stream> contract
@@ -798,9 +797,15 @@ public class FileService : IFileService
             return;
 
         await _storage.SetModifiedDateAsync(normalized, time);
+
+        // The mtime is part of the item tag: log it so feed-based clients rebuild a current tag.
+        await AppendFileUpsertAsync(FileChangeType.Modified, normalized);
     }
 
-    public async Task WriteFileAsync(string path, Stream data, UserContext user, CancellationToken cancellationToken = default)
+    public Task WriteFileAsync(string path, Stream data, UserContext user, CancellationToken cancellationToken = default)
+        => WriteFileAsync(path, data, user, modifiedAtUtc: null, cancellationToken);
+
+    public async Task WriteFileAsync(string path, Stream data, UserContext user, DateTime? modifiedAtUtc, CancellationToken cancellationToken = default)
     {
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
@@ -811,7 +816,21 @@ public class FileService : IFileService
         // creator, never reassigned to whoever later overwrites the file.
         var existedBefore = await _storage.ExistsAsync(normalized);
 
+        // An overwrite only adopts a source mtime that moves the file's time forward. The
+        // stored time then never goes backwards (other devices decide "newest wins" on it),
+        // and every overwrite changes the size:mtime item tag, so If-Match and listing ETags
+        // still detect it.
+        DateTime? previousModifiedAt = modifiedAtUtc is not null && existedBefore
+            ? (await _storage.GetMetadataAsync(normalized)).ModifiedAt.ToUniversalTime()
+            : null;
+
         await _storage.WriteAsync(normalized, data, cancellationToken);
+
+        // Stamp the source mtime before the change-log append, so the feed entry (which stats
+        // the file) carries the preserved time instead of the write time.
+        if (modifiedAtUtc is { } sourceModifiedAt
+            && (previousModifiedAt is null || sourceModifiedAt.ToUniversalTime() > previousModifiedAt))
+            await _storage.SetModifiedDateAsync(normalized, sourceModifiedAt);
 
         if (!existedBefore)
             await RecordOwnerAsync(normalized, isDirectory: false, user);

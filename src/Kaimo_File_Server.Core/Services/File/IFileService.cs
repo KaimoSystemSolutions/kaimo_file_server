@@ -31,6 +31,9 @@ namespace Kaimo_File_Server.Core.Services.File
         // /storage/general/folder/file.txt
         // it would expect folder/file.txt
         Task WriteFileAsync(string path, Stream data, UserContext user, CancellationToken cancellationToken = default);
+        // Same as above, but stamps the source modification time (e.g. from a sync client) on the
+        // written file before the change-log entry is recorded; null keeps the write time.
+        Task WriteFileAsync(string path, Stream data, UserContext user, DateTime? modifiedAtUtc, CancellationToken cancellationToken = default);
         Task CreateFileAsync(string path, UserContext user);
         Task CreateDirectoryAsync(string path, UserContext user);
         Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled);

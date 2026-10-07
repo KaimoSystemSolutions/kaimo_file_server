@@ -99,6 +99,14 @@ public interface IRemoteFileStore
     Task CreateDirectoryAsync(string path, CancellationToken cancellationToken = default);
     Task DeleteAsync(string path, bool recursive, CancellationToken cancellationToken = default);
     Task MoveAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Best-effort: stamps a file's modification time after a write so a sync keeps the
+    /// source mtime. Providers that cannot set it keep this no-op default; the next sync
+    /// then sees the upload time instead.
+    /// </summary>
+    Task TrySetModifiedTimeAsync(string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
 }
 
 public enum OptimizedSyncDirection

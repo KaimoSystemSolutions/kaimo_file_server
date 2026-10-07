@@ -224,16 +224,23 @@ public interface ICloudConnection
     }
 
     /// <summary>
-    /// Compares timestamps with a small tolerance because cloud providers often
-    /// round modification times differently from the local file system.
+    /// Compares timestamps with a tolerance because providers store modification
+    /// times at coarser precision than the local file system (Dropbox, SFTP v3 and
+    /// WebDAV <c>getlastmodified</c> keep whole seconds, FAT two). A tighter window
+    /// makes a just-pushed file look changed again on the next run. Inside the window
+    /// a size mismatch still proves a real change, so the raw order picks the
+    /// direction (identical times give no direction, so nothing transfers).
     /// </summary>
     private static int CompareModifiedTime(
         DateTime local,
-        DateTime remote)
+        long localSize,
+        DateTime remote,
+        long remoteSize)
     {
         var difference = local - remote;
 
-        if (Math.Abs(difference.TotalMilliseconds) < 5)
+        if (Math.Abs(difference.TotalMilliseconds) < 2000
+            && (localSize == remoteSize || difference == TimeSpan.Zero))
             return 0;
 
         return difference > TimeSpan.Zero ? 1 : -1;
@@ -503,7 +510,7 @@ public interface ICloudConnection
             //--------------------------------------------------
             if (mode == SyncMode.Pull)
             {
-                if (CompareModifiedTime(local.ModifiedAt, remote.ModifiedAt) < 0)
+                if (CompareModifiedTime(local.ModifiedAt, local.Size, remote.ModifiedAt, remote.Size) < 0)
                     await PullFileAsync(fileService, user, localChild, remoteChild,
                         remote.Name, remote.ModifiedAt, remote.Size, options, syncProgress,
                         failures, cancellationToken);
@@ -516,7 +523,7 @@ public interface ICloudConnection
             //--------------------------------------------------
             if (mode == SyncMode.Push)
             {
-                if (CompareModifiedTime(local.ModifiedAt, remote.ModifiedAt) > 0)
+                if (CompareModifiedTime(local.ModifiedAt, local.Size, remote.ModifiedAt, remote.Size) > 0)
                     await PushFileAsync(fileService, user, localChild, remoteChild,
                         local.Name, local.ModifiedAt, local.Size, options, syncProgress,
                         failures, cancellationToken);
@@ -527,11 +534,11 @@ public interface ICloudConnection
             //--------------------------------------------------
             // Two-way
             //--------------------------------------------------
-            if (CompareModifiedTime(local.ModifiedAt, remote.ModifiedAt) > 0)
+            if (CompareModifiedTime(local.ModifiedAt, local.Size, remote.ModifiedAt, remote.Size) > 0)
                 await PushFileAsync(fileService, user, localChild, remoteChild,
                     local.Name, local.ModifiedAt, local.Size, options, syncProgress,
                     failures, cancellationToken);
-            else if (CompareModifiedTime(local.ModifiedAt, remote.ModifiedAt) < 0)
+            else if (CompareModifiedTime(local.ModifiedAt, local.Size, remote.ModifiedAt, remote.Size) < 0)
                 await PullFileAsync(fileService, user, localChild, remoteChild,
                     remote.Name, remote.ModifiedAt, remote.Size, options, syncProgress,
                     failures, cancellationToken);

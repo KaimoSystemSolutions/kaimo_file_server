@@ -17,12 +17,24 @@ internal sealed class RemoteFileStoreSyncAdapter(
 
     public Task Dispose() => Task.CompletedTask;
 
-    public Task UploadAsync(
+    public async Task UploadAsync(
         string path,
         Stream data,
         DateTime modifiedTime,
         CancellationToken cancellationToken = default)
-        => remoteFiles.WriteAsync(path, data, overwrite: true, cancellationToken);
+    {
+        await remoteFiles.WriteAsync(path, data, overwrite: true, cancellationToken);
+        try
+        {
+            // Keep the source mtime so the next two-way run does not see the pushed copy
+            // as newer. Best-effort: the content is already uploaded.
+            await remoteFiles.TrySetModifiedTimeAsync(path, modifiedTime, cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // ponytail: swallowed silently; the cost is one re-download on the next run.
+        }
+    }
 
     public async Task DownloadAsync(
         string path,

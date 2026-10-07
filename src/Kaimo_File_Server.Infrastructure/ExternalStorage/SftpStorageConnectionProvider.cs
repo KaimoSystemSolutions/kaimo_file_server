@@ -241,6 +241,14 @@ internal sealed class SftpRemoteFileStore(ISftpClient client, string remoteRoot)
         await content.CopyToAsync(target, cancellationToken).ConfigureAwait(false);
     }
 
+    public Task TrySetModifiedTimeAsync(
+        string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
+    {
+        string serverPath = ResolveFile(path);
+        // SSH.NET only offers a synchronous setter (stat + setstat round trips).
+        return Task.Run(() => client.SetLastWriteTimeUtc(serverPath, modifiedUtc.ToUniversalTime()), cancellationToken);
+    }
+
     public async Task CreateDirectoryAsync(string path, CancellationToken cancellationToken = default)
     {
         string serverPath = ResolveFile(path);

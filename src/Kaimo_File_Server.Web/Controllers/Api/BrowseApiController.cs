@@ -24,6 +24,9 @@ namespace Kaimo_File_Server.Web.Controllers.Api;
 [Route("api/v1/browse")]
 public sealed class BrowseApiController : ApiControllerBase
 {
+    /// <summary>Optional upload header carrying the source mtime as Unix epoch milliseconds (UTC).</summary>
+    public const string ModifiedAtHeader = "X-Kaimo-Modified-At";
+
     private readonly IUserContextFactory _userContextFactory;
     private readonly IShareRepository _shares;
     private readonly IFileServiceFactory _fileServiceFactory;
@@ -142,7 +145,10 @@ public sealed class BrowseApiController : ApiControllerBase
     /// <c>If-Match</c> (overwrite only when the current item still matches — a
     /// mismatch or a missing file yields 412) and <c>If-None-Match: *</c>
     /// (create-only — fail if the file already exists). Supports <c>Idempotency-Key</c>
-    /// so a retried upload replays its stored result instead of re-writing.
+    /// so a retried upload replays its stored result instead of re-writing. An optional
+    /// <c>X-Kaimo-Modified-At</c> header (Unix epoch milliseconds, UTC) preserves the
+    /// source modification time — on an overwrite only when it is newer than the stored
+    /// one; otherwise, and without the header, the file keeps its write time.
     /// </summary>
     [HttpPut("{shareId:guid}/content")]
     public async Task<IActionResult> Upload(Guid shareId, [FromQuery] string? path, CancellationToken ct)
@@ -162,8 +168,23 @@ public sealed class BrowseApiController : ApiControllerBase
                 "Upload body must be raw file bytes, not a form "
                 + "(Content-Type must not be multipart/form-data or application/x-www-form-urlencoded).");
 
+        DateTime? modifiedAtUtc = null;
+        var rawModifiedAt = Request.Headers[ModifiedAtHeader].ToString();
+        if (!string.IsNullOrWhiteSpace(rawModifiedAt))
+        {
+            if (!long.TryParse(rawModifiedAt, NumberStyles.Integer, CultureInfo.InvariantCulture, out var epochMs)
+                || epochMs < 0 || epochMs > DateTimeOffset.MaxValue.ToUnixTimeMilliseconds())
+                return ApiBadRequest("invalid_modified_at",
+                    $"{ModifiedAtHeader} must be Unix epoch milliseconds (UTC).");
+            modifiedAtUtc = DateTimeOffset.FromUnixTimeMilliseconds(epochMs).UtcDateTime;
+        }
+
+        // The mtime is part of the fingerprint (reusing a key with a different mtime is a
+        // different request, not a replay); without it the fingerprint stays as before.
         var fingerprint = RequestFingerprint.Compute(
-            "PUT", $"{shareId}/{resolved.Path}", "len:" + (Request.ContentLength?.ToString() ?? "?"));
+            "PUT", $"{shareId}/{resolved.Path}",
+            "len:" + (Request.ContentLength?.ToString() ?? "?")
+            + (modifiedAtUtc is null ? "" : ";mtime:" + rawModifiedAt.Trim()));
 
         return await ExecuteIdempotentAsync(resolved.User.User.Id, fingerprint, () => GuardAsync(async () =>
         {
@@ -179,7 +200,7 @@ public sealed class BrowseApiController : ApiControllerBase
                     return ApiPreconditionFailed();
             }
 
-            await resolved.Fs.WriteFileAsync(resolved.Path, Request.Body, resolved.User, ct);
+            await resolved.Fs.WriteFileAsync(resolved.Path, Request.Body, resolved.User, modifiedAtUtc, ct);
             var meta = await resolved.Fs.GetMetadataAsync(resolved.Path, resolved.User);
             Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
             return Ok(FileEntryDto.From(meta));

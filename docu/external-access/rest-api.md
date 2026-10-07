@@ -108,7 +108,7 @@ All browse endpoints are ACL-checked per call.
 | `GET /api/v1/browse/{shareId}/list?path=` | Directory children (+ `ETag`). | `If-None-Match` → 304 |
 | `GET /api/v1/browse/{shareId}/metadata?path=` | One item's metadata (+ item-tag `ETag`). | — |
 | `GET /api/v1/browse/{shareId}/content?path=` | Download; supports `Range` (+ item-tag `ETag`). | — |
-| `PUT /api/v1/browse/{shareId}/content?path=` | Upload/overwrite (body = bytes). | `If-Match`, `If-None-Match: *`, `Idempotency-Key` |
+| `PUT /api/v1/browse/{shareId}/content?path=` | Upload/overwrite (body = bytes). Optional `X-Kaimo-Modified-At` preserves the source mtime. | `If-Match`, `If-None-Match: *`, `Idempotency-Key` |
 | `POST /api/v1/browse/{shareId}/directory?path=` | Create a directory. | `Idempotency-Key` |
 | `POST /api/v1/browse/{shareId}/rename` | Body `{ "from": "...", "to": "..." }`. | `If-Match`, `Idempotency-Key` |
 | `DELETE /api/v1/browse/{shareId}/item?path=` | Delete (recycle bin if the share has one). | `If-Match`, `Idempotency-Key` |
@@ -123,6 +123,21 @@ mutating endpoints — see [§3.1](#31-safe-mutations-conditional-requests--idem
 
 **Large files.** `content` downloads honor HTTP `Range`, so a client can resume or
 segment a transfer. Uploads stream straight to disk with an atomic replace.
+
+**Preserving the modification time.** By default an upload's modified time is the
+write time. A sync client sends `X-Kaimo-Modified-At: <Unix epoch milliseconds, UTC>`
+on `PUT content` to keep the source file's mtime; the file, the returned item tag /
+`modifiedAtUtc`, and the change-feed entry then carry that time.
+
+- A **new** file always takes the sent time.
+- An **overwrite** takes it only when it is *newer* than the stored mtime; otherwise the
+  write time is kept (check the returned `modifiedAtUtc`). This keeps the stored time from
+  ever moving backwards, which other devices rely on for "newest wins", and guarantees that
+  every overwrite changes the `size:mtime` item tag, so `If-Match` and listing ETags still
+  detect it.
+- A value that is not a non-negative integer (e.g. a pre-1970 time) →
+  `400 invalid_modified_at`; omit the header for such files.
+- Creation time is not transferred (Linux cannot set it).
 
 ### 3.1 Safe mutations: conditional requests & idempotency keys
 
