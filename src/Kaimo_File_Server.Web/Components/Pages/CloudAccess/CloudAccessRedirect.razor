@@ -1,0 +1,10 @@
+@page "/cloud-access"
+@inject NavigationManager Nav
+
+@code {
+    // The standalone Cloud Access page was split up: virtual shares live in the
+    // Shares page ("Virtual Shares" tab), connections in External Storage. This stub
+    // keeps old bookmarks working; CloudAccess.razor is now only rendered embedded.
+    protected override void OnInitialized()
+        => Nav.NavigateTo("/?view=virtual", replace: true);
+}

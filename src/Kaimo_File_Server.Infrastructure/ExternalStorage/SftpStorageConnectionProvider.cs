@@ -18,7 +18,8 @@ namespace Kaimo_File_Server.Infrastructure.ExternalStorage;
 /// pinned SHA-256 host-key fingerprint the administrator confirmed.
 /// </summary>
 public sealed class SftpStorageConnectionProvider(
-    ICredentialVault credentialVault) : IStorageConnectionProvider
+    ICredentialVault credentialVault,
+    IRsyncSshSetupService? setupService = null) : IStorageConnectionProvider
 {
     public string Id => "sftp";
     public string DisplayName => "SFTP";
@@ -79,7 +80,7 @@ public sealed class SftpStorageConnectionProvider(
     }
 
     public Task RevokeAsync(StorageConnection connection, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
+        => RsyncSshStorageConnectionProvider.DeleteManagedKnownHostAsync(setupService, connection);
 
     private async Task<SftpStorageSession> OpenConnectedSessionAsync(
         StorageConnection connection,

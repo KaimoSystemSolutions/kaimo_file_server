@@ -30,6 +30,12 @@ public interface IRsyncSshSetupService
         CancellationToken cancellationToken = default);
 
     Task DeleteManagedKnownHostAsync(string? path);
+
+    /// <summary>
+    /// Deletes managed known_hosts files that no connection references any more and
+    /// that are older than <paramref name="minimumAge"/>. Returns the number deleted.
+    /// </summary>
+    int DeleteUnreferencedKnownHosts(IEnumerable<string> connectionSettingsJson, TimeSpan minimumAge);
 }
 
 /// <summary>
@@ -185,6 +191,28 @@ public sealed class RsyncSshSetupService : IRsyncSshSetupService
             && Path.GetFileName(fullPath).StartsWith("known-hosts-", StringComparison.Ordinal))
             File.Delete(fullPath);
         return Task.CompletedTask;
+    }
+
+    public int DeleteUnreferencedKnownHosts(IEnumerable<string> connectionSettingsJson, TimeSpan minimumAge)
+    {
+        // The file name (known-hosts-<guid>) is unique and needs no JSON escaping, so a plain
+        // substring match against every stored settings document finds each reference without
+        // parsing (robust even for settings that no longer deserialize).
+        string[] settings = connectionSettingsJson.ToArray();
+        DateTime cutoff = DateTime.UtcNow - minimumAge;
+        int deleted = 0;
+        foreach (string path in Directory.EnumerateFiles(_managedRoot, "known-hosts-*"))
+        {
+            string name = Path.GetFileName(path);
+            // The age guard keeps a file that a running setup wizard just persisted but whose
+            // connection is not saved yet.
+            if (File.GetLastWriteTimeUtc(path) > cutoff
+                || settings.Any(json => json.Contains(name, StringComparison.Ordinal)))
+                continue;
+            File.Delete(path);
+            deleted++;
+        }
+        return deleted;
     }
 
     private static void ValidateCandidate(RsyncSshHostKeyCandidate candidate)

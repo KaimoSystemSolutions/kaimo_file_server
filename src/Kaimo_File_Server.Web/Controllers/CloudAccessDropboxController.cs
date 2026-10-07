@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Kaimo_File_Server.Core.Domain;
@@ -139,38 +138,31 @@ public sealed class CloudAccessDropboxController(
     private static string RenderPage(DropboxAuthorizationStart start, string cspNonce)
     {
         var html = HtmlEncoder.Default;
-        var language = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
-        var title = html.Encode(R("Web_CloudAccess_Dropbox_Title"));
-        var instructions = html.Encode(R("Web_CloudAccess_Dropbox_Instructions"));
         var open = html.Encode(R("Web_CloudAccess_Dropbox_Open"));
         var codeLabel = html.Encode(R("Web_CloudAccess_Dropbox_CodeLabel"));
         var submit = html.Encode(R("Web_CloudAccess_Dropbox_Submit"));
-        var cancel = html.Encode(R("Web_Button_Cancel"));
         var waiting = JsonSerializer.Serialize(R("Web_CloudAccess_Dropbox_Waiting"));
         var failed = JsonSerializer.Serialize(R("Web_CloudAccess_Dropbox_Failed"));
         var codeRequired = JsonSerializer.Serialize(R("Web_CloudAccess_Dropbox_CodeRequired"));
         var submitUrl = JsonSerializer.Serialize("/api/cloud-access/dropbox/submit");
         var sessionId = JsonSerializer.Serialize(start.SessionId);
-        return $$$"""
-            <!doctype html><html lang="{{{language}}}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-            <title>{{{title}}} - Kaimo Files</title><style>
-            :root{color-scheme:light dark;font-family:Inter,system-ui,sans-serif}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#101522;color:#f5f7fb}
-            main{width:min(520px,calc(100% - 40px));padding:36px;border:1px solid #34405a;border-radius:18px;background:#192132;text-align:center}p{color:#bac5d9;line-height:1.55}
-            a.button{display:inline-block;margin:8px 0 22px;padding:11px 18px;border-radius:9px;background:#0061ff;color:white;text-decoration:none;font-weight:650}
-            label{display:block;text-align:left;margin:0 auto;max-width:360px;color:#bac5d9;font-size:.9rem}
-            input{width:100%;box-sizing:border-box;margin-top:6px;padding:11px 12px;border-radius:9px;border:1px solid #34405a;background:#0d1320;color:#f5f7fb;font:1rem ui-monospace,monospace}
-            button.submit{margin-top:16px;padding:11px 18px;border-radius:9px;border:0;background:#2878d0;color:white;font-weight:650;cursor:pointer}button.submit:disabled{opacity:.6;cursor:default}
-            a.cancel{display:block;margin-top:20px;color:#aab6ca}#status{margin-top:18px;font-size:.92rem}#status.error{color:#ff9c9c}
-            </style></head><body><main><h1>{{{title}}}</h1><p>{{{instructions}}}</p>
-            <a class="button" href="{{{html.Encode(start.AuthorizeUrl)}}}" target="_blank" rel="noopener noreferrer">{{{open}}}</a>
-            <label>{{{codeLabel}}}<input id="code" autocomplete="off" spellcheck="false" /></label>
-            <button class="submit" id="submit" type="button">{{{submit}}}</button>
-            <p id="status"></p><a class="cancel" href="/cloud-access">{{{cancel}}}</a></main><script nonce="{{{cspNonce}}}">
-            const url={{{submitUrl}}},session={{{sessionId}}},s=document.getElementById('status'),b=document.getElementById('submit'),i=document.getElementById('code'),f={{{failed}}},w={{{waiting}}},req={{{codeRequired}}};
-            b.addEventListener('click',async()=>{const code=i.value.trim();if(!code){s.textContent=req;s.className='error';return}b.disabled=true;s.className='';s.textContent=w;try{const body=new URLSearchParams({session:session,code:code});const r=await fetch(url,{method:'POST',cache:'no-store',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body});const j=await r.json();if(j.state==='complete'){location.replace(j.redirect);return}s.textContent=j.message||f;s.className='error';b.disabled=false}catch(e){s.textContent=f;s.className='error';b.disabled=false}});
-            i.addEventListener('keydown',e=>{if(e.key==='Enter')b.click()});
-            </script></body></html>
+        var body = $$$"""
+            <div class="auth-actions"><a class="btn-secondary" href="{{{html.Encode(start.AuthorizeUrl)}}}" target="_blank" rel="noopener noreferrer">{{{open}}}</a></div>
+            <div class="form-group auth-form"><label for="code">{{{codeLabel}}}</label><input id="code" autocomplete="off" spellcheck="false" /></div>
+            <div class="auth-actions"><button class="btn-primary" id="submit" type="button">{{{submit}}}</button>
+            <p id="status" role="status"></p></div>
             """;
+        var script = $$$"""
+            const url={{{submitUrl}}},session={{{sessionId}}},s=document.getElementById('status'),b=document.getElementById('submit'),i=document.getElementById('code'),f={{{failed}}},w={{{waiting}}},req={{{codeRequired}}};
+            b.addEventListener('click',async()=>{const code=i.value.trim();if(!code){s.textContent=req;s.className='error-banner';return}b.disabled=true;s.className='';s.textContent=w;try{const body=new URLSearchParams({session:session,code:code});const r=await fetch(url,{method:'POST',cache:'no-store',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body});const j=await r.json();if(j.state==='complete'){location.replace(j.redirect);return}s.textContent=j.message||f;s.className='error-banner';b.disabled=false}catch(e){s.textContent=f;s.className='error-banner';b.disabled=false}});
+            i.addEventListener('keydown',e=>{if(e.key==='Enter')b.click()});
+            """;
+        return CloudAuthorizationPage.Render(
+            R("Web_CloudAccess_Dropbox_Title"),
+            R("Web_CloudAccess_Dropbox_Instructions"),
+            """<svg viewBox="0 0 24 24"><path d="M7 3 1.5 6.5 7 10l5-3.5L7 3z"/><path d="M17 3l-5 3.5L17 10l5.5-3.5L17 3z"/><path d="M1.5 13.5 7 17l5-3.5L6.5 10 1.5 13.5z"/><path d="M17 10l-5 3.5 5 3.5 5.5-3.5L17 10z"/><path d="M7 18.5 12 22l5-3.5L12 15 7 18.5z"/></svg>""",
+            "--provider-dropbox",
+            body, script, cspNonce);
     }
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
@@ -178,7 +170,7 @@ public sealed class CloudAccessDropboxController(
     /// <summary>Builds a return URL to the External Storage → Connections tab.</summary>
     private static string ConnectionsPage(string? error = null, Guid? connected = null)
     {
-        var url = "/external-storage?tab=connections";
+        var url = CloudAuthorizationPage.ConnectionsUrl;
         if (connected is Guid id)
             url += $"&connected={id}";
         if (!string.IsNullOrEmpty(error))

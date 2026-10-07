@@ -185,6 +185,7 @@ public sealed class CloudAccessViewModel
         await EnsureCanManageConnectionsAsync();
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200)
             throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
+        await EnsureConnectionNameAvailableAsync(name.Trim());
         var connection = new StorageConnection
         {
             CreatedByUserId = _actor!.User.Id,
@@ -209,6 +210,7 @@ public sealed class CloudAccessViewModel
         await EnsureCanManageConnectionsAsync();
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200)
             throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
+        await EnsureConnectionNameAvailableAsync(name.Trim());
         var connection = new StorageConnection
         {
             CreatedByUserId = _actor!.User.Id,
@@ -251,6 +253,7 @@ public sealed class CloudAccessViewModel
         string normalizedName = name.Trim();
         if (string.IsNullOrWhiteSpace(normalizedName) || normalizedName.Length > 200)
             throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
+        await EnsureConnectionNameAvailableAsync(normalizedName);
         if (string.IsNullOrWhiteSpace(settingsJson) || settingsJson.Length > 64 * 1024)
             throw new ArgumentException(R("Web_ExternalStorage_InvalidSettings"));
         bool hasUsername = !string.IsNullOrWhiteSpace(username);
@@ -335,6 +338,7 @@ public sealed class CloudAccessViewModel
         var normalizedName = name.Trim();
         if (string.IsNullOrWhiteSpace(normalizedName) || normalizedName.Length > 200)
             throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
+        await EnsureConnectionNameAvailableAsync(normalizedName, connection);
 
         connection.Name = normalizedName;
         await _connections.SaveAsync(connection);
@@ -370,6 +374,7 @@ public sealed class CloudAccessViewModel
         var normalizedName = name.Trim();
         if (string.IsNullOrWhiteSpace(normalizedName) || normalizedName.Length > 200)
             throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
+        await EnsureConnectionNameAvailableAsync(normalizedName, connection);
         if (string.IsNullOrWhiteSpace(settingsJson) || settingsJson.Length > 64 * 1024)
             throw new ArgumentException(R("Web_ExternalStorage_InvalidSettings"));
 
@@ -740,7 +745,15 @@ public sealed class CloudAccessViewModel
             throw new InvalidOperationException(R("Web_StorageConnection_DeleteInUse"));
         if (result == StorageConnectionDeleteResult.Deleted
             && _providerCatalog?.TryGet(connection.ProviderId, out var provider) == true)
-            await provider.RevokeAsync(connection);
+        {
+            // The record is already gone: provider cleanup (cached clients, managed files) is
+            // best-effort and must not turn a successful delete into an error or skip the reload.
+            try { await provider.RevokeAsync(connection); }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Cleanup after deleting storage connection {ConnectionId} failed", connection.Id);
+            }
+        }
         await LoadAsync();
     }
 
@@ -782,6 +795,23 @@ public sealed class CloudAccessViewModel
         if (_actor is null || !await _managementAuth.CanManageDepartmentAsync(
                 _actor, departmentId, ManagementPermission.ManageCloudAccess))
             throw new UnauthorizedAccessException(R("Web_CloudAccess_DepartmentDenied"));
+    }
+
+    /// <summary>
+    /// Connection names are unique (database index). Checking up front turns the otherwise
+    /// generic save failure into a clear message and skips the provider test for a name
+    /// that could never be saved. Case-insensitive, like share names, to avoid look-alikes.
+    /// An unchanged name of <paramref name="current"/> is always accepted: older data may
+    /// hold names that differ only in case (the index is case-sensitive), and editing such a
+    /// connection's settings must not force a rename.
+    /// </summary>
+    private async Task EnsureConnectionNameAvailableAsync(string name, StorageConnection? current = null)
+    {
+        if (current is not null && string.Equals(current.Name, name, StringComparison.Ordinal))
+            return;
+        if ((await _connections.GetAllAsync()).Any(x => x.Id != current?.Id
+                && string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException(R("Web_ExternalStorage_ConnectionNameExists"));
     }
 
     private async Task<bool> IsShareNameAvailableAsync(string name, Guid? excludedShareId = null)

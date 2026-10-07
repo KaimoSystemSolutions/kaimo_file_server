@@ -28,7 +28,9 @@ public sealed class CloudAccessViewModelTests
         var cloudRepository = new Mock<ICloudAccessRepository>();
         var connectionRepository = new Mock<IStorageConnectionRepository>();
         connectionRepository.Setup(x => x.GetAsync(connection.Id, default)).ReturnsAsync(connection);
-        connectionRepository.Setup(x => x.GetAllAsync(default)).ReturnsAsync([connection]);
+        // Legacy data: a sibling whose name differs only in case (the index is case-sensitive).
+        var legacySibling = new StorageConnection { Name = "OLD NAME" };
+        connectionRepository.Setup(x => x.GetAllAsync(default)).ReturnsAsync([connection, legacySibling]);
         cloudRepository.Setup(x => x.GetSharesAsync(default)).ReturnsAsync([]);
         var management = new Mock<IManagementAuthService>();
         management.Setup(x => x.HasGlobalPermissionAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
@@ -50,10 +52,16 @@ public sealed class CloudAccessViewModelTests
             ConnectionFactory(connectionRepository.Object, Mock.Of<ICredentialVault>()),
             NullLogger<CloudAccessViewModel>.Instance);
 
+        // Keeping the unchanged name must not be blocked by the case-variant sibling.
+        await viewModel.UpdateConnectionAsync(connection.Id, "Old name");
         await viewModel.UpdateConnectionAsync(connection.Id, "  Finance OneDrive  ");
 
         Assert.Equal("Finance OneDrive", connection.Name);
-        connectionRepository.Verify(x => x.SaveAsync(connection, default), Times.Once);
+        connectionRepository.Verify(x => x.SaveAsync(connection, default), Times.Exactly(2));
+
+        // A real rename onto a case-variant of another connection is still rejected.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            viewModel.UpdateConnectionAsync(connection.Id, "old name"));
     }
 
     [Fact]
@@ -210,6 +218,14 @@ public sealed class CloudAccessViewModelTests
         Assert.Equal("protected-key", connection.EncryptedCredentialPayload);
         Assert.DoesNotContain(Convert.ToBase64String(privateKey), connection.SettingsJson, StringComparison.Ordinal);
         Assert.Equal(Convert.ToBase64String(privateKey), protectedCredentials?["privateKeyBase64"]);
+
+        // A second connection with the same name (case-insensitive) is rejected with a clear
+        // message before the provider test runs, instead of failing on the unique index.
+        var duplicate = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            viewModel.CreateConfiguredConnectionAsync("rsync-ssh", " backup ", settings, sshPrivateKey: privateKey));
+        Assert.Equal(Resources.ResourceManager.GetString("Web_ExternalStorage_ConnectionNameExists"), duplicate.Message);
+        Assert.Single(savedConnections);
+        provider.Verify(x => x.TestAsync(It.IsAny<StorageConnection>(), default), Times.Once);
     }
 
     [Fact]

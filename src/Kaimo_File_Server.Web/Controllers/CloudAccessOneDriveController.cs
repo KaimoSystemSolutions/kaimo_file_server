@@ -11,7 +11,6 @@ using System.Net.Http.Headers;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
-using System.Globalization;
 
 namespace Kaimo_File_Server.Web.Controllers;
 
@@ -162,28 +161,30 @@ public sealed class CloudAccessOneDriveController(
     private static string RenderPage(OneDriveDeviceAuthorization authorization, string cspNonce)
     {
         var html = HtmlEncoder.Default;
-        var language = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
-        var title = html.Encode(R("Web_CloudSync_Device_Title"));
-        var instructions = html.Encode(R("Web_CloudSync_Device_Instructions"));
         var openMicrosoft = html.Encode(R("Web_CloudSync_Device_OpenMicrosoft"));
         var waiting = html.Encode(R("Web_CloudSync_Device_Waiting"));
-        var cancel = html.Encode(R("Web_Button_Cancel"));
+        var copy = html.Encode(R("Web_CloudSync_Device_CopyCode"));
+        var copiedJs = JsonSerializer.Serialize(R("Web_CloudSync_Device_CodeCopied"));
+        var copyJs = JsonSerializer.Serialize(R("Web_CloudSync_Device_CopyCode"));
         var failed = JsonSerializer.Serialize(R("Web_CloudSync_Device_Failed"));
         var statusUrl = JsonSerializer.Serialize("/api/cloud-access/onedrive/device-status");
         var sessionId = JsonSerializer.Serialize(authorization.SessionId);
-        return $$$"""
-            <!doctype html><html lang="{{{language}}}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-            <title>{{{title}}} - Kaimo Files</title><style>
-            :root{color-scheme:light dark;font-family:Inter,system-ui,sans-serif}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#101522;color:#f5f7fb}
-            main{width:min(520px,calc(100% - 40px));padding:36px;border:1px solid #34405a;border-radius:18px;background:#192132;text-align:center}p{color:#bac5d9;line-height:1.55}
-            code{display:block;margin:26px auto;padding:16px;border-radius:10px;background:#0d1320;color:#8fc8ff;font:700 1.9rem ui-monospace;letter-spacing:.12em;user-select:all}
-            a.button{display:inline-block;padding:11px 18px;border-radius:9px;background:#2878d0;color:white;text-decoration:none;font-weight:650}a.cancel{display:block;margin-top:20px;color:#aab6ca}.error{color:#ff9c9c}
-            </style></head><body><main><h1>{{{title}}}</h1><p>{{{instructions}}}</p>
-            <code>{{{html.Encode(authorization.UserCode)}}}</code><a class="button" href="{{{html.Encode(authorization.VerificationUri)}}}" target="_blank" rel="noopener noreferrer">{{{openMicrosoft}}}</a>
-            <p id="status">{{{waiting}}}</p><a class="cancel" href="/cloud-access">{{{cancel}}}</a></main><script nonce="{{{cspNonce}}}">
-            const u={{{statusUrl}}},session={{{sessionId}}},s=document.getElementById('status'),f={{{failed}}};async function p(){try{const body=new URLSearchParams({session:session});const r=await fetch(u,{method:'POST',cache:'no-store',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body}),j=await r.json();if(j.state==='complete'){location.replace(j.redirect);return}if(j.state==='failed'){s.textContent=j.message||f;s.className='error';return}setTimeout(p,Math.max(1,j.retryAfterSeconds||{{{authorization.PollIntervalSeconds}}})*1000)}catch(e){s.textContent=f;s.className='error'}}setTimeout(p,{{{authorization.PollIntervalSeconds}}}*1000)
-            </script></body></html>
+        var body = $$$"""
+            <div class="auth-code-row"><code class="auth-code" id="code">{{{html.Encode(authorization.UserCode)}}}</code>
+            <button class="btn-secondary auth-copy" id="copy" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>{{{copy}}}</span></button></div>
+            <div class="auth-actions"><a class="btn-primary" href="{{{html.Encode(authorization.VerificationUri)}}}" target="_blank" rel="noopener noreferrer">{{{openMicrosoft}}}</a>
+            <p id="status" role="status">{{{waiting}}}</p></div>
             """;
+        var script = $$$"""
+            const u={{{statusUrl}}},session={{{sessionId}}},s=document.getElementById('status'),f={{{failed}}};async function p(){try{const body=new URLSearchParams({session:session});const r=await fetch(u,{method:'POST',cache:'no-store',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body}),j=await r.json();if(j.state==='complete'){location.replace(j.redirect);return}if(j.state==='failed'){s.textContent=j.message||f;s.className='error-banner';return}setTimeout(p,Math.max(1,j.retryAfterSeconds||{{{authorization.PollIntervalSeconds}}})*1000)}catch(e){s.textContent=f;s.className='error-banner'}}setTimeout(p,{{{authorization.PollIntervalSeconds}}}*1000)
+            const c=document.getElementById('code'),b=document.getElementById('copy'),l=b.querySelector('span');b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(c.textContent.trim())}catch(e){getSelection().selectAllChildren(c);return}l.textContent={{{copiedJs}}};setTimeout(()=>l.textContent={{{copyJs}}},2000)})
+            """;
+        return CloudAuthorizationPage.Render(
+            R("Web_CloudSync_Device_Title"),
+            R("Web_CloudSync_Device_Instructions"),
+            """<svg viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>""",
+            "--provider-onedrive",
+            body, script, cspNonce);
     }
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
@@ -191,7 +192,7 @@ public sealed class CloudAccessOneDriveController(
     /// <summary>Builds a return URL to the External Storage → Connections tab.</summary>
     private static string ConnectionsPage(string? error = null, Guid? connected = null)
     {
-        var url = "/external-storage?tab=connections";
+        var url = CloudAuthorizationPage.ConnectionsUrl;
         if (connected is Guid id)
             url += $"&connected={id}";
         if (!string.IsNullOrEmpty(error))

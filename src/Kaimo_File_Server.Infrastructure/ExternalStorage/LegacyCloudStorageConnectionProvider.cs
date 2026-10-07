@@ -74,17 +74,18 @@ public sealed class LegacyCloudStorageConnectionProvider(
         }
     }
 
-    public async Task RevokeAsync(
+    public Task RevokeAsync(
         StorageConnection connection,
         CancellationToken cancellationToken = default)
-    {
-        Validate(connection);
-        var credentials = credentialVault.UnprotectConnectionCredentials(connection);
-        credentials["connectionId"] = connection.Id.ToString("D");
-        await cloudProviders.DisposeConnectionAsync(
+        // Only drops the cached provider client. Its cache key is the connection id alone
+        // (see OpenSessionAsync), so no credentials are needed: a connection that was never
+        // authorized (or is already invalid) must still be removable without an error.
+        => cloudProviders.DisposeConnectionAsync(
             Guid.Empty,
-            new SyncedFolder(connection.ProviderId, credentials, "/"));
-    }
+            new SyncedFolder(
+                connection.ProviderId,
+                new Dictionary<string, string> { ["connectionId"] = connection.Id.ToString("D") },
+                "/"));
 
     private void Validate(StorageConnection connection)
     {

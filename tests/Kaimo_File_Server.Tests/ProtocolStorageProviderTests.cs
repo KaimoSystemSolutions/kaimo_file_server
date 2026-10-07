@@ -20,6 +20,30 @@ public sealed class ProtocolStorageProviderTests : IDisposable
     public ProtocolStorageProviderTests() => Directory.CreateDirectory(_temporaryRoot);
 
     [Fact]
+    public async Task LegacyCloudRevoke_NeverAuthorizedConnection_DropsCachedClientWithoutCredentials()
+    {
+        // A pending OneDrive/Dropbox connection has no credential payload; deleting it
+        // used to fail in RevokeAsync ("not ready for this provider") after the record was gone.
+        var connection = new StorageConnection
+        {
+            ProviderId = "onedrive",
+            AuthorizationMode = StorageAuthorizationMode.DeviceCode,
+            State = StorageConnectionState.PendingAuthorization
+        };
+        var factory = new Mock<Kaimo_File_Server.Infrastructure.Clouds.ICloudProviderFactory>();
+        var provider = new LegacyCloudStorageConnectionProvider(
+            "onedrive", "Microsoft OneDrive", StorageProviderCapabilities.None,
+            new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.DeviceCode },
+            Mock.Of<ICredentialVault>(MockBehavior.Strict), Mock.Of<Core.Repositories.IStorageConnectionRepository>(),
+            factory.Object);
+
+        await provider.RevokeAsync(connection);
+
+        factory.Verify(x => x.DisposeConnectionAsync(Guid.Empty, It.Is<SyncedFolder>(folder =>
+            folder.Data["connectionId"] == connection.Id.ToString("D"))), Times.Once);
+    }
+
+    [Fact]
     public void RsyncItemize_MapsOnlyReceivedRegularFilesToAbsolutePaths()
     {
         string root = _temporaryRoot;
@@ -468,6 +492,33 @@ public sealed class ProtocolStorageProviderTests : IDisposable
         Assert.True(provider.Capabilities.HasFlag(StorageProviderCapabilities.DirectFileAccess));
         Assert.False(provider.Capabilities.HasFlag(StorageProviderCapabilities.OptimizedSync));
         Assert.Equal([StorageAuthorizationMode.SshKey], provider.AuthorizationModes);
+    }
+
+    [Fact]
+    public void DeleteUnreferencedKnownHosts_RemovesOnlyOldOrphans()
+    {
+        var service = new RsyncSshSetupService(_temporaryRoot);
+        string root = Path.Combine(_temporaryRoot, ".external-storage", "rsync-ssh");
+        string File(string name, bool old)
+        {
+            string path = Path.Combine(root, name);
+            System.IO.File.WriteAllText(path, "host ssh-ed25519 AAAA\n");
+            if (old) System.IO.File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddDays(-1));
+            return path;
+        }
+        string referenced = File("known-hosts-referenced", old: true);
+        string orphan = File("known-hosts-orphan", old: true);
+        string fresh = File("known-hosts-fresh", old: false);
+        string unrelated = File("other-file", old: true);
+        string settings = JsonSerializer.Serialize(new { KnownHostsSecretReference = referenced });
+
+        int deleted = service.DeleteUnreferencedKnownHosts([settings, "{}"], TimeSpan.FromHours(1));
+
+        Assert.Equal(1, deleted);
+        Assert.False(System.IO.File.Exists(orphan));
+        Assert.True(System.IO.File.Exists(referenced));
+        Assert.True(System.IO.File.Exists(fresh));
+        Assert.True(System.IO.File.Exists(unrelated));
     }
 
     [Fact]

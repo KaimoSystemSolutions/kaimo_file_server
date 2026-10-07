@@ -666,3 +666,12 @@
     .connection-detail dl { grid-template-columns: 1fr; gap: 3px; }
     .connection-detail dd { margin-bottom: 7px; }
 }
+
+.connection-form .connection-field-error {
+    color: var(--danger);
+    font-size: 11.5px;
+}
+
+.connection-form input[aria-invalid="true"] {
+    border-color: var(--danger);
+}

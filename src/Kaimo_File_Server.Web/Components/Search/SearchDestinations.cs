@@ -37,8 +37,8 @@ public sealed record SearchDestination(
     {
         _ when Url.StartsWith("/settings", StringComparison.Ordinal) => Loc("Web_Nav_Settings", "Settings"),
         _ when Url.StartsWith("/external-storage", StringComparison.Ordinal)
-            || Url.StartsWith("/cloud-access", StringComparison.Ordinal)
             => Loc("Web_ExternalStorage_Title", "External Storage"),
+        _ when Url.StartsWith("/?view=virtual", StringComparison.Ordinal) => Loc("Web_Nav_Shares", "Shares"),
         _ => Loc("Web_Search_Cat_Page", "Page"),
     };
 
@@ -97,9 +97,9 @@ public static class SearchDestinations
         new("Web_ExternalStorage_Tab_Connections",
             ["connection", "connections", "verbindung", "verbindungen", "external storage", "externer speicher"],
             "/external-storage?tab=connections", "cloud-download.svg", ConnectionsGate),
-        new("Web_CloudAccess_Title",
+        new("Web_Shares_VirtualShares",
             ["cloud access", "virtual shares", "virtuelle shares", "virtueller share", "remote shares"],
-            "/cloud-access", "cloud-download.svg", ConnectionsGate),
+            "/?view=virtual", "cloud-download.svg", ConnectionsGate),
 
         // ── Settings sections (deep-linked via ?tab=) ──
         new("Web_Settings_Tab_Region",

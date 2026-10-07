@@ -253,7 +253,13 @@ else
     private bool IsInsecureWebDavUrl => _serverUrl.TrimStart().StartsWith("http://", StringComparison.OrdinalIgnoreCase);
     // rsync-over-SSH and SFTP share the identical pinned-SSH setup (key + host key).
     private bool UsesPinnedSshSetup => IsRsyncSshProvider || IsSftpProvider;
-    private bool CanCreate => !string.IsNullOrWhiteSpace(_name)
+    /// <summary>Live duplicate-name check against the loaded list; the view model re-checks on save.</summary>
+    private bool ConnectionNameTaken => !string.IsNullOrWhiteSpace(_name)
+        && !(_editing && string.Equals(_selected?.Name, _name.Trim(), StringComparison.Ordinal))
+        && VM.Connections.Any(connection => (!_editing || connection.Id != _selected?.Id)
+            && string.Equals(connection.Name, _name.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    private bool CanCreate => !string.IsNullOrWhiteSpace(_name) && !ConnectionNameTaken
                               && SelectedProvider is not null
                               && (SelectedProviderUsesInteractiveAuthorization
                                   || (IsSmbProvider && !string.IsNullOrWhiteSpace(_server)
@@ -626,13 +632,18 @@ else
                     <select class="edit-input" @bind="_provider" @bind:after="ProviderChanged">@foreach (var provider in CreatableProviders) { <option value="@provider.Id">@provider.DisplayName</option> }</select>
                 }
             </label>
-            <label><span>@R("Web_CloudAccess_ConnectionName")</span><input class="edit-input" maxlength="200" @bind="_name" /></label>
+            <label><span>@R("Web_CloudAccess_ConnectionName")</span><input class="edit-input" maxlength="200" @bind="_name" @bind:event="oninput" aria-invalid="@(ConnectionNameTaken ? "true" : null)" />
+                @if (ConnectionNameTaken)
+                {
+                    <small class="connection-field-error" role="alert">@R("Web_ExternalStorage_ConnectionNameExists")</small>
+                }
+            </label>
         }
         else if (_activeConnectionTab == ConnectionTab.Connection)
         {
             @if (IsSmbProvider)
             {
-                <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="192.168.1.10" @bind="_server" /></label>
+                <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="192.168.1.10" @bind="_server" @bind:event="oninput" /></label>
                 <label><span>@R("Web_ExternalStorage_Port")</span><input class="edit-input" type="number" min="1" max="65535" @bind="_port" /></label>
                 <label><span>@R("Web_ExternalStorage_Domain")</span><input class="edit-input" maxlength="256" placeholder="WORKGROUP" @bind="_domain" /></label>
                 <label><span>@R("Web_ExternalStorage_MinimumDialect")</span><select class="edit-input" @bind="_minimumDialect"><option value="3.0">SMB 3.0</option><option value="3.02">SMB 3.0.2</option><option value="3.1.1">SMB 3.1.1</option></select></label>
@@ -640,7 +651,7 @@ else
             }
             else if (IsWebDavProvider)
             {
-                <label class="storage-wide"><span>@R("Web_ExternalStorage_WebDavServerUrl")</span><input class="edit-input" maxlength="2048" placeholder="https://cloud.example.com/remote.php/dav/files/user/" @bind="_serverUrl" /></label>
+                <label class="storage-wide"><span>@R("Web_ExternalStorage_WebDavServerUrl")</span><input class="edit-input" maxlength="2048" placeholder="https://cloud.example.com/remote.php/dav/files/user/" @bind="_serverUrl" @bind:event="oninput" /></label>
                 <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_WebDavHelp")</p>
                 @if (IsInsecureWebDavUrl)
                 {
@@ -650,22 +661,22 @@ else
             }
             else if (UsesPinnedSshSetup)
             {
-                <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="backup.example.com" @bind="_server" @bind:after="SshEndpointChangedAsync" /></label>
+                <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="backup.example.com" @bind="_server" @bind:event="oninput" @onchange="SshEndpointChangedAsync" /></label>
                 <label><span>@R("Web_ExternalStorage_Port")</span><input class="edit-input" type="number" min="1" max="65535" @bind="_port" @bind:after="SshEndpointChangedAsync" /></label>
-                <label class="storage-wide"><span>@R("Web_ExternalStorage_RemoteRoot")</span><input class="edit-input" maxlength="4096" placeholder="/srv/backups" @bind="_remoteRoot" /></label>
+                <label class="storage-wide"><span>@R("Web_ExternalStorage_RemoteRoot")</span><input class="edit-input" maxlength="4096" placeholder="/srv/backups" @bind="_remoteRoot" @bind:event="oninput" /></label>
                 <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_RsyncSshHelp")</p>
             }
             else
             {
-                <label class="storage-wide"><span>@R("Web_ExternalStorage_ConnectionSettings")</span><textarea class="edit-input" rows="10" maxlength="65536" @bind="_settingsJson"></textarea><small>@R("Web_ExternalStorage_ConnectionSettingsHelp")</small></label>
+                <label class="storage-wide"><span>@R("Web_ExternalStorage_ConnectionSettings")</span><textarea class="edit-input" rows="10" maxlength="65536" @bind="_settingsJson" @bind:event="oninput"></textarea><small>@R("Web_ExternalStorage_ConnectionSettingsHelp")</small></label>
             }
         }
         else
         {
             @if (IsSmbProvider || IsWebDavProvider)
             {
-                <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="256" autocomplete="username" @bind="_username" /></label>
-                <label><span>@R("Web_ExternalStorage_Password")</span><input class="edit-input" type="password" maxlength="4096" autocomplete="new-password" @bind="_password" /></label>
+                <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="256" autocomplete="username" @bind="_username" @bind:event="oninput" /></label>
+                <label><span>@R("Web_ExternalStorage_Password")</span><input class="edit-input" type="password" maxlength="4096" autocomplete="new-password" @bind="_password" @bind:event="oninput" /></label>
                 @if (_editing)
                 {
                     <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_PasswordKeepHint")</p>
@@ -673,7 +684,7 @@ else
             }
             else if (UsesPinnedSshSetup)
             {
-                <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="64" autocomplete="username" @bind="_username" /></label>
+                <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="64" autocomplete="username" @bind="_username" @bind:event="oninput" /></label>
                 @if (_editing)
                 {
                     <label><span>@R("Web_ExternalStorage_SshHostFingerprint")</span><input class="edit-input" maxlength="100" placeholder="SHA256:…" @bind="_sshHostFingerprint" /></label>
@@ -713,9 +724,9 @@ else
                         else
                         {
                             <div class="ssh-advanced-grid">
-                                <label><span>@R("Web_ExternalStorage_SshHostFingerprint")</span><input class="edit-input" maxlength="100" placeholder="SHA256:…" @bind="_sshHostFingerprint" /></label>
-                                <label><span>@R("Web_ExternalStorage_PrivateKeySecretReference")</span><input class="edit-input" maxlength="4096" placeholder="/run/secrets/kaimo_rsync_key" @bind="_privateKeySecretReference" /></label>
-                                <label><span>@R("Web_ExternalStorage_KnownHostsSecretReference")</span><input class="edit-input" maxlength="4096" placeholder="/run/secrets/kaimo_known_hosts" @bind="_knownHostsSecretReference" /></label>
+                                <label><span>@R("Web_ExternalStorage_SshHostFingerprint")</span><input class="edit-input" maxlength="100" placeholder="SHA256:…" @bind="_sshHostFingerprint" @bind:event="oninput" /></label>
+                                <label><span>@R("Web_ExternalStorage_PrivateKeySecretReference")</span><input class="edit-input" maxlength="4096" placeholder="/run/secrets/kaimo_rsync_key" @bind="_privateKeySecretReference" @bind:event="oninput" /></label>
+                                <label><span>@R("Web_ExternalStorage_KnownHostsSecretReference")</span><input class="edit-input" maxlength="4096" placeholder="/run/secrets/kaimo_known_hosts" @bind="_knownHostsSecretReference" @bind:event="oninput" /></label>
                             </div>
                         }
                     </section>
@@ -852,7 +863,7 @@ else
         }
     }
 
-    private bool CanSaveEdit => !string.IsNullOrWhiteSpace(_name)
+    private bool CanSaveEdit => !string.IsNullOrWhiteSpace(_name) && !ConnectionNameTaken
         && (EditsNameOnly
             || (IsSmbProvider
                 ? !string.IsNullOrWhiteSpace(_server) && _port is >= 1 and <= 65535 && !string.IsNullOrWhiteSpace(_username)

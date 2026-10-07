@@ -18,7 +18,9 @@
 @inject Kaimo_File_Server.Web.Components.ProfileNavigator ProfileNav
 
 
-<div class="app-shell" data-theme="@Theme.Current" data-accent="@Theme.Accent">
+@* No data-theme/data-accent here: <html> (themeInit.js / ThemeService) is the single source.
+   A second, lagging copy on this wrapper made inherited text colors resolve against a different theme. *@
+<div class="app-shell">
     @* On phones the sidebar is an off-canvas drawer; the backdrop closes it. *@
     @if (_navOpen)
     {

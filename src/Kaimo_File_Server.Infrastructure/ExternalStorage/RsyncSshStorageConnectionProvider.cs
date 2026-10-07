@@ -91,14 +91,23 @@ public sealed class RsyncSshStorageConnectionProvider(
         }
     }
 
-    public async Task RevokeAsync(StorageConnection connection, CancellationToken cancellationToken = default)
+    public Task RevokeAsync(StorageConnection connection, CancellationToken cancellationToken = default)
+        => DeleteManagedKnownHostAsync(setupService, connection);
+
+    /// <summary>
+    /// Removes the managed known_hosts file the guided SSH setup created for this
+    /// connection (rsync and SFTP share it). Only files inside the managed directory
+    /// are ever deleted; external secret references are left untouched.
+    /// </summary>
+    internal static async Task DeleteManagedKnownHostAsync(
+        IRsyncSshSetupService? setupService, StorageConnection connection)
     {
         if (setupService is null)
             return;
         try
         {
             var settings = ProtocolConnectionSettings.Parse<RsyncSshConnectionSettings>(
-                connection.SettingsJson, "rsync over SSH");
+                connection.SettingsJson, connection.ProviderId);
             await setupService.DeleteManagedKnownHostAsync(settings.KnownHostsSecretReference);
         }
         catch (ProtocolConfigurationException)

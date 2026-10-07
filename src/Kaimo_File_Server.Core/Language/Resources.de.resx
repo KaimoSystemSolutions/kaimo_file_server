@@ -2967,6 +2967,12 @@
   <data name="Web_CloudSync_Device_Failed" xml:space="preserve">
     <value>Die Microsoft-Autorisierung ist fehlgeschlagen. Bitte zur Cloud-Synchronisierung zurückkehren und erneut versuchen.</value>
   </data>
+  <data name="Web_CloudSync_Device_CopyCode" xml:space="preserve">
+    <value>Code kopieren</value>
+  </data>
+  <data name="Web_CloudSync_Device_CodeCopied" xml:space="preserve">
+    <value>Kopiert</value>
+  </data>
   <data name="Web_CloudAccess_Dropbox_Title" xml:space="preserve">
     <value>Dropbox verbinden</value>
   </data>
@@ -3188,6 +3194,9 @@
   </data>
   <data name="Web_CloudAccess_InvalidConnectionName" xml:space="preserve">
     <value>Bitte einen gültigen Verbindungsnamen eingeben.</value>
+  </data>
+  <data name="Web_ExternalStorage_ConnectionNameExists" xml:space="preserve">
+    <value>Eine Verbindung mit diesem Namen existiert bereits.</value>
   </data>
   <data name="Web_CloudAccess_InvalidShareName" xml:space="preserve">
     <value>Bitte einen gültigen Share-Namen eingeben.</value>
