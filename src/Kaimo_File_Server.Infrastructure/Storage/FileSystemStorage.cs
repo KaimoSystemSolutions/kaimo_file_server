@@ -130,6 +130,10 @@ public class FileSystemStorage : IStorageEngine
 
         public ValueTask SetTimesAsync(FileTimes times, CancellationToken ct)
         {
+            // Linux has no API to set the birth time; .NET silently writes mtime instead,
+            // which would clobber the modified date. Skip the creation time there.
+            if (OperatingSystem.IsLinux()) times = times with { Created = null };
+
             if (IsDirectory)
             {
                 var d = new DirectoryInfo(AbsolutePath);
@@ -579,7 +583,7 @@ public class FileSystemStorage : IStorageEngine
                 Name = ShareRelativePath.GetFileName(normalized),
                 Size = 0,
                 IsDirectory = true,
-                CreatedAt = dirInfo.CreationTimeUtc,
+                CreatedAt = FileBirthTime.GetUtc(dirInfo),
                 ModifiedAt = dirInfo.LastWriteTimeUtc,
                 LastAccessedAt = dirInfo.LastAccessTimeUtc,
                 Acl = acl
@@ -595,7 +599,7 @@ public class FileSystemStorage : IStorageEngine
                 Name = ShareRelativePath.GetFileName(normalized),
                 Size = fileInfo.Exists ? fileInfo.Length : 0,
                 IsDirectory = false,
-                CreatedAt = fileInfo.Exists ? fileInfo.CreationTimeUtc : DateTime.UtcNow,
+                CreatedAt = fileInfo.Exists ? FileBirthTime.GetUtc(fileInfo) : DateTime.UtcNow,
                 ModifiedAt = fileInfo.Exists ? fileInfo.LastWriteTimeUtc : DateTime.UtcNow,
                 LastAccessedAt = fileInfo.Exists ? fileInfo.LastAccessTimeUtc : null,
                 Acl = acl
@@ -628,7 +632,7 @@ public class FileSystemStorage : IStorageEngine
                 Name = dirInfo.Name,
                 Size = 0,
                 IsDirectory = true,
-                CreatedAt = dirInfo.CreationTimeUtc,
+                CreatedAt = FileBirthTime.GetUtc(dirInfo),
                 ModifiedAt = dirInfo.LastWriteTimeUtc,
                 LastAccessedAt = dirInfo.LastAccessTimeUtc
             });
@@ -645,7 +649,7 @@ public class FileSystemStorage : IStorageEngine
                 Name = fileInfo.Name,
                 Size = fileInfo.Length,
                 IsDirectory = false,
-                CreatedAt = fileInfo.CreationTimeUtc,
+                CreatedAt = FileBirthTime.GetUtc(fileInfo),
                 ModifiedAt = fileInfo.LastWriteTimeUtc,
                 LastAccessedAt = fileInfo.LastAccessTimeUtc
             });

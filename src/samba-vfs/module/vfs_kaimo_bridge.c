@@ -16,6 +16,8 @@
  *             version tokens; a timewarp (smb_fname->twrp) on open/stat is resolved
  *             to a materialized, decompressed version copy in an isolated global
  *             cache outside every share. Backed by IFileVersionService via the bridge.
+ *   Birth time: stat hooks report the real btime via statx(2) instead of
+ *             Samba's calculated min(ctime, mtime, atime).
  *
  * Deliberately pure C without gRPC: gRPC complexity lives in the kaimo_authd
  * sidecar; the module only does simple Unix socket roundtrips (no fork/threads in smbd).
@@ -37,6 +39,7 @@
 #include <sys/file.h>
 #include <sys/random.h>
 #include <sys/socket.h>
+#include <sys/stat.h> /* statx (real birth time) */
 #include <sys/un.h>
 #ifdef __linux__
 #include <linux/fs.h>
@@ -926,6 +929,54 @@ static int kaimo_get_shadow_copy_data(vfs_handle_struct *handle,
 	return 0;
 }
 
+/* ---- Real birth time ----
+ * Samba never reads btime on Linux: it reports min(ctime, mtime, atime), so the
+ * "Created" date follows every write or timestamp change. statx(2) supplies the
+ * real btime. A create time stored in user.DOSATTRIB (written by Samba on
+ * create, or when a client sets it) still overrides this later in dos_mode().
+ * The Kaimo web UI applies the same precedence (FileBirthTime.cs), so both show
+ * the same value. Version copies (@GMT) are left alone. */
+static void kaimo_fill_btime(int dirfd, const char *path, int flags,
+			     SMB_STRUCT_STAT *st)
+{
+#ifdef __linux__
+	struct statx stx;
+	int saved_errno = errno;
+
+	/* Inode check: the object may have been replaced between both calls. */
+	if (dirfd != -1 && path != NULL &&
+	    statx(dirfd, path, flags, STATX_BTIME | STATX_INO, &stx) == 0 &&
+	    (stx.stx_mask & STATX_BTIME) != 0 &&
+	    stx.stx_ino == (uint64_t)st->st_ex_ino) {
+		st->st_ex_btime.tv_sec = stx.stx_btime.tv_sec;
+		st->st_ex_btime.tv_nsec = stx.stx_btime.tv_nsec;
+		st->st_ex_iflags &= ~ST_EX_IFLAG_CALCULATED_BTIME;
+	}
+	errno = saved_errno;
+#endif
+}
+
+static int kaimo_fstat(vfs_handle_struct *handle, struct files_struct *fsp,
+		       SMB_STRUCT_STAT *sbuf)
+{
+	int ret = SMB_VFS_NEXT_FSTAT(handle, fsp, sbuf);
+	if (ret == 0 && fsp->fsp_name->twrp == 0)
+		kaimo_fill_btime(fsp_get_pathref_fd(fsp), "", AT_EMPTY_PATH, sbuf);
+	return ret;
+}
+
+static int kaimo_fstatat(vfs_handle_struct *handle,
+			 const struct files_struct *dirfsp,
+			 const struct smb_filename *smb_fname,
+			 SMB_STRUCT_STAT *sbuf, int flags)
+{
+	int ret = SMB_VFS_NEXT_FSTATAT(handle, dirfsp, smb_fname, sbuf, flags);
+	if (ret == 0 && smb_fname->twrp == 0)
+		kaimo_fill_btime(fsp_get_pathref_fd(dirfsp), smb_fname->base_name,
+				 flags, sbuf);
+	return ret;
+}
+
 /* ---- Snapshot-aware stat/lstat: resolve a timewarp path to its version copy ---- */
 static int kaimo_stat(vfs_handle_struct *handle, struct smb_filename *smb_fname)
 {
@@ -939,8 +990,13 @@ static int kaimo_stat(vfs_handle_struct *handle, struct smb_filename *smb_fname)
 		errno = EACCES;
 		return -1;
 	}
-	if (smb_fname == NULL || smb_fname->twrp == 0)
-		return SMB_VFS_NEXT_STAT(handle, smb_fname);
+	if (smb_fname == NULL || smb_fname->twrp == 0) {
+		ret = SMB_VFS_NEXT_STAT(handle, smb_fname);
+		if (ret == 0 && smb_fname != NULL)
+			kaimo_fill_btime(AT_FDCWD, smb_fname->base_name, 0,
+					 &smb_fname->st);
+		return ret;
+	}
 
 	/* smb_fname is borrowed from Samba and is not guaranteed to be a talloc
 	 * context (notably for SMB2 GETINFO/QFSINFO). Never allocate below it or
@@ -985,8 +1041,13 @@ static int kaimo_lstat(vfs_handle_struct *handle, struct smb_filename *smb_fname
 		errno = EACCES;
 		return -1;
 	}
-	if (smb_fname == NULL || smb_fname->twrp == 0)
-		return SMB_VFS_NEXT_LSTAT(handle, smb_fname);
+	if (smb_fname == NULL || smb_fname->twrp == 0) {
+		ret = SMB_VFS_NEXT_LSTAT(handle, smb_fname);
+		if (ret == 0 && smb_fname != NULL)
+			kaimo_fill_btime(AT_FDCWD, smb_fname->base_name,
+					 AT_SYMLINK_NOFOLLOW, &smb_fname->st);
+		return ret;
+	}
 
 	frame = talloc_stackframe();
 	snapshot_fname = cp_smb_filename(frame, smb_fname);
@@ -2054,12 +2115,15 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 	.get_shadow_copy_data_fn = kaimo_get_shadow_copy_data,
 	.stat_fn        = kaimo_stat,
 	.lstat_fn       = kaimo_lstat,
+	/* Real birth time via statx (see kaimo_fill_btime). */
+	.fstat_fn       = kaimo_fstat,
+	.fstatat_fn     = kaimo_fstatat,
 };
 
 /* Build marker: bump on every module change so the running image can be
  * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
  * a rebuild actually picked up the latest source vs. served a cached layer. */
-#define KAIMO_BRIDGE_BUILD "2026-10-04a unit-testable decision headers"
+#define KAIMO_BRIDGE_BUILD "2026-10-07a statx birth time"
 
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)

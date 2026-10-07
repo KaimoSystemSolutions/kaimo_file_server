@@ -430,6 +430,10 @@ else
             </div>
             <div class="col-lastaccess col-sortable" @onclick="@(() => OnHeaderClick("lastaccess"))">
                 <span class="col-header-text">@Resources.Web_Folder_Last_Access</span>
+                @if (_sortColumn == "lastaccess")
+                {
+                    <span class="sort-arrow @(_sortDirection == 1 ? "sort-arrow--desc" : "sort-arrow--asc")"></span>
+                }
             </div>
         </div>
 

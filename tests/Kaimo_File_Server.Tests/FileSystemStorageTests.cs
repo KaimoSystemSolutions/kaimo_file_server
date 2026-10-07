@@ -185,6 +185,38 @@ public class FileSystemStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task GetMetadataAsync_File_CreatedAtIsBirthTimeNotModifiedTime()
+    {
+        // On Linux, .NET's CreationTimeUtc falls back to min(mtime, ctime), so a back-dated
+        // mtime would show up as the creation time. Requires a file system that records btime.
+        var fullPath = Path.Combine(_testRoot, "born.txt");
+        File.WriteAllBytes(fullPath, [1]);
+        var oldMtime = new DateTime(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(fullPath, oldMtime);
+
+        var meta = await _sut.GetMetadataAsync("born.txt");
+        Assert.Equal(oldMtime, meta.ModifiedAt);
+        Assert.True(meta.CreatedAt > DateTime.UtcNow.AddMinutes(-5), $"CreatedAt was {meta.CreatedAt:O}");
+    }
+
+    [Fact]
+    public void DosAttribBlob_CreateTimeIsParsedLikeSamba()
+    {
+        // Samba 4.x v5 blob: "0x20\0", pad, version 5, level 5, pad,
+        // valid_flags ATTRIB|CREATE_TIME, attrib 0x20, create_time NTTIME.
+        var v5 = Convert.FromBase64String("MHgyMAAABQAFAAAAEQAAACAAAADSUonYZaHXAQ==");
+        Assert.True(FileBirthTime.TryParseDosAttribCreateTime(v5, out var created));
+        Assert.Equal(DateTime.FromFileTimeUtc(0x01D7A165D88952D2), created);
+
+        // Legacy hex-only blob carries no create time.
+        Assert.False(FileBirthTime.TryParseDosAttribCreateTime("0x20\0"u8, out _));
+
+        // CREATE_TIME bit not set → smbd ignores the value, so must we.
+        v5[12] = 0x01;
+        Assert.False(FileBirthTime.TryParseDosAttribCreateTime(v5, out _));
+    }
+
+    [Fact]
     public async Task GetMetadataAsync_Directory_ReturnsIsDirectory()
     {
         Directory.CreateDirectory(Path.Combine(_testRoot, "metadir"));
