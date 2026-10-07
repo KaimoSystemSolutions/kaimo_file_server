@@ -25,6 +25,9 @@ namespace Kaimo_File_Server.Core.Services.File
         // ------------ Full Operations ------------
         string ToAbsolutePath(string path);
         Task<Stream> ReadFileAsync(string path, UserContext user);
+        // Same as above; with preserveAccessTime the read does not count as an access (the file's
+        // last-access time is restored on dispose). Used by sync transfers.
+        Task<Stream> ReadFileAsync(string path, UserContext user, bool preserveAccessTime);
         
         
         // expects a local path inside the share. so if the storage path was

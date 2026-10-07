@@ -36,6 +36,12 @@ internal sealed class RemoteFileStoreSyncAdapter(
         }
     }
 
+    // SFTP setstat works on directories as is; WebDAV targets the collection URI. The caller
+    // swallows failures.
+    public Task TrySetDirectoryModifiedTimeAsync(
+        string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
+        => remoteFiles.TrySetDirectoryModifiedTimeAsync(path, modifiedUtc, cancellationToken);
+
     public async Task DownloadAsync(
         string path,
         Stream target,

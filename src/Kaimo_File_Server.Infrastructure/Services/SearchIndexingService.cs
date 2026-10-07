@@ -228,7 +228,7 @@ public sealed class SearchIndexingService(
     {
         try
         {
-            return storage.ReadAsync(entry.Path);
+            return storage.ReadAsync(entry.Path, preserveAccessTime: true);
         }
         catch (IOException ex) when (entry.ChangeType == FileChangeType.Created
                                      && ex is not FileNotFoundException

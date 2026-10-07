@@ -67,6 +67,15 @@ public interface ICloudConnection
         => throw new NotSupportedException(
             $"{ServiceName} does not support remote deletion required for delete synchronization.");
 
+    /// <summary>
+    /// Best-effort: stamps a remote directory's modification time after the sync wrote its
+    /// content, so the folder keeps the source time. Providers that cannot set it keep this
+    /// no-op default.
+    /// </summary>
+    Task TrySetDirectoryModifiedTimeAsync(
+        string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
     /// <summary>Recursively calculates the total size used for sync progress reporting.</summary>
     Task<long> GetDirectorySizeAsync(string path, CancellationToken cancellationToken = default);
     
@@ -258,7 +267,12 @@ public interface ICloudConnection
     /// Accumulator for every path that remains present after this run; null unless
     /// delete propagation is active.
     /// </param>
-    private async Task SyncDirectory(
+    /// <returns>
+    /// On which side this pass changed the directory's direct children. The caller uses it to
+    /// give the directory the other side's time once its content is done (see
+    /// <see cref="StampDirectoryAsync"/>).
+    /// </returns>
+    private async Task<(bool Local, bool Remote)> SyncDirectory(
         IFileService fileService,
         UserContext user,
         string remoteDir,
@@ -308,14 +322,18 @@ public interface ICloudConnection
             // while this run walks the tree). Not a failure: the parent already
             // recorded it in the manifest, so the next run reconciles it like any
             // other deletion instead of reporting one error per vanished child.
-            return;
+            return (false, false);
         }
         catch (Exception exception) when (!isRoot)
         {
             failures?.Add(new SyncFailure(localDir, SyncFailureOperation.List, exception.Message));
-            return;
+            return (false, false);
         }
         cancellationToken.ThrowIfCancellationRequested();
+
+        // Which side this pass wrote into; adding or removing an entry moves a folder's mtime.
+        bool localChanged = false;
+        bool remoteChanged = false;
 
         var allNames = new HashSet<string>(
             remoteItems.Keys.Concat(localItems.Keys),
@@ -358,7 +376,7 @@ public interface ICloudConnection
                     if (options.SyncDeletions)
                     {
                         syncProgress.Update($"Removing {local!.Name}...");
-                        await TryTransferAsync(failures, localChild, SyncFailureOperation.Delete,
+                        localChanged |= await TryTransferAsync(failures, localChild, SyncFailureOperation.Delete,
                             () => fileService.DeleteFileAsync(localChild, user, options.HonorRecycleBin),
                             cancellationToken);
                     }
@@ -371,7 +389,7 @@ public interface ICloudConnection
                 if (previousManifest?.Contains(localChild) == true)
                 {
                     syncProgress.Update($"Removing {local!.Name}...");
-                    await TryTransferAsync(failures, localChild, SyncFailureOperation.Delete,
+                    localChanged |= await TryTransferAsync(failures, localChild, SyncFailureOperation.Delete,
                         () => fileService.DeleteFileAsync(localChild, user, options.HonorRecycleBin),
                         cancellationToken);
                     continue;
@@ -385,12 +403,14 @@ public interface ICloudConnection
                     if (await TryTransferAsync(failures, remoteChild, SyncFailureOperation.CreateDirectory,
                             () => CreateDirectoryAsync(remoteChild, cancellationToken), cancellationToken))
                     {
+                        remoteChanged = true;
                         newManifest?.Paths.Add(localChild);
                         await UploadDirectoryRecursive(
                             fileService,
                             user,
                             localChild,
                             remoteChild,
+                            local.ModifiedAt,
                             syncProgress,
                             options,
                             newManifest,
@@ -404,6 +424,7 @@ public interface ICloudConnection
                 {
                     // Manifest only on success: a file that failed to upload does
                     // not exist remotely, so it must not look converged next run.
+                    remoteChanged = true;
                     newManifest?.Paths.Add(localChild);
                 }
 
@@ -424,7 +445,7 @@ public interface ICloudConnection
                 if (previousManifest?.Contains(localChild) == true)
                 {
                     syncProgress.Update($"Removing {remote!.Name}...");
-                    await TryTransferAsync(failures, remoteChild, SyncFailureOperation.Delete,
+                    remoteChanged |= await TryTransferAsync(failures, remoteChild, SyncFailureOperation.Delete,
                         () => DeleteAsync(remoteChild, remote.IsDirectory, cancellationToken),
                         cancellationToken);
                     continue;
@@ -446,8 +467,9 @@ public interface ICloudConnection
                                 await fileService.CreateDirectoryAsync(localChild, user);
                             }, cancellationToken) && !parentGone)
                     {
+                        localChanged = true;
                         newManifest?.Paths.Add(localChild);
-                        await SyncDirectory(
+                        var created = await SyncDirectory(
                             fileService,
                             user,
                             remoteChild,
@@ -461,12 +483,16 @@ public interface ICloudConnection
                             remoteListings,
                             isRoot: false,
                             cancellationToken);
+                        // Created by this pass, so the new folder counts as changed locally.
+                        await StampDirectoryAsync(fileService, user, localChild, remoteChild,
+                            (true, created.Remote), local: null, remote, cancellationToken);
                     }
                 }
                 else if (await PullFileAsync(fileService, user, localChild, remoteChild,
                              remote.Name, remote.ModifiedAt, remote.Size, options, syncProgress,
                              failures, cancellationToken))
                 {
+                    localChanged = true;
                     newManifest?.Paths.Add(localChild);
                 }
 
@@ -479,7 +505,7 @@ public interface ICloudConnection
             if (local!.IsDirectory && remote!.IsDirectory)
             {
                 newManifest?.Paths.Add(localChild);
-                await SyncDirectory(
+                var changes = await SyncDirectory(
                     fileService,
                     user,
                     remoteChild,
@@ -493,6 +519,8 @@ public interface ICloudConnection
                     remoteListings,
                     isRoot: false,
                     cancellationToken);
+                await StampDirectoryAsync(fileService, user, localChild, remoteChild,
+                    changes, local, remote, cancellationToken);
 
                 continue;
             }
@@ -511,7 +539,7 @@ public interface ICloudConnection
             if (mode == SyncMode.Pull)
             {
                 if (CompareModifiedTime(local.ModifiedAt, local.Size, remote.ModifiedAt, remote.Size) < 0)
-                    await PullFileAsync(fileService, user, localChild, remoteChild,
+                    localChanged |= await PullFileAsync(fileService, user, localChild, remoteChild,
                         remote.Name, remote.ModifiedAt, remote.Size, options, syncProgress,
                         failures, cancellationToken);
 
@@ -524,7 +552,7 @@ public interface ICloudConnection
             if (mode == SyncMode.Push)
             {
                 if (CompareModifiedTime(local.ModifiedAt, local.Size, remote.ModifiedAt, remote.Size) > 0)
-                    await PushFileAsync(fileService, user, localChild, remoteChild,
+                    remoteChanged |= await PushFileAsync(fileService, user, localChild, remoteChild,
                         local.Name, local.ModifiedAt, local.Size, options, syncProgress,
                         failures, cancellationToken);
 
@@ -535,13 +563,45 @@ public interface ICloudConnection
             // Two-way
             //--------------------------------------------------
             if (CompareModifiedTime(local.ModifiedAt, local.Size, remote.ModifiedAt, remote.Size) > 0)
-                await PushFileAsync(fileService, user, localChild, remoteChild,
+                remoteChanged |= await PushFileAsync(fileService, user, localChild, remoteChild,
                     local.Name, local.ModifiedAt, local.Size, options, syncProgress,
                     failures, cancellationToken);
             else if (CompareModifiedTime(local.ModifiedAt, local.Size, remote.ModifiedAt, remote.Size) < 0)
-                await PullFileAsync(fileService, user, localChild, remoteChild,
+                localChanged |= await PullFileAsync(fileService, user, localChild, remoteChild,
                     remote.Name, remote.ModifiedAt, remote.Size, options, syncProgress,
                     failures, cancellationToken);
+        }
+
+        return (localChanged, remoteChanged);
+    }
+
+    /// <summary>
+    /// Gives a directory the source side's time once its content is synced (post-order, as
+    /// <c>rsync -t</c> does): writing children moved the target folder's mtime to "now". Only a
+    /// one-sided change has a source; a folder changed on both sides keeps its times. Providers
+    /// without folder times (Dropbox) report <see cref="DateTime.MinValue"/> and are skipped.
+    /// Best-effort: a failed stamp never fails the run.
+    /// </summary>
+    private async Task StampDirectoryAsync(
+        IFileService fileService,
+        UserContext user,
+        string localDir,
+        string remoteDir,
+        (bool Local, bool Remote) changes,
+        FileMetadata? local,
+        CloudItemMeta remote,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (changes.Local && !changes.Remote && remote.ModifiedAt > DateTime.MinValue)
+                await fileService.SetModifiedAtAsync(localDir, user, remote.ModifiedAt);
+            else if (changes.Remote && !changes.Local && local is not null && local.ModifiedAt > DateTime.MinValue)
+                await TrySetDirectoryModifiedTimeAsync(remoteDir, local.ModifiedAt, cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Best-effort: the folder then just keeps the sync time.
         }
     }
 
@@ -570,7 +630,8 @@ public interface ICloudConnection
             Stream source;
             try
             {
-                source = await fileService.ReadFileAsync(localChild, user);
+                // A sync transfer is not a user access: keep the source's last-access time.
+                source = await fileService.ReadFileAsync(localChild, user, preserveAccessTime: true);
             }
             catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
             {
@@ -638,7 +699,8 @@ public interface ICloudConnection
             cancellationToken.ThrowIfCancellationRequested();
             // Stamp the source modification time so pull change-detection keeps
             // working on the next run (mirrors the former SetModifiedAtAsync call).
-            await session.SetTimesAsync(new FileTimes(null, modifiedAt, null), cancellationToken);
+            // atime = mtime: providers expose no access time, and the copy was not opened since.
+            await session.SetTimesAsync(new FileTimes(null, modifiedAt, modifiedAt), cancellationToken);
         }, cancellationToken) && !vanished;
 
         if (ok)
@@ -727,6 +789,7 @@ public interface ICloudConnection
         UserContext user,
         string localDir,
         string remoteDir,
+        DateTime localModifiedAt,
         SyncProgress syncProgress,
         CloudSyncTransferOptions options,
         SyncManifest? newManifest,
@@ -781,6 +844,7 @@ public interface ICloudConnection
                     user,
                     localChild,
                     remoteChild,
+                    item.ModifiedAt,
                     syncProgress,
                     options,
                     newManifest,
@@ -797,6 +861,17 @@ public interface ICloudConnection
                         failures, cancellationToken))
                     newManifest?.Paths.Add(localChild);
             }
+        }
+
+        // This pass wrote the whole folder remotely: give it the local folder's time.
+        try
+        {
+            if (localModifiedAt > DateTime.MinValue)
+                await TrySetDirectoryModifiedTimeAsync(remoteDir, localModifiedAt, cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Best-effort: the remote folder then just keeps the upload time.
         }
     }
     

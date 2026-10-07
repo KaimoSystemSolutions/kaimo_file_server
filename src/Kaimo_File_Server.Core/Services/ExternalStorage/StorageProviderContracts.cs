@@ -107,6 +107,13 @@ public interface IRemoteFileStore
     /// </summary>
     Task TrySetModifiedTimeAsync(string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
+
+    /// <summary>
+    /// Same for a directory, once a sync wrote its content. Defaults to the file variant;
+    /// providers that address directories differently (WebDAV collections) override it.
+    /// </summary>
+    Task TrySetDirectoryModifiedTimeAsync(string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
+        => TrySetModifiedTimeAsync(path, modifiedUtc, cancellationToken);
 }
 
 public enum OptimizedSyncDirection

@@ -41,6 +41,83 @@ public class FileSystemStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadAsync_PreservingAccessTime_RestoresItOnDispose()
+    {
+        var fullPath = Path.Combine(_testRoot, "atime.txt");
+        File.WriteAllBytes(fullPath, [1, 2, 3]);
+        var accessed = new DateTime(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
+        File.SetLastAccessTimeUtc(fullPath, accessed);
+        var modified = File.GetLastWriteTimeUtc(fullPath);
+
+        await using (var stream = await _sut.ReadAsync("atime.txt", preserveAccessTime: true))
+            await stream.CopyToAsync(Stream.Null);
+
+        Assert.Equal(accessed, File.GetLastAccessTimeUtc(fullPath));
+        // Restoring atime must not disturb mtime: it is part of the size:mtime item tag.
+        Assert.Equal(modified, File.GetLastWriteTimeUtc(fullPath));
+    }
+
+    [Fact]
+    public async Task ReadAsync_PreservingAccessTime_FileReplacedDuringRead_KeepsTheNewFilesAccessTime()
+    {
+        if (OperatingSystem.IsWindows())
+            return; // Windows restores by path (read-only handle); the production container is Linux.
+
+        var fullPath = Path.Combine(_testRoot, "replaced.txt");
+        File.WriteAllBytes(fullPath, [1, 2, 3]);
+        File.SetLastAccessTimeUtc(fullPath, new DateTime(2001, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var stream = await _sut.ReadAsync("replaced.txt", preserveAccessTime: true);
+        // An atomic replace (temp + rename) while the internal read is still open.
+        var newAccess = new DateTime(2020, 5, 5, 0, 0, 0, DateTimeKind.Utc);
+        var temp = Path.Combine(_testRoot, "replaced.tmp");
+        File.WriteAllBytes(temp, [9]);
+        File.SetLastAccessTimeUtc(temp, newAccess);
+        File.Move(temp, fullPath, overwrite: true);
+        await stream.DisposeAsync();
+
+        // The restore hit the old inode, not the file that now lives at the path.
+        Assert.Equal(newAccess, File.GetLastAccessTimeUtc(fullPath));
+    }
+
+    [Fact]
+    public async Task ReadAsync_PreservingAccessTime_UndisposedStream_NeverRestoresFromTheFinalizer()
+    {
+        var fullPath = Path.Combine(_testRoot, "leaked.txt");
+        File.WriteAllBytes(fullPath, [1, 2, 3]);
+        File.SetLastAccessTimeUtc(fullPath, new DateTime(2001, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        await OpenAndAbandonAsync("leaked.txt");
+        // A later stamp (sync or user access) must survive the abandoned stream's finalizer.
+        var later = new DateTime(2020, 5, 5, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastAccessTimeUtc(fullPath, later);
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+
+        Assert.Equal(later, File.GetLastAccessTimeUtc(fullPath));
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private async Task OpenAndAbandonAsync(string path)
+        => _ = await _sut.ReadAsync(path, preserveAccessTime: true);
+
+    [Fact]
+    public async Task SetModifiedDateAsync_StampsFilesAndDirectories_WithAccessTimeEqualToModified()
+    {
+        Directory.CreateDirectory(Path.Combine(_testRoot, "dir"));
+        File.WriteAllBytes(Path.Combine(_testRoot, "dir", "f.txt"), [1]);
+        var when = new DateTime(2010, 6, 7, 8, 9, 10, DateTimeKind.Utc);
+
+        await _sut.SetModifiedDateAsync("dir/f.txt", when);
+        await _sut.SetModifiedDateAsync("dir", when);
+
+        Assert.Equal(when, File.GetLastWriteTimeUtc(Path.Combine(_testRoot, "dir", "f.txt")));
+        Assert.Equal(when, File.GetLastAccessTimeUtc(Path.Combine(_testRoot, "dir", "f.txt")));
+        Assert.Equal(when, Directory.GetLastWriteTimeUtc(Path.Combine(_testRoot, "dir")));
+        Assert.Equal(when, Directory.GetLastAccessTimeUtc(Path.Combine(_testRoot, "dir")));
+    }
+
+    [Fact]
     public async Task WriteAsync_CreatesSubdirectories()
     {
         await _sut.WriteAsync("deep/nested/file.txt", new MemoryStream([42]));
@@ -599,6 +676,9 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
     public Task<Stream> ReadAsync(string path)
         => Invoke<Stream>("ReadAsync", path);
 
+    public Task<Stream> ReadAsync(string path, bool preserveAccessTime)
+        => Invoke<Stream>("ReadAsync", path, preserveAccessTime);
+
     public Task WriteAsync(string path, Stream data, CancellationToken cancellationToken = default)
         => Invoke("WriteAsync", path, data, cancellationToken);
 
@@ -657,11 +737,15 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
     
     // -- Helpers that unwrap TargetInvocationException from reflection --
 
+    // Overloads (e.g. ReadAsync) make a lookup by name alone ambiguous; match the argument count.
+    private System.Reflection.MethodInfo FindMethod(string method, object[] args)
+        => _type.GetMethods().Single(m => m.Name == method && m.GetParameters().Length == args.Length);
+
     private async Task Invoke(string method, params object[] args)
     {
         try
         {
-            await (Task)_type.GetMethod(method)!.Invoke(_inner, args)!;
+            await (Task)FindMethod(method, args).Invoke(_inner, args)!;
         }
         catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is not null)
         {
@@ -673,7 +757,7 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
     {
         try
         {
-            return await (Task<T>)_type.GetMethod(method)!.Invoke(_inner, args)!;
+            return await (Task<T>)FindMethod(method, args).Invoke(_inner, args)!;
         }
         catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is not null)
         {

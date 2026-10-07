@@ -277,8 +277,20 @@ internal sealed class WebDavRemoteFileStore(
     /// <c>Win32LastModifiedTime</c>), honored by IIS and Kaimo itself. Servers that store it
     /// only as a dead property (e.g. Nextcloud) keep the upload time.
     /// </summary>
-    public async Task TrySetModifiedTimeAsync(
+    public Task TrySetModifiedTimeAsync(
         string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
+        => ProppatchModifiedTimeAsync(ResolveFileUri(path), modifiedUtc, cancellationToken);
+
+    /// <summary>
+    /// Folder variant: a collection URI ends with a slash (Apache and nginx answer a
+    /// slash-less PROPPATCH on a folder with a 301 redirect).
+    /// </summary>
+    public Task TrySetDirectoryModifiedTimeAsync(
+        string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
+        => ProppatchModifiedTimeAsync(ResolveFileUri(path, trailingSlash: true), modifiedUtc, cancellationToken);
+
+    private async Task ProppatchModifiedTimeAsync(
+        Uri requestUri, DateTime modifiedUtc, CancellationToken cancellationToken)
     {
         string body = $"""
             <?xml version="1.0" encoding="utf-8"?>
@@ -286,7 +298,7 @@ internal sealed class WebDavRemoteFileStore(
               <d:set><d:prop><z:Win32LastModifiedTime>{modifiedUtc.ToUniversalTime():R}</z:Win32LastModifiedTime></d:prop></d:set>
             </d:propertyupdate>
             """;
-        using var request = new HttpRequestMessage(new HttpMethod("PROPPATCH"), ResolveFileUri(path))
+        using var request = new HttpRequestMessage(new HttpMethod("PROPPATCH"), requestUri)
         {
             Content = new StringContent(body, Encoding.UTF8, "application/xml")
         };

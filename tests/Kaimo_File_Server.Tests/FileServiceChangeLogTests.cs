@@ -162,6 +162,36 @@ public sealed class FileServiceChangeLogTests
     }
 
     [Fact]
+    public async Task SetModifiedAtAsync_Directory_StampsItAndLogsADirectory()
+    {
+        // Sync stamps folder times; a feed client must not mistake the folder for a file.
+        var when = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        _storage.Setup(s => s.IsDirectoryAsync("docs")).ReturnsAsync(true);
+        _storage.Setup(s => s.ExistsAsync("docs")).ReturnsAsync(true);
+        _storage.Setup(s => s.GetMetadataAsync("docs"))
+            .ReturnsAsync(new FileMetadata { IsDirectory = true, ModifiedAt = when });
+
+        await _sut.SetModifiedAtAsync("/docs", Ctx(), when);
+
+        _storage.Verify(s => s.SetModifiedDateAsync("docs", when), Times.Once);
+        var e = Single();
+        Assert.True(e.IsDirectory);
+        Assert.Null(e.Size);
+        Assert.Equal(when, e.ModifiedAtUtc);
+    }
+
+    [Fact]
+    public async Task SetModifiedAtAsync_MissingItem_ThrowsNotFound()
+    {
+        _storage.Setup(s => s.IsDirectoryAsync("docs/gone.txt")).ReturnsAsync(false);
+        _storage.Setup(s => s.ExistsAsync("docs/gone.txt")).ReturnsAsync(false);
+
+        await Assert.ThrowsAsync<FileNotFoundException>(
+            () => _sut.SetModifiedAtAsync("/docs/gone.txt", Ctx(), DateTime.UtcNow));
+        Assert.Empty(_log.Entries);
+    }
+
+    [Fact]
     public async Task WriteFileAsync_WithoutSourceMtime_DoesNotTouchTheTime()
     {
         _storage.Setup(s => s.IsDirectoryAsync("docs/a.txt")).ReturnsAsync(false);

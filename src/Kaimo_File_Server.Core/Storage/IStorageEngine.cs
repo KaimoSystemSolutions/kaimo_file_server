@@ -6,6 +6,12 @@ namespace Kaimo_File_Server.Core.Storage
     {
         Task<Stream> ReadAsync(string path);
         /// <summary>
+        /// Same as <see cref="ReadAsync(string)"/>; with <paramref name="preserveAccessTime"/> the
+        /// file's last-access time is restored when the stream is disposed, so server-internal
+        /// reads (search indexing, versioning, sync transfers) do not count as a user access.
+        /// </summary>
+        Task<Stream> ReadAsync(string path, bool preserveAccessTime);
+        /// <summary>
         /// Replaces the destination atomically after the complete input stream has
         /// been persisted. A failed or cancelled write must leave an existing
         /// destination unchanged and must not publish a partial new file.
@@ -29,6 +35,10 @@ namespace Kaimo_File_Server.Core.Storage
         Task RenameDirectoryAsync(string oldDirPath, string newDirPath);
         Task UnzipAsync(string zipPath, string targetPath);
         Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format);
+        /// <summary>
+        /// Stamps a source modification time on a file or directory and sets its last-access
+        /// time to the same value, so a copied item looks untouched since that modification.
+        /// </summary>
         Task SetModifiedDateAsync(string path, DateTime time);
         public string ToAbsolutePath(string shareRelativePath);
         /// <summary>

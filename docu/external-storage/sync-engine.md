@@ -107,6 +107,23 @@ only ever transfer in their own direction).
   clock.
 - Creation times are not synchronized.
 
+## Access times and folder times
+
+- **Access time.** A pulled file gets `atime = mtime` of the remote copy (providers expose no
+  access time, and the copy has not been opened since). Reading the local source for a push, and
+  all server-internal reads (search indexing, version snapshots), restore the file's previous
+  access time afterwards (`IStorageEngine.ReadAsync(path, preserveAccessTime: true)`), so the
+  "last accessed" column only reflects real user access.
+- **Folder times** are stamped post-order, like `rsync -t`: once a directory's content is
+  processed, a directory whose direct children this run changed on **one side only** (including
+  a directory the run created) gets the other side's directory mtime (and atime). A directory
+  changed on both sides keeps its times; the sync root is never stamped. Locally this goes through
+  `IFileService.SetModifiedAtAsync`; remotely through
+  `ICloudConnection.TrySetDirectoryModifiedTimeAsync` (SFTP and WebDAV via the remote file store,
+  a no-op elsewhere). Providers that list folders without a date (Dropbox) are skipped. Folder
+  stamping is best-effort and never fails a run. Directory times are not compared for change
+  detection.
+
 ## Legacy import
 
 Older installations stored sync mappings and provider grants as JSON inside

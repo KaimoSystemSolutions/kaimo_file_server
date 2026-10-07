@@ -107,9 +107,10 @@ All browse endpoints are ACL-checked per call.
 | `GET /api/v1/browse/shares` | Shares the caller may browse. | — |
 | `GET /api/v1/browse/{shareId}/list?path=` | Directory children (+ `ETag`). | `If-None-Match` → 304 |
 | `GET /api/v1/browse/{shareId}/metadata?path=` | One item's metadata (+ item-tag `ETag`). | — |
-| `GET /api/v1/browse/{shareId}/content?path=` | Download; supports `Range` (+ item-tag `ETag`). | — |
+| `GET /api/v1/browse/{shareId}/content?path=` | Download; supports `Range` (+ item-tag `ETag`). Optional `X-Kaimo-Preserve-Access-Time: true` for sync reads. | — |
 | `PUT /api/v1/browse/{shareId}/content?path=` | Upload/overwrite (body = bytes). Optional `X-Kaimo-Modified-At` preserves the source mtime. | `If-Match`, `If-None-Match: *`, `Idempotency-Key` |
 | `POST /api/v1/browse/{shareId}/directory?path=` | Create a directory. | `Idempotency-Key` |
+| `PUT /api/v1/browse/{shareId}/modified-at?path=` | Stamp the mtime (and atime) of an existing file or directory from the required `X-Kaimo-Modified-At` header; returns the item (+ item-tag `ETag`). `404` if missing. | — (safe to retry: same time → same item tag; each call still appends a `Modified` feed entry) |
 | `POST /api/v1/browse/{shareId}/rename` | Body `{ "from": "...", "to": "..." }`. | `If-Match`, `Idempotency-Key` |
 | `DELETE /api/v1/browse/{shareId}/item?path=` | Delete (recycle bin if the share has one). | `If-Match`, `Idempotency-Key` |
 | `GET /api/v1/browse/{shareId}/versions?path=` | Stored versions of a file (newest first). | — |
@@ -137,7 +138,16 @@ on `PUT content` to keep the source file's mtime; the file, the returned item ta
   detect it.
 - A value that is not a non-negative integer (e.g. a pre-1970 time) →
   `400 invalid_modified_at`; omit the header for such files.
+- A stamped time is also used as the **last-access time** (the copy was not opened since).
 - Creation time is not transferred (Linux cannot set it).
+
+**Folder times.** Writing into a directory moves its mtime to "now". A sync client that wants
+to keep the source folder time calls `PUT modified-at` on the folder **after** its content is
+written (deepest first is not required; stamping a child never changes its parent).
+
+**Access time.** Downloads and other reads count as an access. A sync client sends
+`X-Kaimo-Preserve-Access-Time: true` on `GET content` so a transfer leaves the file's
+last-access time unchanged. Server-internal reads (search indexing, versioning) never count.
 
 ### 3.1 Safe mutations: conditional requests & idempotency keys
 

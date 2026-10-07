@@ -243,7 +243,7 @@ public class FileServiceTests
         var ctx = CreateContext();
         var data = new MemoryStream([1, 2, 3]);
         _storageMock.Setup(s => s.IsDirectoryAsync(It.IsAny<string>())).ReturnsAsync(false);
-        _storageMock.Setup(s => s.ReadAsync(It.IsAny<string>()))
+        _storageMock.Setup(s => s.ReadAsync(It.IsAny<string>(), true))
             .ReturnsAsync(() => new MemoryStream([1, 2, 3]));
         AllowAccess(FilePermission.CreateWriteData);
 
@@ -269,7 +269,7 @@ public class FileServiceTests
         var ctx = CreateContext();
         var data = new MemoryStream([1, 2, 3]);
         _storageMock.Setup(s => s.IsDirectoryAsync(It.IsAny<string>())).ReturnsAsync(false);
-        _storageMock.Setup(s => s.ReadAsync(It.IsAny<string>()))
+        _storageMock.Setup(s => s.ReadAsync(It.IsAny<string>(), true))
             .ReturnsAsync(() => new MemoryStream([1, 2, 3]));
         AllowAccess(FilePermission.CreateWriteData);
 
@@ -331,7 +331,7 @@ public class FileServiceTests
         Assert.Equal(capturedBytes, indexed);
         Assert.Equal(2, opens);
         _storageMock.Verify(
-            s => s.ReadAsync(It.IsAny<string>()), Times.Never);
+            s => s.ReadAsync(It.IsAny<string>(), true), Times.Never);
     }
 
     [Fact]
@@ -352,7 +352,7 @@ public class FileServiceTests
         var data = new MemoryStream([1, 2, 3]);
         var indexedContent = new MemoryStream([1, 2, 3]);
         _storageMock.Setup(s => s.IsDirectoryAsync(It.IsAny<string>())).ReturnsAsync(false);
-        _storageMock.Setup(s => s.ReadAsync(It.IsAny<string>())).ReturnsAsync(indexedContent);
+        _storageMock.Setup(s => s.ReadAsync(It.IsAny<string>(), true)).ReturnsAsync(indexedContent);
         _storageMock.Setup(s => s.ToAbsolutePath("test.txt")).Returns("/storage/test.txt");
         AllowAccess(FilePermission.CreateWriteData);
 
@@ -378,7 +378,7 @@ public class FileServiceTests
         _storageMock.Setup(s => s.ExistsAsync("test.txt")).ReturnsAsync(false);
         _storageMock.Setup(s => s.ToAbsolutePath("test.txt"))
             .Returns("/storage/test.txt");
-        _storageMock.Setup(s => s.ReadAsync("test.txt"))
+        _storageMock.Setup(s => s.ReadAsync("test.txt", true))
             .ReturnsAsync(() => new MemoryStream([1, 2, 3]));
         var sut = new FileService(
             _storageMock.Object, _aclMock.Object, search.Object, _shareId);
@@ -1136,7 +1136,7 @@ public class FileServiceTests
 
         AllowAccess(FilePermission.CreateWriteData);
         _storageMock.Setup(s => s.ExistsAsync("document.txt")).ReturnsAsync(true);
-        _storageMock.Setup(s => s.ReadAsync("document.txt"))
+        _storageMock.Setup(s => s.ReadAsync("document.txt", true))
             .ReturnsAsync(new MemoryStream([1, 2, 3]));
         versionService
             .Setup(v => v.CreateVersionAsync(

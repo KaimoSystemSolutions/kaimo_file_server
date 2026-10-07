@@ -22,7 +22,7 @@ public sealed class SearchIndexingServiceTests
     {
         var storage = new Mock<IStorageEngine>();
         storage.Setup(s => s.ToAbsolutePath(It.IsAny<string>())).Returns<string>(p => "/abs/" + p);
-        storage.Setup(s => s.ReadAsync(It.IsAny<string>()))
+        storage.Setup(s => s.ReadAsync(It.IsAny<string>(), true))
             .Returns(Task.FromResult<Stream>(new MemoryStream()));
 
         var search = new Mock<ISearchService>();
@@ -61,7 +61,7 @@ public sealed class SearchIndexingServiceTests
     {
         var (search, admin, shares) = Setup();
         var storage = Mock.Get(shares[ShareId].Storage);
-        storage.Setup(s => s.ReadAsync(It.IsAny<string>()))
+        storage.Setup(s => s.ReadAsync(It.IsAny<string>(), true))
             .Throws(new IOException("The process cannot access the file because it is being used by another process."));
 
         await SearchIndexingService.IndexEntryAsync(

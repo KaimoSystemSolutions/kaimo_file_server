@@ -242,6 +242,113 @@ public sealed class CloudSyncReconciliationTests
         // the source modification time both land locally.
         Assert.Equal("remote-content", local.ReadText("a.txt"));
         Assert.Equal(Time(20), local.GetModified("a.txt"));
+        // The copy was not opened since its last change: atime = source mtime, not the sync time.
+        Assert.Equal(Time(20), local.Accessed["a.txt"]);
+    }
+
+    [Fact]
+    public async Task Push_ReadsTheSourceWithoutCountingAnAccess()
+    {
+        var remote = new InMemoryRemote();
+        var local = new InMemoryFileService();
+        local.PutFile("a.txt", "aaa", Time(10));
+
+        await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.Push,
+            new CloudSyncTransferOptions(new CloudSyncAdvancedSettings()), previousManifest: null);
+
+        Assert.Contains("a.txt", local.PreservedReads);
+    }
+
+    [Fact]
+    public async Task Pull_NewRemoteFolder_GetsTheRemoteTimeAfterItsContent()
+    {
+        var remote = new InMemoryRemote();
+        remote.PutDir("/sub", Time(5));
+        remote.PutDir("/sub/deep", Time(3));
+        remote.PutFile("/sub/a.txt", "a", Time(10));
+        remote.PutFile("/sub/deep/b.txt", "b", Time(10));
+        var local = new InMemoryFileService();
+
+        await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.Pull,
+            new CloudSyncTransferOptions(new CloudSyncAdvancedSettings()), previousManifest: null);
+
+        Assert.Equal(Time(5), local.DirStamps["sub"]);
+        Assert.Equal(Time(3), local.DirStamps["sub/deep"]);
+        // Post-order: writing a child would move the folder time again, so the stamp comes last.
+        Assert.True(local.Log.IndexOf("stamp:sub") > local.Log.IndexOf("write:sub/a.txt"));
+        Assert.True(local.Log.IndexOf("stamp:sub") > local.Log.IndexOf("stamp:sub/deep"));
+    }
+
+    [Fact]
+    public async Task Pull_ExistingFolderWithNothingPulled_IsNotStamped()
+    {
+        var remote = new InMemoryRemote();
+        remote.PutDir("/sub", Time(5));
+        remote.PutFile("/sub/a.txt", "a", Time(10));
+        var local = new InMemoryFileService();
+        local.PutDir("sub", Time(7));
+        local.PutFile("sub/a.txt", "a", Time(10));
+
+        await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.Pull,
+            new CloudSyncTransferOptions(new CloudSyncAdvancedSettings()), previousManifest: null);
+
+        Assert.Empty(local.DirStamps);
+    }
+
+    [Fact]
+    public async Task Push_NewLocalFolder_GetsTheLocalTimeRemotely()
+    {
+        var remote = new InMemoryRemote();
+        var local = new InMemoryFileService();
+        local.PutDir("sub", Time(5));
+        local.PutFile("sub/a.txt", "a", Time(10));
+
+        await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.Push,
+            new CloudSyncTransferOptions(new CloudSyncAdvancedSettings()), previousManifest: null);
+
+        Assert.True(remote.HasFile("/sub/a.txt"));
+        Assert.Equal(Time(5), remote.DirStamps["sub"]);
+    }
+
+    [Fact]
+    public async Task TwoWay_FolderChangedOnBothSides_KeepsItsTimes()
+    {
+        var remote = new InMemoryRemote();
+        remote.PutDir("/d", Time(5));
+        remote.PutFile("/d/remote.txt", "r", Time(10));
+        var local = new InMemoryFileService();
+        local.PutDir("d", Time(6));
+        local.PutFile("d/local.txt", "l", Time(10));
+
+        await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.TwoWay,
+            new CloudSyncTransferOptions(new CloudSyncAdvancedSettings()), previousManifest: null);
+
+        // Both sides gained a file: neither folder time is a valid source for the other.
+        Assert.True(local.HasFile("d/remote.txt"));
+        Assert.True(remote.HasFile("/d/local.txt"));
+        Assert.Empty(local.DirStamps);
+        Assert.Empty(remote.DirStamps);
+    }
+
+    [Fact]
+    public async Task Pull_ProviderWithoutFolderTimes_DoesNotStampTheFolder()
+    {
+        var remote = new InMemoryRemote();
+        remote.PutDir("/sub", DateTime.MinValue); // Dropbox lists folders without a date
+        remote.PutFile("/sub/a.txt", "a", Time(10));
+        var local = new InMemoryFileService();
+
+        await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.Pull,
+            new CloudSyncTransferOptions(new CloudSyncAdvancedSettings()), previousManifest: null);
+
+        Assert.True(local.HasFile("sub/a.txt"));
+        Assert.Empty(local.DirStamps);
     }
 
     [Fact]
@@ -354,6 +461,10 @@ public sealed class CloudSyncReconciliationTests
     {
         private readonly Dictionary<string, (byte[] Data, DateTime Modified)> _files = new();
         private readonly HashSet<string> _dirs = new();
+        private readonly Dictionary<string, DateTime> _dirTimes = new();
+
+        /// <summary>Folder times the sync engine stamped, by normalized path.</summary>
+        public Dictionary<string, DateTime> DirStamps { get; } = new();
 
         public string ServiceName => "in-memory";
         public Task Dispose() => Task.CompletedTask;
@@ -367,7 +478,12 @@ public sealed class CloudSyncReconciliationTests
         public void PutFile(string path, string content, DateTime modified)
             => _files[Normalize(path)] = (System.Text.Encoding.UTF8.GetBytes(content), modified);
 
-        public void PutDir(string path) => _dirs.Add(Normalize(path));
+        public void PutDir(string path, DateTime? modified = null)
+        {
+            _dirs.Add(Normalize(path));
+            if (modified is { } time)
+                _dirTimes[Normalize(path)] = time;
+        }
 
         public void RemoveFile(string path) => _files.Remove(Normalize(path));
 
@@ -375,6 +491,12 @@ public sealed class CloudSyncReconciliationTests
 
         public string ReadText(string path)
             => System.Text.Encoding.UTF8.GetString(_files[Normalize(path)].Data);
+
+        public Task TrySetDirectoryModifiedTimeAsync(string path, DateTime modifiedUtc, CancellationToken ct = default)
+        {
+            DirStamps[Normalize(path)] = modifiedUtc;
+            return Task.CompletedTask;
+        }
 
         public Task UploadAsync(string path, Stream data, DateTime modifiedTime, CancellationToken ct = default)
         {
@@ -438,7 +560,8 @@ public sealed class CloudSyncReconciliationTests
             foreach (var (file, value) in _files.Where(f => Parent(f.Key) == key))
                 items.Add(new CloudItemMeta(false, NameOf(file), "/" + file, value.Data.Length, value.Modified));
             foreach (var dir in _dirs.Where(d => Parent(d) == key))
-                items.Add(new CloudItemMeta(true, NameOf(dir), "/" + dir, 0, DateTime.UnixEpoch));
+                items.Add(new CloudItemMeta(true, NameOf(dir), "/" + dir, 0,
+                    _dirTimes.TryGetValue(dir, out var time) ? time : DateTime.UnixEpoch));
             return Task.FromResult<IReadOnlyList<CloudItemMeta>>(items);
         }
     }
@@ -448,8 +571,21 @@ public sealed class CloudSyncReconciliationTests
     {
         private readonly Dictionary<string, (byte[] Data, DateTime Modified)> _files = new();
         private readonly HashSet<string> _dirs = new();
+        private readonly Dictionary<string, DateTime> _dirTimes = new();
 
         public List<(string Path, bool Recycle)> Deletions { get; } = [];
+
+        /// <summary>Folder times the sync engine stamped, by normalized path.</summary>
+        public Dictionary<string, DateTime> DirStamps { get; } = new();
+
+        /// <summary>Last-access times set on pulled files.</summary>
+        public Dictionary<string, DateTime> Accessed { get; } = new();
+
+        /// <summary>Paths read with <c>preserveAccessTime</c>.</summary>
+        public List<string> PreservedReads { get; } = [];
+
+        /// <summary>Ordered "write:path" / "stamp:path" events, to assert post-order stamping.</summary>
+        public List<string> Log { get; } = [];
 
         // Invoked after each successful listing; lets a test delete a folder
         // between its listing and the processing of its children (mid-run delete).
@@ -458,7 +594,12 @@ public sealed class CloudSyncReconciliationTests
         public void PutFile(string path, string content, DateTime modified)
             => _files[Normalize(path)] = (System.Text.Encoding.UTF8.GetBytes(content), modified);
 
-        public void PutDir(string path) => _dirs.Add(Normalize(path));
+        public void PutDir(string path, DateTime? modified = null)
+        {
+            _dirs.Add(Normalize(path));
+            if (modified is { } time)
+                _dirTimes[Normalize(path)] = time;
+        }
 
         public void RemoveDir(string path)
         {
@@ -498,7 +639,11 @@ public sealed class CloudSyncReconciliationTests
                     Size = value.Data.Length, ModifiedAt = value.Modified
                 });
             foreach (var dir in _dirs.Where(d => Parent(d) == key))
-                items.Add(new FileMetadata { Name = NameOf(dir), Path = dir, IsDirectory = true });
+                items.Add(new FileMetadata
+                {
+                    Name = NameOf(dir), Path = dir, IsDirectory = true,
+                    ModifiedAt = _dirTimes.TryGetValue(dir, out var time) ? time : DateTime.UnixEpoch
+                });
             AfterList?.Invoke(key);
             return Task.FromResult(items);
         }
@@ -507,6 +652,13 @@ public sealed class CloudSyncReconciliationTests
             => _files.TryGetValue(Normalize(path), out var entry)
                 ? Task.FromResult<Stream>(new MemoryStream(entry.Data))
                 : throw new FileNotFoundException($"'{path}' not found");
+
+        public Task<Stream> ReadFileAsync(string path, UserContext user, bool preserveAccessTime)
+        {
+            if (preserveAccessTime)
+                PreservedReads.Add(Normalize(path));
+            return ReadFileAsync(path, user);
+        }
 
         public Task<FileMetadata> GetMetadataAsync(string path, UserContext user)
             => Task.FromResult(new FileMetadata { Path = Normalize(path), IsDirectory = DirExists(path) });
@@ -533,6 +685,11 @@ public sealed class CloudSyncReconciliationTests
             string key = Normalize(path);
             if (_files.TryGetValue(key, out var entry))
                 _files[key] = (entry.Data, time);
+            else if (DirExists(key))
+            {
+                DirStamps[key] = time;
+                Log.Add("stamp:" + key);
+            }
             return Task.CompletedTask;
         }
 
@@ -581,13 +738,13 @@ public sealed class CloudSyncReconciliationTests
         {
             // The pull path opens a write handle and streams the download into it.
             // Commit happens on session dispose, mirroring FileSession semantics.
-            var session = new InMemorySession(_files, Normalize(path), user);
+            var session = new InMemorySession(this, Normalize(path), user);
             return Task.FromResult(new FileOpenResult(session, FileOpenStatus.Created));
         }
 
         /// <summary>Buffers offset-based writes and commits them to the parent store on dispose.</summary>
         private sealed class InMemorySession(
-            Dictionary<string, (byte[] Data, DateTime Modified)> files,
+            InMemoryFileService owner,
             string key,
             UserContext user) : IFileSession
         {
@@ -612,6 +769,8 @@ public sealed class CloudSyncReconciliationTests
             {
                 if (times.LastWritten is { } written)
                     _modified = written;
+                if (times.LastAccessed is { } accessed)
+                    owner.Accessed[key] = accessed;
                 return ValueTask.CompletedTask;
             }
 
@@ -625,7 +784,8 @@ public sealed class CloudSyncReconciliationTests
 
             public ValueTask DisposeAsync()
             {
-                files[key] = (_buffer.ToArray(), _modified);
+                owner._files[key] = (_buffer.ToArray(), _modified);
+                owner.Log.Add("write:" + key);
                 return ValueTask.CompletedTask;
             }
 

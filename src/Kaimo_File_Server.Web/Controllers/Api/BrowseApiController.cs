@@ -27,6 +27,12 @@ public sealed class BrowseApiController : ApiControllerBase
     /// <summary>Optional upload header carrying the source mtime as Unix epoch milliseconds (UTC).</summary>
     public const string ModifiedAtHeader = "X-Kaimo-Modified-At";
 
+    /// <summary>
+    /// Optional download header (<c>true</c>): the read is a sync transfer, not a user access, so the
+    /// file's last-access time is left unchanged.
+    /// </summary>
+    public const string PreserveAccessTimeHeader = "X-Kaimo-Preserve-Access-Time";
+
     private readonly IUserContextFactory _userContextFactory;
     private readonly IShareRepository _shares;
     private readonly IFileServiceFactory _fileServiceFactory;
@@ -115,7 +121,10 @@ public sealed class BrowseApiController : ApiControllerBase
         });
     }
 
-    /// <summary>Downloads a file's content. Supports HTTP Range for resumable transfers.</summary>
+    /// <summary>
+    /// Downloads a file's content. Supports HTTP Range for resumable transfers. With
+    /// <c>X-Kaimo-Preserve-Access-Time: true</c> (sync clients) the read does not count as an access.
+    /// </summary>
     [HttpGet("{shareId:guid}/content")]
     public async Task<IActionResult> Download(Guid shareId, [FromQuery] string? path)
     {
@@ -128,7 +137,9 @@ public sealed class BrowseApiController : ApiControllerBase
             if (meta.IsDirectory)
                 return ApiBadRequest("is_directory", "Cannot download a directory.");
 
-            var stream = await resolved.Fs.ReadFileAsync(resolved.Path, resolved.User);
+            var preserveAccessTime = bool.TryParse(
+                Request.Headers[PreserveAccessTimeHeader].ToString(), out var preserve) && preserve;
+            var stream = await resolved.Fs.ReadFileAsync(resolved.Path, resolved.User, preserveAccessTime);
             Response.Headers[HeaderNames.XContentTypeOptions] = "nosniff";
             Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
             Response.Headers[HeaderNames.LastModified] =
@@ -148,7 +159,8 @@ public sealed class BrowseApiController : ApiControllerBase
     /// so a retried upload replays its stored result instead of re-writing. An optional
     /// <c>X-Kaimo-Modified-At</c> header (Unix epoch milliseconds, UTC) preserves the
     /// source modification time — on an overwrite only when it is newer than the stored
-    /// one; otherwise, and without the header, the file keeps its write time.
+    /// one; otherwise, and without the header, the file keeps its write time. A stamped time
+    /// is also used as the last-access time (the copy was not opened since).
     /// </summary>
     [HttpPut("{shareId:guid}/content")]
     public async Task<IActionResult> Upload(Guid shareId, [FromQuery] string? path, CancellationToken ct)
@@ -168,16 +180,8 @@ public sealed class BrowseApiController : ApiControllerBase
                 "Upload body must be raw file bytes, not a form "
                 + "(Content-Type must not be multipart/form-data or application/x-www-form-urlencoded).");
 
-        DateTime? modifiedAtUtc = null;
-        var rawModifiedAt = Request.Headers[ModifiedAtHeader].ToString();
-        if (!string.IsNullOrWhiteSpace(rawModifiedAt))
-        {
-            if (!long.TryParse(rawModifiedAt, NumberStyles.Integer, CultureInfo.InvariantCulture, out var epochMs)
-                || epochMs < 0 || epochMs > DateTimeOffset.MaxValue.ToUnixTimeMilliseconds())
-                return ApiBadRequest("invalid_modified_at",
-                    $"{ModifiedAtHeader} must be Unix epoch milliseconds (UTC).");
-            modifiedAtUtc = DateTimeOffset.FromUnixTimeMilliseconds(epochMs).UtcDateTime;
-        }
+        if (!TryReadModifiedAtHeader(out var modifiedAtUtc, out var rawModifiedAt))
+            return InvalidModifiedAt();
 
         // The mtime is part of the fingerprint (reusing a key with a different mtime is a
         // different request, not a replay); without it the fingerprint stays as before.
@@ -206,6 +210,55 @@ public sealed class BrowseApiController : ApiControllerBase
             return Ok(FileEntryDto.From(meta));
         }));
     }
+
+    /// <summary>
+    /// Stamps the modification time (and, like an upload, the last-access time) of an existing
+    /// file or directory from the required <c>X-Kaimo-Modified-At</c> header. Sync clients use it
+    /// to give a folder the source time after writing its content. Retries are safe: the same
+    /// time yields the same item tag, though each call appends another <c>Modified</c> feed entry.
+    /// </summary>
+    [HttpPut("{shareId:guid}/modified-at")]
+    public async Task<IActionResult> SetModifiedAt(Guid shareId, [FromQuery] string? path)
+    {
+        var (resolved, error) = await ResolveAsync(shareId, path);
+        if (error is not null) return error;
+
+        if (string.IsNullOrEmpty(resolved!.Path))
+            return ApiBadRequest("invalid_path", "A file or directory path is required.");
+
+        if (!TryReadModifiedAtHeader(out var modifiedAtUtc, out _) || modifiedAtUtc is null)
+            return InvalidModifiedAt();
+
+        return await GuardAsync(async () =>
+        {
+            await resolved.Fs.SetModifiedAtAsync(resolved.Path, resolved.User, modifiedAtUtc.Value);
+            var meta = await resolved.Fs.GetMetadataAsync(resolved.Path, resolved.User);
+            Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
+            return Ok(FileEntryDto.From(meta));
+        });
+    }
+
+    /// <summary>
+    /// Parses the optional <c>X-Kaimo-Modified-At</c> header. Returns false only for a present but
+    /// invalid value; an absent header yields true with a null time.
+    /// </summary>
+    private bool TryReadModifiedAtHeader(out DateTime? modifiedAtUtc, out string raw)
+    {
+        modifiedAtUtc = null;
+        raw = Request.Headers[ModifiedAtHeader].ToString();
+        if (string.IsNullOrWhiteSpace(raw))
+            return true;
+
+        if (!long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var epochMs)
+            || epochMs < 0 || epochMs > DateTimeOffset.MaxValue.ToUnixTimeMilliseconds())
+            return false;
+
+        modifiedAtUtc = DateTimeOffset.FromUnixTimeMilliseconds(epochMs).UtcDateTime;
+        return true;
+    }
+
+    private IActionResult InvalidModifiedAt()
+        => ApiBadRequest("invalid_modified_at", $"{ModifiedAtHeader} must be Unix epoch milliseconds (UTC).");
 
     /// <summary>
     /// Creates a directory. Creating a directory that already exists is treated as

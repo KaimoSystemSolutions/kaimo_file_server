@@ -151,7 +151,7 @@ public class FileService : IFileService
                     // Re-open through storage for search indexing — closed stream
                     // means no race with the SMB session. The Task<Stream> contract
                     // your search hook expects is preserved.
-                    await _owner.OnFileCreated(abs, _owner._storage.ReadAsync(rel));
+                    await _owner.OnFileCreated(abs, _owner._storage.ReadAsync(rel, preserveAccessTime: true));
                 }
             }
             catch (Exception ex)
@@ -304,16 +304,19 @@ public class FileService : IFileService
 
         long? size = null;
         DateTime? modifiedAt = null;
+        var isDirectory = false;
         try
         {
             var meta = await _storage.GetMetadataAsync(relativePath);
-            size = meta.Size;
+            // A directory is logged as such (SetModifiedAtAsync stamps folders too), never as a file.
+            isDirectory = meta.IsDirectory;
+            size = isDirectory ? null : meta.Size;
             modifiedAt = meta.ModifiedAt;
         }
         catch { /* size/mtime are optional enrichment for the change feed */ }
 
         await AppendChangeAsync(
-            type, relativePath, isDirectory: false, size: size, modifiedAtUtc: modifiedAt);
+            type, relativePath, isDirectory: isDirectory, size: size, modifiedAtUtc: modifiedAt);
     }
 
     private async Task ApplyDeleteSideEffectsAsync(
@@ -463,7 +466,7 @@ public class FileService : IFileService
     private async Task IndexStoredFileAsync(
         string relativePath, string absolutePath)
     {
-        var fileData = _storage.ReadAsync(relativePath);
+        var fileData = _storage.ReadAsync(relativePath, preserveAccessTime: true);
         try
         {
             await OnFileCreated(absolutePath, fileData);
@@ -771,30 +774,31 @@ public class FileService : IFileService
 
     // ------------------ Full Operations ------------------
 
-    public async Task<Stream> ReadFileAsync(string path, UserContext user)
+    public Task<Stream> ReadFileAsync(string path, UserContext user)
+        => ReadFileAsync(path, user, preserveAccessTime: false);
+
+    public async Task<Stream> ReadFileAsync(string path, UserContext user, bool preserveAccessTime)
     {
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
 
         await EnsureAccessAsync(user, normalized, isDir, FilePermission.ListReadData);
 
-        return await _storage.ReadAsync(normalized);
+        return preserveAccessTime
+            ? await _storage.ReadAsync(normalized, preserveAccessTime: true)
+            : await _storage.ReadAsync(normalized);
     }
 
     public async Task SetModifiedAtAsync(string path, UserContext user, DateTime time)
     {
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
-        
-        if(isDir)
-            return;
-        
+
+        // Directories are stamped too (sync keeps folder times; WebDAV PROPPATCH on a collection).
         await EnsureAccessAsync(user, normalized, isDir, FilePermission.CreateWriteData);
 
-        var existedBefore = await _storage.ExistsAsync(normalized);
-
-        if(!existedBefore)
-            return;
+        if (!await _storage.ExistsAsync(normalized))
+            throw new FileNotFoundException($"'{normalized}' does not exist.", normalized);
 
         await _storage.SetModifiedDateAsync(normalized, time);
 
@@ -846,7 +850,7 @@ public class FileService : IFileService
         {
             try
             {
-                await using var written = await _storage.ReadAsync(normalized);
+                await using var written = await _storage.ReadAsync(normalized, preserveAccessTime: true);
                 await _versionService.CreateVersionAsync(
                     _shareId, normalized, written, user.User.Id.ToString());
             }
@@ -1190,7 +1194,7 @@ public class FileService : IFileService
         // Content-addressable dedup skips this if it equals the latest version.
         if (await _storage.ExistsAsync(normalized))
         {
-            await using var current = await _storage.ReadAsync(normalized);
+            await using var current = await _storage.ReadAsync(normalized, preserveAccessTime: true);
             await _versionService.CreateVersionAsync(_shareId, normalized, current, user.User.Id.ToString());
         }
 
@@ -1203,7 +1207,7 @@ public class FileService : IFileService
 
         await AppendFileUpsertAsync(FileChangeType.Modified, normalized);
 
-        await OnFileCreated(ToAbsolutePath(normalized), _storage.ReadAsync(normalized));
+        await OnFileCreated(ToAbsolutePath(normalized), _storage.ReadAsync(normalized, preserveAccessTime: true));
     }
 
     public async Task<List<DateTime>> GetFolderSnapshotTimestampsAsync(
