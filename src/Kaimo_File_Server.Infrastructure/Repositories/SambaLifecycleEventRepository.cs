@@ -10,7 +10,7 @@ public sealed class SambaLifecycleEventRepository(
     IDbContextFactory<ApplicationDbContext> dbFactory)
     : ISambaLifecycleEventRepository
 {
-    public async Task<SambaEventClaimResult> TryClaimAsync(
+    public async Task<SambaEventClaim> TryClaimAsync(
         Guid eventId,
         string eventType,
         TimeSpan leaseDuration,
@@ -33,21 +33,24 @@ public sealed class SambaLifecycleEventRepository(
                 .SetProperty(x => x.AttemptCount, x => x.AttemptCount + 1)
                 .SetProperty(x => x.LastError, (string?)null),
                 cancellationToken);
-        if (reclaimed == 1)
-            return SambaEventClaimResult.Acquired;
 
+        // The UPDATE may already have claimed the event (directly or through a replay), so this
+        // read must not be cancelled: an abandoned claim would stall the event until it expires.
+        // The lease just written tells this claim apart from any later one; its attempt count
+        // identifies the claim from now on. Should the lease already be gone, the event is left
+        // to the next retry instead of risking an unowned run.
         var existing = await db.SambaLifecycleEventReceipts
             .AsNoTracking()
-            .SingleOrDefaultAsync(x => x.EventId == eventId, cancellationToken);
+            .SingleOrDefaultAsync(x => x.EventId == eventId, CancellationToken.None);
         if (existing is not null)
         {
             if (!StringComparer.Ordinal.Equals(existing.EventType, eventType))
-                return SambaEventClaimResult.Conflict;
-            if (IsOwnReplayedClaim(db, existing, leaseUntil))
-                return SambaEventClaimResult.Acquired;
-            return existing.CompletedAtUtc is not null
+                return new(SambaEventClaimResult.Conflict);
+            if (IsOwnClaim(db, existing, leaseUntil, replayed: reclaimed == 0))
+                return new(SambaEventClaimResult.Acquired, existing.AttemptCount);
+            return new(existing.CompletedAtUtc is not null
                 ? SambaEventClaimResult.AlreadyCompleted
-                : SambaEventClaimResult.Busy;
+                : SambaEventClaimResult.Busy);
         }
 
         db.SambaLifecycleEventReceipts.Add(new SambaLifecycleEventReceipt
@@ -61,7 +64,7 @@ public sealed class SambaLifecycleEventRepository(
         try
         {
             await db.SaveChangesAsync(cancellationToken);
-            return SambaEventClaimResult.Acquired;
+            return new(SambaEventClaimResult.Acquired, 1);
         }
         catch (DbUpdateException)
         {
@@ -73,12 +76,12 @@ public sealed class SambaLifecycleEventRepository(
                 .AsNoTracking()
                 .SingleAsync(x => x.EventId == eventId, cancellationToken);
             if (!StringComparer.Ordinal.Equals(winner.EventType, eventType))
-                return SambaEventClaimResult.Conflict;
-            if (IsOwnReplayedClaim(retryDb, winner, leaseUntil))
-                return SambaEventClaimResult.Acquired;
-            return winner.CompletedAtUtc is not null
+                return new(SambaEventClaimResult.Conflict);
+            if (IsOwnClaim(retryDb, winner, leaseUntil, replayed: true))
+                return new(SambaEventClaimResult.Acquired, winner.AttemptCount);
+            return new(winner.CompletedAtUtc is not null
                 ? SambaEventClaimResult.AlreadyCompleted
-                : SambaEventClaimResult.Busy;
+                : SambaEventClaimResult.Busy);
         }
     }
 
@@ -114,40 +117,33 @@ public sealed class SambaLifecycleEventRepository(
 
     public async Task<bool> RenewAsync(
         Guid eventId,
+        int claimAttempt,
         TimeSpan leaseDuration,
         CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
         var leaseUntil = now.Add(leaseDuration);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        // Never revive an expired lease: a Samba retry may already have re-claimed the
-        // event, and extending the lease would only hide that two handlers now overlap.
-        var current = await db.SambaLifecycleEventReceipts.AsNoTracking()
-            .Where(x => x.EventId == eventId && x.CompletedAtUtc == null && x.LeaseUntilUtc > now)
-            .Select(x => x.LeaseUntilUtc)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (current is null)
-            return false;
-
-        // Compare-and-swap on the lease value just read, not on the clock: the UPDATE may wait
-        // for the row lock of a running rename transaction, and a Samba retry that re-claims
-        // the event meanwhile changes the lease, so this renewal then matches nothing. A lease
-        // that only ran out during the wait, without a re-claim, is still this handler's.
-        if (await db.SambaLifecycleEventReceipts
-                .Where(x => x.EventId == eventId && x.CompletedAtUtc == null && x.LeaseUntilUtc == current)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(x => x.LeaseUntilUtc, leaseUntil),
-                    cancellationToken) == 1)
-            return true;
-
-        // A replayed statement (lost acknowledgement) finds exactly the lease it wrote.
-        return await db.SambaLifecycleEventReceipts.AnyAsync(
-            x => x.EventId == eventId && x.CompletedAtUtc == null && x.LeaseUntilUtc == leaseUntil,
-            cancellationToken);
+        // Compare-and-swap on the claim's attempt count, which every re-claim increments and
+        // renewals never change: a re-claim is never extended, neither when it happened before
+        // this call nor while the UPDATE waited for the row lock of a running rename transaction.
+        // Never revive an expired lease: a Samba retry may re-claim the event at any moment, and
+        // the heartbeat must report the overlap risk instead of hiding it. A lease that only ran
+        // out during the lock wait, without a re-claim, is still this handler's. A replayed
+        // statement (lost acknowledgement) matches its own renewal again, so it stays idempotent.
+        return await db.SambaLifecycleEventReceipts
+            .Where(x => x.EventId == eventId &&
+                        x.CompletedAtUtc == null &&
+                        x.AttemptCount == claimAttempt &&
+                        x.LeaseUntilUtc > now)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.LeaseUntilUtc, leaseUntil),
+                cancellationToken) == 1;
     }
 
     public async Task ReleaseAsync(
         Guid eventId,
+        int claimAttempt,
         string error,
         CancellationToken cancellationToken = default)
     {
@@ -155,8 +151,10 @@ public sealed class SambaLifecycleEventRepository(
             ? "Lifecycle handler failed."
             : error[..Math.Min(error.Length, 1000)];
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        // Only this claim is released: expiring a re-claim's lease would let a further retry
+        // start while that handler is still running.
         await db.SambaLifecycleEventReceipts
-            .Where(x => x.EventId == eventId && x.CompletedAtUtc == null)
+            .Where(x => x.EventId == eventId && x.CompletedAtUtc == null && x.AttemptCount == claimAttempt)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(x => x.LeaseUntilUtc, DateTime.UtcNow)
                 .SetProperty(x => x.LastError, sanitized),
@@ -164,19 +162,21 @@ public sealed class SambaLifecycleEventRepository(
     }
 
     /// <summary>
-    /// A claim statement that was retried after its acknowledgement was lost finds the receipt
-    /// already carrying exactly this call's lease. That is this call's claim, not a competitor's;
-    /// reporting it as busy would stall the event until the lease expires.
+    /// A receipt carrying exactly this call's lease is this call's claim, not a competitor's.
+    /// That includes a claim statement retried after its acknowledgement was lost
+    /// (<paramref name="replayed"/>); reporting it as busy would stall the event until the
+    /// lease expires.
     /// </summary>
-    private static bool IsOwnReplayedClaim(
-        ApplicationDbContext db, SambaLifecycleEventReceipt receipt, DateTime leaseUntil)
+    private static bool IsOwnClaim(
+        ApplicationDbContext db, SambaLifecycleEventReceipt receipt, DateTime leaseUntil, bool replayed)
     {
         if (receipt.CompletedAtUtc is not null || receipt.LeaseUntilUtc != leaseUntil)
             return false;
 
-        db.GetDatabaseLogger().LogWarning(
-            "Claim of Samba lifecycle event {EventId} was already applied by a statement whose " +
-            "acknowledgement was lost; it is kept as acquired.", receipt.EventId);
+        if (replayed)
+            db.GetDatabaseLogger().LogWarning(
+                "Claim of Samba lifecycle event {EventId} was already applied by a statement whose " +
+                "acknowledgement was lost; it is kept as acquired.", receipt.EventId);
         return true;
     }
 

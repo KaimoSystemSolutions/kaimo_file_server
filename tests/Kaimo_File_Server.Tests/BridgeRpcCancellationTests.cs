@@ -151,7 +151,7 @@ public sealed class BridgeRpcCancellationTests
         receipts.Setup(x => x.TryClaimAsync(
                 eventId, "mkdir", It.IsAny<TimeSpan>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(SambaEventClaimResult.Acquired);
+            .ReturnsAsync(new SambaEventClaim(SambaEventClaimResult.Acquired, 1));
         receipts.Setup(x => x.CompleteAsync(
                 eventId, CancellationToken.None))
             .Returns(Task.CompletedTask);
@@ -174,7 +174,7 @@ public sealed class BridgeRpcCancellationTests
         receipts.Verify(x => x.CompleteAsync(
             eventId, CancellationToken.None), Times.Once);
         receipts.Verify(x => x.ReleaseAsync(
-            It.IsAny<Guid>(), It.IsAny<string>(),
+            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(),
             It.IsAny<CancellationToken>()), Times.Never);
     }
 

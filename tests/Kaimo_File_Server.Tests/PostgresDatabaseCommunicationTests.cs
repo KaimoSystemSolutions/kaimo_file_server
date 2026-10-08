@@ -43,7 +43,7 @@ public sealed class PostgresDatabaseCommunicationTests : PostgresTestBase
 
         // The bridge heartbeat renews the lease while the rename transaction is open.
         var leases = new SambaLifecycleEventRepository(DbFactory);
-        var heartbeat = new RenewAfterReceiptRead(() => leases.RenewAsync(eventId, TimeSpan.FromMinutes(2)));
+        var heartbeat = new RenewAfterReceiptRead(() => leases.RenewAsync(eventId, 1, TimeSpan.FromMinutes(2)));
 
         await new FileVersionRepository(FactoryWith(heartbeat))
             .RenamePathAsync(shareId, "old.txt", "new.txt", eventId);
@@ -238,7 +238,6 @@ public sealed class PostgresDatabaseCommunicationTests : PostgresTestBase
     public async Task SambaLeaseRenewal_ReclaimedWhileWaitingForTheRowLock_DoesNotTouchTheNewClaim()
     {
         var eventId = Guid.NewGuid();
-        var lease = DateTime.UtcNow.AddMinutes(2);
         await using (var db = NewContext())
         {
             db.SambaLifecycleEventReceipts.Add(new SambaLifecycleEventReceipt
@@ -246,7 +245,7 @@ public sealed class PostgresDatabaseCommunicationTests : PostgresTestBase
                 EventId = eventId,
                 EventType = "rename",
                 CreatedAtUtc = DateTime.UtcNow,
-                LeaseUntilUtc = lease,
+                LeaseUntilUtc = DateTime.UtcNow.AddMinutes(2),
                 AttemptCount = 1
             });
             await db.SaveChangesAsync();
@@ -259,7 +258,8 @@ public sealed class PostgresDatabaseCommunicationTests : PostgresTestBase
         await blocker.OpenAsync();
         await using var tx = await blocker.BeginTransactionAsync();
         await using (var reclaim = new NpgsqlCommand(
-            "UPDATE samba_lifecycle_event_receipts SET \"LeaseUntilUtc\" = @lease WHERE \"EventId\" = @id",
+            "UPDATE samba_lifecycle_event_receipts SET \"LeaseUntilUtc\" = @lease, " +
+            "\"AttemptCount\" = \"AttemptCount\" + 1 WHERE \"EventId\" = @id",
             blocker, tx))
         {
             reclaim.Parameters.AddWithValue("lease", reclaimedLease);
@@ -267,8 +267,8 @@ public sealed class PostgresDatabaseCommunicationTests : PostgresTestBase
             await reclaim.ExecuteNonQueryAsync();
         }
 
-        var renewal = new SambaLifecycleEventRepository(DbFactory).RenewAsync(eventId, TimeSpan.FromMinutes(2));
-        await Task.Delay(500);
+        var renewal = new SambaLifecycleEventRepository(DbFactory).RenewAsync(eventId, 1, TimeSpan.FromMinutes(2));
+        await WaitUntilABackendWaitsForALockAsync();
         Assert.False(renewal.IsCompleted);
         await tx.CommitAsync();
 
@@ -278,6 +278,41 @@ public sealed class PostgresDatabaseCommunicationTests : PostgresTestBase
         await using var assertionDb = NewContext();
         var stored = (await assertionDb.SambaLifecycleEventReceipts.FindAsync(eventId))!.LeaseUntilUtc!.Value;
         Assert.True(Math.Abs((stored - reclaimedLease).TotalMilliseconds) < 1);
+    }
+
+    /// <summary>
+    /// Waits until a session of this test's database is blocked on a lock, so a test can
+    /// release the lock exactly while the statement under test is waiting for it.
+    /// </summary>
+    private async Task WaitUntilABackendWaitsForALockAsync()
+    {
+        await using var monitor = new NpgsqlConnection(ConnectionString);
+        await monitor.OpenAsync();
+        await using var waiting = new NpgsqlCommand(
+            "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
+            monitor);
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while ((long)(await waiting.ExecuteScalarAsync())! == 0)
+        {
+            Assert.True(DateTime.UtcNow < deadline, "No session started waiting for the lock.");
+            await Task.Delay(20);
+        }
+    }
+
+    [PostgresFact]
+    public async Task SambaLeaseRenewal_StatementReplayedAfterLostAck_KeepsTheLease()
+    {
+        var repository = new SambaLifecycleEventRepository(DbFactory);
+        var eventId = Guid.NewGuid();
+        var claim = await repository.TryClaimAsync(eventId, "close", TimeSpan.FromMinutes(1));
+
+        var renewed = await new SambaLifecycleEventRepository(FactoryWith(new LoseFirstUpdateAcknowledgement()))
+            .RenewAsync(eventId, claim.Attempt, TimeSpan.FromMinutes(2));
+
+        // The replay matches its own renewal again, so the heartbeat keeps the lease and the
+        // handler still owns its claim for the next renewal and the release.
+        Assert.True(renewed);
+        Assert.True(await repository.RenewAsync(eventId, claim.Attempt, TimeSpan.FromMinutes(2)));
     }
 
     /// <summary>

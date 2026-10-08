@@ -125,25 +125,38 @@ public sealed class DatabaseCommunicationHardeningTests : DatabaseTestBase
     }
 
     [Fact]
-    public async Task SambaLeaseRenewal_ExtendsALiveLease_ButNeverRevivesAnExpiredOne()
+    public async Task SambaLeaseRenewal_ExtendsTheOwnClaim_ButNeverAnExpiredOrReclaimedOne()
     {
         var live = Guid.NewGuid();
         var expired = Guid.NewGuid();
+        var reclaimed = Guid.NewGuid();
+        var reclaimedLease = DateTime.UtcNow.AddMinutes(10);
         await using (var db = NewContext())
         {
-            foreach (var (id, leaseUntil) in new[] { (live, DateTime.UtcNow.AddMinutes(1)), (expired, DateTime.UtcNow.AddSeconds(-1)) })
+            foreach (var (id, leaseUntil, attempt) in new[] { (expired, DateTime.UtcNow.AddSeconds(-1), 1), (reclaimed, reclaimedLease, 2) })
                 db.SambaLifecycleEventReceipts.Add(new SambaLifecycleEventReceipt
                 {
                     EventId = id, EventType = "close", CreatedAtUtc = DateTime.UtcNow,
-                    LeaseUntilUtc = leaseUntil, AttemptCount = 1
+                    LeaseUntilUtc = leaseUntil, AttemptCount = attempt
                 });
             await db.SaveChangesAsync();
         }
         var repository = new SambaLifecycleEventRepository(DbFactory);
 
-        Assert.True(await repository.RenewAsync(live, TimeSpan.FromMinutes(2)));
+        var claim = await repository.TryClaimAsync(live, "close", TimeSpan.FromMinutes(1));
+        Assert.True(await repository.RenewAsync(live, claim.Attempt, TimeSpan.FromMinutes(2)));
+        // Renewals keep the claim's identity, so a replayed one (lost acknowledgement) and the
+        // next tick still match it.
+        Assert.True(await repository.RenewAsync(live, claim.Attempt, TimeSpan.FromMinutes(2)));
+
         // An expired lease may already belong to a Samba retry: renewing it would hide the overlap.
-        Assert.False(await repository.RenewAsync(expired, TimeSpan.FromMinutes(2)));
+        Assert.False(await repository.RenewAsync(expired, 1, TimeSpan.FromMinutes(2)));
+
+        // The handler of attempt 1 still runs, but a retry has re-claimed the event as attempt 2.
+        // Before the fix the renewal extended whatever lease was current, i.e. the new claim.
+        Assert.False(await repository.RenewAsync(reclaimed, 1, TimeSpan.FromMinutes(2)));
+        await using var assertionDb = NewContext();
+        Assert.Equal(reclaimedLease, (await assertionDb.SambaLifecycleEventReceipts.FindAsync(reclaimed))!.LeaseUntilUtc);
     }
 
     [Theory]

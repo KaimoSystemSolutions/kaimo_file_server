@@ -167,24 +167,18 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
     {
         var claim = await _events.TryClaimAsync(
             eventId, eventType, EventLeaseDuration, cancellationToken);
-        if (claim == SambaEventClaimResult.AlreadyCompleted) return true;
-        if (claim != SambaEventClaimResult.Acquired)
+        if (claim.Result == SambaEventClaimResult.AlreadyCompleted) return true;
+        if (claim.Result != SambaEventClaimResult.Acquired)
         {
             _logger.LogWarning(
                 "Lifecycle event {EventId} ({EventType}) was not claimed: {Claim}.",
-                eventId, eventType, claim);
+                eventId, eventType, claim.Result);
             return false;
         }
 
         try
         {
-            await RunWithLeaseHeartbeatAsync(eventId, handler);
-            // Once the non-cooperative lifecycle handler has committed its side
-            // effects, completion is a correctness write and must survive client
-            // cancellation. Releasing the receipt here could let a retry duplicate
-            // a close/version, delete, rename, or mkdir mutation.
-            await _events.CompleteAsync(eventId, CancellationToken.None);
-            return true;
+            await RunWithLeaseHeartbeatAsync(eventId, claim.Attempt, handler);
         }
         catch (Exception error)
         {
@@ -193,19 +187,39 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
                 "Lifecycle event {EventId} ({EventType}) failed and will be retried.",
                 eventId, eventType);
             await _events.ReleaseAsync(
-                eventId, error.Message, CancellationToken.None);
+                eventId, claim.Attempt, error.Message, CancellationToken.None);
             return false;
         }
+
+        // Once the non-cooperative lifecycle handler has committed its side effects, completion
+        // is a correctness write and must survive client cancellation. If it still fails after
+        // the execution strategy's retries, the event is acknowledged anyway and its receipt is
+        // neither released nor reported as failed: either would let a Samba retry duplicate a
+        // close/version, delete, rename, or mkdir mutation. Dropping the bookkeeping is the
+        // lesser harm.
+        try
+        {
+            await _events.CompleteAsync(eventId, CancellationToken.None);
+        }
+        catch (Exception error)
+        {
+            _logger.LogError(
+                error,
+                "Lifecycle event {EventId} ({EventType}) was applied, but its receipt could not be completed; " +
+                "the event is acknowledged without a retry.",
+                eventId, eventType);
+        }
+        return true;
     }
 
     /// <summary>
     /// Keeps the event lease alive while the handler runs. Without it, a handler that
     /// outlives the lease could be re-claimed by a Samba retry and run twice at once.
     /// </summary>
-    private async Task RunWithLeaseHeartbeatAsync(Guid eventId, Func<Task> handler)
+    private async Task RunWithLeaseHeartbeatAsync(Guid eventId, int claimAttempt, Func<Task> handler)
     {
         using var stop = new CancellationTokenSource();
-        var heartbeat = RenewLeaseLoopAsync(eventId, stop.Token);
+        var heartbeat = RenewLeaseLoopAsync(eventId, claimAttempt, stop.Token);
         try
         {
             await handler();
@@ -217,7 +231,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
         }
     }
 
-    private async Task RenewLeaseLoopAsync(Guid eventId, CancellationToken stopToken)
+    private async Task RenewLeaseLoopAsync(Guid eventId, int claimAttempt, CancellationToken stopToken)
     {
         try
         {
@@ -226,13 +240,13 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
             {
                 try
                 {
-                    if (!await _events.RenewAsync(eventId, EventLeaseDuration, stopToken))
+                    // Only this handler's claim is renewed, never a re-claim's.
+                    if (!await _events.RenewAsync(eventId, claimAttempt, EventLeaseDuration, stopToken))
                     {
-                        // Once expired, a re-claimed lease looks alive again; renewing it
-                        // would extend another handler's claim, so stop here.
                         _logger.LogWarning(
-                            "Lease for lifecycle event {EventId} expired while its handler was still running; " +
-                            "a Samba retry may process the event concurrently.", eventId);
+                            "Lease for lifecycle event {EventId} was lost while its handler was still running: it expired, " +
+                            "was re-claimed, or an overlapping handler completed the event. Unless completed, a Samba retry " +
+                            "may process the event concurrently.", eventId);
                         return;
                     }
                 }

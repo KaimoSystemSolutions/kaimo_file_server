@@ -56,8 +56,8 @@ public sealed class FileEventGrpcServiceIdempotencyTests
             receipts.SetupSequence(x => x.TryClaimAsync(
                     It.IsAny<Guid>(), "close", It.IsAny<TimeSpan>(),
                     It.IsAny<CancellationToken>()))
-                .ReturnsAsync(SambaEventClaimResult.Acquired)
-                .ReturnsAsync(SambaEventClaimResult.AlreadyCompleted);
+                .ReturnsAsync(new SambaEventClaim(SambaEventClaimResult.Acquired, 1))
+                .ReturnsAsync(new SambaEventClaim(SambaEventClaimResult.AlreadyCompleted));
             receipts.Setup(x => x.CompleteAsync(
                     It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
@@ -105,8 +105,8 @@ public sealed class FileEventGrpcServiceIdempotencyTests
         receipts.SetupSequence(x => x.TryClaimAsync(
                 It.IsAny<Guid>(), "delete", It.IsAny<TimeSpan>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(SambaEventClaimResult.Acquired)
-            .ReturnsAsync(SambaEventClaimResult.AlreadyCompleted);
+            .ReturnsAsync(new SambaEventClaim(SambaEventClaimResult.Acquired, 1))
+            .ReturnsAsync(new SambaEventClaim(SambaEventClaimResult.AlreadyCompleted));
         receipts.Setup(x => x.CompleteAsync(
                 It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -134,6 +134,47 @@ public sealed class FileEventGrpcServiceIdempotencyTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task AppliedEvent_WhoseCompletionFails_IsAcknowledgedWithoutRelease()
+    {
+        var share = new ShareDefinition("docs", Path.GetTempPath());
+        var shares = new Mock<IShareRepository>();
+        shares.Setup(x => x.GetByNameAsync("docs")).ReturnsAsync(share);
+        var fileService = new Mock<IFileService>();
+        fileService.Setup(x => x.NotifyExternalDeleteAsync("old.txt", false))
+            .Returns(Task.CompletedTask);
+        var factory = new Mock<IFileServiceFactory>();
+        factory.Setup(x => x.CreateForShare(It.Is<ShareDefinition>(s => s.Id == share.Id)))
+            .Returns(fileService.Object);
+        var receipts = new Mock<ISambaLifecycleEventRepository>();
+        receipts.Setup(x => x.TryClaimAsync(
+                It.IsAny<Guid>(), "delete", It.IsAny<TimeSpan>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SambaEventClaim(SambaEventClaimResult.Acquired, 1));
+        receipts.Setup(x => x.CompleteAsync(
+                It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new TimeoutException("Database unreachable"));
+        var service = new FileEventGrpcService(
+            factory.Object, shares.Object, Mock.Of<IAuthenticationLookup>(),
+            receipts.Object, NullLogger<FileEventGrpcService>.Instance);
+
+        var reply = await service.NotifyDelete(
+            new NotifyPathRequest
+            {
+                EventId = Guid.NewGuid().ToString("N"),
+                Username = "alice",
+                Share = "docs",
+                Path = "old.txt"
+            },
+            null!);
+
+        // Before the fix the receipt was released and a failure reported, so a Samba retry
+        // would have run the already applied delete a second time.
+        Assert.True(reply.Ok);
+        receipts.Verify(x => x.ReleaseAsync(
+            It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Theory]
     [InlineData(false, "old.txt", "new.txt")]
     [InlineData(true, "old", "new")]
@@ -157,7 +198,7 @@ public sealed class FileEventGrpcServiceIdempotencyTests
         receipts.Setup(x => x.TryClaimAsync(
                 eventId, "rename", It.IsAny<TimeSpan>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(SambaEventClaimResult.Acquired);
+            .ReturnsAsync(new SambaEventClaim(SambaEventClaimResult.Acquired, 1));
         receipts.Setup(x => x.CompleteAsync(
                 eventId, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
