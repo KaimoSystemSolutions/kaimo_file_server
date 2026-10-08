@@ -16,10 +16,61 @@ public static class SearchConfigKeys
     public const string ElasticEnabledKey = "search.elasticsearch.enabled";
 
     /// <summary>
+    /// The selected <see cref="SearchEngine"/> (stored by name). Supersedes
+    /// <see cref="ElasticEnabledKey"/>: while unset, the legacy flag decides
+    /// (true → Elasticsearch, false → Filename), so existing installations keep their behavior.
+    /// </summary>
+    public const string EngineKey = "search.engine";
+
+    /// <summary>
     /// The highest change-log <c>Seq</c> the background indexer has already applied to
-    /// the index. Persisted so the indexer resumes where it left off across restarts.
+    /// the Elasticsearch index. Persisted so the indexer resumes where it left off across restarts.
     /// </summary>
     public const string IndexCursorKey = "search.index.cursor";
+
+    /// <summary>Change-log cursor of the local (PostgreSQL) index, kept apart from the ES one.</summary>
+    public const string LocalIndexCursorKey = "search.local.cursor";
+
+    /// <summary>
+    /// The <see cref="LocalIndexVersion"/> the last completed full (all-shares) build of the
+    /// local index ran with. While it differs, the indexer (re)starts a full build that
+    /// re-extracts every file, so an interrupted first build is never left half-done and a
+    /// changed indexing rule reaches documents of unchanged files.
+    /// </summary>
+    public const string LocalIndexBuiltKey = "search.local.built-version";
+
+    /// <summary>
+    /// Version of what the local index stores per file. Bump it whenever content extraction
+    /// or the set of indexed paths changes. 2: encoded blobs stripped, recycle bins indexed.
+    /// </summary>
+    public const int LocalIndexVersion = 2;
+
+    /// <summary>The cursor key of an index-backed engine.</summary>
+    public static string CursorKeyFor(SearchEngine engine)
+        => engine == SearchEngine.Local ? LocalIndexCursorKey : IndexCursorKey;
+
+    /// <summary>
+    /// Resolves the effective engine from the stored values. An unknown or missing engine name
+    /// falls back to the legacy Elasticsearch flag.
+    /// </summary>
+    public static SearchEngine ParseEngine(string? storedEngine, bool legacyElasticEnabled)
+        => Enum.TryParse<SearchEngine>(storedEngine, ignoreCase: true, out var engine)
+           && Enum.IsDefined(engine)
+            ? engine
+            : legacyElasticEnabled ? SearchEngine.Elasticsearch : SearchEngine.Filename;
+}
+
+/// <summary>The search backend selected in the settings. Exactly one is active.</summary>
+public enum SearchEngine
+{
+    /// <summary>No index: plain file-name walk over the shares.</summary>
+    Filename,
+
+    /// <summary>Full-text index in the Elasticsearch container.</summary>
+    Elasticsearch,
+
+    /// <summary>Full-text index in the application's PostgreSQL database.</summary>
+    Local
 }
 
 /// <summary>
@@ -40,13 +91,42 @@ public interface ISearchConfigStore
 
     /// <summary>Persists the background indexer's change-log cursor.</summary>
     Task SetIndexCursorAsync(long seq);
+
+    /// <summary>Reads the selected engine fresh (cross-process safe), honoring the legacy flag.</summary>
+    Task<SearchEngine> GetEngineAsync();
+
+    /// <summary>Persists the selected engine.</summary>
+    Task SetEngineAsync(SearchEngine engine);
+
+    /// <summary>Reads the change-log cursor of an index-backed engine (0 when unset).</summary>
+    Task<long> GetIndexCursorAsync(SearchEngine engine);
+
+    /// <summary>Persists the change-log cursor of an index-backed engine.</summary>
+    Task SetIndexCursorAsync(SearchEngine engine, long seq);
+
+    /// <summary>
+    /// Whether a full build of the local index has completed with the current
+    /// <see cref="SearchConfigKeys.LocalIndexVersion"/> (false when unset or older).
+    /// </summary>
+    Task<bool> GetLocalIndexBuiltAsync();
+
+    /// <summary>Records that a full build has completed with the current version (or clears it).</summary>
+    Task SetLocalIndexBuiltAsync(bool built);
 }
 
 /// <summary>Effective runtime state of the search engine, for the settings UI.</summary>
+/// <param name="Enabled">Whether an index-backed engine (ES or Local) is selected.</param>
+/// <param name="Reachable">Whether the selected engine answers; always true for Local and Filename.</param>
+/// <param name="Effective">True when the selected index-backed engine is actually in use.</param>
+/// <param name="Engine">The selected engine.</param>
 public sealed record SearchEngineState(
     bool Enabled,
     bool Reachable,
-    bool Effective);
+    bool Effective,
+    SearchEngine Engine = SearchEngine.Elasticsearch);
+
+/// <summary>Size of the local search index, for the settings UI.</summary>
+public sealed record SearchIndexStats(long Documents, long Bytes);
 
 /// <summary>Progress of a running (or last) full reindex pass.</summary>
 public sealed class ReindexProgress
@@ -71,7 +151,7 @@ public sealed class ReindexProgress
 
 /// <summary>
 /// Administrative surface for the search engine, used by the settings page:
-/// toggle Elasticsearch on/off and trigger a manual full reindex. Implemented by
+/// select the engine (Elasticsearch, local index, filename) and trigger a manual full reindex. Implemented by
 /// the search router so the UI never has to know which backend is active.
 /// </summary>
 public interface ISearchAdminService
@@ -83,10 +163,19 @@ public interface ISearchAdminService
     Task SetElasticEnabledAsync(bool enabled, CancellationToken ct = default);
 
     /// <summary>
+    /// Persists the selected engine. Switching away from the engine a reindex runs for
+    /// cancels that reindex.
+    /// </summary>
+    Task SetEngineAsync(SearchEngine engine, CancellationToken ct = default);
+
+    /// <summary>Document count and on-disk size of the local index.</summary>
+    Task<SearchIndexStats> GetLocalIndexStatsAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// Kicks off a reindex in the background. When <paramref name="shareName"/> is
     /// null or empty, every enabled share is reindexed; otherwise only that share.
-    /// Returns false if Elasticsearch is not currently active (disabled or
-    /// unreachable) or a reindex is already running.
+    /// Returns false if no index-backed engine is currently active (disabled or
+    /// unreachable), indexing is blocked (read-only demo) or a reindex is already running.
     /// </summary>
     Task<bool> TryStartReindexAsync(string? shareName = null, CancellationToken ct = default);
 

@@ -153,7 +153,7 @@ flowchart TD
 |---|---|---|
 | `src/Kaimo_File_Server.Core` | Class library | Domain entities (`Domain/`), repository interfaces (`Repositories/`), security (`Security/AclService.cs`, `ManagementPermission.cs`), the protocol-independent file service (`Services/File/FileService.cs`, `FileVersionService.cs`), external-storage contracts (`Services/ExternalStorage/`) |
 | `src/Kaimo_File_Server.Infrastructure` | Class library | `ApplicationDbContext` and migrations (`Persistence/`, `Migrations/`), repositories, file-system storage (`Storage/FileSystemStorage.cs`), backups, cloud and protocol providers (`Clouds/`, `ExternalStorage/`), notifications outbox, log archive, shared hosted services. Composition entry points: `AddInfrastructure`, `AddCoreServices`, `AddExternalStorageProviders`, `MigrateSeedAndBackupAsync`, `WaitForDatabaseReadyAsync` in `ServiceCollectionExtensions.cs` |
-| `src/Kaimo_File_Server.Search` | Library (Worker SDK) | `AddElasticSearch`, `SearchServiceRouter` (Elasticsearch or filename fallback), `SearchAclFilter` |
+| `src/Kaimo_File_Server.Search` | Library (Worker SDK) | `AddElasticSearch`, `SearchServiceRouter` (Elasticsearch, local PostgreSQL index or filename fallback), `SearchAclFilter` |
 | `src/Kaimo_File_Server.Host` | Worker | Database owner and reconcilers. No network listener (`Program.cs`) |
 | `src/Kaimo_File_Server.Web` | ASP.NET | Kestrel on 8080/8443, Blazor Server, MVC controllers (`Controllers/Api`, `Controllers/WebDav`), OpenAPI at `/openapi/v1.json` |
 | `src/Kaimo_File_Server.SmbBridge` | ASP.NET gRPC | gRPC services in `Services/*GrpcService.cs`, mTLS and per-identity authorization in `Security/` |

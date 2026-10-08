@@ -639,6 +639,15 @@ namespace Kaimo_File_Server.Core.Logging {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Local index search failed, falling back to filename search..
+        /// </summary>
+        public static string SearchLocalFailed {
+            get {
+                return ResourceManager.GetString("SearchLocalFailed", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Elasticsearch not reachable, search running in filename mode..
         /// </summary>
         public static string SearchElasticUnreachable {

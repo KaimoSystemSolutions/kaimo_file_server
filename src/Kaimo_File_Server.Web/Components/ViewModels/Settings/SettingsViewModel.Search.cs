@@ -4,20 +4,37 @@ using Kaimo_File_Server.Search;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
-/// <summary>Search-engine (Elasticsearch) state and manual reindex control.</summary>
+/// <summary>Search-engine selection (Elasticsearch / local index / filename) and manual reindex control.</summary>
 public partial class SettingsViewModel
 {
-    // ── Search engine (Elasticsearch) ──
+    // ── Search engine ──
 
-    /// <summary>Desired state of Elasticsearch (config flag). When off, the
-    /// filename fallback is used and nothing is indexed on write.</summary>
-    public bool SearchEsEnabled { get; set; } = true;
+    /// <summary>Desired engine (config). Persisted on Save; Filename means no index at all.</summary>
+    public SearchEngine SearchEngineSelected { get; set; } = SearchEngine.Elasticsearch;
+
+    /// <summary>Desired state of Elasticsearch. When off, nothing is written to Elasticsearch.</summary>
+    public bool SearchEsEnabled => SearchEngineSelected == SearchEngine.Elasticsearch;
+
+    /// <summary>Desired state of the local (PostgreSQL) index.</summary>
+    public bool SearchLocalEnabled => SearchEngineSelected == SearchEngine.Local;
 
     /// <summary>Whether Elasticsearch answered a ping (container present/reachable).</summary>
     public bool SearchEsReachable { get; private set; }
 
+    /// <summary>The engine actually serving searches right now (Filename when the selected one is unavailable).</summary>
+    public SearchEngine SearchActiveEngine { get; private set; } = SearchEngine.Filename;
+
     /// <summary>True if ES is both enabled and reachable → actually in use.</summary>
-    public bool SearchEsEffective { get; private set; }
+    public bool SearchEsEffective => SearchActiveEngine == SearchEngine.Elasticsearch;
+
+    /// <summary>True if the local index is in use.</summary>
+    public bool SearchLocalEffective => SearchActiveEngine == SearchEngine.Local;
+
+    /// <summary>True when an index engine is in use, i.e. a reindex is possible.</summary>
+    public bool SearchIndexEffective => SearchActiveEngine != SearchEngine.Filename;
+
+    /// <summary>Size of the local index; null while it is not selected or could not be read.</summary>
+    public SearchIndexStats? LocalIndexStats { get; private set; }
 
     /// <summary>True while the search tab is actively probing Elasticsearch.</summary>
     public bool SearchStateLoading { get; private set; }
@@ -31,7 +48,20 @@ public partial class SettingsViewModel
     /// <summary>Selected share for the next reindex; empty = all shares.</summary>
     public string ReindexSelectedShare { get; set; } = string.Empty;
 
-    /// <summary>Reads the desired flag + live reachability of Elasticsearch.</summary>
+    /// <summary>
+    /// Applies one engine toggle. The engines are mutually exclusive: switching one on switches
+    /// the other off; switching the selected one off falls back to the filename search.
+    /// Only the desired state changes; it is persisted on Save.
+    /// </summary>
+    public void ToggleSearchEngine(SearchEngine engine, bool on)
+    {
+        if (on)
+            SearchEngineSelected = engine;
+        else if (SearchEngineSelected == engine)
+            SearchEngineSelected = SearchEngine.Filename;
+    }
+
+    /// <summary>Reads the selected engine, live reachability of Elasticsearch and the local index size.</summary>
     public async Task LoadSearchStateAsync()
     {
         if (!CanManageSettings) return;
@@ -39,10 +69,14 @@ public partial class SettingsViewModel
         try
         {
             var state = await _searchAdmin.GetStateAsync();
-            SearchEsEnabled = state.Enabled;
-            SearchEsReachable = state.Reachable;
-            SearchEsEffective = state.Effective;
+            SearchEngineSelected = state.Engine;
+            // Elasticsearch is not probed while the local index is selected.
+            SearchEsReachable = state.Engine != SearchEngine.Local && state.Reachable;
+            SearchActiveEngine = state.Effective ? state.Engine : SearchEngine.Filename;
             ReindexProgress = _searchAdmin.GetReindexProgress();
+            LocalIndexStats = state.Engine == SearchEngine.Local
+                ? await _searchAdmin.GetLocalIndexStatsAsync()
+                : null;
 
             ReindexShares = (await _shareRepo.GetAllEnabledAsync())
                 .Select(s => s.Name)
@@ -62,12 +96,21 @@ public partial class SettingsViewModel
         }
     }
 
-    /// <summary>Re-reads only the reindex progress (cheap, in-memory).</summary>
-    public Task RefreshReindexProgressAsync()
+    /// <summary>
+    /// Re-reads the reindex progress (cheap, in-memory). When a run has just finished, the
+    /// local index size is re-read too, so the counts match the completed build.
+    /// </summary>
+    public async Task RefreshReindexProgressAsync()
     {
-        if (CanManageSettings)
-            ReindexProgress = _searchAdmin.GetReindexProgress();
-        return Task.CompletedTask;
+        if (!CanManageSettings) return;
+
+        bool wasRunning = ReindexProgress.Running;
+        ReindexProgress = _searchAdmin.GetReindexProgress();
+        if (wasRunning && !ReindexProgress.Running && SearchLocalEffective)
+        {
+            try { LocalIndexStats = await _searchAdmin.GetLocalIndexStatsAsync(); }
+            catch (Exception ex) { _logger.LogDebug(ex, "Failed to refresh local index stats"); }
+        }
     }
 
     /// <summary>Requests cancellation of the running reindex. The run stops at its
@@ -92,19 +135,23 @@ public partial class SettingsViewModel
 
         try
         {
-            await _searchAdmin.SetElasticEnabledAsync(SearchEsEnabled);
+            var engine = SearchEngineSelected;
+            await _searchAdmin.SetEngineAsync(engine);
             await LoadSearchStateAsync();
 
-            _logger.LogInformation("Elasticsearch desired state set to {Enabled}", SearchEsEnabled);
-            SuccessMessage = SearchEsEnabled
-                ? "Elasticsearch aktiviert. Wird verwendet, sobald der Container erreichbar ist."
-                : "Elasticsearch deaktiviert. Es wird die Dateinamen-Suche verwendet und nicht mehr indexiert.";
+            _logger.LogInformation("Search engine set to {Engine}", engine);
+            SuccessMessage = R(engine switch
+            {
+                SearchEngine.Elasticsearch => "Web_Settings_Search_SavedElastic",
+                SearchEngine.Local => "Web_Settings_Search_SavedLocal",
+                _ => "Web_Settings_Search_SavedFilename"
+            });
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to save search engine setting");
-            ErrorMessage = "Such-Einstellung konnte nicht gespeichert werden.";
+            ErrorMessage = R("Web_Settings_Search_SaveFailed");
             return false;
         }
     }
@@ -130,17 +177,17 @@ public partial class SettingsViewModel
 
             if (started)
                 SuccessMessage = share is null
-                    ? "Indexierung gestartet. Der Fortschritt wird unten angezeigt."
-                    : $"Indexierung für Share '{share}' gestartet. Der Fortschritt wird unten angezeigt.";
+                    ? R("Web_Settings_Search_ReindexStarted")
+                    : string.Format(R("Web_Settings_Search_ReindexStartedShare"), share);
             else if (ReindexProgress.Running)
-                ErrorMessage = "Es läuft bereits eine Indexierung.";
+                ErrorMessage = R("Web_Settings_Search_ReindexAlreadyRunning");
             else
-                ErrorMessage = "Indexierung nicht möglich: Elasticsearch ist deaktiviert oder nicht erreichbar.";
+                ErrorMessage = R("Web_Settings_Search_ReindexUnavailable");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to start reindex");
-            ErrorMessage = "Indexierung konnte nicht gestartet werden.";
+            ErrorMessage = R("Web_Settings_Search_ReindexStartFailed");
         }
     }
 }

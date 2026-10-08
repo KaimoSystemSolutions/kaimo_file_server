@@ -258,6 +258,9 @@
   <data name="SearchElasticFailed" xml:space="preserve">
     <value>Elasticsearch search failed, falling back to filename search.</value>
   </data>
+  <data name="SearchLocalFailed" xml:space="preserve">
+    <value>Local index search failed, falling back to filename search.</value>
+  </data>
   <data name="SearchElasticUnreachable" xml:space="preserve">
     <value>Elasticsearch not reachable, search running in filename mode.</value>
   </data>

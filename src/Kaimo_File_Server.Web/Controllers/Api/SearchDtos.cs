@@ -9,7 +9,9 @@ namespace Kaimo_File_Server.Web.Controllers.Api;
 /// <param name="ShareId">Optional: restrict the search to one share.</param>
 /// <param name="Path">Optional share-relative folder (requires <paramref name="ShareId"/>): that folder and below.</param>
 /// <param name="Limit">Maximum number of hits (1–50, default 25).</param>
-public sealed record SearchRequestDto(string? Q, Guid? ShareId = null, string? Path = null, int? Limit = null);
+/// <param name="IncludeRecycleBin">Optional: also return recycle-bin contents (default false; always on when <paramref name="Path"/> lies in a recycle bin).</param>
+public sealed record SearchRequestDto(
+    string? Q, Guid? ShareId = null, string? Path = null, int? Limit = null, bool? IncludeRecycleBin = null);
 
 /// <summary>One piece of a highlight snippet; <c>Highlighted</c> marks the matched text.</summary>
 public sealed record SnippetSegmentDto(string Text, bool Highlighted);

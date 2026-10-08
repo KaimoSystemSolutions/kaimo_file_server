@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using MimeDetective;
 using MimeDetective.Definitions;
@@ -10,7 +11,7 @@ namespace Kaimo_File_Server.Search;
 
 
 
-public class ContentProvider
+public partial class ContentProvider
 {
     private static readonly IContentInspector Inspector = new ContentInspectorBuilder()
     {
@@ -116,9 +117,11 @@ public class ContentProvider
 
         // No known binary signature matched — try as text
         if (IsLikelyText(bytes))
-            return Encoding.UTF8.GetString(bytes);
+            return StripEncodedBlobs(Encoding.UTF8.GetString(bytes));
 
-        return mimeType is not null ?  mimeType! : string.Empty;
+        // Unsupported binary format: index the file by name only. (Returning the detected MIME
+        // type here used to make "application", "octet", … match every such file's "content".)
+        return string.Empty;
     }
 
     /// <summary>
@@ -140,6 +143,19 @@ public class ContentProvider
             total += read;
         }
     }
+
+    /// <summary>
+    /// Drops base64/hex payloads from extracted text: encrypted vaults and backups, embedded
+    /// attachments, keys. They pass the text check yet hold no searchable words, and once made
+    /// up 95 % of the stored index. A payload is a run of at least 60 base64 characters that
+    /// contains a digit; words, identifiers and URLs (which contain '.', ':' or '-') are shorter
+    /// or broken up, and long digit-free words are kept.
+    /// </summary>
+    internal static string StripEncodedBlobs(string text) => EncodedBlobRegex().Replace(text, " ");
+
+    // The lookbehind anchors each attempt at the start of a run, so a scan stays linear.
+    [GeneratedRegex(@"(?<![A-Za-z0-9+/=])(?=[A-Za-z0-9+/=]*[0-9])[A-Za-z0-9+/=]{60,}")]
+    private static partial Regex EncodedBlobRegex();
 
     private static bool IsLikelyText(byte[] data)
     {

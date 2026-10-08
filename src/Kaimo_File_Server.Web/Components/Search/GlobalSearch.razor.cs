@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
@@ -60,12 +61,16 @@ public partial class GlobalSearch : IDisposable
     private string _lastScope = ScopeDest;   // last non-"pick" scope, to revert to
     private ElementReference _searchInput;
 
-    private List<FileDocument> _fileResults = new();
+    private List<FileDocument> _allFileHits = new();  // fetched hits incl. recycle bin, ranked
+    private List<FileDocument> _fileResults = new();  // shown hits (recycle-bin filter applied)
     private List<SearchDestination> _destResults = new();
     private int _activeIndex = -1;        // keyboard-selected result (files first, then destinations); -1 = none
     private bool _revealActive;           // scroll the selected result into view after the next render
     private bool _dropdownVisible;
     private bool _isSearching;
+    // Include recycle-bin contents (toggle inside the search bar). Off by default so deleted
+    // files do not crowd the results; searching inside a recycle bin always includes them.
+    private bool _includeRecycleBin;
     private CancellationTokenSource? _searchCts;
 
     // Same cap as the client API: in filename-fallback mode a search holds one of the
@@ -327,6 +332,22 @@ public partial class GlobalSearch : IDisposable
         await RefocusSearchAsync();
     }
 
+    // Live: re-filters the hits already fetched; a running search applies the new state when done.
+    private void ToggleRecycleBin()
+    {
+        _includeRecycleBin = !_includeRecycleBin;
+        ApplyRecycleBinFilter();
+        if (_searchQuery.Length >= 2)
+            _dropdownVisible = true;
+    }
+
+    private string RecycleToggleTitle => _includeRecycleBin
+        ? Text("Web_Search_RecycleBinIncluded", "Recycle bin contents are included — click to exclude them")
+        : Text("Web_Search_RecycleBinExcluded", "Include recycle bin contents");
+
+    // Web hits are relative to the share (or to the own home), so the share-root rule applies.
+    private static bool IsInRecycleBin(FileDocument hit) => ShareEntryPolicy.IsRecycleBinPath(hit.SharePath);
+
     private async Task RefocusSearchAsync()
     {
         // Returning focus makes the component "focus-within" again, cancelling the
@@ -390,7 +411,9 @@ public partial class GlobalSearch : IDisposable
         var files = new List<FileDocument>();
         foreach (var (share, sub) in plan.Targets)
         {
-            var hits = await SearchService.SearchAsync(_searchQuery, _user, share, sub, token);
+            // Always fetched with the recycle bin; the toggle only filters the display, so it
+            // switches the results live without another round trip.
+            var hits = await SearchService.SearchAsync(_searchQuery, _user, share, sub, token, includeRecycleBin: true);
             files.AddRange(hits.Select(ToWebHit).OfType<FileDocument>());
         }
 
@@ -404,18 +427,36 @@ public partial class GlobalSearch : IDisposable
             return;
         }
 
-        // Kept in display order (grouped by share) so the keyboard index matches the dropdown.
-        _fileResults = files
+        _allFileHits = files
             .GroupBy(f => f.Id)
             .Select(g => g.First())
+            .ToList();
+        ApplyRecycleBinFilter();
+        _destResults = dests.Take(plan.DestLimit).ToList();
+        _isSearching = false;
+    }
+
+    /// <summary>
+    /// Derives the shown file hits from the fetched ones: recycle-bin hits only while the toggle
+    /// is on (or the folder scope lies in a recycle bin), the best 8, in display order (grouped
+    /// by share) so the keyboard index matches the dropdown.
+    /// </summary>
+    private void ApplyRecycleBinFilter()
+    {
+        bool showBin = _includeRecycleBin || IsRecycleBinScope;
+        _fileResults = _allFileHits
+            .Where(f => showBin || !IsInRecycleBin(f))
             .Take(8)
             .GroupBy(f => f.ShareName)
             .SelectMany(g => g)
             .ToList();
-        _destResults = dests.Take(plan.DestLimit).ToList();
         _activeIndex = -1;
-        _isSearching = false;
     }
+
+    // Searching inside a recycle bin always shows its contents (same rule as the router).
+    private bool IsRecycleBinScope =>
+        _scope == ScopeFolder
+        && _contextSubPath.Split('/').Any(s => s.Equals(ShareEntryPolicy.RecycleBinName, StringComparison.OrdinalIgnoreCase));
 
     private (bool Dest, int DestLimit, List<(string? Share, string Sub)> Targets) ResolvePlan()
     {
@@ -581,6 +622,7 @@ public partial class GlobalSearch : IDisposable
 
     private void ResetResults()
     {
+        _allFileHits = new();
         _fileResults = new();
         _destResults = new();
         _activeIndex = -1;

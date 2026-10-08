@@ -1,5 +1,6 @@
 using Elastic.Clients.Elasticsearch;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Logging;
 using Microsoft.Extensions.Logging;
 
@@ -7,23 +8,25 @@ namespace Kaimo_File_Server.Search;
 
 /// <summary>
 /// The <see cref="ISearchService"/> every process actually resolves. It routes
-/// both searching and index-writing to one of two backends:
+/// both searching and index-writing to the engine selected in the settings:
 ///
-///  • <see cref="ElasticSearchService"/> when Elasticsearch is enabled (admin flag)
-///    AND reachable (the container exists and answers a ping).
+///  • <see cref="ElasticSearchService"/> when Elasticsearch is selected AND reachable
+///    (the container exists and answers a ping).
+///  • <see cref="LocalIndexSearchService"/> when local indexing is selected — the index lives
+///    in the application's PostgreSQL database, so there is no reachability check.
 ///  • <see cref="FilenameSearchService"/> otherwise — a plain filename search that
 ///    needs no index, so writes are simply not indexed.
 ///
 /// This makes the system degrade gracefully: bring up the stack without the
 /// Elasticsearch container and search transparently falls back to filename
-/// matching; flip the admin toggle and indexing stops/starts within a few seconds.
+/// matching; switch the engine and indexing stops/starts within a few seconds.
 ///
 /// It also implements <see cref="ISearchAdminService"/> for the settings page
-/// (toggle + manual reindex).
+/// (engine selection + manual reindex).
 /// </summary>
 public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
 {
-    // How long an effective-state probe (flag read + ES ping) is reused before we
+    // How long an effective-state probe (engine read + ES ping) is reused before we
     // re-check. Bounds DB/ping load to roughly one probe per interval per process,
     // while keeping cross-process toggles reasonably responsive.
     private static readonly TimeSpan StateTtl = TimeSpan.FromSeconds(5);
@@ -41,6 +44,7 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
     private const int PingAttempts = 2;
 
     private readonly ElasticSearchService _es;
+    private readonly LocalIndexSearchService _local;
     private readonly FilenameSearchService _filename;
     private readonly ElasticsearchClient _client;
     private readonly ISearchConfigStore _configStore;
@@ -62,15 +66,18 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
     private ReindexProgress _reindexProgress = ReindexProgress.Idle;
     private Task? _reindexTask;
     private CancellationTokenSource? _reindexCts;
+    private SearchEngine _reindexEngine;
 
     public SearchServiceRouter(
         ElasticSearchService es,
+        LocalIndexSearchService local,
         FilenameSearchService filename,
         ElasticsearchClient client,
         ISearchConfigStore configStore,
         ILogger<SearchServiceRouter> logger)
     {
         _es = es;
+        _local = local;
         _filename = filename;
         _client = client;
         _configStore = configStore;
@@ -92,38 +99,27 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
             if (!forceFresh && _cachedState is { } cached2 && DateTime.UtcNow < _stateExpiresUtc)
                 return cached2;
 
-            bool enabled;
+            SearchEngine engine;
             try
             {
-                enabled = await _configStore.GetElasticEnabledAsync(fallback: true);
+                engine = await _configStore.GetEngineAsync();
             }
             catch (Exception ex)
             {
-                // If the flag can't be read, stay backward compatible (enabled) and
+                // If the setting can't be read, stay backward compatible (Elasticsearch) and
                 // let the reachability check decide the effective state.
                 _logger.LogWarning(LogEvents.SearchFlagReadFailed, ex, LogMessages.SearchFlagReadFailed);
-                enabled = true;
+                engine = SearchEngine.Elasticsearch;
             }
 
-            bool reachable = await PingAsync(ct);
-
-            var state = new SearchEngineState(enabled, reachable, enabled && reachable);
-
-            // Make an ES outage visible in Settings > Logging. The unreachable case
-            // was previously only logged at Debug (invisible at the default Warning
-            // level), so search silently fell back to filename mode with no trace.
-            if (enabled && !reachable)
+            var state = engine switch
             {
-                if (!_esDownLogged)
-                {
-                    _logger.LogWarning(LogEvents.SearchElasticUnreachable, LogMessages.SearchElasticUnreachable);
-                    _esDownLogged = true;
-                }
-            }
-            else
-            {
-                _esDownLogged = false;
-            }
+                // The local index lives in the database every process already depends on.
+                SearchEngine.Local => new SearchEngineState(true, true, true, engine),
+                // Still probe ES while it is off, so the settings page shows whether the
+                // container would be available.
+                _ => await ResolveElasticStateAsync(engine, ct)
+            };
 
             _cachedState = state;
             _stateExpiresUtc = DateTime.UtcNow.Add(StateTtl);
@@ -133,6 +129,30 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
         {
             _stateLock.Release();
         }
+    }
+
+    private async Task<SearchEngineState> ResolveElasticStateAsync(SearchEngine engine, CancellationToken ct)
+    {
+        bool enabled = engine == SearchEngine.Elasticsearch;
+        bool reachable = await PingAsync(ct);
+
+        // Make an ES outage visible in Settings > Logging. The unreachable case
+        // was previously only logged at Debug (invisible at the default Warning
+        // level), so search silently fell back to filename mode with no trace.
+        if (enabled && !reachable)
+        {
+            if (!_esDownLogged)
+            {
+                _logger.LogWarning(LogEvents.SearchElasticUnreachable, LogMessages.SearchElasticUnreachable);
+                _esDownLogged = true;
+            }
+        }
+        else
+        {
+            _esDownLogged = false;
+        }
+
+        return new SearchEngineState(enabled, reachable, enabled && reachable, engine);
     }
 
     private async Task<bool> PingAsync(CancellationToken ct)
@@ -165,7 +185,8 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
 
     private void InvalidateState() => _stateExpiresUtc = DateTime.MinValue;
 
-    private async Task<bool> IsElasticActiveAsync(CancellationToken ct = default)
+    /// <summary>The engine actually in use: the selected index engine when effective, else Filename.</summary>
+    private async Task<SearchEngine> GetActiveEngineAsync(CancellationToken ct = default)
     {
         // A merely expired state is answered from cache and re-probed in the background:
         // a hanging Elasticsearch would otherwise cost the caller up to
@@ -175,10 +196,20 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
         {
             if (DateTime.UtcNow >= _stateExpiresUtc && Interlocked.Exchange(ref _refreshing, 1) == 0)
                 _ = RefreshStateAsync();
-            return known.Effective;
+            return ActiveEngine(known);
         }
 
-        return (await ResolveStateAsync(forceFresh: false, ct)).Effective;
+        return ActiveEngine(await ResolveStateAsync(forceFresh: false, ct));
+    }
+
+    private static SearchEngine ActiveEngine(SearchEngineState state)
+        => state.Effective ? state.Engine : SearchEngine.Filename;
+
+    /// <summary>The index backend currently receiving writes, or null in filename mode.</summary>
+    private async Task<ISearchService?> GetActiveIndexAsync(CancellationToken ct = default)
+    {
+        var engine = await GetActiveEngineAsync(ct);
+        return engine == SearchEngine.Filename ? null : await GetIndexAsync(engine, ct);
     }
 
     private async Task RefreshStateAsync()
@@ -225,10 +256,9 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
 
     public async Task onFileCreated(string absolutePath, Task<Stream> fileData, CancellationToken ct = default)
     {
-        if (await IsElasticActiveAsync(ct))
+        if (await GetActiveIndexAsync(ct) is { } index)
         {
-            await EnsureEsInitializedAsync(ct);
-            await _es.onFileCreated(absolutePath, fileData, ct);
+            await index.onFileCreated(absolutePath, fileData, ct);
             return;
         }
 
@@ -240,32 +270,32 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
 
     public async Task onFileDeleted(string absolutePath)
     {
-        if (await IsElasticActiveAsync())
-            await _es.onFileDeleted(absolutePath);
+        if (await GetActiveIndexAsync() is { } index)
+            await index.onFileDeleted(absolutePath);
     }
 
     public async Task onDirectoryCreated(string absolutePath)
     {
-        if (await IsElasticActiveAsync())
-            await _es.onDirectoryCreated(absolutePath);
+        if (await GetActiveIndexAsync() is { } index)
+            await index.onDirectoryCreated(absolutePath);
     }
 
     public async Task onDirectoryDeleted(string absolutePath)
     {
-        if (await IsElasticActiveAsync())
-            await _es.onDirectoryDeleted(absolutePath);
+        if (await GetActiveIndexAsync() is { } index)
+            await index.onDirectoryDeleted(absolutePath);
     }
 
     public async Task onFileRenamed(string oldAbsolutePath, string newAbsolutePath)
     {
-        if (await IsElasticActiveAsync())
-            await _es.onFileRenamed(oldAbsolutePath, newAbsolutePath);
+        if (await GetActiveIndexAsync() is { } index)
+            await index.onFileRenamed(oldAbsolutePath, newAbsolutePath);
     }
 
     public async Task onDirectoryRenamed(string oldAbsolutePath, string newAbsolutePath)
     {
-        if (await IsElasticActiveAsync())
-            await _es.onDirectoryRenamed(oldAbsolutePath, newAbsolutePath);
+        if (await GetActiveIndexAsync() is { } index)
+            await index.onDirectoryRenamed(oldAbsolutePath, newAbsolutePath);
     }
 
     private static async Task DrainAsync(Task<Stream> fileData)
@@ -288,14 +318,18 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
     public async Task<List<FileDocument>> SearchAsync(
         string searchText, UserContext user,
         string? shareName = null, string? pathPrefix = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default, bool includeRecycleBin = false)
     {
-        if (await IsElasticActiveAsync(ct))
+        // Searching inside a recycle bin always shows its contents, whatever the toggle says.
+        includeRecycleBin |= IsRecycleBinScope(pathPrefix);
+
+        var engine = await GetActiveEngineAsync(ct);
+        if (engine != SearchEngine.Filename)
         {
             try
             {
-                await EnsureEsInitializedAsync(ct);
-                return await _es.SearchAsync(searchText, user, shareName, pathPrefix, ct);
+                var index = await GetIndexAsync(engine, ct);
+                return await index.SearchAsync(searchText, user, shareName, pathPrefix, ct, includeRecycleBin);
             }
             catch (OperationCanceledException)
             {
@@ -304,22 +338,45 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
             catch (Exception) when (ct.IsCancellationRequested)
             {
                 // The transport may wrap a cancellation in its own exception type. That is
-                // the caller's timeout, not an Elasticsearch failure: no fallback, no warning.
+                // the caller's timeout, not an index failure: no fallback, no warning.
                 throw new OperationCanceledException(ct);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(LogEvents.SearchElasticFailed, ex, LogMessages.SearchElasticFailed);
+                if (engine == SearchEngine.Local)
+                    _logger.LogWarning(LogEvents.SearchLocalFailed, ex, LogMessages.SearchLocalFailed);
+                else
+                    _logger.LogWarning(LogEvents.SearchElasticFailed, ex, LogMessages.SearchElasticFailed);
                 InvalidateState();
             }
         }
 
-        return await _filename.SearchAsync(searchText, user, shareName, pathPrefix, ct);
+        return await _filename.SearchAsync(searchText, user, shareName, pathPrefix, ct, includeRecycleBin);
+    }
+
+    /// <summary>
+    /// Whether a scope folder lies in a recycle bin. Any ".RECYCLE_BIN" segment counts: only the
+    /// share's/home's own bin is indexed (dot folders elsewhere are excluded), so no depth is needed.
+    /// </summary>
+    internal static bool IsRecycleBinScope(string? pathPrefix)
+        => (pathPrefix ?? string.Empty).Replace('\\', '/').Split('/')
+            .Any(s => s.Equals(ShareEntryPolicy.RecycleBinName, StringComparison.OrdinalIgnoreCase));
+
+    private async Task<ISearchService> GetIndexAsync(SearchEngine engine, CancellationToken ct)
+    {
+        if (engine == SearchEngine.Local)
+            return _local;
+        await EnsureEsInitializedAsync(ct);
+        return _es;
     }
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         var state = await ResolveStateAsync(forceFresh: true, ct);
+
+        // The local index schema is created by migrations; only ES needs an index bootstrap.
+        if (state.Engine == SearchEngine.Local)
+            return;
 
         if (!state.Reachable)
         {
@@ -343,16 +400,33 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
     public Task<SearchEngineState> GetStateAsync(CancellationToken ct = default)
         => ResolveStateAsync(forceFresh: true, ct);
 
-    public async Task SetElasticEnabledAsync(bool enabled, CancellationToken ct = default)
+    public Task SetElasticEnabledAsync(bool enabled, CancellationToken ct = default)
+        => SetEngineAsync(enabled ? SearchEngine.Elasticsearch : SearchEngine.Filename, ct);
+
+    public async Task SetEngineAsync(SearchEngine engine, CancellationToken ct = default)
     {
-        await _configStore.SetElasticEnabledAsync(enabled);
+        await _configStore.SetEngineAsync(engine);
         InvalidateState();
+
+        // A reindex writes into the engine it was started for; once that engine is no longer
+        // selected, its writes would only fill an index nobody reads.
+        lock (_reindexGate)
+        {
+            if (_reindexProgress.Running && _reindexEngine != engine)
+                _reindexCts?.Cancel();
+        }
     }
+
+    public Task<SearchIndexStats> GetLocalIndexStatsAsync(CancellationToken ct = default)
+        => _local.GetStatsAsync(ct);
 
     public async Task<bool> TryStartReindexAsync(string? shareName = null, CancellationToken ct = default)
     {
-        // Reindexing only makes sense against a live, enabled Elasticsearch.
-        if (!(await ResolveStateAsync(forceFresh: true, ct)).Effective)
+        // Reindexing only makes sense against a live, selected index engine.
+        var state = await ResolveStateAsync(forceFresh: true, ct);
+        if (!state.Effective)
+            return false;
+        if (state.Engine == SearchEngine.Local && !_local.CanWrite)
             return false;
 
         lock (_reindexGate)
@@ -369,8 +443,10 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
 
             _reindexCts?.Dispose();
             _reindexCts = new CancellationTokenSource();
+            _reindexEngine = state.Engine;
             var token = _reindexCts.Token;
-            _reindexTask = Task.Run(() => RunReindexAsync(shareName, token));
+            var engine = state.Engine;
+            _reindexTask = Task.Run(() => RunReindexAsync(engine, shareName, token));
             return true;
         }
     }
@@ -390,13 +466,11 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
             return _reindexProgress;
     }
 
-    private async Task RunReindexAsync(string? shareName, CancellationToken ct)
+    private async Task RunReindexAsync(SearchEngine engine, string? shareName, CancellationToken ct)
     {
         var started = DateTime.UtcNow;
         try
         {
-            await EnsureEsInitializedAsync(ct);
-
             // SYNCHRONOUS on purpose: Progress<T> posts its callbacks to the thread
             // pool, so a late "100%" callback could land AFTER the completion block
             // below and flip Running back to true — leaving the bar stuck at 100%.
@@ -417,7 +491,28 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
                 }
             });
 
-            await _es.ReindexAllAsync(progress, ct, shareName);
+            if (engine == SearchEngine.Local)
+            {
+                bool fullPass = string.IsNullOrEmpty(shareName);
+                // An index built with an older LocalIndexVersion (other extraction or path
+                // rules) must re-read unchanged files too, not just touch them.
+                bool rebuild = fullPass && !await _configStore.GetLocalIndexBuiltAsync();
+                if (rebuild)
+                    await _local.ResetContentStampsAsync(ct);
+                await _local.ReindexAllAsync(progress, ct, shareName);
+                // Only a completed all-shares pass makes the index complete; the indexer
+                // restarts the build until this is set (canceled/failed passes never get here).
+                if (fullPass)
+                    await _configStore.SetLocalIndexBuiltAsync(true);
+                // A rebuild rewrote most rows; give the freed space back to the disk once.
+                if (rebuild)
+                    await _local.CompactAsync(ct);
+            }
+            else
+            {
+                await EnsureEsInitializedAsync(ct);
+                await _es.ReindexAllAsync(progress, ct, shareName);
+            }
 
             lock (_reindexGate)
             {

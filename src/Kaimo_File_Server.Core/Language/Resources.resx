@@ -771,6 +771,15 @@
   <data name="Web_Search_Clear" xml:space="preserve">
     <value>Clear search</value>
   </data>
+  <data name="Web_Search_RecycleBin" xml:space="preserve">
+    <value>Recycle bin</value>
+  </data>
+  <data name="Web_Search_RecycleBinIncluded" xml:space="preserve">
+    <value>Recycle bin contents are included — click to exclude them</value>
+  </data>
+  <data name="Web_Search_RecycleBinExcluded" xml:space="preserve">
+    <value>Include recycle bin contents</value>
+  </data>
   <data name="Web_Search_Section_Destinations" xml:space="preserve">
     <value>Settings &amp; tabs</value>
   </data>
@@ -4225,13 +4234,13 @@
     <value>Refresh</value>
   </data>
   <data name="Web_Settings_Search_Title" xml:space="preserve">
-    <value>Full-text search (Elasticsearch)</value>
+    <value>Full-text search</value>
   </data>
   <data name="Web_Settings_Search_Description" xml:space="preserve">
-    <value>If Elasticsearch is enabled and reachable, file contents are indexed and searchable. Otherwise – or if the container was not started – a simple search by file name is used automatically.</value>
+    <value>Choose how file contents are indexed: Elasticsearch (separate container, best for large data sets) or local indexing in the application database (no extra container). Only one of them can be active. If neither is enabled – or Elasticsearch is not reachable – a simple search by file name is used automatically.</value>
   </data>
   <data name="Web_Settings_Search_CheckingStatus" xml:space="preserve">
-    <value>Checking Elasticsearch status…</value>
+    <value>Checking search status…</value>
   </data>
   <data name="Web_Settings_Search_Toggle" xml:space="preserve">
     <value>Enable/disable Elasticsearch</value>
@@ -4258,7 +4267,7 @@
     <value>Manual indexing</value>
   </data>
   <data name="Web_Settings_Search_ReindexDescription" xml:space="preserve">
-    <value>Re-indexes all files – e.g. if files were added by other means or Elasticsearch was previously disabled. Already indexed, unchanged files are skipped.</value>
+    <value>Re-indexes all files – e.g. if files were added by other means or the index was previously disabled. Already indexed, unchanged files are skipped.</value>
   </data>
   <data name="Web_Settings_Search_Indexing" xml:space="preserve">
     <value>Indexing… {0} / {1} ({2} %)</value>
@@ -5597,5 +5606,50 @@
   </data>
   <data name="Web_Settings_Data_StatusRefreshFailed" xml:space="preserve">
     <value>The service status could not be read. The database may be temporarily unreachable; please try again shortly.</value>
+  </data>
+  <data name="Web_Settings_Search_LocalName" xml:space="preserve">
+    <value>Local indexing</value>
+  </data>
+  <data name="Web_Settings_Search_LocalToggle" xml:space="preserve">
+    <value>Enable/disable local indexing</value>
+  </data>
+  <data name="Web_Settings_Search_StatusInactive" xml:space="preserve">
+    <value>Inactive</value>
+  </data>
+  <data name="Web_Settings_Search_LocalDocuments" xml:space="preserve">
+    <value>Indexed entries</value>
+  </data>
+  <data name="Web_Settings_Search_LocalSize" xml:space="preserve">
+    <value>Index size</value>
+  </data>
+  <data name="Web_Settings_Search_ModeLocal" xml:space="preserve">
+    <value>Local indexing (full text)</value>
+  </data>
+  <data name="Web_Settings_Search_SavedElastic" xml:space="preserve">
+    <value>Elasticsearch enabled. It is used as soon as the container is reachable.</value>
+  </data>
+  <data name="Web_Settings_Search_SavedLocal" xml:space="preserve">
+    <value>Local indexing enabled. When it is enabled for the first time, all files are indexed in the background.</value>
+  </data>
+  <data name="Web_Settings_Search_SavedFilename" xml:space="preserve">
+    <value>Index search disabled. The file name search is used and nothing is indexed anymore.</value>
+  </data>
+  <data name="Web_Settings_Search_SaveFailed" xml:space="preserve">
+    <value>The search setting could not be saved.</value>
+  </data>
+  <data name="Web_Settings_Search_ReindexStarted" xml:space="preserve">
+    <value>Indexing started. Progress is shown below.</value>
+  </data>
+  <data name="Web_Settings_Search_ReindexStartedShare" xml:space="preserve">
+    <value>Indexing for share &apos;{0}&apos; started. Progress is shown below.</value>
+  </data>
+  <data name="Web_Settings_Search_ReindexAlreadyRunning" xml:space="preserve">
+    <value>An indexing run is already in progress.</value>
+  </data>
+  <data name="Web_Settings_Search_ReindexUnavailable" xml:space="preserve">
+    <value>Indexing not possible: no index search is active, Elasticsearch is not reachable, or the read-only demo mode is on.</value>
+  </data>
+  <data name="Web_Settings_Search_ReindexStartFailed" xml:space="preserve">
+    <value>Indexing could not be started.</value>
   </data>
 </root>

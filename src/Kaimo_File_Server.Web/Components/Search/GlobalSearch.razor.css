@@ -1,0 +1,51 @@
+/* Recycle-bin filter inside the search bar: a compact pressed/unpressed toggle. Off it reads
+   like the other secondary in-bar controls; on it uses the selection accent (DESIGN_SPEC §9.2:
+   filters must show their active state). Focus ring comes from the global :focus-visible rule. */
+.search-recycle-toggle {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--space-1);
+    height: 26px;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.search-recycle-toggle:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.search-recycle-toggle.is-active {
+    background: var(--accent-selected);
+    border-color: var(--accent);
+    color: var(--accent-strong);
+}
+
+/* Overrides the bar's generic 18 px icon rule for the smaller in-toggle icon. */
+.search-recycle-toggle ::deep svg {
+    width: 14px;
+    height: 14px;
+    opacity: 1;
+}
+
+/* Narrow bars keep only the icon; title/aria-label still name the filter. */
+@media (max-width: 640px) {
+    .search-recycle-toggle__label {
+        display: none;
+    }
+}
+
+/* "Recycle bin" marker next to a hit's name. */
+::deep .search-result-badge {
+    flex: 0 0 auto;
+    font-size: 0.7rem;
+}

@@ -94,7 +94,8 @@ public sealed class SearchApiController : ApiControllerBase
         List<FileDocument> hits;
         try
         {
-            hits = await _search.SearchAsync(query, user, shareName, pathPrefix, cts.Token);
+            hits = await _search.SearchAsync(
+                query, user, shareName, pathPrefix, cts.Token, request.IncludeRecycleBin == true);
         }
         catch (OperationCanceledException) when (!HttpContext.RequestAborted.IsCancellationRequested)
         {

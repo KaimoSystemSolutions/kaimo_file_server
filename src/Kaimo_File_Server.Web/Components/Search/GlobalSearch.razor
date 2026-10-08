@@ -16,6 +16,18 @@
                    @bind:event="oninput"
                    @bind:after="OnSearchInputChanged"
                    @onkeydown="HandleSearchKeyDown" />
+            @* Recycle-bin filter inside the bar. mousedown:preventDefault keeps the focus in the
+               input, so the focus-out auto-hide does not collapse the open results. *@
+            <button type="button"
+                    class="search-recycle-toggle @(_includeRecycleBin ? "is-active" : "")"
+                    aria-pressed="@(_includeRecycleBin ? "true" : "false")"
+                    title="@RecycleToggleTitle"
+                    aria-label="@RecycleToggleTitle"
+                    @onmousedown:preventDefault
+                    @onclick="ToggleRecycleBin">
+                @Assets.SVG("trash.svg", new SvgOptions())
+                <span class="search-recycle-toggle__label">@Text("Web_Search_RecycleBin", "Recycle bin")</span>
+            </button>
             @if (_searchQuery.Length > 0)
             {
                 <span class="search-scope-hint" title="@ScopeHint()">@ScopeHint()</span>
@@ -42,6 +54,11 @@
                                     @Assets.SVG(result.IsDirectory ? "folder.svg" : FileHelper.GetIcon(result.FileName), new SvgOptions())
                                     <div class="search-result-info">
                                         <span class="search-result-name">@result.FileName</span>
+                                        @if (IsInRecycleBin(result))
+                                        {
+                                            <StatusBadge Tone="StatusTone.Neutral" ShowDot="false" Class="search-result-badge"
+                                                         Label="@Text("Web_Search_RecycleBin", "Recycle bin")" />
+                                        }
                                         <span class="search-result-meta">
                                             @if (!string.IsNullOrEmpty(result.HighlightSnippet))
                                             {

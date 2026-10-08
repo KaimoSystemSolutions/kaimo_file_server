@@ -17,7 +17,8 @@ A single logical file is represented in up to five independently durable stores:
 | File system | `<pool>/<share>/…` | Live file content and the share's `.RECYCLE_BIN` | Authoritative for content |
 | PostgreSQL | `kaimo_file_server` database | Metadata, ownership, ACLs, version rows, shares, configuration | Authoritative for permissions and history |
 | Version blobs | `<pool>/.kaimo-versions/` | Compressed, content-addressed historical content | Referenced by `file_versions` rows |
-| Elasticsearch | index `kaimo-files-v2` | Searchable file names and content | Derived, rebuildable |
+| Elasticsearch | index `kaimo-files-v2` | Searchable file names and content (engine "Elasticsearch") | Derived, rebuildable |
+| PostgreSQL | table `search_documents` | Searchable file names and content (engine "local indexing") | Derived, rebuildable |
 | Snapshot cache | `/data/kaimo-system/.kaimo-snapshots/` | Materialized @GMT "Previous Versions" views for SMB | Derived, rebuildable |
 
 No transaction spans these stores. `FileService` (`src/Kaimo_File_Server.Core/Services/File/FileService.cs`)
@@ -141,7 +142,7 @@ Consumers:
 
 | Consumer | Process | Use |
 |---|---|---|
-| `SearchIndexingService` | Web | Tails the log from a persisted cursor and writes Elasticsearch |
+| `SearchIndexingService` | Web | Tails the log from a persisted per-engine cursor and writes the selected search index |
 | `SyncApiController` | Web | `GET /api/v1/sync/{shareId}/changes?since=N` and the long-poll wait endpoint |
 | `ClientSyncRetentionService` | Web | Prunes rows older than the retention window |
 

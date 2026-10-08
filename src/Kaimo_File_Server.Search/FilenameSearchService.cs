@@ -43,7 +43,7 @@ public sealed class FilenameSearchService
     public async Task<List<FileDocument>> SearchAsync(
         string searchText, UserContext user,
         string? shareName = null, string? pathPrefix = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default, bool includeRecycleBin = false)
     {
         if (user is null || string.IsNullOrWhiteSpace(searchText))
             return new List<FileDocument>();
@@ -51,7 +51,7 @@ public sealed class FilenameSearchService
         await WalkSlots.WaitAsync(ct);
         try
         {
-            return await CollectVisibleMatchesAsync(searchText, user, shareName, pathPrefix, ct);
+            return await CollectVisibleMatchesAsync(searchText, user, shareName, pathPrefix, includeRecycleBin, ct);
         }
         finally
         {
@@ -62,7 +62,8 @@ public sealed class FilenameSearchService
     /// <summary>
     /// Enumerates files under each persisted share path and keeps those whose name contains
     /// the query and that the user may read. Hidden/system folders (".versions", ".dp-keys",
-    /// recycle bin, …) are skipped — they are never part of the Elasticsearch index either.
+    /// …) are skipped — they are never part of the indexes either; the recycle bin only
+    /// when <paramref name="includeRecycleBin"/> is off.
     ///
     /// When <paramref name="shareName"/> is set the walk is restricted to that share,
     /// and when <paramref name="pathPrefix"/> is also set (a share-relative folder) the
@@ -70,7 +71,7 @@ public sealed class FilenameSearchService
     /// </summary>
     private async Task<List<FileDocument>> CollectVisibleMatchesAsync(
         string searchText, UserContext user, string? shareName, string? pathPrefix,
-        CancellationToken ct)
+        bool includeRecycleBin, CancellationToken ct)
     {
         var results = new List<FileDocument>();
         var batch = new List<FileDocument>(RawFetchSize);
@@ -144,7 +145,7 @@ public sealed class FilenameSearchService
                         continue;
 
                     var relativePath = Path.GetRelativePath(share.Path, absolutePath);
-                    if (IsHiddenPath(relativePath))
+                    if (IsSkipped(relativePath, share, includeRecycleBin))
                         continue;
 
                     long size = 0;
@@ -167,7 +168,7 @@ public sealed class FilenameSearchService
                         continue;
 
                     var relativePath = Path.GetRelativePath(share.Path, absolutePath);
-                    if (IsHiddenPath(relativePath))
+                    if (IsSkipped(relativePath, share, includeRecycleBin))
                         continue;
 
                     if (await AddAsync(CreateDocument(
@@ -214,16 +215,13 @@ public sealed class FilenameSearchService
             HighlightSnippet = Highlight(name, searchText)
         };
 
-    /// <summary>True if any path segment is a hidden/system folder (starts with '.').</summary>
-    private static bool IsHiddenPath(string relativePath)
-    {
-        foreach (var segment in relativePath.Split(Path.DirectorySeparatorChar))
-        {
-            if (segment.StartsWith('.'))
-                return true;
-        }
-        return false;
-    }
+    /// <summary>
+    /// Same rule as the indexes: hidden/system folders (dot segments) are skipped, the share's or
+    /// home's recycle bin only when <paramref name="includeRecycleBin"/> is off.
+    /// </summary>
+    private static bool IsSkipped(string relativePath, ShareDefinition share, bool includeRecycleBin)
+        => ShareEntryPolicy.IsExcludedFromSearch(relativePath, share.RecycleRootDepth)
+           || (!includeRecycleBin && ShareEntryPolicy.IsRecycleBinPath(relativePath, share.RecycleRootDepth));
 
     /// <summary>Wraps the first case-insensitive match of the query in &lt;mark&gt; tags.</summary>
     private static string Highlight(string fileName, string searchText)

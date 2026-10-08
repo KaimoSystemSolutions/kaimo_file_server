@@ -56,7 +56,7 @@ Every way a client reaches the server from outside. All of them converge on the 
 
 | Document | Content |
 |---|---|
-| [Search and indexing](subsystems/search-indexing.md) | Elasticsearch, change-log indexer, filename fallback, ACL filter |
+| [Search and indexing](subsystems/search-indexing.md) | Elasticsearch or local PostgreSQL index, change-log indexer, filename fallback, ACL filter |
 | [Mail notifications](subsystems/mail-notifications.md) | Outbox, dispatcher, rules, templates |
 | [User home folders](subsystems/user-home-folders.md) | The `users` system share and its ACL layout |
 

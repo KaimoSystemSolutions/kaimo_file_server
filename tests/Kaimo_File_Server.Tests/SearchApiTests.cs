@@ -228,7 +228,7 @@ public sealed class SearchApiTests : IDisposable
 
         var search = new Mock<ISearchService>();
         search.Setup(s => s.SearchAsync(It.IsAny<string>(), user, It.IsAny<string?>(),
-                It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(hits.ToList());
 
         var controller = new SearchApiController(users.Object, shares.Object, search.Object)

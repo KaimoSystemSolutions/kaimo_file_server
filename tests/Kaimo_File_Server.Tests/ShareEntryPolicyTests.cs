@@ -97,6 +97,22 @@ public sealed class ShareEntryPolicyTests
         Assert.True(ShareRelativePath.TryNormalizeStrict("uid/docs/.kaimo-x", out _, rootDepth: 1));
     }
 
+    [Theory]
+    [InlineData("docs/a.txt", 0, false)]
+    [InlineData(".RECYCLE_BIN/a.txt", 0, false)]
+    [InlineData(".RECYCLE_BIN", 0, false)]
+    [InlineData("uid/.RECYCLE_BIN/sub/a.txt", 1, false)]
+    [InlineData(".RECYCLE_BIN/.env", 0, true)]
+    [InlineData("docs/.RECYCLE_BIN/a.txt", 0, true)]
+    [InlineData("uid/.RECYCLE_BIN/a.txt", 0, true)]
+    [InlineData("docs/.git/config", 0, true)]
+    [InlineData(".kaimo-close-captures/x", 0, true)]
+    [InlineData("uid/.versions/a", 1, true)]
+    public void IsExcludedFromSearch_HidesDotSegmentsExceptTheOwnRecycleBin(string path, int depth, bool excluded)
+    {
+        Assert.Equal(excluded, ShareEntryPolicy.IsExcludedFromSearch(path, depth));
+    }
+
     [Fact]
     public void GetRecyclePath_ForTheRecycleRootItself_Throws()
     {

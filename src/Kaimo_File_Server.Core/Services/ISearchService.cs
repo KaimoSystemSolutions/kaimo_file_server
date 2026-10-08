@@ -32,11 +32,14 @@ public interface ISearchService
     /// share are considered; when <paramref name="pathPrefix"/> is also set (a
     /// share-relative folder path), only that folder and everything below it. Both
     /// null (the default) keeps the original global-across-all-shares behavior.
+    ///
+    /// Recycle-bin contents are indexed but only returned when
+    /// <paramref name="includeRecycleBin"/> is set (or the scope itself lies inside a recycle bin).
     /// </summary>
     Task<List<FileDocument>> SearchAsync(
         string searchText, UserContext user,
         string? shareName = null, string? pathPrefix = null,
-        CancellationToken ct = default);
+        CancellationToken ct = default, bool includeRecycleBin = false);
 
     Task InitializeAsync(CancellationToken ct = default);
 }

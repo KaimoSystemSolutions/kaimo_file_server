@@ -30,6 +30,10 @@
       <ProjectReference Include="..\Kaimo_File_Server.Core\Kaimo_File_Server.Core.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <InternalsVisibleTo Include="Kaimo_File_Server.Tests" />
+    </ItemGroup>
+
 	<ItemGroup>
 		<Content Update="appsettings.json" CopyToPublishDirectory="Never" CopyToOutputDirectory="Never" />
 		<Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" CopyToOutputDirectory="Never" />

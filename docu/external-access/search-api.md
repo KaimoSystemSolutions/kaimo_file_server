@@ -12,8 +12,9 @@ Related: [Search indexing](../subsystems/search-indexing.md) ·
 
 ## Request and response
 
-`POST /api/v1/search` searches file names and content (Elasticsearch, falling back to
-a file-name-only search when the index is disabled or unreachable). Every hit has
+`POST /api/v1/search` searches file names and content (Elasticsearch or the local
+PostgreSQL index, falling back to a file-name-only search when no index is active or
+Elasticsearch is unreachable). Every hit has
 passed the same ACL filter as the web UI (`ListReadData`, fail-closed), so a caller
 only ever sees items they may read.
 
@@ -24,7 +25,9 @@ URL or reverse-proxy access logs:
   "shareId": "…",        // optional: restrict to one share
   "path": "projects/a",  // optional, requires shareId: that folder and below
                          // (share-relative, no leading "/"; "" = share root)
-  "limit": 25 }          // optional, 1–50 (default 25)
+  "limit": 25,           // optional, 1–50 (default 25)
+  "includeRecycleBin": false } // optional: also return recycle-bin contents (default false;
+                         // always on when "path" lies in a recycle bin)
 ```
 Response (`Cache-Control: no-store`):
 ```jsonc

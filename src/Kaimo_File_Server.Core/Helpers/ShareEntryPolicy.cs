@@ -130,6 +130,26 @@ public static class ShareEntryPolicy
         Classify(shareRelativePath, rootDepth).Kind == ShareEntryKind.RecycleBin;
 
     /// <summary>
+    /// Whether search leaves a path out entirely (index, live indexing and the filename walk):
+    /// any segment starting with a dot (".versions", ".git", ".kaimo-…") — except the share's or
+    /// home's own recycle bin, whose contents are searchable on request.
+    /// </summary>
+    public static bool IsExcludedFromSearch(string? shareRelativePath, int rootDepth = 0)
+    {
+        var segments = ShareRelativePath.Normalize(shareRelativePath).Split('/', StringSplitOptions.RemoveEmptyEntries);
+        // Position of the recycle-bin segment, mirroring Classify: share root first, then
+        // the first segment below rootDepth.
+        int bin = !IsRecycleBinPath(shareRelativePath, rootDepth) ? -1
+            : segments[0].Equals(RecycleBinName, StringComparison.OrdinalIgnoreCase) ? 0
+            : rootDepth;
+
+        for (int i = 0; i < segments.Length; i++)
+            if (i != bin && segments[i].StartsWith('.'))
+                return true;
+        return false;
+    }
+
+    /// <summary>
     /// Returns whether a user-driven create, upload, replace, move, or rename
     /// would claim a namespace owned by Kaimo. Reading, restoring from, and
     /// deleting existing recycle-bin entries are separate operations.

@@ -7,12 +7,13 @@ namespace Kaimo_File_Server.Search;
 public static class SearchServiceExtensions
 {
     /// <summary>
-    /// Registers the search stack: the Elasticsearch client, both search backends
-    /// (Elasticsearch + filename fallback) and the router that picks between them.
-    /// The router is exposed as <see cref="ISearchService"/> (indexing + search)
-    /// and <see cref="ISearchAdminService"/> (settings page toggle + reindex).
+    /// Registers the search stack: the Elasticsearch client, the three search backends
+    /// (Elasticsearch, local PostgreSQL index, filename fallback) and the router that picks
+    /// between them. The router is exposed as <see cref="ISearchService"/> (indexing + search)
+    /// and <see cref="ISearchAdminService"/> (settings page engine selection + reindex).
     ///
-    /// Requires <c>ISearchConfigStore</c> from AddInfrastructure — call AddInfrastructure first.
+    /// Requires <c>ISearchConfigStore</c>, <c>ISearchIndexRepository</c> and <c>DemoModeOptions</c>
+    /// from AddInfrastructure — call AddInfrastructure first.
     /// Must be registered BEFORE AddCoreServices so the router wins over the NoOp
     /// fallback (AddCoreServices uses TryAddSingleton).
     /// </summary>
@@ -30,6 +31,7 @@ public static class SearchServiceExtensions
         services.AddSingleton(client);
         services.AddSingleton<SearchAclFilter>();
         services.AddSingleton<ElasticSearchService>();
+        services.AddSingleton<LocalIndexSearchService>();
         services.AddSingleton<FilenameSearchService>();
         services.AddSingleton<SearchServiceRouter>();
 

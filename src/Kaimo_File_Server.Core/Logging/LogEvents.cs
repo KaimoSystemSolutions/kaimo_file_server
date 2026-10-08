@@ -62,6 +62,7 @@ public static class LogEvents
     public static readonly EventId SearchElasticUnreachable = new(3203, nameof(SearchElasticUnreachable));
     public static readonly EventId SearchElasticDisabled = new(3204, nameof(SearchElasticDisabled));
     public static readonly EventId SearchReindexFailed = new(3205, nameof(SearchReindexFailed));
+    public static readonly EventId SearchLocalFailed = new(3206, nameof(SearchLocalFailed));
 
     #endregion
 

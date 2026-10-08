@@ -771,6 +771,15 @@
   <data name="Web_Search_Clear" xml:space="preserve">
     <value>Suche löschen</value>
   </data>
+  <data name="Web_Search_RecycleBin" xml:space="preserve">
+    <value>Papierkorb</value>
+  </data>
+  <data name="Web_Search_RecycleBinIncluded" xml:space="preserve">
+    <value>Papierkorb-Inhalte werden mitgesucht – klicken zum Ausschließen</value>
+  </data>
+  <data name="Web_Search_RecycleBinExcluded" xml:space="preserve">
+    <value>Papierkorb-Inhalte mitsuchen</value>
+  </data>
   <data name="Web_Search_Section_Destinations" xml:space="preserve">
     <value>Einstellungen &amp; Tabs</value>
   </data>
@@ -4159,13 +4168,13 @@
     <value>Aktualisieren</value>
   </data>
   <data name="Web_Settings_Search_Title" xml:space="preserve">
-    <value>Volltext-Suche (Elasticsearch)</value>
+    <value>Volltext-Suche</value>
   </data>
   <data name="Web_Settings_Search_Description" xml:space="preserve">
-    <value>Ist Elasticsearch aktiviert und erreichbar, werden Dateiinhalte indexiert und durchsuchbar. Andernfalls – oder wenn der Container nicht gestartet wurde – wird automatisch eine einfache Suche nach Dateinamen verwendet.</value>
+    <value>Wähle, wie Dateiinhalte indexiert werden: Elasticsearch (eigener Container, am besten für große Datenmengen) oder die lokale Indexierung in der Anwendungsdatenbank (kein zusätzlicher Container). Es kann nur eine davon aktiv sein. Ist keine aktiviert – oder Elasticsearch nicht erreichbar –, wird automatisch eine einfache Suche nach Dateinamen verwendet.</value>
   </data>
   <data name="Web_Settings_Search_CheckingStatus" xml:space="preserve">
-    <value>Prüfe Elasticsearch-Status…</value>
+    <value>Prüfe Such-Status…</value>
   </data>
   <data name="Web_Settings_Search_Toggle" xml:space="preserve">
     <value>Elasticsearch aktivieren/deaktivieren</value>
@@ -4192,7 +4201,7 @@
     <value>Manuelle Indexierung</value>
   </data>
   <data name="Web_Settings_Search_ReindexDescription" xml:space="preserve">
-    <value>Indexiert alle Dateien neu – z. B. wenn Dateien auf anderem Wege hinzugekommen sind oder Elasticsearch zuvor deaktiviert war. Bereits indexierte, unveränderte Dateien werden übersprungen.</value>
+    <value>Indexiert alle Dateien neu – z. B. wenn Dateien auf anderem Wege hinzugekommen sind oder der Index zuvor deaktiviert war. Bereits indexierte, unveränderte Dateien werden übersprungen.</value>
   </data>
   <data name="Web_Settings_Search_Indexing" xml:space="preserve">
     <value>Indexiere… {0} / {1} ({2} %)</value>
@@ -5531,5 +5540,50 @@
   </data>
   <data name="Web_Settings_Data_StatusRefreshFailed" xml:space="preserve">
     <value>Der Dienststatus konnte nicht gelesen werden. Die Datenbank ist möglicherweise kurzzeitig nicht erreichbar; bitte gleich erneut versuchen.</value>
+  </data>
+  <data name="Web_Settings_Search_LocalName" xml:space="preserve">
+    <value>Lokale Indexierung</value>
+  </data>
+  <data name="Web_Settings_Search_LocalToggle" xml:space="preserve">
+    <value>Lokale Indexierung aktivieren/deaktivieren</value>
+  </data>
+  <data name="Web_Settings_Search_StatusInactive" xml:space="preserve">
+    <value>Inaktiv</value>
+  </data>
+  <data name="Web_Settings_Search_LocalDocuments" xml:space="preserve">
+    <value>Indexierte Einträge</value>
+  </data>
+  <data name="Web_Settings_Search_LocalSize" xml:space="preserve">
+    <value>Indexgröße</value>
+  </data>
+  <data name="Web_Settings_Search_ModeLocal" xml:space="preserve">
+    <value>Lokale Indexierung (Volltext)</value>
+  </data>
+  <data name="Web_Settings_Search_SavedElastic" xml:space="preserve">
+    <value>Elasticsearch aktiviert. Wird verwendet, sobald der Container erreichbar ist.</value>
+  </data>
+  <data name="Web_Settings_Search_SavedLocal" xml:space="preserve">
+    <value>Lokale Indexierung aktiviert. Beim ersten Einschalten werden alle Dateien im Hintergrund indexiert.</value>
+  </data>
+  <data name="Web_Settings_Search_SavedFilename" xml:space="preserve">
+    <value>Index-Suche deaktiviert. Es wird die Dateinamen-Suche verwendet und nicht mehr indexiert.</value>
+  </data>
+  <data name="Web_Settings_Search_SaveFailed" xml:space="preserve">
+    <value>Such-Einstellung konnte nicht gespeichert werden.</value>
+  </data>
+  <data name="Web_Settings_Search_ReindexStarted" xml:space="preserve">
+    <value>Indexierung gestartet. Der Fortschritt wird unten angezeigt.</value>
+  </data>
+  <data name="Web_Settings_Search_ReindexStartedShare" xml:space="preserve">
+    <value>Indexierung für Share &apos;{0}&apos; gestartet. Der Fortschritt wird unten angezeigt.</value>
+  </data>
+  <data name="Web_Settings_Search_ReindexAlreadyRunning" xml:space="preserve">
+    <value>Es läuft bereits eine Indexierung.</value>
+  </data>
+  <data name="Web_Settings_Search_ReindexUnavailable" xml:space="preserve">
+    <value>Indexierung nicht möglich: Keine Index-Suche aktiv, Elasticsearch nicht erreichbar oder schreibgeschützter Demo-Modus.</value>
+  </data>
+  <data name="Web_Settings_Search_ReindexStartFailed" xml:space="preserve">
+    <value>Indexierung konnte nicht gestartet werden.</value>
   </data>
 </root>

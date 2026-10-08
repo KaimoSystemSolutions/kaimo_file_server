@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.ClientSync;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Storage;
@@ -11,8 +12,8 @@ using Microsoft.Extensions.Logging;
 namespace Kaimo_File_Server.Infrastructure.Services;
 
 /// <summary>
-/// Owns ALL Elasticsearch index writes by tailing the durable <c>file_change_log</c> from a
-/// persisted cursor. The file-operation path no longer touches Elasticsearch (see
+/// Owns ALL search index writes (Elasticsearch or the local PostgreSQL index, whichever engine is
+/// selected) by tailing the durable <c>file_change_log</c> from a persisted per-engine cursor. The file-operation path no longer touches Elasticsearch (see
 /// <see cref="FileServiceFactory"/>), so no upload, delete, rename or SMB close ever waits on
 /// ES reachability or indexing — the change log is the buffer between them.
 ///
@@ -40,34 +41,51 @@ public sealed class SearchIndexingService(
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan EsInactiveInterval = TimeSpan.FromSeconds(10);
 
+    // True once this process knows the local index is built or has started its build. Reset on
+    // every engine change, so returning to Local re-checks whether a canceled build must restart.
+    private bool _localBuildChecked;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        long cursor;
-        try { cursor = await configStore.GetIndexCursorAsync(); }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Search indexer could not read its cursor; starting from 0.");
-            cursor = 0;
-        }
+        // Each index engine keeps its own cursor, so switching engines never makes one index
+        // skip the changes it missed while the other was active.
+        SearchEngine? cursorEngine = null;
+        long cursor = 0;
 
         while (!stoppingToken.IsCancellationRequested)
         {
             var delay = PollInterval;
             try
             {
-                // Only index against a live, enabled Elasticsearch. Otherwise wait WITHOUT
-                // advancing the cursor so the log keeps buffering until ES returns.
-                if (!(await searchAdmin.GetStateAsync(stoppingToken)).Effective)
+                // Only index against a live, selected index engine. Otherwise wait WITHOUT
+                // advancing the cursor so the log keeps buffering until it returns.
+                var state = await searchAdmin.GetStateAsync(stoppingToken);
+                if (!state.Effective)
                 {
                     await Sleep(EsInactiveInterval, stoppingToken);
                     continue;
+                }
+
+                if (cursorEngine != state.Engine)
+                {
+                    cursor = await LoadCursorAsync(state.Engine);
+                    cursorEngine = state.Engine;
+                    _localBuildChecked = false;
                 }
 
                 using var scope = scopeFactory.CreateScope();
                 var sp = scope.ServiceProvider;
                 var log = sp.GetRequiredService<IFileChangeLogRepository>();
 
-                cursor = await ResolveCursorAsync(log, cursor, stoppingToken);
+                if (await ResolveCursorAsync(log, state.Engine, cursor, stoppingToken) is not { } resolved)
+                {
+                    // A required full build (first local build or change-log gap) could not start
+                    // yet (e.g. a reindex of the previous engine is still winding down). Keep the
+                    // cursor where it is and try again shortly.
+                    await Sleep(EsInactiveInterval, stoppingToken);
+                    continue;
+                }
+                cursor = resolved;
 
                 var batch = await log.GetChangesSinceGlobalAsync(cursor, BatchSize, stoppingToken);
                 if (batch.Count == 0)
@@ -97,7 +115,10 @@ public sealed class SearchIndexingService(
                     cursor = entry.Seq;
                 }
 
-                await configStore.SetIndexCursorAsync(cursor);
+                // ponytail: an engine switch during this batch lets the router send its tail to the
+                // new engine while the old engine's cursor still advances; at most one batch is
+                // missed there, healed by the gap check or a manual reindex.
+                await configStore.SetIndexCursorAsync(state.Engine, cursor);
 
                 // A full batch likely means more is waiting — loop immediately.
                 if (batch.Count == BatchSize)
@@ -117,22 +138,50 @@ public sealed class SearchIndexingService(
         }
     }
 
+    private async Task<long> LoadCursorAsync(SearchEngine engine)
+    {
+        try { return await configStore.GetIndexCursorAsync(engine); }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Search indexer could not read its {Engine} cursor; starting from 0.", engine);
+            return 0;
+        }
+    }
+
     /// <summary>
-    /// Fast-forwards the cursor on first start (existing content is already indexed) and repairs a
-    /// gap: if the log prefix the cursor pointed after was pruned, the missed entries are gone, so
-    /// a full reindex is triggered and the cursor jumps to the head.
+    /// Starts the full build of the local index until one has completed, fast-forwards the cursor
+    /// on first start and repairs a gap: if the log prefix the cursor pointed after was pruned,
+    /// the missed entries are gone, so a full reindex is triggered and the cursor jumps to the
+    /// head. Returns null when a required full build could not be started yet; the cursor then
+    /// stays put.
     /// </summary>
-    private async Task<long> ResolveCursorAsync(
-        IFileChangeLogRepository log, long cursor, CancellationToken ct)
+    private async Task<long?> ResolveCursorAsync(
+        IFileChangeLogRepository log, SearchEngine engine, long cursor, CancellationToken ct)
     {
         long head = await log.GetHeadSeqGlobalAsync(ct);
+        bool buildStarted = false;
+
+        if (engine == SearchEngine.Local && !_localBuildChecked)
+        {
+            // An empty or partially built local index (first enable, or a build interrupted by a
+            // restart or an engine switch) is built from disk; the log is followed meanwhile.
+            // Checked once per engine activation, so a running build is not restarted per poll.
+            if (!await configStore.GetLocalIndexBuiltAsync())
+            {
+                if (!await searchAdmin.TryStartReindexAsync(shareName: null, ct))
+                    return null;
+                buildStarted = true;
+            }
+            _localBuildChecked = true;
+        }
 
         if (cursor == 0)
         {
-            // Bootstrap: start from now. Pre-existing files were indexed by the old write path
-            // (or are covered by a manual reindex); replaying the whole log would be wasteful.
+            // Bootstrap: start from now. For Elasticsearch, pre-existing files were indexed by the
+            // old write path (or are covered by a manual reindex); the local index is covered by
+            // its full build above. Replaying the whole log would be wasteful.
             if (head > 0)
-                await configStore.SetIndexCursorAsync(head);
+                await configStore.SetIndexCursorAsync(engine, head);
             return head;
         }
 
@@ -143,9 +192,12 @@ public sealed class SearchIndexingService(
             logger.LogWarning(
                 "Search indexer detected a change-log gap (cursor {Cursor} < oldest {Oldest}); " +
                 "triggering a full reindex.", cursor, oldest);
-            await searchAdmin.TryStartReindexAsync(shareName: null, ct);
+            // Jumping to the head without a running rebuild would lose the gap for good; a local
+            // build started just above already covers it.
+            if (!buildStarted && !await searchAdmin.TryStartReindexAsync(shareName: null, ct))
+                return null;
             if (head > 0)
-                await configStore.SetIndexCursorAsync(head);
+                await configStore.SetIndexCursorAsync(engine, head);
             return head;
         }
 
@@ -162,7 +214,7 @@ public sealed class SearchIndexingService(
         {
             // Same storage construction as FileServiceFactory.
             var storage = new FileSystemStorage(share.Path, share.Id, rootProvider);
-            map[share.Id] = new ShareTarget(storage, share.Name);
+            map[share.Id] = new ShareTarget(storage, share.Name, share.RecycleRootDepth);
         }
         return map;
     }
@@ -182,10 +234,15 @@ public sealed class SearchIndexingService(
 
         var storage = target.Storage;
 
+        // Hidden paths (".git", ".versions", …) are never indexed, exactly like the full reindex
+        // skips them (ShareEntryPolicy.IsExcludedFromSearch; the recycle bin is indexed). Deletes
+        // are still applied, so nothing indexed earlier can linger there.
         switch (entry.ChangeType)
         {
             case FileChangeType.Created:
             case FileChangeType.Modified:
+                if (IsHiddenPath(entry.Path, target.RecycleRootDepth))
+                    break;
                 if (entry.IsDirectory)
                     await search.onDirectoryCreated(storage.ToAbsolutePath(entry.Path));
                 else
@@ -204,6 +261,34 @@ public sealed class SearchIndexingService(
             case FileChangeType.Renamed:
                 var newAbs = storage.ToAbsolutePath(entry.Path);
                 var oldAbs = storage.ToAbsolutePath(entry.OldPath ?? entry.Path);
+                bool newHidden = IsHiddenPath(entry.Path, target.RecycleRootDepth);
+                bool oldHidden = IsHiddenPath(entry.OldPath ?? entry.Path, target.RecycleRootDepth);
+
+                if (newHidden)
+                {
+                    // Moved into a hidden folder: the entry leaves the index instead of
+                    // following the file there. (Deletes to the recycle bin are plain renames.)
+                    if (oldHidden)
+                        break;
+                    if (entry.IsDirectory)
+                        await search.onDirectoryDeleted(oldAbs);
+                    else
+                        await search.onFileDeleted(oldAbs);
+                    break;
+                }
+
+                if (oldHidden)
+                {
+                    // Moved out of a hidden folder: the index has nothing to move, so index the
+                    // target fresh. A folder brings an unbounded subtree — reindex its share,
+                    // like SubtreeChanged.
+                    if (entry.IsDirectory)
+                        await searchAdmin.TryStartReindexAsync(target.ShareName);
+                    else
+                        await search.onFileCreated(newAbs, OpenForIndexing(storage, entry));
+                    break;
+                }
+
                 if (entry.IsDirectory)
                     await search.onDirectoryRenamed(oldAbs, newAbs);
                 else
@@ -243,12 +328,16 @@ public sealed class SearchIndexingService(
         }
     }
 
+    /// <summary>The reindex rule: dot segments are hidden, the share's/home's recycle bin is not.</summary>
+    private static bool IsHiddenPath(string sharePath, int recycleRootDepth)
+        => ShareEntryPolicy.IsExcludedFromSearch(sharePath, recycleRootDepth);
+
     private static async Task Sleep(TimeSpan delay, CancellationToken ct)
     {
         try { await Task.Delay(delay, ct); }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
     }
 
-    /// <summary>A share resolved to its storage engine and advertised name.</summary>
-    internal readonly record struct ShareTarget(IStorageEngine Storage, string ShareName);
+    /// <summary>A share resolved to its storage engine, advertised name and recycle-bin depth.</summary>
+    internal readonly record struct ShareTarget(IStorageEngine Storage, string ShareName, int RecycleRootDepth = 0);
 }

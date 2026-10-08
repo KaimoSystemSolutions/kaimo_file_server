@@ -116,6 +116,8 @@ namespace Kaimo_File_Server.Infrastructure
 
             // -- Search engine config flag (cross-process, read by the search router) --
             services.AddSingleton<ISearchConfigStore, Configuration.SearchConfigStore>();
+            // -- Local (PostgreSQL) search index; stateless over the context factory --
+            services.AddSingleton<ISearchIndexRepository, SearchIndexRepository>();
 
             // -- SMB protocol settings (cross-process, read by the SMB host on start) --
             services.AddSingleton<ISmbConfigStore, Configuration.SmbConfigStore>();

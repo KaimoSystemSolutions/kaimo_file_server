@@ -25,7 +25,7 @@ mapping.
 
 | Service | Purpose |
 |---|---|
-| `SearchIndexingService` | **Single owner** of all Elasticsearch writes. Tails `file_change_log` in batches of 200 from a cursor persisted in `config_settings`; does not advance the cursor while Elasticsearch is disabled or unreachable |
+| `SearchIndexingService` | **Single owner** of all search index writes (Elasticsearch or the local PostgreSQL index, whichever is selected). Tails `file_change_log` in batches of 200 from a per-engine cursor persisted in `config_settings`; does not advance the cursor while no index engine is active or Elasticsearch is unreachable |
 | `NotificationDispatcherService` | **Single owner** of mail delivery. Leases `notification_events`, applies mail rules, renders and sends via SMTP, retries with backoff, prunes old rows |
 | `ClientSyncRetentionService` | Every 6 h, prunes `file_change_log`, `client_request_receipts` and expired refresh tokens |
 | `CloudSyncSchedulerService` | Evaluates enabled sync schedules and enqueues due syncs; woken immediately when a sync definition changes |

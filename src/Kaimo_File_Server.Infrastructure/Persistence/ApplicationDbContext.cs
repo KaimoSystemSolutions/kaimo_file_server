@@ -47,6 +47,9 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<ClientRequestReceipt> ClientRequestReceipts { get; set; }
         public DbSet<FileChangeLogEntry> FileChangeLog { get; set; }
 
+        // -- Local search index (alternative to Elasticsearch) --
+        public DbSet<SearchDocumentRecord> SearchDocuments { get; set; }
+
         // -- Departments & Scoped Roles --
         public DbSet<Department> Departments { get; set; }
         public DbSet<DepartmentUser> DepartmentUsers { get; set; }
@@ -564,6 +567,32 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(e => new { e.ShareId, e.Seq });
                 // Drives retention pruning of old entries.
                 entity.HasIndex(e => e.CreatedAtUtc);
+            });
+
+            // -- Local search index --
+
+            // Trigram GIN indexes make ILIKE '%term%' on name and content index-backed, the
+            // PostgreSQL counterpart of the Elasticsearch n-gram fields. pg_trgm is a trusted
+            // extension (PG 13+), so the database owner can create it.
+            modelBuilder.HasPostgresExtension("pg_trgm");
+            modelBuilder.Entity<SearchDocumentRecord>(entity =>
+            {
+                entity.ToTable("search_documents");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id).HasMaxLength(32);
+                entity.Property(e => e.FileName).IsRequired();
+                entity.Property(e => e.ShareName).IsRequired();
+                entity.Property(e => e.AbsolutePath).IsRequired();
+                entity.Property(e => e.SharePath).IsRequired();
+                entity.Property(e => e.FileType).IsRequired();
+                entity.Property(e => e.Content).IsRequired();
+                entity.HasIndex(e => e.FileName).HasMethod("gin").HasOperators("gin_trgm_ops");
+                entity.HasIndex(e => e.Content).HasMethod("gin").HasOperators("gin_trgm_ops");
+                // Prefix scans (subtree delete/move, folder-scoped search) use LIKE 'x/%'.
+                // ponytail: b-tree entries are limited to ~2.7 kB, so a file with a longer absolute
+                // path fails to index (logged, skipped); switch to a hashed path column if that matters.
+                entity.HasIndex(e => e.AbsolutePath).HasOperators("text_pattern_ops");
+                entity.HasIndex(e => new { e.ShareName, e.SharePath }).HasOperators("text_ops", "text_pattern_ops");
             });
 
             // -- Departments --
