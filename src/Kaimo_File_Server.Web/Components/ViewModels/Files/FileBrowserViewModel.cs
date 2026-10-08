@@ -6,6 +6,7 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -49,6 +50,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     private readonly DemoModeOptions _demo;
     private readonly ISyncDefinitionRepository _syncRepo;
     private readonly IShareLinkRepository _shareLinkRepo;
+    private readonly ICloudSyncJobRunner? _syncJobs;
 
     // Normalized root paths of the loaded share's public links (with the owning link's id, so
     // an emblem can jump to it), so the browser can mark a shared folder (and everything beneath
@@ -78,7 +80,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         ZipDownloadTicketStore zipTickets,
         DemoModeOptions demo,
         ISyncDefinitionRepository syncRepo,
-        IShareLinkRepository shareLinkRepo)
+        IShareLinkRepository shareLinkRepo,
+        ICloudSyncJobRunner? syncJobs = null)
     {
         _fileServiceFactory = fileServiceFactory;
         _shareRepo = shareRepo;
@@ -94,6 +97,9 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         _demo = demo;
         _syncRepo = syncRepo;
         _shareLinkRepo = shareLinkRepo;
+        _syncJobs = syncJobs;
+        if (_syncJobs is not null)
+            _syncJobs.OnChanged += OnSyncJobsChanged;
     }
 
     // -- State --
@@ -144,6 +150,15 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     // LocalPath) first so a nested sync wins over an ancestor one. Loaded per share,
     // not per directory, and reused across in-place directory refreshes.
     private List<(string LocalPath, SyncMode Mode, string Name, DateTime? LastSuccessfulRunAtUtc, HashSet<string>? RemotePaths, Guid Id)> _shareSyncs = [];
+
+    // Normalized local paths of the loaded share's syncs that currently have a job queued
+    // or running. Replaced (never mutated) so render-time reads need no lock.
+    private HashSet<string> _activeSyncPaths = [];
+
+    // Bumped by every sync-state load (and by a share switch), so a slower, older load that
+    // finishes last can never overwrite newer state — neither another share's syncs nor a
+    // last-success time read before the run that just ended.
+    private int _syncLoadGeneration;
 
     public List<FileMetadata> Items { get; private set; } = [];
     public string CurrentPath { get; private set; } = "";
@@ -276,7 +291,9 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             CanManageShareLinks = false;
             CanManageUploadLinks = false;
             CanManageUploadLinks = false;
+            Interlocked.Increment(ref _syncLoadGeneration);
             _shareSyncs = [];
+            _activeSyncPaths = [];
             _sharedRoots = [];
             _fileService = null;
 
@@ -1096,7 +1113,10 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     // cheaper than a dedicated query and keeps the repository surface unchanged.
     private async Task LoadShareSyncsAsync(Guid shareId)
     {
+        var generation = Interlocked.Increment(ref _syncLoadGeneration);
         var all = await _syncRepo.GetAllAsync();
+        if (generation != Volatile.Read(ref _syncLoadGeneration))
+            return; // superseded by a newer load or a share switch
         _shareSyncs = all
             .Where(entry => entry.Definition.Enabled && entry.Definition.LocalShareId == shareId)
             .Select(entry => (
@@ -1114,6 +1134,45 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
                 entry.Definition.Id))
             .OrderByDescending(sync => sync.LocalPath.Length)
             .ToList();
+        _activeSyncPaths = ActiveSyncPaths(shareId);
+    }
+
+    // Local paths of this share's syncs that have a job queued or running in the runner.
+    private HashSet<string> ActiveSyncPaths(Guid shareId)
+        => _syncJobs?.Jobs
+               .Where(job => job.ShareId == shareId)
+               .Select(job => ShareRelativePath.Normalize(job.LocalPath))
+               .ToHashSet(StringComparer.Ordinal)
+           ?? [];
+
+    // Raised by the singleton runner on a background thread, also for every progress tick.
+    // Only a change in which syncs are active matters: a job that started flips its items to
+    // "syncing", and one that ended leaves a new last-success time and manifest behind, so
+    // the sync state is reloaded and the emblems re-evaluated without navigating.
+    private void OnSyncJobsChanged()
+    {
+        if (CurrentShare is not { } share || !Capabilities.HasCloudSync)
+            return;
+        var active = ActiveSyncPaths(share.Id);
+        if (active.SetEquals(_activeSyncPaths))
+            return;
+        // Record the new set right away: a run that ends while the reload for its start is
+        // still pending must compare against this set, not the stale one, or its end is missed.
+        _activeSyncPaths = active;
+        _ = ReloadSyncStateAsync(share.Id);
+    }
+
+    private async Task ReloadSyncStateAsync(Guid shareId)
+    {
+        try
+        {
+            await LoadShareSyncsAsync(shareId);
+            OnStateChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to reload sync state for share {ShareId}", shareId);
+        }
     }
 
     // Normalizes a persisted sync manifest into a share-relative, case-insensitive set.
@@ -1210,7 +1269,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
                 // timestamp heuristic; a set means membership is authoritative.
                 bool? isRemoteBacked = sync.RemotePaths?.Contains(rel);
                 var state = SyncItemStateEvaluator.Evaluate(
-                    entry.ModifiedAt, sync.LastSuccessfulRunAtUtc, sync.Mode, isRemoteBacked);
+                    entry.ModifiedAt, sync.LastSuccessfulRunAtUtc, sync.Mode, isRemoteBacked,
+                    isRunning: _activeSyncPaths.Contains(sync.LocalPath));
                 return new SyncFolderMarker(sync.Mode, sync.Name, state, sync.Id);
             }
         }
@@ -1748,6 +1808,9 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
 
     public void Dispose()
     {
+        if (_syncJobs is not null)
+            _syncJobs.OnChanged -= OnSyncJobsChanged;
+
         List<string> staged;
         lock (_uploadLock)
         {

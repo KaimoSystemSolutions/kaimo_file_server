@@ -4,6 +4,7 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Search;
@@ -42,9 +43,11 @@ public sealed class HomeFileBrowserViewModel : FileBrowserViewModel
         DemoModeOptions demo,
         ISyncDefinitionRepository syncRepo,
         IShareLinkRepository shareLinkRepo,
-        HomeDirectoryService homes)
+        HomeDirectoryService homes,
+        ICloudSyncJobRunner? syncJobs = null)
         : base(fileServiceFactory, shareRepo, dbFactory, userContextFactory, mgmtAuth, authState,
-               logger, searchService, userRepo, downloadTickets, zipTickets, demo, syncRepo, shareLinkRepo)
+               logger, searchService, userRepo, downloadTickets, zipTickets, demo, syncRepo, shareLinkRepo,
+               syncJobs)
     {
         _homes = homes;
         _users = userRepo;

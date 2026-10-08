@@ -11795,7 +11795,16 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Sync_PendingUploadTooltip", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Synchronizing with &quot;{0}&quot; — status updates when the run finishes ähnelt.
+        /// </summary>
+        public static string Web_Sync_RunningTooltip {
+            get {
+                return ResourceManager.GetString("Web_Sync_RunningTooltip", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Not uploaded — &quot;{0}&quot; is a pull-only sync ähnelt.
         /// </summary>

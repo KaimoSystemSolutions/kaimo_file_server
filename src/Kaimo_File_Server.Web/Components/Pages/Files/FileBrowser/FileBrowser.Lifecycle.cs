@@ -44,13 +44,17 @@ public partial class FileBrowser
             _focusItemListAfterRender = true;
         }
 
+        var (previousShare, previousPath) = (_loadedShareName, VM.CurrentPath ?? "");
         await VM.LoadShareAsync(ShareName, EffectiveLoadSubPath);
+        _loadedShareName = ShareName;
         UpdateAclPath();
         await LoadAclCounts();
         VM.OnStateChanged -= OnVmStateChanged;
         VM.OnStateChanged += OnVmStateChanged;
 
-        TryApplyPendingFileSelection();
+        // A search hit selects its own entry; otherwise going up re-selects where we came from.
+        if (!TryApplyPendingFileSelection())
+            SelectChildWeCameFrom(previousShare, previousPath);
 
         await CheckForJustSynced();
     }
@@ -95,6 +99,47 @@ public partial class FileBrowser
 
     // Index of a search-selected entry to scroll to on the next render (-1 = none).
     private int _pendingScrollIndex = -1;
+
+    // Share the listing was last loaded for, so a path comparison never spans two shares.
+    private string? _loadedShareName;
+
+    /// <summary>
+    /// After navigating to an ancestor (".." row, Backspace, breadcrumb, browser Back), selects
+    /// the child folder on the way to the previous location and scrolls it into view, so the
+    /// user keeps their place. A no-op for any other navigation or a same-folder reload.
+    /// </summary>
+    private void SelectChildWeCameFrom(string? previousShare, string previousPath)
+    {
+        if (previousShare != ShareName)
+            return;
+
+        var name = ChildToward(VM.CurrentPath ?? "", previousPath);
+        if (name is null)
+            return;
+
+        var dir = SortedDirectories.FirstOrDefault(d => d.Name == name);
+        if (dir is null)
+            return;
+
+        _selectedItems.Add(dir);
+        _anchorItem = _cursorItem = dir; // arrow keys and Shift continue from here
+        _pendingScrollIndex = SortedEntries.IndexOf(dir);
+    }
+
+    /// <summary>
+    /// First path segment below <paramref name="ancestor"/> on the way to
+    /// <paramref name="descendant"/>, or <c>null</c> when the descendant is not strictly
+    /// beneath the ancestor. Both are share-relative paths.
+    /// </summary>
+    internal static string? ChildToward(string ancestor, string descendant)
+    {
+        ancestor = ancestor.Trim('/');
+        descendant = descendant.Trim('/');
+        var prefix = ancestor.Length == 0 ? "" : ancestor + "/";
+        if (descendant.Length <= prefix.Length || !descendant.StartsWith(prefix, StringComparison.Ordinal))
+            return null;
+        return descendant[prefix.Length..].Split('/')[0];
+    }
 
     private string? _lastLoadedLocation;
     private bool _focusItemListAfterRender;
@@ -470,15 +515,20 @@ public partial class FileBrowser
         _ => SyncIcon(marker.Mode)
     };
 
-    /// <summary>Info tint for a synced entry, warning tint for anything still pending.</summary>
+    /// <summary>Info tint for a synced (or currently syncing) entry, warning tint for anything still pending.</summary>
     private static string SyncMarkerColor(SyncItemState state)
-        => state == SyncItemState.Synced ? "var(--info)" : "var(--warning)";
+        => IsSyncQuiet(state) ? "var(--info)" : "var(--warning)";
 
     private static string SyncIndicatorClass(SyncItemState state)
-        => state == SyncItemState.Synced ? "" : "sync-indicator--warn";
+        => IsSyncQuiet(state) ? "" : "sync-indicator--warn";
+
+    // A running sync decides the final state itself, so it never warns in the meantime.
+    private static bool IsSyncQuiet(SyncItemState state)
+        => state is SyncItemState.Synced or SyncItemState.Syncing;
 
     private string SyncMarkerTooltip(SyncFolderMarker marker) => marker.State switch
     {
+        SyncItemState.Syncing => string.Format(Resources.Web_Sync_RunningTooltip, marker.SyncName),
         SyncItemState.PendingUpload => string.Format(Resources.Web_Sync_PendingUploadTooltip, marker.SyncName),
         SyncItemState.PullBlocked => string.Format(Resources.Web_Sync_PullBlockedTooltip, marker.SyncName),
         _ => string.Format(Resources.Web_Sync_FolderTooltip, marker.SyncName)
@@ -593,8 +643,11 @@ public partial class FileBrowser
         _sortDirection = 0;
         _contextMenuComponent?.CloseContextMenu();
 
+        var (previousShare, previousPath) = (_loadedShareName, VM.CurrentPath ?? "");
         await VM.LoadShareAsync(ShareName, routeSubPath);
+        _loadedShareName = ShareName;
         UpdateAclPath();
+        SelectChildWeCameFrom(previousShare, previousPath);
         StateHasChanged();
     }
 

@@ -13,7 +13,12 @@ public enum SyncItemState
     /// <summary>Changed since the last run under a push/two-way sync — upload still pending.</summary>
     PendingUpload,
     /// <summary>Changed since the last run under a pull-only sync — will never be uploaded.</summary>
-    PullBlocked
+    PullBlocked,
+    /// <summary>
+    /// A run of this sync is queued or in progress; the item's final state is decided once
+    /// it completes (a just-pulled item cannot be told apart from a pending one mid-run).
+    /// </summary>
+    Syncing
 }
 
 /// <summary>
@@ -36,11 +41,24 @@ public static class SyncItemStateEvaluator
     /// no manifest exists yet (a pull that has not run under manifest tracking); the timestamp
     /// heuristic below then stands in until the first run records one.
     ///
-    /// ponytail: push/two-way have no manifest and keep the mtime heuristic. A successful run
-    /// really does upload the item, so "last write at/before the last success" == synced holds;
-    /// anything newer (or before any success) is still pending upload. Both times must be UTC.
+    /// ponytail: push/two-way keep the mtime heuristic. A successful run really does upload the
+    /// item, so "last write at/before the last success" == synced holds; anything newer (or
+    /// before any success) is still pending upload. Both times must be UTC.
+    ///
+    /// While a run is active (<paramref name="isRunning"/>), items pulled by that run carry
+    /// a remote mtime newer than the last success (or no success exists yet) and are not in
+    /// the previous manifest, so any non-synced verdict is reported as
+    /// <see cref="SyncItemState.Syncing"/> until the run completes.
     /// </summary>
     public static SyncItemState Evaluate(
+        DateTime modifiedAtUtc, DateTime? lastSuccessfulRunAtUtc, SyncMode mode, bool? isRemoteBacked,
+        bool isRunning = false)
+    {
+        var state = EvaluateSettled(modifiedAtUtc, lastSuccessfulRunAtUtc, mode, isRemoteBacked);
+        return isRunning && state != SyncItemState.Synced ? SyncItemState.Syncing : state;
+    }
+
+    private static SyncItemState EvaluateSettled(
         DateTime modifiedAtUtc, DateTime? lastSuccessfulRunAtUtc, SyncMode mode, bool? isRemoteBacked)
     {
         // Pull never uploads, so "local-only" is authoritative only from the manifest.

@@ -354,6 +354,9 @@
   <data name="Web_Sync_PendingUploadTooltip" xml:space="preserve">
     <value>Not yet uploaded to "{0}" — will sync on the next run</value>
   </data>
+  <data name="Web_Sync_RunningTooltip" xml:space="preserve">
+    <value>Synchronizing with "{0}" — status updates when the run finishes</value>
+  </data>
   <data name="Web_Sync_PullBlockedTooltip" xml:space="preserve">
     <value>Not uploaded — "{0}" is a pull-only sync</value>
   </data>

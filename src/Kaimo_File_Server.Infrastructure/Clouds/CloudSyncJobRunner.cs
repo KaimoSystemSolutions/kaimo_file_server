@@ -33,14 +33,20 @@ public interface ICloudSyncJobRunner
     bool Cancel(Guid jobId);
 }
 
-/// <summary>Immutable job view consumed by the Running Jobs menu.</summary>
+/// <summary>
+/// Immutable job view consumed by the Running Jobs menu. <see cref="ShareId"/> and
+/// <see cref="LocalPath"/> identify the sync, so the file browser can tell which
+/// synced folders currently have a run queued or in progress.
+/// </summary>
 public sealed record SyncJobSnapshot(
     Guid Id,
     string Title,
     string Detail,
     int Progress,
     DateTimeOffset StartedAt,
-    bool IsCancellationRequested);
+    bool IsCancellationRequested,
+    Guid ShareId = default,
+    string LocalPath = "");
 
 public sealed class CloudSyncJobRunner(
     IServiceScopeFactory scopeFactory,
@@ -234,6 +240,6 @@ public sealed class CloudSyncJobRunner(
         public DateTimeOffset StartedAt { get; } = DateTimeOffset.UtcNow;
 
         public SyncJobSnapshot ToSnapshot()
-            => new(Id, Title, Detail, Progress, StartedAt, CancelRequested);
+            => new(Id, Title, Detail, Progress, StartedAt, CancelRequested, ShareId, LocalPath);
     }
 }

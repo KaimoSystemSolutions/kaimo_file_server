@@ -82,4 +82,40 @@ public sealed class SyncItemStateEvaluatorTests
             LastRun, lastSuccessfulRunAtUtc: null, SyncMode.Pull, isRemoteBacked: null);
         Assert.Equal(SyncItemState.Synced, state);
     }
+
+    [Fact]
+    public void TwoWay_FirstRunInProgress_IsSyncing_NotPendingUpload()
+    {
+        // Initial two-way run: items just pulled must not be flagged as "not yet uploaded".
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun, lastSuccessfulRunAtUtc: null, SyncMode.TwoWay, isRemoteBacked: null, isRunning: true);
+        Assert.Equal(SyncItemState.Syncing, state);
+    }
+
+    [Theory]
+    [InlineData(SyncMode.Push)]
+    [InlineData(SyncMode.TwoWay)]
+    public void ChangedAfterLastRun_WhileRunning_IsSyncing(SyncMode mode)
+    {
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(5), LastRun, mode, isRemoteBacked: null, isRunning: true);
+        Assert.Equal(SyncItemState.Syncing, state);
+    }
+
+    [Fact]
+    public void Pull_ManifestMiss_WhileRunning_IsSyncing()
+    {
+        // A file pulled by the current run is not in the previous manifest yet.
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(5), LastRun, SyncMode.Pull, isRemoteBacked: false, isRunning: true);
+        Assert.Equal(SyncItemState.Syncing, state);
+    }
+
+    [Fact]
+    public void SyncedItem_StaysSynced_WhileRunning()
+    {
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(-5), LastRun, SyncMode.TwoWay, isRemoteBacked: null, isRunning: true);
+        Assert.Equal(SyncItemState.Synced, state);
+    }
 }

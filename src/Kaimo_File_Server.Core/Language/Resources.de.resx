@@ -354,6 +354,9 @@
   <data name="Web_Sync_PendingUploadTooltip" xml:space="preserve">
     <value>Noch nicht zu „{0}" hochgeladen – wird beim nächsten Lauf synchronisiert</value>
   </data>
+  <data name="Web_Sync_RunningTooltip" xml:space="preserve">
+    <value>Synchronisierung mit „{0}" läuft – Status wird nach dem Lauf aktualisiert</value>
+  </data>
   <data name="Web_Sync_PullBlockedTooltip" xml:space="preserve">
     <value>Nicht hochgeladen – „{0}" ist eine reine Pull-Synchronisierung</value>
   </data>
