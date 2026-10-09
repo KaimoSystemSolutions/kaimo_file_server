@@ -18,6 +18,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 \
     && apt-get purge -y --auto-remove curl gnupg \
     && rm -rf /var/lib/apt/lists/*
+# restic (file backup/restore) — the pinned official release binary, verified
+# against its published SHA-256 before installation. Bump all three ARGs
+# together (checksums from the release's SHA256SUMS file). BSD-2-Clause; the
+# license ships with the image (see NOTICE, "Third-party binaries").
+ARG TARGETARCH
+ARG RESTIC_VERSION=0.19.1
+ARG RESTIC_SHA256_AMD64=f415415624dcc452f2a02b8c33641791a8c6d6d3b65bbb3543fcf9a25151585c
+ARG RESTIC_SHA256_ARM64=a5f64aaab53d51e311fa3829124c5b703f2d14cf187d8640b6be3b2b49376465
+RUN apt-get update && apt-get install -y --no-install-recommends curl bzip2 \
+    && arch="${TARGETARCH:-amd64}" \
+    && case "$arch" in \
+         amd64) sha="$RESTIC_SHA256_AMD64" ;; \
+         arm64) sha="$RESTIC_SHA256_ARM64" ;; \
+         *) echo "unsupported architecture for restic: $arch" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL -o /tmp/restic.bz2 \
+        "https://github.com/restic/restic/releases/download/v${RESTIC_VERSION}/restic_${RESTIC_VERSION}_linux_${arch}.bz2" \
+    && echo "${sha}  /tmp/restic.bz2" | sha256sum -c - \
+    && bunzip2 -c /tmp/restic.bz2 > /usr/local/bin/restic \
+    && chmod 0755 /usr/local/bin/restic \
+    && rm /tmp/restic.bz2 \
+    && apt-get purge -y --auto-remove curl bzip2 \
+    && rm -rf /var/lib/apt/lists/* \
+    && restic version
+COPY --chmod=0644 third-party/restic/LICENSE /usr/share/doc/restic/LICENSE
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080

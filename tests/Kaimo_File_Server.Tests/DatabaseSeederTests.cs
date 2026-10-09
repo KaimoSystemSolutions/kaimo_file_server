@@ -275,4 +275,20 @@ public class DatabaseSeederTests : IDisposable
         Assert.True(manager.IsSystemRole);
         Assert.Equal(ManagementPermission.ManageNotifications, manager.ManagementPermissions);
     }
+    // ─────────────── File backup permissions ───────────────
+
+    [Fact]
+    public async Task SeedAsync_FileBackupBits_OnAdministratorAndBackupOperator_OutsideFullAdmin()
+    {
+        await SeedAsync(("Seed:DemoData", "false"));
+
+        var admin = await _db.Roles.AsNoTracking().SingleAsync(r => r.Id == WellKnownGUIDs.ROLE_ADMIN);
+        Assert.True(admin.ManagementPermissions.HasFlag(ManagementPermission.FileBackupAdmin));
+        Assert.Equal(ManagementPermission.None, ManagementPermission.FullAdmin & ManagementPermission.FileBackupAdmin);
+
+        var operatorRole = await _db.Roles.AsNoTracking().SingleAsync(r => r.Id == WellKnownGUIDs.ROLE_BACKUP_OPERATOR);
+        Assert.True(operatorRole.IsSystemRole);
+        Assert.Equal(ManagementPermission.BackupOperator, operatorRole.ManagementPermissions);
+        Assert.False(operatorRole.ManagementPermissions.HasFlag(ManagementPermission.ManageBackupRepositories));
+    }
 }

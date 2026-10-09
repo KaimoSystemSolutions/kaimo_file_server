@@ -42,6 +42,9 @@ public static class NotificationContextRoles
 
     /// <summary>The creator of a cloud sync definition.</summary>
     public const string SyncCreator = "syncCreator";
+
+    /// <summary>The creator of a file backup job.</summary>
+    public const string JobCreator = "jobCreator";
 }
 
 /// <summary>The in-code catalog of all notification event types.</summary>
@@ -57,6 +60,8 @@ public static class NotificationEventCatalog
     public const string SyncNeedsReauthorization = "sync.needs_reauthorization";
     public const string BackupFailed = "backup.failed";
     public const string BackupSucceeded = "backup.succeeded";
+    public const string FileBackupFailed = "backup.restic.failed";
+    public const string FileBackupWarnings = "backup.restic.warnings";
     public const string DeviceRegistered = "device.registered";
     public const string CertificateRenewed = "certificate.renewed";
     public const string CertificateRenewalFailed = "certificate.renewal_failed";
@@ -112,6 +117,14 @@ public static class NotificationEventCatalog
         new(BackupSucceeded, "backup", [],
             [P("backup.trigger", "Scheduled"), P("backup.fileName", "kaimo_2026-09-28_0200_scheduled.dump"), P("backup.size", "48.3 MB")],
             [Holders("ManageBackups")]),
+        new(FileBackupFailed, "filebackup", [NotificationContextRoles.JobCreator],
+            [P("job.name", "Projekte nachts"), P("repository.name", "NAS Keller"), P("errorCode", "repo_unreachable"), P("failedSources", "Projekte")],
+            [Role(NotificationContextRoles.JobCreator), Holders("ManageBackupJobs")],
+            DefaultThrottleMinutes: 360),
+        new(FileBackupWarnings, "filebackup", [NotificationContextRoles.JobCreator],
+            [P("job.name", "Projekte nachts"), P("repository.name", "NAS Keller"), P("warningCount", "3")],
+            [Role(NotificationContextRoles.JobCreator), Holders("ManageBackupJobs")],
+            DefaultThrottleMinutes: 1440),
         new(DeviceRegistered, "devices", [NotificationContextRoles.Affected],
             [P("device.name", "Erikas iPhone"), P("device.platform", "ios"), P("user.username", "erika")],
             [Role(NotificationContextRoles.Affected)]),

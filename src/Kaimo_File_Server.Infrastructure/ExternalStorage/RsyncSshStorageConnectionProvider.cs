@@ -329,7 +329,7 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
         ];
     }
 
-    private static string BuildRemoteShell(RsyncSshConnectionSettings settings)
+    internal static string BuildRemoteShell(RsyncSshConnectionSettings settings)
     {
         // rsync parses -e as one command string. Secret paths are therefore
         // deliberately restricted to shell-neutral absolute paths.

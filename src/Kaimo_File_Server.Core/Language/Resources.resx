@@ -5661,4 +5661,670 @@
   <data name="Web_Settings_Search_ReindexStartFailed" xml:space="preserve">
     <value>Indexing could not be started.</value>
   </data>
+  <data name="Web_PermGroup_FileBackup" xml:space="preserve">
+    <value>File backup</value>
+  </data>
+  <data name="Web_Perm_ManageBackupRepositories" xml:space="preserve">
+    <value>Manage backup repositories</value>
+  </data>
+  <data name="Web_Perm_ManageBackupJobs" xml:space="preserve">
+    <value>Manage backup jobs</value>
+  </data>
+  <data name="Web_Perm_RestoreFromBackup" xml:space="preserve">
+    <value>Restore from backup (new folder / download)</value>
+  </data>
+  <data name="Web_Perm_RestoreBackupInPlace" xml:space="preserve">
+    <value>Restore in place (overwrite, other share, permissions)</value>
+  </data>
+  <data name="Notification_Category_filebackup" xml:space="preserve">
+    <value>File backup</value>
+  </data>
+  <data name="Notification_Event_backup_restic_failed" xml:space="preserve">
+    <value>File backup failed</value>
+  </data>
+  <data name="Notification_Event_backup_restic_failed_Desc" xml:space="preserve">
+    <value>A backup job could not back up one or more of its sources.</value>
+  </data>
+  <data name="Notification_Event_backup_restic_warnings" xml:space="preserve">
+    <value>File backup with warnings</value>
+  </data>
+  <data name="Notification_Event_backup_restic_warnings_Desc" xml:space="preserve">
+    <value>A backup job finished, but some files could not be read.</value>
+  </data>
+  <data name="Notification_Role_backup_restic_failed_jobCreator" xml:space="preserve">
+    <value>Creator of the backup job</value>
+  </data>
+  <data name="Notification_Role_backup_restic_warnings_jobCreator" xml:space="preserve">
+    <value>Creator of the backup job</value>
+  </data>
+  <data name="Web_Notifications_Role_jobCreator" xml:space="preserve">
+    <value>Job creator</value>
+  </data>
+  <data name="Web_Backup_Kit_Template" xml:space="preserve">
+    <value>KAIMO FILES - RECOVERY KIT\n==========================\nKeep this file offline and safe (e.g. printed in a safe or in a password manager).\nAnyone holding it can read the backups - without it, NOBODY can restore them.\n\nRepository:      {0}\nBackend:         {1}\nRepository id:   {5}\nCreated:         {7}\nrestic version:  {6}\nKit code:        {8}\n\nRESTIC_REPOSITORY={2}\nRESTIC_PASSWORD={4}\n\nFurther parameters / credentials you must supply yourself:\n{3}\n\nCredentials of the storage target (S3 keys, REST user, SSH key) are NOT part of this kit. Keep them separately.\n\nLAYOUT\n------\nEvery backup run creates one snapshot per share, tagged:\n  kaimo, job:&lt;job id&gt;, run:&lt;run id&gt;, level:files, share:&lt;share id&gt;\nA snapshot contains the share folder and kaimo-acl-manifest.json (owners and permissions of the share).\n\nRESTORE WITH THE RESTIC COMMAND LINE (works without the Kaimo server)\n--------------------------------------------------------------------\n1. Install restic (https://restic.net), the version above or newer.\n2. export RESTIC_REPOSITORY='&lt;value above&gt;'\n   export RESTIC_PASSWORD='&lt;value above&gt;'\n   plus the storage credentials (e.g. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).\n3. List backups:          restic snapshots --tag kaimo\n   Only one share:        restic snapshots --tag share:&lt;share id&gt;\n4. Browse a backup:       restic ls &lt;snapshot id&gt;\n5. Restore everything:    restic restore &lt;snapshot id&gt; --target /restore\n   Restore one folder:    restic restore &lt;snapshot id&gt;:&lt;share path&gt;/&lt;folder&gt; --target /restore\n6. Copy the restored files back into the share folder. Owners and permissions are listed in kaimo-acl-manifest.json.\n</value>
+  </data>
+  <data name="Web_Nav_Backup" xml:space="preserve">
+    <value>Backup</value>
+  </data>
+  <data name="Web_Backup_Subtitle" xml:space="preserve">
+    <value>Encrypted, incremental file backups of your shares with restic.</value>
+  </data>
+  <data name="Web_Backup_Tab_Overview" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="Web_Backup_Tab_Jobs" xml:space="preserve">
+    <value>Jobs</value>
+  </data>
+  <data name="Web_Backup_Tab_Repositories" xml:space="preserve">
+    <value>Repositories</value>
+  </data>
+  <data name="Web_Backup_Tab_Activity" xml:space="preserve">
+    <value>Activity</value>
+  </data>
+  <data name="Web_Backup_Overview_KitPending" xml:space="preserve">
+    <value>The repository "{0}" waits for its recovery kit to be downloaded and confirmed. No backups run into it until then.</value>
+  </data>
+  <data name="Web_Backup_Overview_OpenRepository" xml:space="preserve">
+    <value>Open repository</value>
+  </data>
+  <data name="Web_Backup_Overview_JobCount" xml:space="preserve">
+    <value>{0} jobs</value>
+  </data>
+  <data name="Web_Backup_Overview_RepositoryCount" xml:space="preserve">
+    <value>{0} repositories</value>
+  </data>
+  <data name="Web_Backup_LastSuccess" xml:space="preserve">
+    <value>Last success</value>
+  </data>
+  <data name="Web_Backup_LastRun" xml:space="preserve">
+    <value>Last run</value>
+  </data>
+  <data name="Web_Backup_NextRun" xml:space="preserve">
+    <value>Next run</value>
+  </data>
+  <data name="Web_Backup_LastReachable" xml:space="preserve">
+    <value>Last reachable</value>
+  </data>
+  <data name="Web_Backup_LastError" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="Web_Backup_Never" xml:space="preserve">
+    <value>never</value>
+  </data>
+  <data name="Web_Backup_NeverRun" xml:space="preserve">
+    <value>Never run</value>
+  </data>
+  <data name="Web_Backup_NoSchedule" xml:space="preserve">
+    <value>no schedule</value>
+  </data>
+  <data name="Web_Backup_Running" xml:space="preserve">
+    <value>Running ({0} %)</value>
+  </data>
+  <data name="Web_Backup_Queued" xml:space="preserve">
+    <value>Queued</value>
+  </data>
+  <data name="Web_Backup_Disabled" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="Web_Backup_Enabled" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="Web_Backup_Enable" xml:space="preserve">
+    <value>Enable</value>
+  </data>
+  <data name="Web_Backup_Disable" xml:space="preserve">
+    <value>Disable</value>
+  </data>
+  <data name="Web_Backup_Edit" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="Web_Backup_Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Web_Backup_Saved" xml:space="preserve">
+    <value>Saved.</value>
+  </data>
+  <data name="Web_Backup_Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Web_Backup_Select" xml:space="preserve">
+    <value>– Select –</value>
+  </data>
+  <data name="Web_Backup_Repository" xml:space="preserve">
+    <value>Repository</value>
+  </data>
+  <data name="Web_Backup_ConfirmDelete" xml:space="preserve">
+    <value>Delete now</value>
+  </data>
+  <data name="Web_Backup_Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Web_Backup_Working" xml:space="preserve">
+    <value>Working…</value>
+  </data>
+  <data name="Web_Backup_DeletedJob" xml:space="preserve">
+    <value>(deleted job)</value>
+  </data>
+  <data name="Web_Backup_Level_Files" xml:space="preserve">
+    <value>Files</value>
+  </data>
+  <data name="Web_Backup_Jobs_Help" xml:space="preserve">
+    <value>A job backs up one or more shares into a repository at fixed times. Each share gets its own backup point including its permissions.</value>
+  </data>
+  <data name="Web_Backup_Jobs_Create" xml:space="preserve">
+    <value>New backup job</value>
+  </data>
+  <data name="Web_Backup_Jobs_Edit" xml:space="preserve">
+    <value>Edit backup job</value>
+  </data>
+  <data name="Web_Backup_Jobs_Detail" xml:space="preserve">
+    <value>Backup job</value>
+  </data>
+  <data name="Web_Backup_Jobs_Empty" xml:space="preserve">
+    <value>No backup jobs yet.</value>
+  </data>
+  <data name="Web_Backup_Jobs_SelectHint" xml:space="preserve">
+    <value>Select a job to see its details, or create a new one.</value>
+  </data>
+  <data name="Web_Backup_Jobs_Sources" xml:space="preserve">
+    <value>Shares</value>
+  </data>
+  <data name="Web_Backup_Jobs_SourcesPlaceholder" xml:space="preserve">
+    <value>Select shares</value>
+  </data>
+  <data name="Web_Backup_Jobs_SourcesHelp" xml:space="preserve">
+    <value>Only shares you may manage backups for are listed.</value>
+  </data>
+  <data name="Web_Backup_Jobs_NoShares" xml:space="preserve">
+    <value>No shares available.</value>
+  </data>
+  <data name="Web_Backup_Jobs_NoRepository" xml:space="preserve">
+    <value>No active repository is released for all selected shares. Ask an administrator to release one to your department.</value>
+  </data>
+  <data name="Web_Backup_Jobs_IncludeRecycleBin" xml:space="preserve">
+    <value>Include recycle bin</value>
+  </data>
+  <data name="Web_Backup_Jobs_RunNow" xml:space="preserve">
+    <value>Run now</value>
+  </data>
+  <data name="Web_Backup_Jobs_DeleteHint" xml:space="preserve">
+    <value>Deleting the job keeps all backups already stored in the repository.</value>
+  </data>
+  <data name="Web_Backup_Job_Deleted" xml:space="preserve">
+    <value>Backup job deleted.</value>
+  </data>
+  <data name="Web_Backup_Job_Started" xml:space="preserve">
+    <value>Backup started. Progress is shown here.</value>
+  </data>
+  <data name="Web_Backup_Schedule" xml:space="preserve">
+    <value>Schedule</value>
+  </data>
+  <data name="Web_Backup_Schedule_Help" xml:space="preserve">
+    <value>Start times (server time) on the selected weekdays. If the server was off, one missed run is caught up (up to 7 days).</value>
+  </data>
+  <data name="Web_Backup_Schedule_Time" xml:space="preserve">
+    <value>Start time</value>
+  </data>
+  <data name="Web_Backup_Schedule_AddTime" xml:space="preserve">
+    <value>Add time</value>
+  </data>
+  <data name="Web_Backup_Schedule_RemoveTime" xml:space="preserve">
+    <value>Remove time</value>
+  </data>
+  <data name="Web_Backup_Schedule_Days" xml:space="preserve">
+    <value>Weekdays</value>
+  </data>
+  <data name="Web_Backup_Schedule_Daily" xml:space="preserve">
+    <value>Daily</value>
+  </data>
+  <data name="Web_Backup_Schedule_ManualOnly" xml:space="preserve">
+    <value>No schedule – runs only when started manually.</value>
+  </data>
+  <data name="Web_Backup_Repos_Help" xml:space="preserve">
+    <value>A repository is the encrypted storage location of the backups. Every repository gets its own password, which is only handed out in the recovery kit.</value>
+  </data>
+  <data name="Web_Backup_Repos_Create" xml:space="preserve">
+    <value>New repository</value>
+  </data>
+  <data name="Web_Backup_Repos_Edit" xml:space="preserve">
+    <value>Edit repository</value>
+  </data>
+  <data name="Web_Backup_Repos_Detail" xml:space="preserve">
+    <value>Repository</value>
+  </data>
+  <data name="Web_Backup_Repos_Empty" xml:space="preserve">
+    <value>No repositories yet.</value>
+  </data>
+  <data name="Web_Backup_Repos_SelectHint" xml:space="preserve">
+    <value>Select a repository to see its details, or create a new one.</value>
+  </data>
+  <data name="Web_Backup_Repos_Backend" xml:space="preserve">
+    <value>Storage type</value>
+  </data>
+  <data name="Web_Backup_Repos_LocalPath" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="Web_Backup_Repos_LocalPathHelp" xml:space="preserve">
+    <value>Must lie below: {0}</value>
+  </data>
+  <data name="Web_Backup_Repos_Connection" xml:space="preserve">
+    <value>SSH connection</value>
+  </data>
+  <data name="Web_Backup_Repos_ConnectionHelp" xml:space="preserve">
+    <value>An existing SFTP or rsync/SSH connection with a pinned host key (guided SSH setup).</value>
+  </data>
+  <data name="Web_Backup_Repos_RemotePath" xml:space="preserve">
+    <value>Folder below the connection's root</value>
+  </data>
+  <data name="Web_Backup_Repos_Endpoint" xml:space="preserve">
+    <value>Server URL</value>
+  </data>
+  <data name="Web_Backup_Repos_SubPath" xml:space="preserve">
+    <value>Path on the server (optional)</value>
+  </data>
+  <data name="Web_Backup_Repos_Username" xml:space="preserve">
+    <value>User name (optional)</value>
+  </data>
+  <data name="Web_Backup_Repos_Password" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Web_Backup_Repos_KeepSecret" xml:space="preserve">
+    <value>unchanged</value>
+  </data>
+  <data name="Web_Backup_Repos_Bucket" xml:space="preserve">
+    <value>Bucket</value>
+  </data>
+  <data name="Web_Backup_Repos_Prefix" xml:space="preserve">
+    <value>Prefix (optional)</value>
+  </data>
+  <data name="Web_Backup_Repos_Region" xml:space="preserve">
+    <value>Region (optional)</value>
+  </data>
+  <data name="Web_Backup_Repos_AccessKey" xml:space="preserve">
+    <value>Access key</value>
+  </data>
+  <data name="Web_Backup_Repos_SecretKey" xml:space="preserve">
+    <value>Secret key</value>
+  </data>
+  <data name="Web_Backup_Repos_PathStyle" xml:space="preserve">
+    <value>Path-style bucket access (MinIO etc.)</value>
+  </data>
+  <data name="Web_Backup_Repos_CaCertificate" xml:space="preserve">
+    <value>CA certificate (optional, PEM)</value>
+  </data>
+  <data name="Web_Backup_Repos_CaCertificateHelp" xml:space="preserve">
+    <value>Only needed if the server uses a certificate from a private CA.</value>
+  </data>
+  <data name="Web_Backup_Repos_MinFreeSpace" xml:space="preserve">
+    <value>Minimum free space (GB)</value>
+  </data>
+  <data name="Web_Backup_Repos_AppendOnly" xml:space="preserve">
+    <value>Append-only server</value>
+  </data>
+  <data name="Web_Backup_Repos_AppendOnlyHelp" xml:space="preserve">
+    <value>The rest-server runs with --append-only: backups can only be added, never deleted – even with stolen credentials. Old backups are then not cleaned up automatically.</value>
+  </data>
+  <data name="Web_Backup_Repos_Departments" xml:space="preserve">
+    <value>Released to departments</value>
+  </data>
+  <data name="Web_Backup_Repos_DepartmentsHelp" xml:space="preserve">
+    <value>Department administrators with backup rights may create jobs into this repository for their shares. A release includes all sub-departments. They never see the password.</value>
+  </data>
+  <data name="Web_Backup_Repos_DepartmentsNone" xml:space="preserve">
+    <value>Global administrators only</value>
+  </data>
+  <data name="Web_Backup_Repos_Setup" xml:space="preserve">
+    <value>Set up</value>
+  </data>
+  <data name="Web_Backup_Repos_SetupHelp" xml:space="preserve">
+    <value>First test the location. An empty location is initialized with a new, generated password; an existing restic repository is connected with its password.</value>
+  </data>
+  <data name="Web_Backup_Repos_Test" xml:space="preserve">
+    <value>Test location</value>
+  </data>
+  <data name="Web_Backup_Repos_Initialize" xml:space="preserve">
+    <value>Initialize new repository</value>
+  </data>
+  <data name="Web_Backup_Repos_ExistingPassword" xml:space="preserve">
+    <value>Password of the existing repository</value>
+  </data>
+  <data name="Web_Backup_Repos_Connect" xml:space="preserve">
+    <value>Connect repository</value>
+  </data>
+  <data name="Web_Backup_Repos_Location" xml:space="preserve">
+    <value>Location</value>
+  </data>
+  <data name="Web_Backup_Repos_RepositoryId" xml:space="preserve">
+    <value>Repository id</value>
+  </data>
+  <data name="Web_Backup_Repos_DeleteHint" xml:space="preserve">
+    <value>Kaimo forgets the repository; the backup data at the location is not deleted.</value>
+  </data>
+  <data name="Web_Backup_Probe_Empty" xml:space="preserve">
+    <value>The location is reachable and empty – a new repository can be initialized.</value>
+  </data>
+  <data name="Web_Backup_Probe_Existing" xml:space="preserve">
+    <value>There is already a restic repository at this location. Enter its password to connect it.</value>
+  </data>
+  <data name="Web_Backup_Repo_Initialized" xml:space="preserve">
+    <value>Repository initialized. Download and confirm the recovery kit to activate it.</value>
+  </data>
+  <data name="Web_Backup_Repo_Connected" xml:space="preserve">
+    <value>Repository connected. Download and confirm the recovery kit to activate it.</value>
+  </data>
+  <data name="Web_Backup_Repo_Deleted" xml:space="preserve">
+    <value>Repository removed from Kaimo.</value>
+  </data>
+  <data name="Web_Backup_Repo_State_Active" xml:space="preserve">
+    <value>Active</value>
+  </data>
+  <data name="Web_Backup_Repo_State_PendingKit" xml:space="preserve">
+    <value>Recovery kit pending</value>
+  </data>
+  <data name="Web_Backup_Repo_State_Error" xml:space="preserve">
+    <value>Not reachable</value>
+  </data>
+  <data name="Web_Backup_Kit_Title" xml:space="preserve">
+    <value>Recovery kit</value>
+  </data>
+  <data name="Web_Backup_Kit_Help" xml:space="preserve">
+    <value>The kit contains the repository password. Without it, nobody – not even Kaimo after a server loss – can restore the backups. Store it offline and safe.</value>
+  </data>
+  <data name="Web_Backup_Kit_Step1" xml:space="preserve">
+    <value>Download the kit and store it safely.</value>
+  </data>
+  <data name="Web_Backup_Kit_Step2" xml:space="preserve">
+    <value>Type the kit code printed in the file to confirm.</value>
+  </data>
+  <data name="Web_Backup_Kit_Download" xml:space="preserve">
+    <value>Download recovery kit</value>
+  </data>
+  <data name="Web_Backup_Kit_Code" xml:space="preserve">
+    <value>Kit code</value>
+  </data>
+  <data name="Web_Backup_Kit_Confirm" xml:space="preserve">
+    <value>Confirm</value>
+  </data>
+  <data name="Web_Backup_Kit_Confirmed" xml:space="preserve">
+    <value>Recovery kit confirmed – the repository is active.</value>
+  </data>
+  <data name="Web_Backup_Kit_ConfirmedAt" xml:space="preserve">
+    <value>Confirmed on {0}</value>
+  </data>
+  <data name="Web_Backup_Kit_NotConfirmed" xml:space="preserve">
+    <value>Not confirmed</value>
+  </data>
+  <data name="Web_Backup_Activity_Empty" xml:space="preserve">
+    <value>No backup activity yet.</value>
+  </data>
+  <data name="Web_Backup_Activity_Detail" xml:space="preserve">
+    <value>Run details</value>
+  </data>
+  <data name="Web_Backup_Activity_SelectHint" xml:space="preserve">
+    <value>Select an entry to see its details.</value>
+  </data>
+  <data name="Web_Backup_Activity_Trigger" xml:space="preserve">
+    <value>Started by</value>
+  </data>
+  <data name="Web_Backup_Activity_Started" xml:space="preserve">
+    <value>Started</value>
+  </data>
+  <data name="Web_Backup_Activity_Finished" xml:space="preserve">
+    <value>Finished</value>
+  </data>
+  <data name="Web_Backup_Activity_Files" xml:space="preserve">
+    <value>Files</value>
+  </data>
+  <data name="Web_Backup_Activity_FilesValue" xml:space="preserve">
+    <value>{0} new, {1} changed, {2} unchanged</value>
+  </data>
+  <data name="Web_Backup_Activity_Data" xml:space="preserve">
+    <value>Data</value>
+  </data>
+  <data name="Web_Backup_Activity_DataValue" xml:space="preserve">
+    <value>{0} added of {1} read</value>
+  </data>
+  <data name="Web_Backup_Activity_Warnings" xml:space="preserve">
+    <value>Warnings</value>
+  </data>
+  <data name="Web_Backup_Activity_SourceWarnings" xml:space="preserve">
+    <value>{0} files could not be read</value>
+  </data>
+  <data name="Web_Backup_Activity_Snapshot" xml:space="preserve">
+    <value>Backup point {0}</value>
+  </data>
+  <data name="Web_Backup_Activity_ShowWarnings" xml:space="preserve">
+    <value>Show affected files</value>
+  </data>
+  <data name="Web_Backup_Activity_Log" xml:space="preserve">
+    <value>restic output</value>
+  </data>
+  <data name="Web_Backup_Backend_Local" xml:space="preserve">
+    <value>Local folder</value>
+  </data>
+  <data name="Web_Backup_Backend_Sftp" xml:space="preserve">
+    <value>SFTP</value>
+  </data>
+  <data name="Web_Backup_Backend_Rest" xml:space="preserve">
+    <value>REST server</value>
+  </data>
+  <data name="Web_Backup_Backend_S3" xml:space="preserve">
+    <value>S3 / S3-compatible</value>
+  </data>
+  <data name="Web_Backup_Status_Queued" xml:space="preserve">
+    <value>Queued</value>
+  </data>
+  <data name="Web_Backup_Status_Running" xml:space="preserve">
+    <value>Running</value>
+  </data>
+  <data name="Web_Backup_Status_Succeeded" xml:space="preserve">
+    <value>Succeeded</value>
+  </data>
+  <data name="Web_Backup_Status_SucceededWithWarnings" xml:space="preserve">
+    <value>With warnings</value>
+  </data>
+  <data name="Web_Backup_Status_Failed" xml:space="preserve">
+    <value>Failed</value>
+  </data>
+  <data name="Web_Backup_Status_Cancelled" xml:space="preserve">
+    <value>Cancelled</value>
+  </data>
+  <data name="Web_Backup_Status_Interrupted" xml:space="preserve">
+    <value>Interrupted</value>
+  </data>
+  <data name="Web_Backup_RunType_Init" xml:space="preserve">
+    <value>Set up repository</value>
+  </data>
+  <data name="Web_Backup_RunType_Backup" xml:space="preserve">
+    <value>Backup</value>
+  </data>
+  <data name="Web_Backup_RunType_Forget" xml:space="preserve">
+    <value>Apply retention</value>
+  </data>
+  <data name="Web_Backup_RunType_Prune" xml:space="preserve">
+    <value>Clean up</value>
+  </data>
+  <data name="Web_Backup_RunType_Check" xml:space="preserve">
+    <value>Integrity check</value>
+  </data>
+  <data name="Web_Backup_RunType_Copy" xml:space="preserve">
+    <value>Mirror</value>
+  </data>
+  <data name="Web_Backup_RunType_TestRestore" xml:space="preserve">
+    <value>Test restore</value>
+  </data>
+  <data name="Web_Backup_RunType_Restore" xml:space="preserve">
+    <value>Restore</value>
+  </data>
+  <data name="Web_Backup_Trigger_Manual" xml:space="preserve">
+    <value>Manual</value>
+  </data>
+  <data name="Web_Backup_Trigger_Scheduled" xml:space="preserve">
+    <value>Schedule</value>
+  </data>
+  <data name="Web_Backup_Trigger_CatchUp" xml:space="preserve">
+    <value>Catch-up after downtime</value>
+  </data>
+  <data name="Web_Backup_Error_Generic" xml:space="preserve">
+    <value>Error: {0}</value>
+  </data>
+  <data name="Web_Backup_Error_demo" xml:space="preserve">
+    <value>Not available in the read-only demo.</value>
+  </data>
+  <data name="Web_Backup_Error_ca_certificate_invalid" xml:space="preserve">
+    <value>The CA certificate must be a PEM certificate.</value>
+  </data>
+  <data name="Web_Backup_Error_connection_required" xml:space="preserve">
+    <value>Select an SSH connection.</value>
+  </data>
+  <data name="Web_Backup_Error_path_invalid" xml:space="preserve">
+    <value>The path is invalid (letters, digits, '.', '_', '-', '/'; no '..').</value>
+  </data>
+  <data name="Web_Backup_Error_path_outside_roots" xml:space="preserve">
+    <value>Local repositories must lie below an allowed folder.</value>
+  </data>
+  <data name="Web_Backup_Error_credentials_incomplete" xml:space="preserve">
+    <value>Enter both user name and password, or neither.</value>
+  </data>
+  <data name="Web_Backup_Error_endpoint_invalid" xml:space="preserve">
+    <value>The server URL must be an http(s) URL without credentials.</value>
+  </data>
+  <data name="Web_Backup_Error_bucket_invalid" xml:space="preserve">
+    <value>The bucket name is invalid.</value>
+  </data>
+  <data name="Web_Backup_Error_region_invalid" xml:space="preserve">
+    <value>The region is invalid.</value>
+  </data>
+  <data name="Web_Backup_Error_credentials_required" xml:space="preserve">
+    <value>Access key and secret key are required.</value>
+  </data>
+  <data name="Web_Backup_Error_backend_unsupported" xml:space="preserve">
+    <value>This storage type is not supported.</value>
+  </data>
+  <data name="Web_Backup_Error_password_missing" xml:space="preserve">
+    <value>The repository has no password.</value>
+  </data>
+  <data name="Web_Backup_Error_password_required" xml:space="preserve">
+    <value>Enter the repository password.</value>
+  </data>
+  <data name="Web_Backup_Error_private_key_missing" xml:space="preserve">
+    <value>The SSH connection has no private key.</value>
+  </data>
+  <data name="Web_Backup_Error_known_hosts_missing" xml:space="preserve">
+    <value>The SSH connection has no pinned host key file. Run the guided SSH setup for the connection first.</value>
+  </data>
+  <data name="Web_Backup_Error_host_key_mismatch" xml:space="preserve">
+    <value>The SSH host key does not match the pinned key.</value>
+  </data>
+  <data name="Web_Backup_Error_host_key_missing" xml:space="preserve">
+    <value>The SSH host is missing from the pinned host key file.</value>
+  </data>
+  <data name="Web_Backup_Error_secret_path_unsafe" xml:space="preserve">
+    <value>The SSH key path contains unsupported characters.</value>
+  </data>
+  <data name="Web_Backup_Error_connection_missing" xml:space="preserve">
+    <value>The SSH connection no longer exists.</value>
+  </data>
+  <data name="Web_Backup_Error_connection_invalid" xml:space="preserve">
+    <value>Only SFTP or rsync/SSH connections can be used.</value>
+  </data>
+  <data name="Web_Backup_Error_unexpected_output" xml:space="preserve">
+    <value>restic returned unexpected output.</value>
+  </data>
+  <data name="Web_Backup_Error_source_missing" xml:space="preserve">
+    <value>The job has no sources.</value>
+  </data>
+  <data name="Web_Backup_Error_restic_unavailable" xml:space="preserve">
+    <value>restic is not installed on the server.</value>
+  </data>
+  <data name="Web_Backup_Error_repo_not_found" xml:space="preserve">
+    <value>No repository found at the location.</value>
+  </data>
+  <data name="Web_Backup_Error_repo_exists" xml:space="preserve">
+    <value>A repository already exists at the location.</value>
+  </data>
+  <data name="Web_Backup_Error_lock_failed" xml:space="preserve">
+    <value>The repository is locked by another operation.</value>
+  </data>
+  <data name="Web_Backup_Error_wrong_password" xml:space="preserve">
+    <value>Wrong repository password.</value>
+  </data>
+  <data name="Web_Backup_Error_cancelled" xml:space="preserve">
+    <value>Cancelled.</value>
+  </data>
+  <data name="Web_Backup_Error_permission_denied" xml:space="preserve">
+    <value>Access to the location was denied (file permissions).</value>
+  </data>
+  <data name="Web_Backup_Error_repo_unreachable" xml:space="preserve">
+    <value>The location is not reachable.</value>
+  </data>
+  <data name="Web_Backup_Error_tls_error" xml:space="preserve">
+    <value>The server certificate is not trusted.</value>
+  </data>
+  <data name="Web_Backup_Error_access_denied" xml:space="preserve">
+    <value>The server rejected the credentials.</value>
+  </data>
+  <data name="Web_Backup_Error_restic_failed" xml:space="preserve">
+    <value>restic failed. See the restic output in the activity.</value>
+  </data>
+  <data name="Web_Backup_Error_job_missing" xml:space="preserve">
+    <value>The backup job no longer exists.</value>
+  </data>
+  <data name="Web_Backup_Error_repository_not_active" xml:space="preserve">
+    <value>The repository is not active (recovery kit not confirmed or disabled).</value>
+  </data>
+  <data name="Web_Backup_Error_share_missing" xml:space="preserve">
+    <value>A share no longer exists.</value>
+  </data>
+  <data name="Web_Backup_Error_source_unavailable" xml:space="preserve">
+    <value>The share folder does not exist (storage pool not mounted?).</value>
+  </data>
+  <data name="Web_Backup_Error_source_empty" xml:space="preserve">
+    <value>The share folder is suddenly empty although earlier backups had content (storage pool not mounted?). The backup was skipped.</value>
+  </data>
+  <data name="Web_Backup_Error_insufficient_space" xml:space="preserve">
+    <value>The repository target has less free space than configured.</value>
+  </data>
+  <data name="Web_Backup_Error_sources_failed" xml:space="preserve">
+    <value>Several shares could not be backed up.</value>
+  </data>
+  <data name="Web_Backup_Error_unexpected_error" xml:space="preserve">
+    <value>An unexpected error occurred. See the server log.</value>
+  </data>
+  <data name="Web_Backup_Error_interrupted" xml:space="preserve">
+    <value>The server was restarted during the run.</value>
+  </data>
+  <data name="Web_Backup_Error_name_taken" xml:space="preserve">
+    <value>The name is already in use.</value>
+  </data>
+  <data name="Web_Backup_Error_name_invalid" xml:space="preserve">
+    <value>A name (max. 200 characters) is required.</value>
+  </data>
+  <data name="Web_Backup_Error_repository_missing" xml:space="preserve">
+    <value>The repository no longer exists.</value>
+  </data>
+  <data name="Web_Backup_Error_repository_mismatch" xml:space="preserve">
+    <value>The location now holds a different repository. Changes were not saved.</value>
+  </data>
+  <data name="Web_Backup_Error_repository_in_use" xml:space="preserve">
+    <value>Delete the repository's backup jobs first.</value>
+  </data>
+  <data name="Web_Backup_Error_kit_not_downloaded" xml:space="preserve">
+    <value>Download the recovery kit first.</value>
+  </data>
+  <data name="Web_Backup_Error_kit_code_wrong" xml:space="preserve">
+    <value>The kit code does not match. Check the code in the downloaded file.</value>
+  </data>
+  <data name="Web_Backup_Error_sources_required" xml:space="preserve">
+    <value>Select at least one share.</value>
+  </data>
+  <data name="Web_Backup_Error_schedule_invalid" xml:space="preserve">
+    <value>Select start times and weekdays, or neither.</value>
+  </data>
+  <data name="Web_Backup_Error_sources_multi_department" xml:space="preserve">
+    <value>Jobs spanning several departments need a global administrator.</value>
+  </data>
+  <data name="Web_Backup_Error_repository_not_usable" xml:space="preserve">
+    <value>The repository is not available for these shares.</value>
+  </data>
 </root>

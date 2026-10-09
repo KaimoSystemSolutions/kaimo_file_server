@@ -7,6 +7,7 @@
 @implements IDisposable
 @inject JobService JobService
 @inject ICloudSyncJobRunner SyncJobRunner
+@inject Kaimo_File_Server.Infrastructure.Backup.Restic.IBackupRunner BackupRunner
 @inject ISearchAdminService SearchAdmin
 @inject DateFormatService DateFmt
 @inherits AppComponentBase
@@ -132,6 +133,35 @@
                             </div>
                         </article>
                     }
+                    @* restic backup runs (manual + scheduled), visible to Global backup-job admins. *@
+                    @foreach (var run in BackupRuns)
+                    {
+                        <article class="job-menu-item">
+                            <div class="job-menu-item-heading">
+                                <div>
+                                    <strong>@($"{Text("Web_Nav_Backup", "Backup")} · {run.Title}")</strong>
+                                    <small>@(run.IsRunning ? run.Detail : Text("Web_Backup_Queued", "Queued"))</small>
+                                </div>
+                                <button class="job-cancel"
+                                        type="button"
+                                        disabled="@run.IsCancellationRequested"
+                                        title="@Text("Web_Jobs_Cancel", "Cancel job")"
+                                        aria-label="@Text("Web_Jobs_Cancel", "Cancel job")"
+                                        @onclick="() => BackupRunner.Cancel(run.RunId)">
+                                    @Assets.SVG("close.svg", new SvgOptions(Width: 13, Height: 13, StrokeWidth: 2))
+                                </button>
+                            </div>
+                            <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@run.Progress">
+                                <div class="job-progress-fill" style="width: @(run.Progress)%"></div>
+                            </div>
+                            <div class="job-menu-meta">
+                                <span>@(run.IsCancellationRequested
+                                    ? Text("Web_Jobs_Cancelling", "Cancelling…")
+                                    : $"{run.Progress}%")</span>
+                                <span>@FormatTime(run.QueuedAt)</span>
+                            </div>
+                        </article>
+                    }
                 </div>
             }
         </section>
@@ -144,6 +174,13 @@
     /// Set by the layout from the ManageSystemSettings permission.
     /// </summary>
     [Parameter] public bool CanSeeReindex { get; set; }
+
+    /// <summary>Whether this session may see (and cancel) restic backup runs. Set by the
+    /// layout from ManageBackupJobs at global scope.</summary>
+    [Parameter] public bool CanSeeBackups { get; set; }
+
+    private IReadOnlyList<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRunSnapshot> BackupRuns
+        => CanSeeBackups ? BackupRunner.Runs : [];
 
     private bool _isOpen;
     private ReindexProgress _reindex = ReindexProgress.Idle;
@@ -164,7 +201,7 @@
     private string ReindexScopeLabel => string.IsNullOrEmpty(_reindex.ShareName)
         ? Text("Web_Settings_Search_ReindexAllShares", "All shares")
         : _reindex.ShareName!;
-    private int TotalCount => JobService.Jobs.Count + SyncJobRunner.Jobs.Count + (ReindexRunning ? 1 : 0);
+    private int TotalCount => JobService.Jobs.Count + SyncJobRunner.Jobs.Count + BackupRuns.Count + (ReindexRunning ? 1 : 0);
 
     // Renders a UTC timestamp as local time using the configured time format
     // (24h or 12h AM/PM), so job times match the rest of the UI.
@@ -182,6 +219,7 @@
     {
         JobService.OnChanged += HandleChanged;
         SyncJobRunner.OnChanged += HandleChanged;
+        BackupRunner.OnChanged += HandleChanged;
         _reindex = SearchAdmin.GetReindexProgress();
         _reindexSig = (_reindex.Running, _reindex.Done, _reindex.Total);
 
@@ -229,6 +267,7 @@
     {
         JobService.OnChanged -= HandleChanged;
         SyncJobRunner.OnChanged -= HandleChanged;
+        BackupRunner.OnChanged -= HandleChanged;
         if (_pollTimer is not null)
         {
             _pollTimer.Elapsed -= PollReindex;

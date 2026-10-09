@@ -78,6 +78,14 @@
                 </NavLink>
             }
 
+            @if (_canManageFileBackup)
+            {
+                <NavLink class="nav-item" href="/backup" Match="NavLinkMatch.Prefix">
+                    @Assets.SVG("archive.svg", new SvgOptions())
+                    <span class="nav-label">@Text("Web_Nav_Backup", "Backup")</span>
+                </NavLink>
+            }
+
             @if (_canViewSecurity)
             {
                 <NavLink class="nav-item" href="/security" Match="NavLinkMatch.Prefix">
@@ -175,7 +183,7 @@
                 @Assets.SVG("menu.svg", new SvgOptions())
             </button>
             <GlobalSearch />
-            <JobMenu CanSeeReindex="_canManageSettings" />
+            <JobMenu CanSeeReindex="_canManageSettings" CanSeeBackups="_canSeeAllBackupRuns" />
         </div>
         @if (Demo.ReadOnly)
         {
@@ -226,6 +234,8 @@
     private bool _canManageShareLinks;
     private bool _canViewSecurity;
     private bool _canManageNotifications;
+    private bool _canManageFileBackup;
+    private bool _canSeeAllBackupRuns;
     private UserContext? _currentUser;
     
     [Inject] private IJSRuntime JS { get; set; } = default!;
@@ -403,6 +413,16 @@
             _canManageNotifications = _currentUser != null
                                       && await ManagementAuthService.HasAnyPermissionAsync(
                                              _currentUser, ManagementPermission.ManageNotifications);
+            // Mirror BackupAccess.CanAccessPage (repositories or jobs).
+            _canManageFileBackup = _currentUser != null
+                                   && await ManagementAuthService.HasAnyPermissionAsync(
+                                          _currentUser,
+                                          ManagementPermission.ManageBackupRepositories | ManagementPermission.ManageBackupJobs);
+            // The running-jobs menu lists every backup run, so only Global job admins see it;
+            // scoped admins follow their runs on the backup page.
+            _canSeeAllBackupRuns = _currentUser != null
+                                   && await ManagementAuthService.HasGlobalPermissionAsync(
+                                          _currentUser, ManagementPermission.ManageBackupJobs);
         }
 
         if (_currentUser?.User.MustChangePassword == true)

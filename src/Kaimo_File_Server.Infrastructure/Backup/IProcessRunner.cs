@@ -22,4 +22,21 @@ public interface IProcessRunner
         IReadOnlyList<string> arguments,
         IReadOnlyDictionary<string, string>? environment = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Runs a long-lived process whose stdout is streamed line by line to
+    /// <paramref name="onStdoutLine"/> (the returned <see cref="ProcessResult.StandardOutput"/>
+    /// is then empty) and whose stderr is kept only as a bounded tail. With
+    /// <paramref name="clearEnvironment"/> the child does not inherit this process's
+    /// environment (which holds e.g. the database connection string); only PATH, HOME,
+    /// locale and temp variables are carried over before <paramref name="environment"/> is applied.
+    /// </summary>
+    Task<ProcessResult> RunStreamingAsync(
+        string fileName,
+        IReadOnlyList<string> arguments,
+        IReadOnlyDictionary<string, string>? environment,
+        Action<string>? onStdoutLine,
+        bool clearEnvironment,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("This process runner does not support streaming.");
 }

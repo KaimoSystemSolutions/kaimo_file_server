@@ -91,6 +91,16 @@ public static class DefaultMailTemplates
         [(C.BackupSucceeded, "en")] = new("Database backup created",
             "<p>The database backup <strong>{{ backup.fileName }}</strong> ({{ backup.size }}, {{ backup.trigger }}) was created.</p>"),
 
+        [(C.FileBackupFailed, "de")] = new("Datensicherung „{{ job.name }}“ fehlgeschlagen",
+            "<p>Der Sicherungsauftrag <strong>{{ job.name }}</strong> in das Repository <strong>{{ repository.name }}</strong> ist fehlgeschlagen.</p><p>Fehlercode: <code>{{ errorCode }}</code><br>Betroffene Quellen: {{ failedSources }}<br>Zeitpunkt: {{ event.time }}</p>" + LoginLink),
+        [(C.FileBackupFailed, "en")] = new("File backup \"{{ job.name }}\" failed",
+            "<p>The backup job <strong>{{ job.name }}</strong> into the repository <strong>{{ repository.name }}</strong> failed.</p><p>Error code: <code>{{ errorCode }}</code><br>Affected sources: {{ failedSources }}<br>Time: {{ event.time }}</p>" + LoginLink),
+
+        [(C.FileBackupWarnings, "de")] = new("Datensicherung „{{ job.name }}“ mit Warnungen",
+            "<p>Der Sicherungsauftrag <strong>{{ job.name }}</strong> wurde abgeschlossen, aber {{ warningCount }} Dateien konnten nicht gelesen werden (z. B. weil sie während der Sicherung geändert oder gesperrt waren). Details stehen im Verlauf der Sicherung.</p>" + LoginLink),
+        [(C.FileBackupWarnings, "en")] = new("File backup \"{{ job.name }}\" completed with warnings",
+            "<p>The backup job <strong>{{ job.name }}</strong> completed, but {{ warningCount }} files could not be read (for example because they changed or were locked during the backup). See the backup activity for details.</p>" + LoginLink),
+
         [(C.DeviceRegistered, "de")] = new("Neues Gerät angemeldet: {{ device.name }}",
             "<p>Hallo {{ recipient.name }},</p><p>mit deinem Konto <strong>{{ user.username }}</strong> wurde ein neues Gerät angemeldet: <strong>{{ device.name }}</strong> ({{ device.platform }}), {{ event.time }}.</p><p>Warst du das nicht, ändere bitte dein Passwort und informiere deinen Administrator.</p>"),
         [(C.DeviceRegistered, "en")] = new("New device signed in: {{ device.name }}",

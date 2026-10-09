@@ -73,3 +73,10 @@ Bundled browser assets (redistributed under src/Kaimo_File_Server.Web/wwwroot/li
     Font License 1.1, Copyright 2020 The Plus Jakarta Sans Project Authors. The
     OFL requires the notice and license to travel with the font; both are kept in
     fonts/PlusJakartaSans-OFL.txt.
+
+Third-party binaries (installed into the Web container image):
+
+  - restic (https://restic.net) -- BSD 2-Clause License, Copyright (c) 2014,
+    Alexander Neumann. The official, checksum-pinned release binary is installed
+    as /usr/local/bin/restic; the license is kept in third-party/restic/LICENSE
+    and shipped in the image as /usr/share/doc/restic/LICENSE.

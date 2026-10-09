@@ -73,6 +73,14 @@
         // immediately invalidates its access token too.
         ManageClientDevices = 1L << 55,
 
+        // -- File backup (restic) --
+        // Kept outside FullAdmin (see DatabaseSeeder.RoleDefinitions): FullAdmin doubles as
+        // the "is global admin" test. ManageBackups (bit 44) stays the database-backup right.
+        ManageBackupRepositories = 1L << 58, // create/connect repositories, recovery kit, release to departments (Global)
+        ManageBackupJobs = 1L << 59,         // create/edit/run backup jobs for shares in scope
+        RestoreFromBackup = 1L << 60,        // restore into a new folder or as download
+        RestoreBackupInPlace = 1L << 61,     // restore over existing content / into another share, incl. ACLs
+
         // -- Shortcuts --
         UserAdmin = CreateUsers | DeleteUsers | EditUserProfiles
                   | ResetPasswords | EnableDisableUsers,
@@ -98,5 +106,9 @@
         SyncAdmin = CreateSyncs | DeleteSyncs | ConfigureSyncs | SyncManually,
 
         CloudAccessAdmin = ManageCloudAccess | ManageConnections | UseConnections,
+
+        FileBackupAdmin = ManageBackupRepositories | ManageBackupJobs | RestoreFromBackup | RestoreBackupInPlace,
+
+        BackupOperator = ManageBackupJobs | RestoreFromBackup | RestoreBackupInPlace,
     }
 }

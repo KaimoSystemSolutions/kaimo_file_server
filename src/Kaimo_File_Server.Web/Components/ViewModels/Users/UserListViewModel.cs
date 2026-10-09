@@ -447,6 +447,17 @@ public class UserListViewModel
             new(ManagementPermission.ManageConnections, Resources.Web_Perm_ManageConnections),
             new(ManagementPermission.UseConnections, Resources.Web_Perm_UseConnections),
         ]),
+        new(Resources.ResourceManager.GetString("Web_PermGroup_FileBackup") ?? "File backup",
+        [
+            new(ManagementPermission.ManageBackupRepositories,
+                Resources.ResourceManager.GetString("Web_Perm_ManageBackupRepositories") ?? "Manage backup repositories"),
+            new(ManagementPermission.ManageBackupJobs,
+                Resources.ResourceManager.GetString("Web_Perm_ManageBackupJobs") ?? "Manage backup jobs"),
+            new(ManagementPermission.RestoreFromBackup,
+                Resources.ResourceManager.GetString("Web_Perm_RestoreFromBackup") ?? "Restore from backup"),
+            new(ManagementPermission.RestoreBackupInPlace,
+                Resources.ResourceManager.GetString("Web_Perm_RestoreBackupInPlace") ?? "Restore in place"),
+        ]),
     ];
 
     public static readonly List<PermissionPreset> PermissionPresets =
@@ -457,6 +468,7 @@ public class UserListViewModel
         new("DepartmentAdmin", ManagementPermission.DepartmentAdmin),
         new("SystemAdmin", ManagementPermission.SystemAdmin),
         new("ExternalStorageAdmin", ManagementPermission.CloudAccessAdmin),
+        new("BackupAdmin", ManagementPermission.FileBackupAdmin),
         new("FullAdmin", ManagementPermission.FullAdmin),
     ];
 

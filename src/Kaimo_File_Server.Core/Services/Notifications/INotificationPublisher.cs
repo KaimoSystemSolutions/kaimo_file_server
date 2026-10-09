@@ -71,6 +71,16 @@ public static class NotificationEvents
         => Build(C.BackupSucceeded, null, Roles(),
             [("backup.trigger", trigger), ("backup.fileName", fileName), ("backup.size", FormatSize(size))]);
 
+    public static NotificationEvent FileBackupFailed(Guid jobId, string jobName, string repositoryName, Guid? creatorId, string errorCode, string failedSources)
+        => Build(C.FileBackupFailed, null, Roles((R.JobCreator, creatorId)),
+            [("job.name", jobName), ("repository.name", repositoryName), ("errorCode", errorCode), ("failedSources", Truncate(failedSources, 500))],
+            "filebackup-failed:" + jobId.ToString("N"));
+
+    public static NotificationEvent FileBackupWarnings(Guid jobId, string jobName, string repositoryName, Guid? creatorId, int warningCount)
+        => Build(C.FileBackupWarnings, null, Roles((R.JobCreator, creatorId)),
+            [("job.name", jobName), ("repository.name", repositoryName), ("warningCount", warningCount.ToString(System.Globalization.CultureInfo.InvariantCulture))],
+            "filebackup-warnings:" + jobId.ToString("N"));
+
     public static NotificationEvent DeviceRegistered(Guid userId, string username, string deviceName, string platform)
         => Build(C.DeviceRegistered, userId, Roles((R.Affected, userId)),
             [("device.name", deviceName), ("device.platform", platform), ("user.username", username)]);

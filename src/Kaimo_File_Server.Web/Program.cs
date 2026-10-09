@@ -467,6 +467,19 @@ builder.Services.AddHostedService(sp =>
 builder.Services.AddHostedService<CertificateRenewalService>();
 builder.Services.AddHostedService<CloudSyncSchedulerService>();
 
+// restic file backup (Web only: the vault that holds repository passwords lives here).
+builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.ResticClient>();
+builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.ResticTargetResolver>();
+builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupJobExecutor>();
+builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRunner>();
+builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.IBackupRunner>(
+    sp => sp.GetRequiredService<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRunner>());
+builder.Services.AddHostedService(
+    sp => sp.GetRequiredService<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRunner>());
+builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupSchedulerService>();
+builder.Services.AddScoped<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupCatalogService>();
+builder.Services.AddScoped<Kaimo_File_Server.Web.Components.ViewModels.Backup.BackupViewModel>();
+
 
 // ══════════════════════════════════════════
 //  Build & configure pipeline
