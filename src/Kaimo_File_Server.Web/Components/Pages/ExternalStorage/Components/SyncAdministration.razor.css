@@ -46,6 +46,8 @@
 .storage-path-field > button { flex: 0 0 auto; width: auto; }
 .storage-editor .detail-actions { flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; margin-top: 14px; }
 .storage-editor .detail-actions > button { flex: 0 0 auto; width: auto; white-space: nowrap; }
+.storage-form-grid input[aria-invalid="true"] { border-color: var(--danger); }
+.sync-validation-hint { flex: 0 0 100%; color: var(--text-secondary); font-size: 11.5px; }
 .sync-detail-pane .detail-empty { min-height: 420px; height: 100%; padding: 24px; color: var(--text-tertiary); }
 .sync-detail-pane .detail-empty p { max-width: 260px; font-size: 12.5px; line-height: 1.5; }
 

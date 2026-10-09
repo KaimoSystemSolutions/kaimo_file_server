@@ -108,6 +108,9 @@ public sealed class ExternalStorageSyncViewModel(
         ArgumentNullException.ThrowIfNull(model);
         await EnsureActorAsync();
         var share = await GetAuthorizedShareAsync(model.LocalShareId, ManagementPermission.CreateSyncs);
+        // Before the remote path is resolved, which would turn an unpicked folder into the root.
+        ValidateFields(model);
+        await EnsureSyncNameAvailableAsync(model.DisplayName.Trim(), current: null);
         var connection = await GetUsableConnectionAsync(model.ConnectionId);
         EnsureCapability(connection, StorageProviderCapabilities.Sync, "Web_ExternalStorage_SyncUnsupported",
             "This provider does not support synchronization.");
@@ -147,6 +150,8 @@ public sealed class ExternalStorageSyncViewModel(
                          ?? throw new InvalidOperationException(Text(
                              "Web_ExternalStorage_SyncMissing", "The sync no longer exists."));
         var share = await GetAuthorizedShareAsync(definition.LocalShareId, ManagementPermission.ConfigureSyncs);
+        ValidateFields(model);
+        await EnsureSyncNameAvailableAsync(model.DisplayName.Trim(), definition);
         StorageConnection connection;
         if (model.Enabled)
         {
@@ -344,19 +349,50 @@ public sealed class ExternalStorageSyncViewModel(
                 "Web_CloudSync_Error_LocalFolder", "Select an existing local folder."));
     }
 
+    /// <summary>
+    /// Sync names are unique (case-insensitive) across all shares, ignoring editor
+    /// tombstones. An unchanged name is always accepted, so legacy rows that differ
+    /// only in case stay editable without a forced rename.
+    /// </summary>
+    private async Task EnsureSyncNameAvailableAsync(string name, SyncDefinition? current)
+    {
+        if (current is not null && string.Equals(current.DisplayName, name, StringComparison.Ordinal))
+            return;
+        if ((await syncDefinitions.GetAllAsync()).Select(entry => entry.Definition).Any(candidate =>
+                candidate.Id != current?.Id
+                && candidate.MigrationSource != SyncDefinition.DeletedByFirstClassEditorSource
+                && string.Equals(candidate.DisplayName?.Trim(), name, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException(Text(
+                "Web_ExternalStorage_SyncNameExists", "A sync with this name already exists."));
+    }
+
     // Form-only checks that need no connection, remote or filesystem access.
     private static void ValidateFields(ExternalStorageSyncEditModel model)
     {
+        if (GetFieldError(model) is { } error)
+            throw new ArgumentException(error);
+    }
+
+    /// <summary>
+    /// Returns the first form-field validation message, or <c>null</c> when the
+    /// fields are valid. Shared by the save path and the editor's live validation.
+    /// </summary>
+    public static string? GetFieldError(ExternalStorageSyncEditModel model)
+    {
         if (string.IsNullOrWhiteSpace(model.DisplayName) || model.DisplayName.Trim().Length > 200)
-            throw new ArgumentException(Text("Web_ExternalStorage_InvalidName", "Enter a name of at most 200 characters."));
+            return Text("Web_ExternalStorage_InvalidName", "Enter a name of at most 200 characters.");
+        // The remote folder must be chosen explicitly, even when it is the root ("/").
+        if (string.IsNullOrWhiteSpace(model.RemotePath))
+            return Text("Web_CloudAccess_FolderRequired", "Select a remote folder.");
         if (model.Description.Length > 2000)
-            throw new ArgumentException(Text("Web_ExternalStorage_InvalidDescription", "The description is too long."));
+            return Text("Web_ExternalStorage_InvalidDescription", "The description is too long.");
         if (model.IntervalSeconds is < CloudSyncSchedule.MinIntervalSeconds or > CloudSyncSchedule.MaxIntervalSeconds)
-            throw new ArgumentException(Text("Web_CloudSync_Schedule_Error_Interval", "Enter an interval between 1 and 86400 seconds."));
+            return Text("Web_CloudSync_Schedule_Error_Interval", "Enter an interval between 1 and 86400 seconds.");
         if (model.ScheduleEnabled && !model.ActiveScheduleSlots.Any(CloudSyncSchedule.IsValidSlot))
-            throw new ArgumentException(Text("Web_CloudSync_Schedule_Error_Empty", "Select at least one hour before enabling the timer."));
+            return Text("Web_CloudSync_Schedule_Error_Empty", "Select at least one hour before enabling the timer.");
         if (model.MaxFileSizeMb is < 0 || model.MaxUploadRateKbps is < 0 || model.MaxDownloadRateKbps is < 0)
-            throw new ArgumentException(Text("Web_CloudSync_Advanced_Error_Negative", "Advanced limits cannot be negative."));
+            return Text("Web_CloudSync_Advanced_Error_Negative", "Advanced limits cannot be negative.");
+        return null;
     }
 
     private async Task<ShareDefinition> GetAuthorizedShareAsync(Guid id, ManagementPermission permission)

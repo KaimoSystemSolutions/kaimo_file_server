@@ -77,7 +77,8 @@
     [Parameter] public EventCallback OnClosed { get; set; }
 
     private string RootPath => IsRemote ? "/" : "";
-    private string DisplayPath => string.IsNullOrEmpty(CurrentPath) ? "/" : CurrentPath;
+    // Shown rooted for both sides; typed input goes through NormalizePath either way.
+    private string DisplayPath => "/" + CurrentPath.TrimStart('/');
     private bool IsAtRoot => string.Equals(CurrentPath, RootPath, StringComparison.Ordinal);
 
     // The parent owns picker state; the dialog only reports user intent.

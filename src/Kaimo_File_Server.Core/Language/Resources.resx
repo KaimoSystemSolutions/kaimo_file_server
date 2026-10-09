@@ -3207,6 +3207,9 @@
   <data name="Web_ExternalStorage_ConnectionNameExists" xml:space="preserve">
     <value>A connection with this name already exists.</value>
   </data>
+  <data name="Web_ExternalStorage_SyncNameExists" xml:space="preserve">
+    <value>A sync with this name already exists.</value>
+  </data>
   <data name="Web_CloudAccess_InvalidShareName" xml:space="preserve">
     <value>Enter a valid share name.</value>
   </data>

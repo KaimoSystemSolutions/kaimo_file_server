@@ -1,4 +1,5 @@
 @using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Helpers
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Services.DataServices
 @using Kaimo_File_Server.Core.Services.ExternalStorage
@@ -98,7 +99,7 @@ else
             @if (_activeSettingsTab == SyncSettingsTab.General)
             {
                 <div class="storage-form-grid storage-tab-panel" role="tabpanel">
-                    <label><span>@R("Web_ExternalStorage_Name")</span><input class="edit-input" maxlength="200" @bind="_model.DisplayName" /></label>
+                    <label><span>@R("Web_ExternalStorage_Name")</span><input class="edit-input" maxlength="200" @bind="_model.DisplayName" @bind:event="oninput" aria-invalid="@(SyncNameTaken ? "true" : null)" /></label>
                     <label><span>@R("Web_ExternalStorage_Connection")</span><select class="edit-input" @bind="_model.ConnectionId" @bind:after="ConnectionChanged">
                         <option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>
                         @* Keep a broken sync's current connection selectable so it can still be edited and disabled. *@
@@ -107,7 +108,7 @@ else
                             <option value="@connection.Id">@connection.Name (@ProviderName(connection.ProviderId))</option>
                         }
                     </select></label>
-                    <label><span>@R("Web_ExternalStorage_LocalShare")</span><select class="edit-input" @bind="_model.LocalShareId">
+                    <label><span>@R("Web_ExternalStorage_LocalShare")</span><select class="edit-input" @bind="_model.LocalShareId" @bind:after="ShareChanged" disabled="@(_editingId is not null)">
                         <option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>
                         @foreach (var share in VM.Shares)
                         {
@@ -126,8 +127,8 @@ else
                         }
                         <option value="@SyncMode.Pull">@R("Web_CloudSync_Mode_Pull")</option>
                     </select></label>
-                    <label><span>@R("Web_ExternalStorage_LocalPath")</span><span class="storage-path-field"><input class="edit-input" placeholder="/" @bind="_model.LocalPath" /><button class="btn-secondary" type="button" disabled="@(_model.LocalShareId == Guid.Empty)" @onclick="OpenLocalPickerAsync">@R("Web_CloudAccess_Browse")</button></span></label>
-                    <label><span>@R("Web_ExternalStorage_RemotePath")</span><span class="storage-path-field"><input class="edit-input" placeholder="/" @bind="_model.RemotePath" />@if (SelectedConnectionSupports(StorageProviderCapabilities.Browse)) { <button class="btn-secondary" type="button" disabled="@(_model.ConnectionId == Guid.Empty)" @onclick="OpenRemotePickerAsync">@R("Web_CloudAccess_Browse")</button> }</span></label>
+                    <label><span>@R("Web_ExternalStorage_LocalPath")</span><span class="storage-path-field"><input class="edit-input" @bind="LocalPathDisplay" /><button class="btn-secondary" type="button" disabled="@(_model.LocalShareId == Guid.Empty)" @onclick="OpenLocalPickerAsync">@R("Web_CloudAccess_Browse")</button></span></label>
+                    <label><span>@R("Web_ExternalStorage_RemotePath")</span><span class="storage-path-field"><input class="edit-input" @bind="_model.RemotePath" @bind:event="oninput" />@if (SelectedConnectionSupports(StorageProviderCapabilities.Browse)) { <button class="btn-secondary" type="button" disabled="@(_model.ConnectionId == Guid.Empty)" @onclick="OpenRemotePickerAsync">@R("Web_CloudAccess_Browse")</button> }</span></label>
                     <label class="storage-wide"><span>@R("Web_ExternalStorage_Description")</span><textarea class="edit-input" maxlength="2000" @bind="_model.Description"></textarea></label>
                 </div>
             }
@@ -149,7 +150,7 @@ else
                         <span class="cloud-schedule-interval-input">
                             <input class="edit-input cloud-schedule-interval-field" type="number"
                                    min="@CloudSyncSchedule.MinIntervalSeconds" max="@CloudSyncSchedule.MaxIntervalSeconds"
-                                   @bind="_model.IntervalSeconds" />
+                                   @bind="_model.IntervalSeconds" @bind:event="oninput" />
                             <span>@R("Web_CloudSync_Schedule_Seconds")</span>
                         </span>
                     </label>
@@ -205,10 +206,10 @@ else
                     <h4>@R("Web_CloudSync_Advanced")</h4>
                     <p>@R("Web_CloudSync_Advanced_Help")</p>
                     <div class="storage-form-grid">
-                        <label><span>@R("Web_CloudSync_Advanced_MaxFileSize")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxFileSizeMb" /><small>@R("Web_CloudSync_Advanced_Unlimited_Help")</small></label>
+                        <label><span>@R("Web_CloudSync_Advanced_MaxFileSize")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxFileSizeMb" @bind:event="oninput" /><small>@R("Web_CloudSync_Advanced_Unlimited_Help")</small></label>
                         <label><span>@R("Web_CloudSync_Advanced_ExcludedExtensions")</span><textarea class="edit-input" placeholder=".tmp, .iso, .bak" @bind="_model.ExcludedExtensions"></textarea><small>@R("Web_CloudSync_Advanced_ExcludedExtensions_Help")</small></label>
-                        <label><span>@R("Web_CloudSync_Advanced_MaxUpload")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxUploadRateKbps" /><small>@R("Web_CloudSync_Advanced_Unlimited_Help")</small></label>
-                        <label><span>@R("Web_CloudSync_Advanced_MaxDownload")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxDownloadRateKbps" /><small>@R("Web_CloudSync_Advanced_Unlimited_Help")</small></label>
+                        <label><span>@R("Web_CloudSync_Advanced_MaxUpload")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxUploadRateKbps" @bind:event="oninput" /><small>@R("Web_CloudSync_Advanced_Unlimited_Help")</small></label>
+                        <label><span>@R("Web_CloudSync_Advanced_MaxDownload")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxDownloadRateKbps" @bind:event="oninput" /><small>@R("Web_CloudSync_Advanced_Unlimited_Help")</small></label>
                     </div>
                     @if (_model.Mode == SyncMode.TwoWay || _model.Mode == SyncMode.Pull)
                     {
@@ -221,6 +222,10 @@ else
                 </div>
             }
             <div class="detail-actions">
+                @if (ValidationHint is { } hint)
+                {
+                    <small class="sync-validation-hint" role="status">@hint</small>
+                }
                 <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelEdit">@R("Web_Button_Cancel")</button>
                 <button class="btn-primary" type="button" disabled="@(_busy || !CanSave)" @onclick="SaveAsync">@R("Web_CloudAccess_Save")</button>
             </div>
@@ -348,7 +353,25 @@ else
     private DotNetObjectReference<SyncAdministration>? _schedulePaintReference;
     private IEnumerable<StorageConnection> ReadyConnections => VM.Connections.Where(c =>
         c.State == StorageConnectionState.Ready && VM.Supports(c, StorageProviderCapabilities.Sync));
-    private bool CanSave => _model.ConnectionId != Guid.Empty && _model.LocalShareId != Guid.Empty && !string.IsNullOrWhiteSpace(_model.DisplayName);
+    // Live validation: the first missing/invalid field, mirroring the save-path checks.
+    private string? ValidationHint
+        => _model.ConnectionId == Guid.Empty ? R("Web_CloudAccess_ConnectionRequired")
+            : _model.LocalShareId == Guid.Empty ? R("Web_CloudSync_Error_ShareRequired")
+            : SyncNameTaken ? R("Web_ExternalStorage_SyncNameExists")
+            : ExternalStorageSyncViewModel.GetFieldError(_model);
+    private bool CanSave => ValidationHint is null;
+    /// <summary>Live duplicate-name check against the loaded list; the view model re-checks on save.</summary>
+    private bool SyncNameTaken => !string.IsNullOrWhiteSpace(_model.DisplayName)
+        && !(_editingId is not null && string.Equals(SelectedItem?.Definition.DisplayName, _model.DisplayName.Trim(), StringComparison.Ordinal))
+        && VM.Syncs.Any(sync => sync.Definition.Id != _editingId
+            && string.Equals(sync.Definition.DisplayName?.Trim(), _model.DisplayName.Trim(), StringComparison.OrdinalIgnoreCase));
+    // Local paths are stored share-relative ("" = root) but shown rooted ("/docs"),
+    // exactly like remote paths. Bound on change, so normalizing never fights typing.
+    private string LocalPathDisplay
+    {
+        get => DisplayPath(_model.LocalPath);
+        set => _model.LocalPath = ShareRelativePath.Normalize(value);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -381,7 +404,7 @@ else
         _selectedId = null;
         _error = null;
         _activeSettingsTab = SyncSettingsTab.General;
-        _model = new ExternalStorageSyncEditModel { ConnectionId = connectionId ?? Guid.Empty };
+        _model = new ExternalStorageSyncEditModel { ConnectionId = connectionId ?? Guid.Empty, RemotePath = string.Empty };
         ConnectionChanged();
     }
 
@@ -394,8 +417,13 @@ else
         _runSucceeded = false;
     }
 
+    // A local folder belongs to its share; start again at the share root.
+    private void ShareChanged() => _model.LocalPath = string.Empty;
+
     private void ConnectionChanged()
     {
+        // A remote folder belongs to its connection, so a new sync must pick it again.
+        if (_editingId is null) _model.RemotePath = string.Empty;
         if (_model.ConnectionId != Guid.Empty
             && (!SelectedConnectionSupports(StorageProviderCapabilities.Write)
                 || (SelectedConnectionSupports(StorageProviderCapabilities.OptimizedSync)
