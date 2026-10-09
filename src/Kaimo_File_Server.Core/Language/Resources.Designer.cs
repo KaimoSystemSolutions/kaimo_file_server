@@ -3389,6 +3389,15 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_CloudSync_Schedule_Clear", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Custom times ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Custom {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Custom", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Every hour on {0}: {1} ähnelt.

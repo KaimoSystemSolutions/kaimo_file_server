@@ -5182,8 +5182,18 @@ input[type="radio"] {
     font-size: 11px;
 }
 
+.cloud-schedule-custom-toggle {
+    margin: var(--space-3) 0 var(--space-2);
+    font-size: 13px;
+}
+
+.cloud-schedule-custom-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-control);
+}
+
 .cloud-schedule-scroll {
-    overflow-x: auto;
     padding-bottom: 4px;
     transition: opacity .15s ease;
 }
@@ -5192,10 +5202,10 @@ input[type="radio"] {
     opacity: .55;
 }
 
+/* Days are columns, hours are rows: seven columns fit the detail panel at any width. */
 .cloud-schedule-grid {
     display: grid;
-    grid-template-columns: 46px repeat(24, minmax(17px, 1fr));
-    min-width: 500px;
+    grid-template-columns: 48px repeat(7, minmax(0, 1fr));
     gap: 3px;
     align-items: center;
     user-select: none;
@@ -5214,29 +5224,40 @@ input[type="radio"] {
 }
 
 .cloud-schedule-hour {
-    overflow: visible;
-    padding: 0;
+    padding: 0 6px 0 0;
     background: transparent;
-    font-size: 8px;
-    text-align: center;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
     cursor: pointer;
 }
 
 .cloud-schedule-day {
     overflow: hidden;
-    padding: 3px 5px;
+    padding: 3px 0;
     background: transparent;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 650;
-    text-align: left;
+    text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
     cursor: pointer;
 }
 
+.cloud-schedule-hour:hover:not(:disabled),
+.cloud-schedule-day:hover:not(:disabled) {
+    color: var(--text-primary);
+}
+
+.cloud-schedule-hour:focus-visible,
+.cloud-schedule-day:focus-visible,
+.cloud-schedule-slot:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
 .cloud-schedule-slot {
-    aspect-ratio: 1;
-    min-height: 17px;
+    height: 20px;
     padding: 0;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-control);
@@ -5250,14 +5271,12 @@ input[type="radio"] {
     border-color: var(--accent);
     background: color-mix(in srgb, var(--accent) 24%, var(--bg-sunken));
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
-    transform: scale(1.12);
 }
 
 .cloud-schedule-scroll--paint-deselect .cloud-schedule-slot:hover:not(:disabled) {
     border-color: var(--danger);
     background: color-mix(in srgb, var(--danger) 24%, var(--bg-sunken));
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 25%, transparent);
-    transform: scale(1.12);
 }
 
 .cloud-schedule-slot--active {

@@ -141,7 +141,7 @@ else
                             <InfoButton Text="@R("Web_CloudSync_Schedule_Help")" />
                         </div>
                         <label class="toggle-switch cloud-schedule-toggle" title="@R("Web_CloudSync_Schedule_Toggle")">
-                            <input type="checkbox" @bind="_model.ScheduleEnabled" aria-label="@R("Web_CloudSync_Schedule_Toggle")" />
+                            <input type="checkbox" @bind="_model.ScheduleEnabled" @bind:after="ScheduleToggled" aria-label="@R("Web_CloudSync_Schedule_Toggle")" />
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
@@ -154,50 +154,62 @@ else
                             <span>@R("Web_CloudSync_Schedule_Seconds")</span>
                         </span>
                     </label>
-                    <div class="cloud-schedule-paint-toolbar">
-                        <span class="cloud-schedule-paint-label cloud-schedule-field-label">@R("Web_CloudSync_Schedule_Paint_Mode")</span>
-                        <div class="cloud-schedule-paint-modes" role="group" aria-label="@R("Web_CloudSync_Schedule_Paint_Mode")">
-                            <button class="cloud-schedule-paint-mode cloud-schedule-paint-mode--select @(_schedulePaintMode == SchedulePaintMode.Select ? "cloud-schedule-paint-mode--active" : "")"
-                                    type="button" disabled="@(!_model.ScheduleEnabled)" @onclick="() => _schedulePaintMode = SchedulePaintMode.Select">
-                                <span aria-hidden="true">+</span>@R("Web_CloudSync_Schedule_Paint_Select")
-                            </button>
-                            <button class="cloud-schedule-paint-mode cloud-schedule-paint-mode--deselect @(_schedulePaintMode == SchedulePaintMode.Deselect ? "cloud-schedule-paint-mode--active" : "")"
-                                    type="button" disabled="@(!_model.ScheduleEnabled)" @onclick="() => _schedulePaintMode = SchedulePaintMode.Deselect">
-                                <span aria-hidden="true">−</span>@R("Web_CloudSync_Schedule_Paint_Deselect")
-                            </button>
+                    @if (_model.ScheduleEnabled)
+                    {
+                        <button class="acl-collapse-toggle cloud-schedule-custom-toggle" type="button" aria-expanded="@_scheduleCustomOpen"
+                                @onclick="() => _scheduleCustomOpen = !_scheduleCustomOpen">
+                            @Assets.SVG("chevron_right.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-collapse-chevron" + (_scheduleCustomOpen ? " acl-collapse-chevron--open" : "")))
+                            <span>@R("Web_CloudSync_Schedule_Custom")</span>
+                        </button>
+                    }
+                    @if (_model.ScheduleEnabled && _scheduleCustomOpen)
+                    {
+                        <div class="cloud-schedule-paint-toolbar">
+                            <span class="cloud-schedule-paint-label cloud-schedule-field-label">@R("Web_CloudSync_Schedule_Paint_Mode")</span>
+                            <div class="cloud-schedule-paint-modes" role="group" aria-label="@R("Web_CloudSync_Schedule_Paint_Mode")">
+                                <button class="cloud-schedule-paint-mode cloud-schedule-paint-mode--select @(_schedulePaintMode == SchedulePaintMode.Select ? "cloud-schedule-paint-mode--active" : "")"
+                                        type="button" disabled="@(!_model.ScheduleEnabled)" @onclick="() => _schedulePaintMode = SchedulePaintMode.Select">
+                                    <span aria-hidden="true">+</span>@R("Web_CloudSync_Schedule_Paint_Select")
+                                </button>
+                                <button class="cloud-schedule-paint-mode cloud-schedule-paint-mode--deselect @(_schedulePaintMode == SchedulePaintMode.Deselect ? "cloud-schedule-paint-mode--active" : "")"
+                                        type="button" disabled="@(!_model.ScheduleEnabled)" @onclick="() => _schedulePaintMode = SchedulePaintMode.Deselect">
+                                    <span aria-hidden="true">−</span>@R("Web_CloudSync_Schedule_Paint_Deselect")
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="cloud-schedule-scroll @SchedulePaintModeClass @(_model.ScheduleEnabled ? "" : "cloud-schedule-scroll--disabled")" @ref="_scheduleGrid">
-                        <div class="cloud-schedule-grid" role="grid" aria-label="@R("Web_CloudSync_Schedule_Grid")">
-                            <span class="cloud-schedule-corner" aria-hidden="true"></span>
-                            @foreach (var hour in Enumerable.Range(0, CloudSyncSchedule.HoursPerDay))
-                            {
-                                <button class="cloud-schedule-hour" type="button" disabled="@(!_model.ScheduleEnabled)"
-                                        title="@ScheduleHourActionLabel(hour)" @onclick="() => PaintScheduleHour(hour)">@hour.ToString("00")</button>
-                            }
-                            @foreach (var day in ScheduleDays)
-                            {
-                                <button class="cloud-schedule-day" type="button" disabled="@(!_model.ScheduleEnabled)"
-                                        title="@ScheduleDayActionLabel(day)" @onclick="() => PaintScheduleDay(day)">@ScheduleDayName(day)</button>
+                        <div class="cloud-schedule-scroll @SchedulePaintModeClass @(_model.ScheduleEnabled ? "" : "cloud-schedule-scroll--disabled")" @ref="_scheduleGrid">
+                            <div class="cloud-schedule-grid" role="grid" aria-label="@R("Web_CloudSync_Schedule_Grid")">
+                                @* Days are columns and hours are rows, so the grid fits the narrow detail panel without horizontal scrolling. *@
+                                <span class="cloud-schedule-corner" aria-hidden="true"></span>
+                                @foreach (var day in ScheduleDays)
+                                {
+                                    <button class="cloud-schedule-day" type="button" disabled="@(!_model.ScheduleEnabled)"
+                                            title="@ScheduleDayActionLabel(day)" @onclick="() => PaintScheduleDay(day)">@ScheduleDayName(day)</button>
+                                }
                                 @foreach (var hour in Enumerable.Range(0, CloudSyncSchedule.HoursPerDay))
                                 {
-                                    var active = IsScheduleSlotActive(day, hour);
-                                    <button class="cloud-schedule-slot @(active ? "cloud-schedule-slot--active" : "")" type="button" role="gridcell"
-                                            data-schedule-row="@Array.IndexOf(ScheduleDays, day)" data-schedule-hour="@hour"
-                                            aria-pressed="@active" aria-label="@ScheduleSlotLabel(day, hour, active)"
-                                            title="@ScheduleSlotLabel(day, hour, active)" disabled="@(!_model.ScheduleEnabled)"
-                                            @onclick="() => PaintScheduleSlot(day, hour)"></button>
+                                    <button class="cloud-schedule-hour" type="button" disabled="@(!_model.ScheduleEnabled)"
+                                            title="@ScheduleHourActionLabel(hour)" @onclick="() => PaintScheduleHour(hour)">@($"{hour:00}:00")</button>
+                                    @foreach (var day in ScheduleDays)
+                                    {
+                                        var active = IsScheduleSlotActive(day, hour);
+                                        <button class="cloud-schedule-slot @(active ? "cloud-schedule-slot--active" : "")" type="button" role="gridcell"
+                                                data-schedule-row="@Array.IndexOf(ScheduleDays, day)" data-schedule-hour="@hour"
+                                                aria-pressed="@active" aria-label="@ScheduleSlotLabel(day, hour, active)"
+                                                title="@ScheduleSlotLabel(day, hour, active)" disabled="@(!_model.ScheduleEnabled)"
+                                                @onclick="() => PaintScheduleSlot(day, hour)"></button>
+                                    }
                                 }
+                            </div>
+                        </div>
+                        <div class="cloud-schedule-footer">
+                            <span>@string.Format(R("Web_CloudSync_Schedule_Selected"), _model.ActiveScheduleSlots.Count)</span>
+                            @if (_model.ActiveScheduleSlots.Count > 0)
+                            {
+                                <button type="button" class="cloud-schedule-clear" @onclick="ClearSchedule">@R("Web_CloudSync_Schedule_Clear")</button>
                             }
                         </div>
-                    </div>
-                    <div class="cloud-schedule-footer">
-                        <span>@string.Format(R("Web_CloudSync_Schedule_Selected"), _model.ActiveScheduleSlots.Count)</span>
-                        @if (_model.ActiveScheduleSlots.Count > 0)
-                        {
-                            <button type="button" class="cloud-schedule-clear" @onclick="ClearSchedule">@R("Web_CloudSync_Schedule_Clear")</button>
-                        }
-                    </div>
+                    }
                 </div>
             }
             else
@@ -349,6 +361,7 @@ else
         : R("Web_CloudSync_Directory_LocalTitle");
     private SyncSettingsTab _activeSettingsTab = SyncSettingsTab.General;
     private SchedulePaintMode _schedulePaintMode = SchedulePaintMode.Select;
+    private bool _scheduleCustomOpen;
     private ElementReference _scheduleGrid;
     private DotNetObjectReference<SyncAdministration>? _schedulePaintReference;
     private IEnumerable<StorageConnection> ReadyConnections => VM.Connections.Where(c =>
@@ -405,6 +418,7 @@ else
         _error = null;
         _activeSettingsTab = SyncSettingsTab.General;
         _model = new ExternalStorageSyncEditModel { ConnectionId = connectionId ?? Guid.Empty, RemotePath = string.Empty };
+        _scheduleCustomOpen = false;
         ConnectionChanged();
     }
 
@@ -458,6 +472,8 @@ else
             ExcludedExtensions = string.Join(", ", definition.AdvancedSettings.ExcludedExtensions),
             SyncDeletions = definition.AdvancedSettings.SyncDeletions
         };
+        // Only a partial week counts as custom times worth showing straight away.
+        _scheduleCustomOpen = _model.ActiveScheduleSlots.Count is > 0 and < CloudSyncSchedule.SlotCount;
     }
 
     private async Task SaveAsync() => await ActAsync(async () =>
@@ -556,6 +572,12 @@ else
         foreach (DayOfWeek day in ScheduleDays) SetScheduleSlot(day, hour, SchedulePaintValue);
     }
     private void ClearSchedule() => _model.ActiveScheduleSlots.Clear();
+    // Enabling automatic sync defaults to every hour of every day; existing custom slots are kept.
+    private void ScheduleToggled()
+    {
+        if (_model.ScheduleEnabled && _model.ActiveScheduleSlots.Count == 0)
+            _model.ActiveScheduleSlots.UnionWith(Enumerable.Range(0, CloudSyncSchedule.SlotCount));
+    }
     private string ScheduleDayActionLabel(DayOfWeek day) => string.Format(R("Web_CloudSync_Schedule_Day_Paint"), ScheduleDayName(day), R(_schedulePaintMode == SchedulePaintMode.Select ? "Web_CloudSync_Schedule_Paint_Select" : "Web_CloudSync_Schedule_Paint_Deselect"));
     private string ScheduleHourActionLabel(int hour) => string.Format(R("Web_CloudSync_Schedule_Hour_Paint"), hour.ToString("00"), R(_schedulePaintMode == SchedulePaintMode.Select ? "Web_CloudSync_Schedule_Paint_Select" : "Web_CloudSync_Schedule_Paint_Deselect"));
     private static string ScheduleSlotLabel(DayOfWeek day, int hour, bool active) => string.Format(R(active ? "Web_CloudSync_Schedule_Slot_On" : "Web_CloudSync_Schedule_Slot_Off"), ScheduleDayName(day), hour.ToString("00"), ((hour + 1) % CloudSyncSchedule.HoursPerDay).ToString("00"));

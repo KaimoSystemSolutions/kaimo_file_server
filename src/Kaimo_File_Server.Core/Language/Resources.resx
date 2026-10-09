@@ -2868,6 +2868,9 @@
   <data name="Web_CloudSync_Schedule_Clear" xml:space="preserve">
     <value>Clear</value>
   </data>
+  <data name="Web_CloudSync_Schedule_Custom" xml:space="preserve">
+    <value>Custom times</value>
+  </data>
   <data name="Web_CloudSync_Schedule_Error_Empty" xml:space="preserve">
     <value>Select at least one hour before enabling the timer.</value>
   </data>
