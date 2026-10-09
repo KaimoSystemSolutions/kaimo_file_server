@@ -254,8 +254,14 @@ public sealed class BackupRunner(
         }
     }
 
+    private int _disposed;
+
+    // Reachable through three registrations (class, interface, hosted service), so the
+    // container disposes the same instance more than once.
     public override void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
+            return;
         _shutdown.Cancel();
         _shutdown.Dispose();
         base.Dispose();

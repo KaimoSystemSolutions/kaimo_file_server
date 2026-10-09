@@ -146,10 +146,13 @@ public sealed class ResticClient(IProcessRunner runner, IConfiguration configura
     private async Task<ProcessResult> RunAsync(
         ResticTarget target, IReadOnlyList<string> command, Action<string>? onLine, CancellationToken ct, string? lockRetry)
     {
-        var args = new List<string>(command) { "--json", "--cache-dir", CacheDirectory };
+        // Global flags go BEFORE the command: a command may end with "--" followed by paths,
+        // and anything after that separator would be taken as a path to back up.
+        var args = new List<string> { "--json", "--cache-dir", CacheDirectory };
         if (lockRetry is not null)
             args.AddRange(["--retry-lock", lockRetry]);
         args.AddRange(target.GlobalArguments);
+        args.AddRange(command);
         // With --json, restic reports fatal errors as an "exit_error" line on stdout instead of
         // stderr; fold them into the error text so mapping and log excerpts see them.
         var exitErrors = new System.Text.StringBuilder();

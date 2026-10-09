@@ -1,0 +1,222 @@
+/* Backup page. Child components (Pages/Backup/Components) are styled through ::deep from
+   the page root; the list/detail frame itself is the shared .workspace primitive. */
+
+.backup-tabs {
+    margin-bottom: var(--space-4);
+}
+
+.backup-page ::deep .backup-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+.backup-page ::deep .backup-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-3);
+}
+
+    .backup-page ::deep .backup-toolbar .subtitle {
+        max-width: 720px;
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 12.5px;
+        line-height: 1.45;
+    }
+
+    .backup-page ::deep .backup-toolbar > button {
+        flex: 0 0 auto;
+    }
+
+/* Empty states inside an already framed list stay compact and unframed. */
+.backup-page ::deep :is(.workspace-list, .backup-overview-section) > .empty-state {
+    min-height: 0;
+    padding: var(--space-5) var(--space-4);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+/* ── Overview ── */
+
+.backup-page ::deep .backup-overview-section {
+    margin-bottom: var(--space-5);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+}
+
+.backup-page ::deep .backup-overview-row:disabled {
+    cursor: default;
+}
+
+    .backup-page ::deep .backup-overview-row:disabled:hover {
+        background: var(--bg-secondary);
+    }
+
+.backup-page ::deep .backup-overview-meta {
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    color: var(--text-tertiary);
+    font-size: 11.5px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* ── Job editor ── */
+
+.backup-page ::deep .backup-times {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+.backup-page ::deep .backup-time {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+    .backup-page ::deep .backup-time .edit-input {
+        width: 9.5em;
+    }
+
+.backup-page ::deep .backup-days {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+
+.backup-page ::deep .backup-progress {
+    display: grid;
+    gap: var(--space-1);
+    margin-bottom: var(--space-3);
+}
+
+/* ── Repository editor ── */
+
+.backup-page ::deep .backup-label-with-info {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.backup-page ::deep .backup-inline-actions {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+.backup-page ::deep .backup-pem,
+.backup-page ::deep .backup-log,
+.backup-page ::deep .backup-kit-code {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12px;
+}
+
+.backup-page ::deep .backup-kit {
+    margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--warning);
+    border-radius: var(--radius-control);
+    background: var(--warning-subtle);
+}
+
+    .backup-page ::deep .backup-kit > p {
+        color: var(--text-primary);
+    }
+
+.backup-page ::deep .backup-kit-steps {
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+    padding-left: var(--space-4);
+    color: var(--text-primary);
+    font-size: 12.5px;
+}
+
+    .backup-page ::deep .backup-kit-steps li {
+        display: grid;
+        gap: var(--space-2);
+        justify-items: start;
+    }
+
+.backup-page ::deep .backup-kit-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.backup-page ::deep .backup-kit-code {
+    width: 9em;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+/* ── Activity ── */
+
+.backup-page ::deep .backup-source-list {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+    .backup-page ::deep .backup-source-list > li {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+.backup-page ::deep .backup-details {
+    flex-basis: 100%;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+    .backup-page ::deep .backup-details summary {
+        cursor: pointer;
+    }
+
+    .backup-page ::deep .backup-details ul {
+        margin: var(--space-1) 0 0;
+        padding-left: var(--space-4);
+    }
+
+.backup-page ::deep .backup-log {
+    max-height: 260px;
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-sunken);
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+    .backup-page ::deep .backup-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .backup-page ::deep .backup-overview-meta {
+        display: none;
+    }
+}

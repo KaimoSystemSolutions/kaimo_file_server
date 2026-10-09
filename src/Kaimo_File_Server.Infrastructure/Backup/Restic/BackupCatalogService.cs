@@ -155,8 +155,11 @@ public sealed class BackupCatalogService(
         var probe = NewRepository(Guid.NewGuid(), draft);
         try
         {
-            using var target = await resolver.ResolveAsync(probe, draft.Secrets, ResticBackend.GeneratePassword(), ct);
-            await restic.CatConfigAsync(target, ct);
+            await WithInteractiveTimeoutAsync(async token =>
+            {
+                using var target = await resolver.ResolveAsync(probe, draft.Secrets, ResticBackend.GeneratePassword(), token);
+                return await restic.CatConfigAsync(target, token);
+            }, ct);
             // A random password cannot open a repository, so success is impossible in practice.
             return BackupRepositoryProbe.Existing;
         }
@@ -200,14 +203,15 @@ public sealed class BackupCatalogService(
             StartedAtUtc = time.GetUtcNow().UtcDateTime,
         };
 
-        using (var target = await resolver.ResolveAsync(repository, draft.Secrets, password, ct))
+        repository.ResticRepositoryId = await WithInteractiveTimeoutAsync(async token =>
         {
+            using var target = await resolver.ResolveAsync(repository, draft.Secrets, password, token);
             if (repository.Backend == BackupBackend.Local && initialize)
                 Directory.CreateDirectory(Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(target.RepositoryUrl))!);
-            repository.ResticRepositoryId = initialize
-                ? await restic.InitAsync(target, ct)
-                : await restic.CatConfigAsync(target, ct);
-        }
+            return initialize
+                ? await restic.InitAsync(target, token)
+                : await restic.CatConfigAsync(target, token);
+        }, ct);
 
         repository.EncryptedPassword = resolver.ProtectPassword(repository.Id, password);
         repository.EncryptedSecrets = HasSecrets(draft.Secrets) ? resolver.ProtectSecrets(repository.Id, draft.Secrets) : null;
@@ -249,8 +253,11 @@ public sealed class BackupCatalogService(
         if (targetChanged)
         {
             var candidate = NewRepository(repository.Id, draft);
-            using var target = await resolver.ResolveAsync(candidate, secrets, resolver.ReadPassword(repository), ct);
-            var id = await restic.CatConfigAsync(target, ct);
+            var id = await WithInteractiveTimeoutAsync(async token =>
+            {
+                using var target = await resolver.ResolveAsync(candidate, secrets, resolver.ReadPassword(repository), token);
+                return await restic.CatConfigAsync(target, token);
+            }, ct);
             if (!string.Equals(id, repository.ResticRepositoryId, StringComparison.Ordinal))
                 throw new ResticException("repository_mismatch", "The location holds a different repository.");
             repository.SettingsJson = settingsJson;
@@ -654,6 +661,26 @@ public sealed class BackupCatalogService(
     // ══════════════════════════════════════════
     //  Helpers
     // ══════════════════════════════════════════
+
+    /// <summary>
+    /// restic retries backend errors (e.g. rejected credentials) with backoff for many
+    /// minutes; an action the admin waits for in the UI must give up much earlier.
+    /// </summary>
+    public static readonly TimeSpan InteractiveTimeout = TimeSpan.FromSeconds(90);
+
+    private static async Task<T> WithInteractiveTimeoutAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(InteractiveTimeout);
+        try
+        {
+            return await action(timeout.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new ResticException("timeout", "The repository did not answer in time.");
+        }
+    }
 
     private static BackupRepository NewRepository(Guid id, BackupRepositoryDraft draft) => new()
     {

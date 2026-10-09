@@ -1,0 +1,310 @@
+@using System.Globalization
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Domain.Backup
+@using Kaimo_File_Server.Infrastructure.Backup.Restic
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.ViewModels.Backup
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+@implements IDisposable
+@inject BackupViewModel VM
+@inject DateFormatService DateFmt
+
+@* Backup jobs: list left, detail / editor right (shared workspace frame). *@
+
+<div class="backup-toolbar">
+    <p class="subtitle">@R("Web_Backup_Jobs_Help")</p>
+    <button class="btn-primary" type="button" disabled="@(VM.IsReadOnlyDemo || VM.SelectableShares.Count == 0)" @onclick="StartCreate">
+        @R("Web_Backup_Jobs_Create")
+    </button>
+</div>
+
+<div class="workspace">
+    <section class="workspace-list" aria-label="@R("Web_Backup_Tab_Jobs")">
+        <div class="workspace-list-header"><span>@R("Web_Backup_Tab_Jobs")</span></div>
+        @if (VM.Jobs.Count == 0)
+        {
+            <div class="empty-state"><p>@R("Web_Backup_Jobs_Empty")</p></div>
+        }
+        @foreach (var view in VM.Jobs)
+        {
+            var job = view.Job;
+            <button type="button" class="workspace-row @(_selectedId == job.Id && !_editing ? "workspace-row--selected" : "")"
+                    aria-pressed="@(_selectedId == job.Id ? "true" : "false")" @onclick="() => Select(job.Id)">
+                <span class="workspace-row-icon">@Assets.SVG("history.svg", new SvgOptions(Width: 16, Height: 16))</span>
+                <span class="workspace-row-text">
+                    <strong>@job.Name</strong>
+                    <small>@string.Join(", ", view.Shares.Select(s => s.Name)) → @view.RepositoryName</small>
+                </span>
+                <StatusBadge Tone="@BackupUi.JobTone(job)" Label="@BackupUi.JobStatusLabel(job)" />
+            </button>
+        }
+    </section>
+
+    <aside class="workspace-detail" aria-label="@R("Web_Backup_Jobs_Detail")">
+        @if (_editing)
+        {
+            var form = VM.JobForm;
+            var repos = VM.UsableRepositoriesForForm;
+            <div class="workspace-heading">
+                <div>
+                    <h3>@(form.Id is null ? R("Web_Backup_Jobs_Create") : R("Web_Backup_Jobs_Edit"))</h3>
+                    <span class="workspace-heading-sub">@R("Web_Backup_Level_Files")</span>
+                </div>
+                <label class="workspace-enabled">
+                    <span class="toggle-switch">
+                        <input type="checkbox" @bind="form.Enabled" aria-label="@R("Web_Backup_Enabled")" />
+                        <span class="toggle-slider"></span>
+                    </span>
+                    <span>@R("Web_Backup_Enabled")</span>
+                </label>
+            </div>
+
+            <div class="workspace-form">
+                <label>
+                    <span>@R("Web_Backup_Name")</span>
+                    <input class="edit-input" maxlength="200" @bind="form.Name" @bind:event="oninput" />
+                </label>
+                <div class="workspace-field">
+                    <span>@R("Web_Backup_Jobs_Sources")</span>
+                    <MultiSelect T="ShareDefinition" Items="form.Shares" Label="s => s.Name"
+                                 PlaceholderText="@R("Web_Backup_Jobs_SourcesPlaceholder")"
+                                 EmptyText="@R("Web_Backup_Jobs_NoShares")" />
+                    <small>@R("Web_Backup_Jobs_SourcesHelp")</small>
+                </div>
+                <label>
+                    <span>@R("Web_Backup_Repository")</span>
+                    <select class="edit-input" @bind="form.RepositoryId">
+                        <option value="@Guid.Empty">@R("Web_Backup_Select")</option>
+                        @foreach (var repo in repos)
+                        {
+                            <option value="@repo.Id">@repo.Name (@BackupUi.BackendLabel(repo.Backend))</option>
+                        }
+                    </select>
+                    @if (repos.Count == 0)
+                    {
+                        <small>@R("Web_Backup_Jobs_NoRepository")</small>
+                    }
+                </label>
+                <div class="toggle-row">
+                    <span>@R("Web_Backup_Jobs_IncludeRecycleBin")</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" @bind="form.IncludeRecycleBin" aria-label="@R("Web_Backup_Jobs_IncludeRecycleBin")" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <section class="workspace-section">
+                <h4>@R("Web_Backup_Schedule")</h4>
+                <p>@R("Web_Backup_Schedule_Help")</p>
+                <div class="backup-times">
+                    @for (var i = 0; i < form.Times.Count; i++)
+                    {
+                        var index = i;
+                        <span class="backup-time">
+                            <input class="edit-input" type="time" value="@form.Times[index].ToString("HH:mm", CultureInfo.InvariantCulture)"
+                                   aria-label="@R("Web_Backup_Schedule_Time")" @onchange="e => SetTime(index, e.Value)" />
+                            <button type="button" class="btn-icon btn-icon--small btn-icon--danger" title="@R("Web_Backup_Schedule_RemoveTime")"
+                                    aria-label="@R("Web_Backup_Schedule_RemoveTime")" @onclick="() => form.Times.RemoveAt(index)">
+                                @Assets.SVG("close.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2))
+                            </button>
+                        </span>
+                    }
+                    <button type="button" class="btn-secondary btn-secondary--sm" disabled="@(form.Times.Count >= 24)" @onclick="AddTime">
+                        @Assets.SVG("plus.svg", new SvgOptions(Width: 12, Height: 12))
+                        <span>@R("Web_Backup_Schedule_AddTime")</span>
+                    </button>
+                </div>
+                <div class="backup-days" role="group" aria-label="@R("Web_Backup_Schedule_Days")">
+                    @foreach (var day in WeekDays)
+                    {
+                        var on = form.Days.Contains(day);
+                        <button type="button" class="preset-chip @(on ? "preset-chip--active" : "")" aria-pressed="@(on ? "true" : "false")"
+                                @onclick="() => ToggleDay(day)">@DayName(day)</button>
+                    }
+                </div>
+                @if (form.Times.Count == 0 || form.Days.Count == 0)
+                {
+                    <p class="form-hint">@R("Web_Backup_Schedule_ManualOnly")</p>
+                }
+            </section>
+
+            <div class="detail-actions">
+                <button class="btn-secondary" type="button" disabled="@VM.IsBusy" @onclick="CancelEdit">@R("Web_Button_Cancel")</button>
+                <button class="btn-primary" type="button" disabled="@(VM.IsBusy || !CanSave)" @onclick="SaveAsync">@R("Web_Backup_Save")</button>
+            </div>
+        }
+        else if (Selected is { } view)
+        {
+            var job = view.Job;
+            var active = VM.ActiveRuns.FirstOrDefault(r => r.JobId == job.Id);
+            <div class="workspace-heading">
+                <div>
+                    <h3>@job.Name</h3>
+                    <span class="workspace-heading-sub">@view.RepositoryName</span>
+                </div>
+                <StatusBadge Tone="@BackupUi.JobTone(job)" Label="@BackupUi.JobStatusLabel(job)" />
+            </div>
+
+            @if (active is not null)
+            {
+                <div class="backup-progress">
+                    <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@active.Progress">
+                        <div class="job-progress-fill" style="width: @(active.Progress)%"></div>
+                    </div>
+                    <span class="form-hint">
+                        @(active.IsCancellationRequested ? R("Web_Jobs_Cancelling")
+                            : active.IsRunning ? string.Format(R("Web_Backup_Running"), active.Progress) + (active.Detail is null ? "" : " · " + active.Detail)
+                            : R("Web_Backup_Queued"))
+                    </span>
+                </div>
+            }
+
+            <dl class="workspace-dl">
+                <dt>@R("Web_Backup_Jobs_Sources")</dt><dd>@string.Join(", ", view.Shares.Select(s => s.Name))</dd>
+                <dt>@R("Web_Backup_Repository")</dt><dd>@view.RepositoryName</dd>
+                <dt>@R("Web_Backup_Schedule")</dt><dd>@ScheduleText(job.Schedule)</dd>
+                <dt>@R("Web_Backup_Jobs_IncludeRecycleBin")</dt><dd>@(job.IncludeRecycleBin ? R("Web_Common_Yes") : R("Web_Common_No"))</dd>
+                <dt>@R("Web_Backup_LastRun")</dt><dd>@DateFmt.FormatDateTime(job.LastRunAtUtc, R("Web_Backup_Never"))</dd>
+                <dt>@R("Web_Backup_LastSuccess")</dt><dd>@DateFmt.FormatDateTime(job.LastSuccessAtUtc, R("Web_Backup_Never"))</dd>
+                <dt>@R("Web_Backup_NextRun")</dt><dd>@DateFmt.FormatDateTime(VM.NextRunUtc(job), R("Web_Backup_NoSchedule"))</dd>
+            </dl>
+
+            <div class="detail-actions">
+                @if (active is null)
+                {
+                    <button class="btn-primary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo || !job.Enabled)" @onclick="() => VM.RunNowAsync(job.Id)">
+                        @R("Web_Backup_Jobs_RunNow")
+                    </button>
+                }
+                else
+                {
+                    <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || active.IsCancellationRequested)" @onclick="() => VM.CancelRunAsync(active.RunId)">
+                        @R("Web_Jobs_Cancel")
+                    </button>
+                }
+                <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => StartEdit(view)">@R("Web_Backup_Edit")</button>
+                @if (_confirmDelete)
+                {
+                    <button class="btn-danger" type="button" disabled="@VM.IsBusy" @onclick="() => DeleteAsync(job.Id)">@R("Web_Backup_ConfirmDelete")</button>
+                    <button class="btn-secondary" type="button" @onclick="() => _confirmDelete = false">@R("Web_Button_Cancel")</button>
+                }
+                else
+                {
+                    <button class="btn-danger-outline" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => _confirmDelete = true">@R("Web_Action_Delete")</button>
+                }
+            </div>
+            @if (_confirmDelete)
+            {
+                <p class="form-hint">@R("Web_Backup_Jobs_DeleteHint")</p>
+            }
+        }
+        else
+        {
+            <div class="detail-empty"><p>@R("Web_Backup_Jobs_SelectHint")</p></div>
+        }
+    </aside>
+</div>
+
+@code {
+    // Results and runner progress are announced by the view model; the page does not
+    // re-render this component on its own.
+    protected override void OnInitialized() => VM.Changed += Refresh;
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => VM.Changed -= Refresh;
+
+    [Parameter] public Guid? SelectedJobId { get; set; }
+
+    private Guid? _selectedId;
+    private bool _editing;
+    private bool _confirmDelete;
+
+    // Monday first, as on the server side weekdays are plain DayOfWeek values.
+    private static readonly DayOfWeek[] WeekDays =
+        [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
+
+    protected override void OnParametersSet()
+    {
+        if (SelectedJobId is not null)
+            _selectedId = SelectedJobId;
+    }
+
+    private BackupJobView? Selected => VM.Jobs.FirstOrDefault(j => j.Job.Id == _selectedId);
+
+    private bool CanSave => !string.IsNullOrWhiteSpace(VM.JobForm.Name)
+                            && VM.JobForm.SelectedShareIds.Any()
+                            && VM.JobForm.RepositoryId != Guid.Empty;
+
+    private void Select(Guid id)
+    {
+        _selectedId = id;
+        _editing = false;
+        _confirmDelete = false;
+    }
+
+    private void StartCreate()
+    {
+        VM.NewJob();
+        _editing = true;
+        _confirmDelete = false;
+    }
+
+    private void StartEdit(BackupJobView view)
+    {
+        VM.EditJob(view);
+        _editing = true;
+        _confirmDelete = false;
+    }
+
+    private void CancelEdit() => _editing = false;
+
+    private async Task SaveAsync()
+    {
+        if (await VM.SaveJobAsync())
+        {
+            _selectedId = VM.JobForm.Id;
+            _editing = false;
+        }
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        if (await VM.DeleteJobAsync(id))
+            _selectedId = null;
+        _confirmDelete = false;
+    }
+
+    private void AddTime()
+    {
+        var last = VM.JobForm.Times.Count > 0 ? VM.JobForm.Times[^1] : new TimeOnly(1, 0);
+        VM.JobForm.Times.Add(last.AddHours(1));
+    }
+
+    private void SetTime(int index, object? value)
+    {
+        if (TimeOnly.TryParse(value?.ToString(), CultureInfo.InvariantCulture, out var time) && index < VM.JobForm.Times.Count)
+            VM.JobForm.Times[index] = time;
+    }
+
+    private void ToggleDay(DayOfWeek day)
+    {
+        if (!VM.JobForm.Days.Remove(day))
+            VM.JobForm.Days.Add(day);
+    }
+
+    private static string DayName(DayOfWeek day)
+        => CultureInfo.CurrentUICulture.DateTimeFormat.GetAbbreviatedDayName(day);
+
+    private static string ScheduleText(BackupSchedule schedule)
+    {
+        if (schedule.IsEmpty)
+            return R("Web_Backup_Schedule_ManualOnly");
+        var days = schedule.Days.Count == 7
+            ? R("Web_Backup_Schedule_Daily")
+            : string.Join(", ", WeekDays.Where(schedule.Days.Contains).Select(DayName));
+        return days + " · " + string.Join(", ", schedule.Times.Select(t => t.ToString("HH:mm", CultureInfo.InvariantCulture)));
+    }
+
+    private static string R(string key) => BackupViewModel.R(key);
+}

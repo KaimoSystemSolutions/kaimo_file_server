@@ -5635,7 +5635,45 @@
     <value>Auftragsersteller</value>
   </data>
   <data name="Web_Backup_Kit_Template" xml:space="preserve">
-    <value>KAIMO FILES - WIEDERHERSTELLUNGS-KIT\n====================================\nBewahre diese Datei offline und sicher auf (z. B. ausgedruckt im Tresor oder in einem Passwort-Manager).\nWer sie besitzt, kann die Sicherungen lesen - ohne sie kann NIEMAND sie wiederherstellen.\n\nRepository:      {0}\nBackend:         {1}\nRepository-ID:   {5}\nErstellt:        {7}\nrestic-Version:  {6}\nKit-Code:        {8}\n\nRESTIC_REPOSITORY={2}\nRESTIC_PASSWORD={4}\n\nWeitere Parameter / Zugangsdaten, die du selbst angeben musst:\n{3}\n\nZugangsdaten des Speicherziels (S3-Schlüssel, REST-Benutzer, SSH-Schlüssel) sind NICHT Teil dieses Kits. Bewahre sie getrennt auf.\n\nAUFBAU\n------\nJeder Sicherungslauf erzeugt pro Freigabe einen Snapshot mit den Tags:\n  kaimo, job:&lt;Auftrags-ID&gt;, run:&lt;Lauf-ID&gt;, level:files, share:&lt;Freigabe-ID&gt;\nEin Snapshot enthält den Freigabe-Ordner und kaimo-acl-manifest.json (Besitzer und Berechtigungen der Freigabe).\n\nWIEDERHERSTELLEN MIT DER RESTIC-KOMMANDOZEILE (funktioniert ohne Kaimo-Server)\n------------------------------------------------------------------------------\n1. restic installieren (https://restic.net), obige Version oder neuer.\n2. export RESTIC_REPOSITORY='&lt;Wert oben&gt;'\n   export RESTIC_PASSWORD='&lt;Wert oben&gt;'\n   dazu die Zugangsdaten des Speicherziels (z. B. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).\n3. Sicherungen auflisten:      restic snapshots --tag kaimo\n   Nur eine Freigabe:          restic snapshots --tag share:&lt;Freigabe-ID&gt;\n4. Sicherung durchsuchen:      restic ls &lt;Snapshot-ID&gt;\n5. Alles wiederherstellen:     restic restore &lt;Snapshot-ID&gt; --target /restore\n   Einen Ordner:               restic restore &lt;Snapshot-ID&gt;:&lt;Freigabe-Pfad&gt;/&lt;Ordner&gt; --target /restore\n6. Die wiederhergestellten Dateien zurück in den Freigabe-Ordner kopieren. Besitzer und Berechtigungen stehen in kaimo-acl-manifest.json.\n</value>
+    <value>KAIMO FILES - WIEDERHERSTELLUNGS-KIT
+====================================
+Bewahre diese Datei offline und sicher auf (z. B. ausgedruckt im Tresor oder in einem Passwort-Manager).
+Wer sie besitzt, kann die Sicherungen lesen - ohne sie kann NIEMAND sie wiederherstellen.
+
+Repository:      {0}
+Backend:         {1}
+Repository-ID:   {5}
+Erstellt:        {7}
+restic-Version:  {6}
+Kit-Code:        {8}
+
+RESTIC_REPOSITORY={2}
+RESTIC_PASSWORD={4}
+
+Weitere Parameter / Zugangsdaten, die du selbst angeben musst:
+{3}
+
+Zugangsdaten des Speicherziels (S3-Schlüssel, REST-Benutzer, SSH-Schlüssel) sind NICHT Teil dieses Kits. Bewahre sie getrennt auf.
+
+AUFBAU
+------
+Jeder Sicherungslauf erzeugt pro Freigabe einen Snapshot mit den Tags:
+  kaimo, job:&lt;Auftrags-ID&gt;, run:&lt;Lauf-ID&gt;, level:files, share:&lt;Freigabe-ID&gt;
+Ein Snapshot enthält den Freigabe-Ordner und kaimo-acl-manifest.json (Besitzer und Berechtigungen der Freigabe).
+
+WIEDERHERSTELLEN MIT DER RESTIC-KOMMANDOZEILE (funktioniert ohne Kaimo-Server)
+------------------------------------------------------------------------------
+1. restic installieren (https://restic.net), obige Version oder neuer.
+2. export RESTIC_REPOSITORY='&lt;Wert oben&gt;'
+   export RESTIC_PASSWORD='&lt;Wert oben&gt;'
+   dazu die Zugangsdaten des Speicherziels (z. B. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).
+3. Sicherungen auflisten:      restic snapshots --tag kaimo
+   Nur eine Freigabe:          restic snapshots --tag share:&lt;Freigabe-ID&gt;
+4. Sicherung durchsuchen:      restic ls &lt;Snapshot-ID&gt;
+5. Alles wiederherstellen:     restic restore &lt;Snapshot-ID&gt; --target /restore
+   Einen Ordner:               restic restore &lt;Snapshot-ID&gt;:&lt;Freigabe-Pfad&gt;/&lt;Ordner&gt; --target /restore
+6. Die wiederhergestellten Dateien zurück in den Freigabe-Ordner kopieren. Besitzer und Berechtigungen stehen in kaimo-acl-manifest.json.
+</value>
   </data>
   <data name="Web_Nav_Backup" xml:space="preserve">
     <value>Sicherung</value>
@@ -6260,5 +6298,8 @@
   </data>
   <data name="Web_Backup_Error_repository_not_usable" xml:space="preserve">
     <value>Das Repository ist für diese Freigaben nicht verfügbar.</value>
+  </data>
+  <data name="Web_Backup_Error_timeout" xml:space="preserve">
+    <value>Der Speicherort hat nicht rechtzeitig geantwortet. Prüfe Adresse und Zugangsdaten.</value>
   </data>
 </root>

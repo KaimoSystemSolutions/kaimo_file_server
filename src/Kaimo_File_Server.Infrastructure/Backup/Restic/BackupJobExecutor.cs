@@ -111,7 +111,8 @@ public sealed class BackupJobExecutor(
         run.WarningCount = outcomes.Sum(o => o.WarningCount);
         run.SnapshotIdsJson = JsonSerializer.Serialize(outcomes.Where(o => o.SnapshotId is not null).Select(o => o.SnapshotId));
         run.DetailsJson = JsonSerializer.Serialize(new { sources = outcomes });
-        run.LogExcerpt = Tail(stderrTail);
+        if (stderrTail is not null)
+            run.LogExcerpt = Tail(stderrTail);
 
         if (job is not null)
         {
@@ -160,6 +161,8 @@ public sealed class BackupJobExecutor(
             run.FilesUnmodified += result.FilesUnmodified;
             run.BytesAdded += result.BytesAdded;
             run.BytesProcessed += result.BytesProcessed;
+            if (result.HasWarnings && !string.IsNullOrWhiteSpace(result.StderrTail))
+                run.LogExcerpt = Tail((run.LogExcerpt + "\n" + result.StderrTail).Trim());
             return new(share.Id, share.Name, result.SnapshotId, null, result.WarningCount, result.Warnings);
         }
         catch (ResticException ex)
@@ -206,7 +209,10 @@ public sealed class BackupJobExecutor(
     {
         if (!Directory.Exists(path))
             throw new ResticException("source_unavailable", "The share folder does not exist (pool not mounted?).");
-        if (hadContentBefore && !Directory.EnumerateFileSystemEntries(path).Any())
+        // Kaimo itself recreates internal ".kaimo-*" folders in a share folder (also on an
+        // unmounted pool), so only user-visible entries count as content.
+        if (hadContentBefore && !Directory.EnumerateFileSystemEntries(path)
+                .Any(e => !Path.GetFileName(e).StartsWith(ShareEntryPolicy.InternalNamespacePrefix, StringComparison.Ordinal)))
             throw new ResticException("source_empty", "The share folder is empty although earlier backups had content (pool not mounted?).");
     }
 

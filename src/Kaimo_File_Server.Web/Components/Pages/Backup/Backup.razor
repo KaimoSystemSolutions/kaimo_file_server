@@ -1,0 +1,125 @@
+@page "/backup"
+@using Kaimo_File_Server.Web.Components.Pages.Backup.Components
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.ViewModels.Backup
+@implements IDisposable
+@inject BackupViewModel VM
+@inject NavigationManager Nav
+
+@*
+    restic file backup: overview, jobs (scoped to the shares an admin manages), repositories
+    (Global) and the activity log. Gated by the file-backup permission bits; every action is
+    re-authorized in BackupCatalogService.
+*@
+
+<PageTitle>@R("Web_Nav_Backup") - Kaimo Files</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>@R("Web_Nav_Backup")</h1>
+        <p class="subtitle">@R("Web_Backup_Subtitle")</p>
+    </div>
+</div>
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state"><div class="spinner"></div><p>@R("Web_Common_Loading")</p></div>
+}
+else if (!VM.Access.CanAccessPage)
+{
+    <div class="error-banner">@R("Web_Error_NoPermission")</div>
+}
+else
+{
+    <div class="backup-page">
+        @if (VM.SuccessMessage is not null) { <div class="success-banner backup-banner" role="status">@VM.SuccessMessage</div> }
+        @if (VM.ErrorMessage is not null) { <div class="error-banner backup-banner" role="alert">@VM.ErrorMessage</div> }
+
+        <div class="backup-tabs">
+            <Tabs aria-label="@R("Web_Nav_Backup")">
+                <Tab Active="@(_tab == BackupTab.Overview)" Icon="compass.svg" Label="@R("Web_Backup_Tab_Overview")" OnClick="() => SwitchTab(BackupTab.Overview)" />
+                @if (VM.Access.CanManageJobs)
+                {
+                    <Tab Active="@(_tab == BackupTab.Jobs)" Icon="history.svg" Label="@R("Web_Backup_Tab_Jobs")" OnClick="() => SwitchTab(BackupTab.Jobs)" />
+                }
+                @if (VM.Access.CanManageRepositories)
+                {
+                    <Tab Active="@(_tab == BackupTab.Repositories)" Icon="archive.svg" Label="@R("Web_Backup_Tab_Repositories")" OnClick="() => SwitchTab(BackupTab.Repositories)" />
+                }
+                <Tab Active="@(_tab == BackupTab.Activity)" Icon="menu.svg" Label="@R("Web_Backup_Tab_Activity")" OnClick="() => SwitchTab(BackupTab.Activity)" />
+            </Tabs>
+        </div>
+
+        @switch (_tab)
+        {
+            case BackupTab.Jobs:
+                <BackupJobs SelectedJobId="_selectedId" />
+                break;
+            case BackupTab.Repositories:
+                <BackupRepositories SelectedRepositoryId="_selectedId" />
+                break;
+            case BackupTab.Activity:
+                <BackupActivity />
+                break;
+            default:
+                <BackupOverview OnOpenJob="id => SwitchTab(BackupTab.Jobs, id)"
+                                OnOpenRepository="id => SwitchTab(BackupTab.Repositories, id)" />
+                break;
+        }
+    </div>
+}
+
+@code {
+    private enum BackupTab { Overview, Jobs, Repositories, Activity }
+
+    [SupplyParameterFromQuery(Name = "tab")] public string? TabQuery { get; set; }
+
+    private BackupTab _tab = BackupTab.Overview;
+    private Guid? _selectedId;
+    private int _lastActiveRuns;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await VM.LoadAsync();
+        _lastActiveRuns = VM.ActiveRuns.Count;
+        VM.RunnerChanged += OnRunnerChanged;
+        VM.Changed += OnVmChanged;
+    }
+
+    private void OnVmChanged() => _ = InvokeAsync(StateHasChanged);
+
+    protected override void OnParametersSet()
+    {
+        _tab = Enum.TryParse<BackupTab>(TabQuery, ignoreCase: true, out var tab) ? tab : BackupTab.Overview;
+        if (_tab == BackupTab.Repositories && !VM.Access.CanManageRepositories) _tab = BackupTab.Overview;
+        if (_tab == BackupTab.Jobs && !VM.Access.CanManageJobs) _tab = BackupTab.Overview;
+    }
+
+    private void SwitchTab(BackupTab tab, Guid? selectId = null)
+    {
+        _selectedId = selectId;
+        VM.ClearMessages();
+        Nav.NavigateTo("/backup?tab=" + tab.ToString().ToLowerInvariant(), replace: true);
+    }
+
+    // A finished run changes job status and the activity list, so reload then; progress
+    // updates only re-render.
+    private void OnRunnerChanged() => _ = InvokeAsync(async () =>
+    {
+        var active = VM.ActiveRuns.Count;
+        if (active < _lastActiveRuns)
+            await VM.ReloadAsync();
+        _lastActiveRuns = active;
+        StateHasChanged();
+        // Tab components keep their parameters, so they would not re-render on their own.
+        VM.NotifyChanged();
+    });
+
+    public void Dispose()
+    {
+        VM.RunnerChanged -= OnRunnerChanged;
+        VM.Changed -= OnVmChanged;
+    }
+
+    private static string R(string key) => BackupViewModel.R(key);
+}

@@ -262,6 +262,10 @@ _UpgradeReport_Files/
 Backup*/
 # Do not ignore the Infrastructure source folder that happens to be named "Backup".
 !src/Kaimo_File_Server.Infrastructure/Backup/
+# Same for the file-backup (restic) feature folders.
+!src/Kaimo_File_Server.Core/Domain/Backup/
+!src/Kaimo_File_Server.Web/Components/Pages/Backup/
+!src/Kaimo_File_Server.Web/Components/ViewModels/Backup/
 UpgradeLog*.XML
 UpgradeLog*.htm
 ServiceFabricBackup/

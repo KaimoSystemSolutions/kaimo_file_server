@@ -246,14 +246,17 @@ public class ResticBackupTests
         var result = await Client(runner).BackupAsync(Target(), Request, null, CancellationToken.None);
 
         var args = runner.Arguments;
-        Assert.Equal("backup", args[0]);
+        Assert.Contains("backup", args);
         Assert.Equal("kaimo", args[args.IndexOf("--host") + 1]);
         Assert.Contains("--json", args);
         Assert.Equal("/cache", args[args.IndexOf("--cache-dir") + 1]);
         Assert.Equal("30m", args[args.IndexOf("--retry-lock") + 1]);
         Assert.Contains("s3.bucket-lookup=path", args);
+        // Nothing but the paths may follow the separator — a global flag there would be
+        // backed up as a path (regression found against the real binary).
         var separator = args.IndexOf("--");
-        Assert.Equal(Request.Paths, args.Skip(separator + 1).Take(2));
+        Assert.Equal(Request.Paths, args.Skip(separator + 1));
+        Assert.True(args.IndexOf("--json") < args.IndexOf("backup"));
         Assert.True(args.IndexOf("--exclude") < separator);
         Assert.DoesNotContain(args, a => a.Contains("pw-secret"));
         Assert.True(runner.ClearedEnvironment);
@@ -361,6 +364,9 @@ public class ResticBackupTests
             Assert.Equal("source_empty", Assert.Throws<ResticException>(() =>
                 BackupJobExecutor.GuardSource(dir, hadContentBefore: true)).Code);
             BackupJobExecutor.GuardSource(dir, hadContentBefore: false); // a new, empty share is fine
+            Directory.CreateDirectory(Path.Combine(dir, ".kaimo-close-captures"));
+            Assert.Equal("source_empty", Assert.Throws<ResticException>(() =>
+                BackupJobExecutor.GuardSource(dir, hadContentBefore: true)).Code);
             File.WriteAllText(Path.Combine(dir, "a.txt"), "x");
             BackupJobExecutor.GuardSource(dir, hadContentBefore: true);
         }

@@ -1,0 +1,146 @@
+@using System.Text.Json
+@using Kaimo_File_Server.Core.Domain.Backup
+@using Kaimo_File_Server.Core.Services.Notifications
+@using Kaimo_File_Server.Infrastructure.Backup.Restic
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.ViewModels.Backup
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+@implements IDisposable
+@inject BackupViewModel VM
+@inject DateFormatService DateFmt
+
+@* Activity: every restic operation (backup, init, …) with its outcome; doubles as audit log. *@
+
+<div class="workspace">
+    <section class="workspace-list" aria-label="@R("Web_Backup_Tab_Activity")">
+        <div class="workspace-list-header">
+            <span>@R("Web_Backup_Tab_Activity")</span>
+            <button type="button" class="btn-secondary btn-secondary--sm" disabled="@VM.IsBusy" @onclick="VM.ReloadAsync">@R("Web_Backup_Refresh")</button>
+        </div>
+        @if (VM.Runs.Count == 0)
+        {
+            <div class="empty-state"><p>@R("Web_Backup_Activity_Empty")</p></div>
+        }
+        @foreach (var run in VM.Runs)
+        {
+            <button type="button" class="workspace-row @(_selectedId == run.Id ? "workspace-row--selected" : "")"
+                    aria-pressed="@(_selectedId == run.Id ? "true" : "false")" @onclick="() => _selectedId = run.Id">
+                <span class="workspace-row-text">
+                    <strong>@BackupUi.RunTypeLabel(run.Type) · @(run.JobId is null ? VM.RepositoryName(run.RepositoryId) : VM.JobName(run.JobId))</strong>
+                    <small>@DateFmt.FormatDateTime(run.StartedAtUtc ?? run.QueuedAtUtc) · @BackupUi.TriggerLabel(run.Trigger)</small>
+                </span>
+                <StatusBadge Tone="@BackupUi.RunTone(run.Status)" Label="@BackupUi.RunStatusLabel(run.Status)" />
+            </button>
+        }
+    </section>
+
+    <aside class="workspace-detail" aria-label="@R("Web_Backup_Activity_Detail")">
+        @if (Selected is { } current)
+        {
+            <div class="workspace-heading">
+                <div>
+                    <h3>@BackupUi.RunTypeLabel(current.Type)</h3>
+                    <span class="workspace-heading-sub">@(current.JobId is null ? VM.RepositoryName(current.RepositoryId) : VM.JobName(current.JobId))</span>
+                </div>
+                <StatusBadge Tone="@BackupUi.RunTone(current.Status)" Label="@BackupUi.RunStatusLabel(current.Status)" />
+            </div>
+            <dl class="workspace-dl">
+                <dt>@R("Web_Backup_Repository")</dt><dd>@VM.RepositoryName(current.RepositoryId)</dd>
+                <dt>@R("Web_Backup_Activity_Trigger")</dt><dd>@BackupUi.TriggerLabel(current.Trigger)</dd>
+                <dt>@R("Web_Backup_Activity_Started")</dt><dd>@DateFmt.FormatDateTime(current.StartedAtUtc)</dd>
+                <dt>@R("Web_Backup_Activity_Finished")</dt><dd>@DateFmt.FormatDateTime(current.FinishedAtUtc)</dd>
+                @if (current.Type == BackupRunType.Backup)
+                {
+                    <dt>@R("Web_Backup_Activity_Files")</dt>
+                    <dd>@string.Format(R("Web_Backup_Activity_FilesValue"), current.FilesNew, current.FilesChanged, current.FilesUnmodified)</dd>
+                    <dt>@R("Web_Backup_Activity_Data")</dt>
+                    <dd>@string.Format(R("Web_Backup_Activity_DataValue"), NotificationEvents.FormatSize(current.BytesAdded), NotificationEvents.FormatSize(current.BytesProcessed))</dd>
+                }
+                @if (current.WarningCount > 0)
+                {
+                    <dt>@R("Web_Backup_Activity_Warnings")</dt><dd>@current.WarningCount</dd>
+                }
+                @if (!string.IsNullOrEmpty(current.ErrorCode))
+                {
+                    <dt>@R("Web_Backup_LastError")</dt><dd>@BackupViewModel.ErrorText(current.ErrorCode)</dd>
+                }
+            </dl>
+
+            @if (Sources(current) is { Count: > 0 } sources)
+            {
+                <section class="workspace-section">
+                    <h4>@R("Web_Backup_Jobs_Sources")</h4>
+                    <ul class="backup-source-list">
+                        @foreach (var source in sources)
+                        {
+                            <li>
+                                <StatusBadge Tone="@(source.ErrorCode is not null ? StatusTone.Negative : source.WarningCount > 0 ? StatusTone.Warning : StatusTone.Positive)"
+                                             Label="@source.Name" />
+                                <span class="form-hint">
+                                    @(source.ErrorCode is not null ? BackupViewModel.ErrorText(source.ErrorCode)
+                                        : source.WarningCount > 0 ? string.Format(R("Web_Backup_Activity_SourceWarnings"), source.WarningCount)
+                                        : string.Format(R("Web_Backup_Activity_Snapshot"), source.SnapshotId?[..Math.Min(8, source.SnapshotId.Length)]))
+                                </span>
+                                @if (source.Warnings.Count > 0)
+                                {
+                                    <details class="backup-details">
+                                        <summary>@R("Web_Backup_Activity_ShowWarnings")</summary>
+                                        <ul>
+                                            @foreach (var warning in source.Warnings)
+                                            {
+                                                <li><code>@warning</code></li>
+                                            }
+                                        </ul>
+                                    </details>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(current.LogExcerpt))
+            {
+                <section class="workspace-section">
+                    <h4>@R("Web_Backup_Activity_Log")</h4>
+                    <pre class="backup-log">@current.LogExcerpt</pre>
+                </section>
+            }
+        }
+        else
+        {
+            <div class="detail-empty"><p>@R("Web_Backup_Activity_SelectHint")</p></div>
+        }
+    </aside>
+</div>
+
+@code {
+    // Results and runner progress are announced by the view model; the page does not
+    // re-render this component on its own.
+    protected override void OnInitialized() => VM.Changed += Refresh;
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => VM.Changed -= Refresh;
+
+    private Guid? _selectedId;
+
+    private BackupRun? Selected => VM.Runs.FirstOrDefault(r => r.Id == _selectedId);
+
+    private sealed record DetailsDto(List<BackupSourceOutcome>? Sources);
+
+    private static List<BackupSourceOutcome> Sources(BackupRun run)
+    {
+        if (string.IsNullOrWhiteSpace(run.DetailsJson))
+            return [];
+        try
+        {
+            return JsonSerializer.Deserialize<DetailsDto>(run.DetailsJson, new JsonSerializerOptions(JsonSerializerDefaults.Web))?.Sources ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static string R(string key) => BackupViewModel.R(key);
+}

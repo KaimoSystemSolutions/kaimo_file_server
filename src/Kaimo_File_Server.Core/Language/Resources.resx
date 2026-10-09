@@ -5701,7 +5701,45 @@
     <value>Job creator</value>
   </data>
   <data name="Web_Backup_Kit_Template" xml:space="preserve">
-    <value>KAIMO FILES - RECOVERY KIT\n==========================\nKeep this file offline and safe (e.g. printed in a safe or in a password manager).\nAnyone holding it can read the backups - without it, NOBODY can restore them.\n\nRepository:      {0}\nBackend:         {1}\nRepository id:   {5}\nCreated:         {7}\nrestic version:  {6}\nKit code:        {8}\n\nRESTIC_REPOSITORY={2}\nRESTIC_PASSWORD={4}\n\nFurther parameters / credentials you must supply yourself:\n{3}\n\nCredentials of the storage target (S3 keys, REST user, SSH key) are NOT part of this kit. Keep them separately.\n\nLAYOUT\n------\nEvery backup run creates one snapshot per share, tagged:\n  kaimo, job:&lt;job id&gt;, run:&lt;run id&gt;, level:files, share:&lt;share id&gt;\nA snapshot contains the share folder and kaimo-acl-manifest.json (owners and permissions of the share).\n\nRESTORE WITH THE RESTIC COMMAND LINE (works without the Kaimo server)\n--------------------------------------------------------------------\n1. Install restic (https://restic.net), the version above or newer.\n2. export RESTIC_REPOSITORY='&lt;value above&gt;'\n   export RESTIC_PASSWORD='&lt;value above&gt;'\n   plus the storage credentials (e.g. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).\n3. List backups:          restic snapshots --tag kaimo\n   Only one share:        restic snapshots --tag share:&lt;share id&gt;\n4. Browse a backup:       restic ls &lt;snapshot id&gt;\n5. Restore everything:    restic restore &lt;snapshot id&gt; --target /restore\n   Restore one folder:    restic restore &lt;snapshot id&gt;:&lt;share path&gt;/&lt;folder&gt; --target /restore\n6. Copy the restored files back into the share folder. Owners and permissions are listed in kaimo-acl-manifest.json.\n</value>
+    <value>KAIMO FILES - RECOVERY KIT
+==========================
+Keep this file offline and safe (e.g. printed in a safe or in a password manager).
+Anyone holding it can read the backups - without it, NOBODY can restore them.
+
+Repository:      {0}
+Backend:         {1}
+Repository id:   {5}
+Created:         {7}
+restic version:  {6}
+Kit code:        {8}
+
+RESTIC_REPOSITORY={2}
+RESTIC_PASSWORD={4}
+
+Further parameters / credentials you must supply yourself:
+{3}
+
+Credentials of the storage target (S3 keys, REST user, SSH key) are NOT part of this kit. Keep them separately.
+
+LAYOUT
+------
+Every backup run creates one snapshot per share, tagged:
+  kaimo, job:&lt;job id&gt;, run:&lt;run id&gt;, level:files, share:&lt;share id&gt;
+A snapshot contains the share folder and kaimo-acl-manifest.json (owners and permissions of the share).
+
+RESTORE WITH THE RESTIC COMMAND LINE (works without the Kaimo server)
+--------------------------------------------------------------------
+1. Install restic (https://restic.net), the version above or newer.
+2. export RESTIC_REPOSITORY='&lt;value above&gt;'
+   export RESTIC_PASSWORD='&lt;value above&gt;'
+   plus the storage credentials (e.g. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).
+3. List backups:          restic snapshots --tag kaimo
+   Only one share:        restic snapshots --tag share:&lt;share id&gt;
+4. Browse a backup:       restic ls &lt;snapshot id&gt;
+5. Restore everything:    restic restore &lt;snapshot id&gt; --target /restore
+   Restore one folder:    restic restore &lt;snapshot id&gt;:&lt;share path&gt;/&lt;folder&gt; --target /restore
+6. Copy the restored files back into the share folder. Owners and permissions are listed in kaimo-acl-manifest.json.
+</value>
   </data>
   <data name="Web_Nav_Backup" xml:space="preserve">
     <value>Backup</value>
@@ -6326,5 +6364,8 @@
   </data>
   <data name="Web_Backup_Error_repository_not_usable" xml:space="preserve">
     <value>The repository is not available for these shares.</value>
+  </data>
+  <data name="Web_Backup_Error_timeout" xml:space="preserve">
+    <value>The storage location did not answer in time. Check the address and the credentials.</value>
   </data>
 </root>

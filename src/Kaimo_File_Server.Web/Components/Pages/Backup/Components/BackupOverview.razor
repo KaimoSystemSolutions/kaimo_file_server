@@ -1,0 +1,99 @@
+@using Kaimo_File_Server.Core.Domain.Backup
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.ViewModels.Backup
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+@implements IDisposable
+@inject BackupViewModel VM
+@inject DateFormatService DateFmt
+
+@* Health at a glance: one row per job (last result, last success, next start) and, for
+   repository administrators, one row per repository (state, recovery kit, reachability). *@
+
+@foreach (var pending in VM.Repositories.Where(r => r.Repository.State == BackupRepositoryState.PendingRecoveryKit))
+{
+    <div class="warning-banner backup-banner">
+        <span>@string.Format(R("Web_Backup_Overview_KitPending"), pending.Repository.Name)</span>
+        <button type="button" class="btn-secondary btn-secondary--sm" @onclick="() => OnOpenRepository.InvokeAsync(pending.Repository.Id)">
+            @R("Web_Backup_Overview_OpenRepository")
+        </button>
+    </div>
+}
+
+<section class="backup-overview-section" aria-label="@R("Web_Backup_Tab_Jobs")">
+    <div class="workspace-list-header">
+        <span>@R("Web_Backup_Tab_Jobs")</span>
+        <span class="form-hint">@string.Format(R("Web_Backup_Overview_JobCount"), VM.Jobs.Count)</span>
+    </div>
+    @if (VM.Jobs.Count == 0)
+    {
+        <div class="empty-state"><p>@R("Web_Backup_Jobs_Empty")</p></div>
+    }
+    @foreach (var view in VM.Jobs)
+    {
+        var job = view.Job;
+        var active = VM.ActiveRuns.FirstOrDefault(r => r.JobId == job.Id);
+        <button type="button" class="workspace-row backup-overview-row" disabled="@(!VM.Access.CanManageJobs)"
+                @onclick="() => OnOpenJob.InvokeAsync(job.Id)">
+            <span class="workspace-row-icon">@Assets.SVG("history.svg", new SvgOptions(Width: 16, Height: 16))</span>
+            <span class="workspace-row-text">
+                <strong>@job.Name</strong>
+                <small>@string.Join(", ", view.Shares.Select(s => s.Name)) → @view.RepositoryName</small>
+            </span>
+            <span class="backup-overview-meta">
+                <span>@R("Web_Backup_LastSuccess"): @DateFmt.FormatDateTime(job.LastSuccessAtUtc, R("Web_Backup_Never"))</span>
+                <span>@R("Web_Backup_NextRun"): @DateFmt.FormatDateTime(VM.NextRunUtc(job), R("Web_Backup_NoSchedule"))</span>
+            </span>
+            @if (active is not null)
+            {
+                <StatusBadge Tone="StatusTone.Neutral" Label="@(active.IsRunning ? string.Format(R("Web_Backup_Running"), active.Progress) : R("Web_Backup_Queued"))" />
+            }
+            else
+            {
+                <StatusBadge Tone="@BackupUi.JobTone(job)" Label="@BackupUi.JobStatusLabel(job)" />
+            }
+        </button>
+    }
+</section>
+
+@if (VM.Access.CanManageRepositories)
+{
+    <section class="backup-overview-section" aria-label="@R("Web_Backup_Tab_Repositories")">
+        <div class="workspace-list-header">
+            <span>@R("Web_Backup_Tab_Repositories")</span>
+            <span class="form-hint">@string.Format(R("Web_Backup_Overview_RepositoryCount"), VM.Repositories.Count)</span>
+        </div>
+        @if (VM.Repositories.Count == 0)
+        {
+            <div class="empty-state"><p>@R("Web_Backup_Repos_Empty")</p></div>
+        }
+        @foreach (var view in VM.Repositories)
+        {
+            var repo = view.Repository;
+            <button type="button" class="workspace-row backup-overview-row" @onclick="() => OnOpenRepository.InvokeAsync(repo.Id)">
+                <span class="workspace-row-icon">@Assets.SVG("archive.svg", new SvgOptions(Width: 16, Height: 16))</span>
+                <span class="workspace-row-text">
+                    <strong>@repo.Name</strong>
+                    <small>@BackupUi.BackendLabel(repo.Backend) · @string.Format(R("Web_Backup_Overview_JobCount"), view.JobCount)</small>
+                </span>
+                <span class="backup-overview-meta">
+                    <span>@R("Web_Backup_LastReachable"): @DateFmt.FormatDateTime(repo.LastReachableAtUtc, R("Web_Backup_Never"))</span>
+                </span>
+                <StatusBadge Tone="@BackupUi.RepositoryTone(repo)" Label="@BackupUi.RepositoryStateLabel(repo)" />
+            </button>
+        }
+    </section>
+}
+
+@code {
+    // Results and runner progress are announced by the view model; the page does not
+    // re-render this component on its own.
+    protected override void OnInitialized() => VM.Changed += Refresh;
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => VM.Changed -= Refresh;
+
+    [Parameter] public EventCallback<Guid> OnOpenJob { get; set; }
+    [Parameter] public EventCallback<Guid> OnOpenRepository { get; set; }
+
+    private static string R(string key) => BackupViewModel.R(key);
+}

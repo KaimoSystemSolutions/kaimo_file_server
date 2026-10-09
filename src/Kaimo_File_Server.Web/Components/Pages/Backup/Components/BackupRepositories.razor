@@ -1,0 +1,452 @@
+@using Kaimo_File_Server.Core.Domain.Backup
+@using Kaimo_File_Server.Core.Domain.Department
+@using Kaimo_File_Server.Infrastructure.Backup.Restic
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.ViewModels.Backup
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+@implements IDisposable
+@inject BackupViewModel VM
+@inject DateFormatService DateFmt
+@inject NavigationManager Nav
+
+@*
+    Repositories (Global): create (test → initialize new / connect existing), recovery kit
+    (download → type code → active), department release, enable/disable, delete.
+*@
+
+<div class="backup-toolbar">
+    <p class="subtitle">@R("Web_Backup_Repos_Help")</p>
+    <button class="btn-primary" type="button" disabled="@VM.IsReadOnlyDemo" @onclick="StartCreate">@R("Web_Backup_Repos_Create")</button>
+</div>
+
+<div class="workspace">
+    <section class="workspace-list" aria-label="@R("Web_Backup_Tab_Repositories")">
+        <div class="workspace-list-header"><span>@R("Web_Backup_Tab_Repositories")</span></div>
+        @if (VM.Repositories.Count == 0)
+        {
+            <div class="empty-state"><p>@R("Web_Backup_Repos_Empty")</p></div>
+        }
+        @foreach (var view in VM.Repositories)
+        {
+            var repo = view.Repository;
+            <button type="button" class="workspace-row @(_selectedId == repo.Id && !_editing ? "workspace-row--selected" : "")"
+                    aria-pressed="@(_selectedId == repo.Id ? "true" : "false")" @onclick="() => Select(repo.Id)">
+                <span class="workspace-row-icon">@Assets.SVG("archive.svg", new SvgOptions(Width: 16, Height: 16))</span>
+                <span class="workspace-row-text">
+                    <strong>@repo.Name</strong>
+                    <small>@BackupUi.BackendLabel(repo.Backend)</small>
+                </span>
+                <StatusBadge Tone="@BackupUi.RepositoryTone(repo)" Label="@BackupUi.RepositoryStateLabel(repo)" />
+            </button>
+        }
+    </section>
+
+    <aside class="workspace-detail" aria-label="@R("Web_Backup_Repos_Detail")">
+        @if (_editing)
+        {
+            var form = VM.RepositoryForm;
+            var isNew = form.Id is null;
+            <div class="workspace-heading">
+                <div>
+                    <h3>@(isNew ? R("Web_Backup_Repos_Create") : R("Web_Backup_Repos_Edit"))</h3>
+                    <span class="workspace-heading-sub">@BackupUi.BackendLabel(form.Backend)</span>
+                </div>
+            </div>
+
+            <div class="workspace-form">
+                <label>
+                    <span>@R("Web_Backup_Name")</span>
+                    <input class="edit-input" maxlength="200" @bind="form.Name" @bind:event="oninput" />
+                </label>
+                <label>
+                    <span>@R("Web_Backup_Repos_Backend")</span>
+                    <select class="edit-input" @bind="form.Backend" @bind:after="Changed" disabled="@(!isNew)">
+                        @foreach (var backend in Enum.GetValues<BackupBackend>())
+                        {
+                            <option value="@backend">@BackupUi.BackendLabel(backend)</option>
+                        }
+                    </select>
+                </label>
+
+                @switch (form.Backend)
+                {
+                    case BackupBackend.Local:
+                        <label>
+                            <span>@R("Web_Backup_Repos_LocalPath")</span>
+                            <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                            <small>@string.Format(R("Web_Backup_Repos_LocalPathHelp"), string.Join(", ", VM.LocalRoots))</small>
+                        </label>
+                        break;
+                    case BackupBackend.Sftp:
+                        <label>
+                            <span>@R("Web_Backup_Repos_Connection")</span>
+                            <select class="edit-input" @bind="form.ConnectionId" @bind:after="Changed">
+                                <option value="@Guid.Empty">@R("Web_Backup_Select")</option>
+                                @foreach (var (id, name) in VM.SshConnections)
+                                {
+                                    <option value="@id">@name</option>
+                                }
+                            </select>
+                            <small>@R("Web_Backup_Repos_ConnectionHelp")</small>
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_RemotePath")</span>
+                            <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" placeholder="kaimo-backup" />
+                        </label>
+                        break;
+                    case BackupBackend.Rest:
+                        <label>
+                            <span>@R("Web_Backup_Repos_Endpoint")</span>
+                            <input class="edit-input" @bind="form.Endpoint" @bind:event="oninput" @bind:after="Changed" spellcheck="false" placeholder="https://backup.example.com:8000" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_SubPath")</span>
+                            <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_Username")</span>
+                            <input class="edit-input" @bind="form.RestUsername" @bind:event="oninput" @bind:after="Changed" autocomplete="off"
+                                   placeholder="@(isNew ? "" : R("Web_Backup_Repos_KeepSecret"))" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_Password")</span>
+                            <input class="edit-input" type="password" @bind="form.RestPassword" @bind:event="oninput" @bind:after="Changed" autocomplete="new-password"
+                                   placeholder="@(isNew ? "" : R("Web_Backup_Repos_KeepSecret"))" />
+                        </label>
+                        break;
+                    case BackupBackend.S3:
+                        <label>
+                            <span>@R("Web_Backup_Repos_Endpoint")</span>
+                            <input class="edit-input" @bind="form.Endpoint" @bind:event="oninput" @bind:after="Changed" spellcheck="false" placeholder="https://s3.eu-central-1.amazonaws.com" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_Bucket")</span>
+                            <input class="edit-input" @bind="form.Bucket" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_Prefix")</span>
+                            <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_Region")</span>
+                            <input class="edit-input" @bind="form.Region" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_AccessKey")</span>
+                            <input class="edit-input" @bind="form.S3AccessKeyId" @bind:event="oninput" @bind:after="Changed" autocomplete="off"
+                                   placeholder="@(isNew ? "" : R("Web_Backup_Repos_KeepSecret"))" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_SecretKey")</span>
+                            <input class="edit-input" type="password" @bind="form.S3SecretAccessKey" @bind:event="oninput" @bind:after="Changed" autocomplete="new-password"
+                                   placeholder="@(isNew ? "" : R("Web_Backup_Repos_KeepSecret"))" />
+                        </label>
+                        <div class="toggle-row">
+                            <span>@R("Web_Backup_Repos_PathStyle")</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" @bind="form.S3PathStyle" @bind:after="Changed" aria-label="@R("Web_Backup_Repos_PathStyle")" />
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        break;
+                }
+
+                @if (form.Backend is BackupBackend.Rest or BackupBackend.S3)
+                {
+                    <label>
+                        <span>@R("Web_Backup_Repos_CaCertificate")</span>
+                        <textarea class="edit-input backup-pem" rows="3" spellcheck="false" @bind="form.CaCertificatePem" @bind:event="oninput" @bind:after="Changed"
+                                  placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+                        <small>@R("Web_Backup_Repos_CaCertificateHelp")</small>
+                    </label>
+                }
+
+                @if (form.Backend == BackupBackend.Local)
+                {
+                    <label>
+                        <span>@R("Web_Backup_Repos_MinFreeSpace")</span>
+                        <input class="edit-input" type="number" min="0" @bind="form.MinFreeSpaceGb" @bind:event="oninput" />
+                    </label>
+                }
+
+                @if (form.Backend == BackupBackend.Rest)
+                {
+                    <div class="toggle-row">
+                        <span class="backup-label-with-info">
+                            @R("Web_Backup_Repos_AppendOnly")
+                            <InfoButton Text="@R("Web_Backup_Repos_AppendOnlyHelp")" />
+                        </span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" @bind="form.IsAppendOnly" aria-label="@R("Web_Backup_Repos_AppendOnly")" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                }
+
+                <div class="workspace-field">
+                    <span class="backup-label-with-info">
+                        @R("Web_Backup_Repos_Departments")
+                        <InfoButton Text="@R("Web_Backup_Repos_DepartmentsHelp")" />
+                    </span>
+                    <MultiSelect T="Department" Items="form.Departments" Label="d => d.Name"
+                                 PlaceholderText="@R("Web_Backup_Repos_DepartmentsNone")" />
+                </div>
+            </div>
+
+            @if (isNew)
+            {
+                <section class="workspace-section">
+                    <h4>@R("Web_Backup_Repos_Setup")</h4>
+                    <p>@R("Web_Backup_Repos_SetupHelp")</p>
+                    <div class="detail-actions backup-inline-actions">
+                        <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || !CanSubmit)" @onclick="VM.ProbeAsync">
+                            @(VM.IsBusy ? R("Web_Backup_Working") : R("Web_Backup_Repos_Test"))
+                        </button>
+                    </div>
+                    @if (VM.ProbeResult == BackupRepositoryProbe.Empty)
+                    {
+                        <div class="detail-actions backup-inline-actions">
+                            <button class="btn-primary" type="button" disabled="@(VM.IsBusy || !CanSubmit)" @onclick="() => CreateAsync(false)">@R("Web_Backup_Repos_Initialize")</button>
+                        </div>
+                    }
+                    else if (VM.ProbeResult == BackupRepositoryProbe.Existing)
+                    {
+                        <label class="workspace-field">
+                            <span>@R("Web_Backup_Repos_ExistingPassword")</span>
+                            <input class="edit-input" type="password" autocomplete="off" @bind="form.ExistingPassword" @bind:event="oninput" />
+                        </label>
+                        <div class="detail-actions backup-inline-actions">
+                            <button class="btn-primary" type="button" disabled="@(VM.IsBusy || string.IsNullOrEmpty(form.ExistingPassword))" @onclick="() => CreateAsync(true)">@R("Web_Backup_Repos_Connect")</button>
+                        </div>
+                    }
+                </section>
+            }
+
+            <div class="detail-actions">
+                <button class="btn-secondary" type="button" disabled="@VM.IsBusy" @onclick="() => _editing = false">@R("Web_Button_Cancel")</button>
+                @if (!isNew)
+                {
+                    <button class="btn-primary" type="button" disabled="@(VM.IsBusy || !CanSubmit)" @onclick="UpdateAsync">@R("Web_Backup_Save")</button>
+                }
+            </div>
+        }
+        else if (Selected is { } view)
+        {
+            var repo = view.Repository;
+            <div class="workspace-heading">
+                <div>
+                    <h3>@repo.Name</h3>
+                    <span class="workspace-heading-sub">@BackupUi.BackendLabel(repo.Backend)</span>
+                </div>
+                <StatusBadge Tone="@BackupUi.RepositoryTone(repo)" Label="@BackupUi.RepositoryStateLabel(repo)" />
+            </div>
+
+            @if (repo.State == BackupRepositoryState.PendingRecoveryKit)
+            {
+                <section class="workspace-section backup-kit">
+                    <h4>@R("Web_Backup_Kit_Title")</h4>
+                    <p>@R("Web_Backup_Kit_Help")</p>
+                    <ol class="backup-kit-steps">
+                        <li>
+                            <span>@R("Web_Backup_Kit_Step1")</span>
+                            <button class="btn-secondary btn-secondary--sm" type="button" disabled="@VM.IsReadOnlyDemo" @onclick="() => DownloadKitAsync(repo.Id)">
+                                @Assets.SVG("download.svg", new SvgOptions(Width: 12, Height: 12))
+                                <span>@R("Web_Backup_Kit_Download")</span>
+                            </button>
+                        </li>
+                        <li>
+                            <span>@R("Web_Backup_Kit_Step2")</span>
+                            <span class="backup-kit-confirm">
+                                <input class="edit-input backup-kit-code" maxlength="12" autocomplete="off" spellcheck="false"
+                                       aria-label="@R("Web_Backup_Kit_Code")" placeholder="ABC234" @bind="_kitCode" @bind:event="oninput" />
+                                <button class="btn-primary" type="button" disabled="@(VM.IsBusy || repo.KitDownloadedAtUtc is null && !_kitDownloaded || string.IsNullOrWhiteSpace(_kitCode))"
+                                        @onclick="() => ConfirmKitAsync(repo.Id)">@R("Web_Backup_Kit_Confirm")</button>
+                            </span>
+                        </li>
+                    </ol>
+                </section>
+            }
+
+            <dl class="workspace-dl">
+                <dt>@R("Web_Backup_Repos_Location")</dt><dd><code>@Location(repo)</code></dd>
+                <dt>@R("Web_Backup_Repos_RepositoryId")</dt><dd><code>@(repo.ResticRepositoryId ?? "–")</code></dd>
+                <dt>@R("Web_Backup_Repos_Departments")</dt><dd>@DepartmentNames(view)</dd>
+                <dt>@R("Web_Backup_Tab_Jobs")</dt><dd>@view.JobCount</dd>
+                <dt>@R("Web_Backup_LastReachable")</dt><dd>@DateFmt.FormatDateTime(repo.LastReachableAtUtc, R("Web_Backup_Never"))</dd>
+                @if (!string.IsNullOrEmpty(repo.LastErrorCode))
+                {
+                    <dt>@R("Web_Backup_LastError")</dt><dd>@BackupViewModel.ErrorText(repo.LastErrorCode)</dd>
+                }
+                <dt>@R("Web_Backup_Kit_Title")</dt>
+                <dd>@(repo.KitConfirmedAtUtc is { } confirmed
+                        ? string.Format(R("Web_Backup_Kit_ConfirmedAt"), DateFmt.FormatDateTime(confirmed))
+                        : R("Web_Backup_Kit_NotConfirmed"))</dd>
+                @if (repo.Backend == BackupBackend.Rest)
+                {
+                    <dt>@R("Web_Backup_Repos_AppendOnly")</dt><dd>@(repo.IsAppendOnly ? R("Web_Common_Yes") : R("Web_Common_No"))</dd>
+                }
+            </dl>
+
+            <div class="detail-actions">
+                <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => StartEdit(view)">@R("Web_Backup_Edit")</button>
+                @if (repo.State != BackupRepositoryState.PendingRecoveryKit)
+                {
+                    <button class="btn-secondary" type="button" disabled="@VM.IsReadOnlyDemo" @onclick="() => DownloadKitAsync(repo.Id)">@R("Web_Backup_Kit_Download")</button>
+                }
+                @if (repo.State == BackupRepositoryState.Disabled)
+                {
+                    <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => VM.SetRepositoryEnabledAsync(repo.Id, true)">@R("Web_Backup_Enable")</button>
+                }
+                else
+                {
+                    <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => VM.SetRepositoryEnabledAsync(repo.Id, false)">@R("Web_Backup_Disable")</button>
+                }
+                @if (_confirmDelete)
+                {
+                    <button class="btn-danger" type="button" disabled="@VM.IsBusy" @onclick="() => DeleteAsync(repo.Id)">@R("Web_Backup_ConfirmDelete")</button>
+                    <button class="btn-secondary" type="button" @onclick="() => _confirmDelete = false">@R("Web_Button_Cancel")</button>
+                }
+                else
+                {
+                    <button class="btn-danger-outline" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo || view.JobCount > 0)"
+                            title="@(view.JobCount > 0 ? R("Web_Backup_Error_repository_in_use") : null)" @onclick="() => _confirmDelete = true">@R("Web_Action_Delete")</button>
+                }
+            </div>
+            @if (_confirmDelete)
+            {
+                <p class="form-hint">@R("Web_Backup_Repos_DeleteHint")</p>
+            }
+        }
+        else
+        {
+            <div class="detail-empty"><p>@R("Web_Backup_Repos_SelectHint")</p></div>
+        }
+    </aside>
+</div>
+
+@code {
+    // Results and runner progress are announced by the view model; the page does not
+    // re-render this component on its own.
+    protected override void OnInitialized() => VM.Changed += Refresh;
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => VM.Changed -= Refresh;
+
+    [Parameter] public Guid? SelectedRepositoryId { get; set; }
+
+    private Guid? _selectedId;
+    private bool _editing;
+    private bool _confirmDelete;
+    private bool _kitDownloaded;
+    private string _kitCode = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (SelectedRepositoryId is not null)
+            _selectedId = SelectedRepositoryId;
+    }
+
+    private BackupRepositoryView? Selected => VM.Repositories.FirstOrDefault(r => r.Repository.Id == _selectedId);
+
+    private bool CanSubmit
+    {
+        get
+        {
+            var f = VM.RepositoryForm;
+            return !string.IsNullOrWhiteSpace(f.Name) && f.Backend switch
+            {
+                BackupBackend.Local => !string.IsNullOrWhiteSpace(f.Path),
+                BackupBackend.Sftp => f.ConnectionId != Guid.Empty && !string.IsNullOrWhiteSpace(f.Path),
+                BackupBackend.Rest => !string.IsNullOrWhiteSpace(f.Endpoint),
+                BackupBackend.S3 => !string.IsNullOrWhiteSpace(f.Endpoint) && !string.IsNullOrWhiteSpace(f.Bucket),
+                _ => false,
+            };
+        }
+    }
+
+    private void Select(Guid id)
+    {
+        _selectedId = id;
+        _editing = false;
+        _confirmDelete = false;
+        _kitDownloaded = false;
+        _kitCode = string.Empty;
+    }
+
+    private void StartCreate()
+    {
+        VM.NewRepository();
+        _editing = true;
+    }
+
+    private void StartEdit(BackupRepositoryView view)
+    {
+        VM.EditRepository(view);
+        _editing = true;
+        _confirmDelete = false;
+    }
+
+    // Any change to the target invalidates an earlier test result.
+    private void Changed()
+    {
+        if (VM.RepositoryForm.Id is null)
+            VM.ResetProbe();
+    }
+
+    private async Task CreateAsync(bool connectExisting)
+    {
+        if (await VM.CreateRepositoryAsync(connectExisting))
+        {
+            Select(VM.RepositoryForm.Id!.Value);
+        }
+    }
+
+    private async Task UpdateAsync()
+    {
+        if (await VM.UpdateRepositoryAsync())
+            _editing = false;
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        if (await VM.DeleteRepositoryAsync(id))
+            _selectedId = null;
+        _confirmDelete = false;
+    }
+
+    private async Task DownloadKitAsync(Guid id)
+    {
+        var url = await VM.CreateKitDownloadUrlAsync(Nav.BaseUri, id);
+        if (string.IsNullOrEmpty(url))
+            return;
+        _kitDownloaded = true;
+        Nav.NavigateTo(url, forceLoad: true);
+    }
+
+    private async Task ConfirmKitAsync(Guid id)
+    {
+        if (await VM.ConfirmKitAsync(id, _kitCode))
+            _kitCode = string.Empty;
+    }
+
+    private string DepartmentNames(BackupRepositoryView view)
+    {
+        var names = VM.AllDepartments.Where(d => view.DepartmentIds.Contains(d.Id)).Select(d => d.Name).ToList();
+        return names.Count == 0 ? R("Web_Backup_Repos_DepartmentsNone") : string.Join(", ", names);
+    }
+
+    private static string Location(BackupRepository repo)
+    {
+        var s = ResticRepositorySettings.Parse(repo.SettingsJson);
+        return repo.Backend switch
+        {
+            BackupBackend.Local => s.Path ?? "–",
+            BackupBackend.Sftp => "sftp: " + s.Path,
+            BackupBackend.Rest => s.Endpoint + (string.IsNullOrEmpty(s.Path) ? "" : "/" + s.Path.Trim('/')),
+            BackupBackend.S3 => s.Endpoint + "/" + s.Bucket + (string.IsNullOrEmpty(s.Path) ? "" : "/" + s.Path.Trim('/')),
+            _ => "–",
+        };
+    }
+
+    private static string R(string key) => BackupViewModel.R(key);
+}
