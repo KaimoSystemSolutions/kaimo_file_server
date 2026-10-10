@@ -26,6 +26,15 @@ public class ResticBackupDatabaseTests : DatabaseTestBase
 
     private UserContext Actor => new(_user, [], [], []);
 
+    public ResticBackupDatabaseTests()
+    {
+        // No restore rights unless a test grants them.
+        _auth.Setup(a => a.GetAuthorizedShareIdsAnyAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(AuthorizedScopeResult.LimitedTo([]));
+        _auth.Setup(a => a.GetAuthorizedShareIdsAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(AuthorizedScopeResult.LimitedTo([]));
+    }
+
     private BackupCatalogService Catalog(bool demo = false)
     {
         var config = new ConfigurationBuilder().Build();
@@ -85,6 +94,28 @@ public class ResticBackupDatabaseTests : DatabaseTestBase
         Assert.Equal([new TimeOnly(2, 0)], saved.Schedule.Times);
         // A new job never catches up on slots from before it existed.
         Assert.NotNull(saved.LastScheduledSlotUtc);
+    }
+
+    [Theory]
+    [InlineData(false, true)]   // weekdays left, all start times removed
+    [InlineData(true, false)]   // start times left, all weekdays removed
+    [InlineData(false, false)]
+    public async Task SaveJob_WithoutTimesOrDays_IsStoredAsManualOnly(bool withTimes, bool withDays)
+    {
+        var (_, _, childShare, _, repo) = await SeedAsync(releaseToParent: true);
+        ScopedJobAdmin(childShare.Id);
+
+        var job = await Catalog().SaveJobAsync(Actor, Draft(repo.Id, childShare.Id) with
+        {
+            Times = withTimes ? [new TimeOnly(2, 0)] : [],
+            Days = withDays ? Enum.GetValues<DayOfWeek>() : [],
+        });
+
+        await using var db = NewContext();
+        var schedule = (await db.BackupJobs.SingleAsync(j => j.Id == job.Id)).Schedule;
+        Assert.Empty(schedule.Times);
+        Assert.Empty(schedule.Days);
+        Assert.True(schedule.IsEmpty);
     }
 
     [Fact]

@@ -17,7 +17,8 @@ public sealed record BackupRunSnapshot(
     int Progress,
     DateTimeOffset QueuedAt,
     bool IsRunning,
-    bool IsCancellationRequested);
+    bool IsCancellationRequested,
+    bool IsRestore = false);
 
 /// <summary>Queues backup runs and executes them off the UI thread (Web process only).</summary>
 public interface IBackupRunner
@@ -31,6 +32,12 @@ public interface IBackupRunner
     /// </summary>
     Task<Guid> EnqueueJobAsync(Guid jobId, BackupRunTrigger trigger, Guid? actorUserId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Queues a restore (already authorized by the caller) on its own lane, so a restore never
+    /// waits behind a long-running backup. Returns the run id.
+    /// </summary>
+    Task<Guid> EnqueueRestoreAsync(BackupRestoreRequest request, string title, Guid actorUserId, CancellationToken ct = default);
+
     bool Cancel(Guid runId);
 }
 
@@ -42,13 +49,16 @@ public interface IBackupRunner
 public sealed class BackupRunner(
     IDbContextFactory<ApplicationDbContext> dbFactory,
     BackupJobExecutor executor,
+    BackupRestoreExecutor restoreExecutor,
     ResticTargetResolver resolver,
     DemoModeOptions demo,
     TimeProvider time,
     ILogger<BackupRunner> logger) : BackgroundService, IBackupRunner
 {
-    // ponytail: one global serial backup lane; per-repository parallelism if throughput matters.
+    // ponytail: one global serial backup lane (+ one restore lane); per-repository parallelism if throughput matters.
     private readonly Channel<Guid> _queue = Channel.CreateUnbounded<Guid>(
+        new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+    private readonly Channel<Guid> _restoreQueue = Channel.CreateUnbounded<Guid>(
         new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
     private readonly object _gate = new();
     private readonly Dictionary<Guid, RunState> _runs = [];
@@ -120,6 +130,42 @@ public sealed class BackupRunner(
         return run.Id;
     }
 
+    public async Task<Guid> EnqueueRestoreAsync(BackupRestoreRequest request, string title, Guid actorUserId, CancellationToken ct = default)
+    {
+        if (demo.ReadOnly)
+            throw new ReadOnlyDemoException();
+        await _recovered.Task.WaitAsync(ct);
+
+        var run = new BackupRun
+        {
+            RepositoryId = request.RepositoryId,
+            Type = BackupRunType.Restore,
+            Trigger = BackupRunTrigger.Manual,
+            ActorUserId = actorUserId,
+            QueuedAtUtc = time.GetUtcNow().UtcDateTime,
+            DetailsJson = new BackupRestoreDetails(request).Serialize(),
+        };
+        lock (_gate)
+            _runs[run.Id] = new RunState(run.Id, Guid.Empty, title,
+                CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token), time.GetUtcNow()) { IsRestore = true };
+
+        try
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            db.BackupRuns.Add(run);
+            await db.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            lock (_gate) _runs.Remove(run.Id);
+            throw;
+        }
+
+        _restoreQueue.Writer.TryWrite(run.Id);
+        NotifyChanged();
+        return run.Id;
+    }
+
     public bool Cancel(Guid runId)
     {
         RunState? state;
@@ -146,9 +192,14 @@ public sealed class BackupRunner(
             _recovered.TrySetResult();
         }
 
+        await Task.WhenAll(DrainAsync(_queue, stoppingToken), DrainAsync(_restoreQueue, stoppingToken));
+    }
+
+    private async Task DrainAsync(Channel<Guid> queue, CancellationToken stoppingToken)
+    {
         try
         {
-            await foreach (var runId in _queue.Reader.ReadAllAsync(stoppingToken))
+            await foreach (var runId in queue.Reader.ReadAllAsync(stoppingToken))
                 await RunAsync(runId);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -164,6 +215,7 @@ public sealed class BackupRunner(
         {
             resolver.WipeTempRoot();
             executor.WipeMetaRoot();
+            await restoreExecutor.WipeStagingAsync(ct);
             await using var db = await dbFactory.CreateDbContextAsync(ct);
             var now = time.GetUtcNow().UtcDateTime;
             var stale = await db.BackupRuns
@@ -204,7 +256,9 @@ public sealed class BackupRunner(
             NotifyChanged();
 
             long lastNotify = 0;
-            await executor.ExecuteAsync(runId, (detail, progress) =>
+            Func<Guid, Action<string?, int>, CancellationToken, Task> execute =
+                state.IsRestore ? restoreExecutor.ExecuteAsync : executor.ExecuteAsync;
+            await execute(runId, (detail, progress) =>
             {
                 lock (_gate)
                 {
@@ -280,8 +334,9 @@ public sealed class BackupRunner(
         public int Progress { get; set; }
         public bool IsRunning { get; set; }
         public bool CancelRequested { get; set; }
+        public bool IsRestore { get; init; }
 
         public BackupRunSnapshot ToSnapshot()
-            => new(RunId, JobId, Title, Detail, Progress, QueuedAt, IsRunning, CancelRequested);
+            => new(RunId, JobId, Title, Detail, Progress, QueuedAt, IsRunning, CancelRequested, IsRestore);
     }
 }

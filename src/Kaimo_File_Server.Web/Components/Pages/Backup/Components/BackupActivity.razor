@@ -27,7 +27,7 @@
             <button type="button" class="workspace-row @(_selectedId == run.Id ? "workspace-row--selected" : "")"
                     aria-pressed="@(_selectedId == run.Id ? "true" : "false")" @onclick="() => _selectedId = run.Id">
                 <span class="workspace-row-text">
-                    <strong>@BackupUi.RunTypeLabel(run.Type) · @(run.JobId is null ? VM.RepositoryName(run.RepositoryId) : VM.JobName(run.JobId))</strong>
+                    <strong>@BackupUi.RunTypeLabel(run.Type) · @RunSubject(run)</strong>
                     <small>@DateFmt.FormatDateTime(run.StartedAtUtc ?? run.QueuedAtUtc) · @BackupUi.TriggerLabel(run.Trigger)</small>
                 </span>
                 <StatusBadge Tone="@BackupUi.RunTone(run.Status)" Label="@BackupUi.RunStatusLabel(run.Status)" />
@@ -41,7 +41,7 @@
             <div class="workspace-heading">
                 <div>
                     <h3>@BackupUi.RunTypeLabel(current.Type)</h3>
-                    <span class="workspace-heading-sub">@(current.JobId is null ? VM.RepositoryName(current.RepositoryId) : VM.JobName(current.JobId))</span>
+                    <span class="workspace-heading-sub">@RunSubject(current)</span>
                 </div>
                 <StatusBadge Tone="@BackupUi.RunTone(current.Status)" Label="@BackupUi.RunStatusLabel(current.Status)" />
             </div>
@@ -100,6 +100,59 @@
                 </section>
             }
 
+            @if (current.Type == BackupRunType.Restore && BackupRestoreDetails.TryParse(current.DetailsJson) is { } restore)
+            {
+                var request = restore.Request;
+                var result = restore.Result;
+                <section class="workspace-section">
+                    <h4>@R("Web_Backup_Activity_Restore")</h4>
+                    <dl class="workspace-dl">
+                        <dt>@R("Web_Backup_Restore_Mode")</dt>
+                        <dd>@R("Web_Backup_Restore_Mode_" + request.Mode)@(request.Mode == BackupRestoreMode.InPlace ? " · " + R("Web_Backup_Restore_Conflict_" + request.Conflict) : "")</dd>
+                        <dt>@R("Web_Backup_Activity_RestoreSource")</dt>
+                        <dd>@SharePath(result?.SourceShareName, request.FolderPath)@(request.Items.Count == 0 ? "" : " · " + string.Join(", ", request.Items))</dd>
+                        @if (result is not null && request.Mode != BackupRestoreMode.Download)
+                        {
+                            <dt>@R("Web_Backup_Activity_RestoreTarget")</dt>
+                            <dd>@SharePath(result.DestinationShareName, result.DestinationPath)</dd>
+                            <dt>@R("Web_Backup_Activity_Files")</dt>
+                            <dd>@string.Format(R("Web_Backup_Activity_RestoreFilesValue"), result.FilesRestored, NotificationEvents.FormatSize(result.BytesRestored))</dd>
+                            @if (request.Mode == BackupRestoreMode.InPlace)
+                            {
+                                <dt>@R("Web_Backup_Activity_RestoreConflicts")</dt>
+                                <dd>@string.Format(R("Web_Backup_Activity_RestoreConflictsValue"), result.Overwritten, result.VersionsCreated, result.Unchanged, result.Skipped, result.Renamed)</dd>
+                            }
+                            <dt>@R("Web_Backup_Restore_Permissions")</dt>
+                            <dd>@(request.RestorePermissions ? string.Format(R("Web_Backup_Activity_RestoreAclValue"), result.AclEntriesApplied) : R("Web_Common_No"))</dd>
+                        }
+                    </dl>
+                    @if (result is { SkippedPrincipals.Count: > 0 })
+                    {
+                        <details class="backup-details">
+                            <summary>@string.Format(R("Web_Backup_Activity_SkippedPrincipals"), result.SkippedPrincipals.Count)</summary>
+                            <ul>
+                                @foreach (var principal in result.SkippedPrincipals)
+                                {
+                                    <li>@(principal.Name ?? "?") <code>@principal.Id</code></li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                    @if (result is { SkippedItems.Count: > 0 })
+                    {
+                        <details class="backup-details">
+                            <summary>@string.Format(R("Web_Backup_Activity_SkippedItems"), result.SkippedItems.Count)</summary>
+                            <ul>
+                                @foreach (var item in result.SkippedItems)
+                                {
+                                    <li><code>@item</code></li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                </section>
+            }
+
             @if (!string.IsNullOrWhiteSpace(current.LogExcerpt))
             {
                 <section class="workspace-section">
@@ -141,6 +194,16 @@
             return [];
         }
     }
+
+    /// <summary>Restores name their source ("share/folder"), jobs their job, the rest their repository.</summary>
+    private string RunSubject(BackupRun run)
+        => run.Type == BackupRunType.Restore && BackupRestoreDetails.TryParse(run.DetailsJson) is { } restore
+            ? SharePath(restore.Result?.SourceShareName, restore.Request.FolderPath)
+            : run.JobId is null ? VM.RepositoryName(run.RepositoryId) : VM.JobName(run.JobId);
+
+    // The share name is only recorded once the run started; a queued restore shows its folder.
+    private static string SharePath(string? share, string? path)
+        => string.Join("/", new[] { share, path }.Where(p => !string.IsNullOrEmpty(p))) is { Length: > 0 } text ? text : "–";
 
     private static string R(string key) => BackupViewModel.R(key);
 }

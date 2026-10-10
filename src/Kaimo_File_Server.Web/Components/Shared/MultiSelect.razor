@@ -1,4 +1,4 @@
-@using Kaimo_File_Server.Web.DynamicHelpers
+﻿@using Kaimo_File_Server.Web.DynamicHelpers
 @inject AssetProvider Icons
 @typeparam T
 
@@ -24,7 +24,7 @@
             @foreach (var item in Items)
             {
                 <label class="multi-select-option">
-                    <input type="checkbox" @bind="item.IsChecked" />
+                    <input type="checkbox" @bind="item.IsChecked" @bind:after="NotifyChangedAsync" />
                     <span>@Label(item.Item)</span>
                     @if (Hint is not null)
                     {
@@ -56,6 +56,12 @@
     /// <summary>Shown inside the open panel when there are no items to choose from.</summary>
     [Parameter] public string? EmptyText { get; set; }
 
+    /// <summary>
+    /// Raised after an item was (un)checked. The selection itself is already written to the
+    /// items; this lets the caller re-render what depends on it (e.g. a Save button).
+    /// </summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
     /// <summary>Extra CSS classes for local overrides.</summary>
     [Parameter] public string? Class { get; set; }
 
@@ -63,6 +69,7 @@
 
     private void Toggle() => _open = !_open;
     private void Close() => _open = false;
+    private Task NotifyChangedAsync() => OnChanged.InvokeAsync();
 
     private string SummaryText
     {

@@ -6368,4 +6368,217 @@ RESTORE WITH THE RESTIC COMMAND LINE (works without the Kaimo server)
   <data name="Web_Backup_Error_timeout" xml:space="preserve">
     <value>The storage location did not answer in time. Check the address and the credentials.</value>
   </data>
+  <data name="Web_Backup_Tab_Restore" xml:space="preserve">
+    <value>Restore</value>
+  </data>
+  <data name="Web_Backup_Restore_Help" xml:space="preserve">
+    <value>Browse the backup points of a share and restore single files, folders or the whole share: into a new folder, back to the original location or into another share. Downloads stream directly from the repository.</value>
+  </data>
+  <data name="Web_Backup_Restore_Shares" xml:space="preserve">
+    <value>Shares</value>
+  </data>
+  <data name="Web_Backup_Restore_NoShares" xml:space="preserve">
+    <value>There are no backups of shares you may restore.</value>
+  </data>
+  <data name="Web_Backup_Restore_PointCount" xml:space="preserve">
+    <value>{0} backup points · latest {1}</value>
+  </data>
+  <data name="Web_Backup_Restore_Browser" xml:space="preserve">
+    <value>Backup content</value>
+  </data>
+  <data name="Web_Backup_Restore_Point" xml:space="preserve">
+    <value>Backup point</value>
+  </data>
+  <data name="Web_Backup_Restore_PointFiles" xml:space="preserve">
+    <value>{0} files, {1}</value>
+  </data>
+  <data name="Web_Backup_Restore_Path" xml:space="preserve">
+    <value>Folder in the backup</value>
+  </data>
+  <data name="Web_Backup_Restore_NothingSelected" xml:space="preserve">
+    <value>Nothing selected: the whole folder is restored</value>
+  </data>
+  <data name="Web_Backup_Restore_Selected" xml:space="preserve">
+    <value>{0} selected</value>
+  </data>
+  <data name="Web_Backup_Restore_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="Web_Backup_Restore_DownloadHint" xml:space="preserve">
+    <value>Select exactly one entry. Folders are downloaded as ZIP file.</value>
+  </data>
+  <data name="Web_Backup_Restore_RestoreFolder" xml:space="preserve">
+    <value>Restore folder…</value>
+  </data>
+  <data name="Web_Backup_Restore_RestoreSelected" xml:space="preserve">
+    <value>Restore selection…</value>
+  </data>
+  <data name="Web_Backup_Restore_SelectAll" xml:space="preserve">
+    <value>Select all</value>
+  </data>
+  <data name="Web_Backup_Restore_SelectEntry" xml:space="preserve">
+    <value>Select {0}</value>
+  </data>
+  <data name="Web_Backup_Restore_Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Web_Backup_Restore_Size" xml:space="preserve">
+    <value>Size</value>
+  </data>
+  <data name="Web_Backup_Restore_Modified" xml:space="preserve">
+    <value>Modified</value>
+  </data>
+  <data name="Web_Backup_Restore_Reading" xml:space="preserve">
+    <value>Reading the backup…</value>
+  </data>
+  <data name="Web_Backup_Restore_NoPoints" xml:space="preserve">
+    <value>This share has no backup points.</value>
+  </data>
+  <data name="Web_Backup_Restore_EmptyFolder" xml:space="preserve">
+    <value>This folder is empty in the backup.</value>
+  </data>
+  <data name="Web_Backup_Restore_SelectHint" xml:space="preserve">
+    <value>Select a share to browse its backups.</value>
+  </data>
+  <data name="Web_Backup_Restore_DialogTitle" xml:space="preserve">
+    <value>Restore from backup</value>
+  </data>
+  <data name="Web_Backup_Restore_WhatFolder" xml:space="preserve">
+    <value>All entries of {0}</value>
+  </data>
+  <data name="Web_Backup_Restore_WhatEntries" xml:space="preserve">
+    <value>{0} selected entries of {1}</value>
+  </data>
+  <data name="Web_Backup_Restore_WhatEntry" xml:space="preserve">
+    <value>1 selected entry of {0}</value>
+  </data>
+  <data name="Web_Backup_Restore_WhatPoint" xml:space="preserve">
+    <value>Backup point: {0}</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode" xml:space="preserve">
+    <value>Restore to</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_NewFolder" xml:space="preserve">
+    <value>New folder</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_NewFolder_Help" xml:space="preserve">
+    <value>Creates a folder “Restored &lt;date&gt;” in the current folder. Existing data stays untouched.</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_InPlace" xml:space="preserve">
+    <value>Original location</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_InPlace_Help" xml:space="preserve">
+    <value>Puts the entries back where they were. Missing files are recreated, existing ones are handled as chosen below. Nothing is deleted.</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_OtherShare" xml:space="preserve">
+    <value>Another share</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_OtherShare_Help" xml:space="preserve">
+    <value>Creates a folder “Restored &lt;date&gt;” in a folder of another share.</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="Web_Backup_Restore_ModeNotAllowed" xml:space="preserve">
+    <value>You lack the permission for this on this share.</value>
+  </data>
+  <data name="Web_Backup_Restore_Conflict" xml:space="preserve">
+    <value>Existing files</value>
+  </data>
+  <data name="Web_Backup_Restore_Conflict_Overwrite" xml:space="preserve">
+    <value>Overwrite (current content is kept as file version)</value>
+  </data>
+  <data name="Web_Backup_Restore_Conflict_Skip" xml:space="preserve">
+    <value>Skip</value>
+  </data>
+  <data name="Web_Backup_Restore_Conflict_Rename" xml:space="preserve">
+    <value>Restore beside them under a new name</value>
+  </data>
+  <data name="Web_Backup_Restore_NeverDeletes" xml:space="preserve">
+    <value>Files that did not exist at the time of the backup are kept.</value>
+  </data>
+  <data name="Web_Backup_Restore_TargetShare" xml:space="preserve">
+    <value>Target share</value>
+  </data>
+  <data name="Web_Backup_Restore_TargetFolder" xml:space="preserve">
+    <value>Target folder</value>
+  </data>
+  <data name="Web_Backup_Restore_TargetFolderPlaceholder" xml:space="preserve">
+    <value>e.g. projects/2026 (empty = share root)</value>
+  </data>
+  <data name="Web_Backup_Restore_TargetFolderHelp" xml:space="preserve">
+    <value>The folder must exist; the restore creates a new subfolder in it.</value>
+  </data>
+  <data name="Web_Backup_Restore_Permissions" xml:space="preserve">
+    <value>Restore permissions</value>
+  </data>
+  <data name="Web_Backup_Restore_PermissionsHelp" xml:space="preserve">
+    <value>Owners and permissions as at the time of the backup. Users and groups that no longer exist are skipped and listed.</value>
+  </data>
+  <data name="Web_Backup_Restore_PermissionsNotAllowed" xml:space="preserve">
+    <value>Needs the permission “Restore in place” on the destination share.</value>
+  </data>
+  <data name="Web_Backup_Restore_Start" xml:space="preserve">
+    <value>Start restore</value>
+  </data>
+  <data name="Web_Backup_Restore_Started" xml:space="preserve">
+    <value>Restore started. Progress and result appear in the activity log.</value>
+  </data>
+  <data name="Web_Backup_Restore_FolderName" xml:space="preserve">
+    <value>Restored {0}</value>
+  </data>
+  <data name="Web_Backup_Restore_RenameSuffix" xml:space="preserve">
+    <value>restored {0}</value>
+  </data>
+  <data name="Web_Backup_Restore_JobTitle" xml:space="preserve">
+    <value>Restore {0}</value>
+  </data>
+  <data name="Web_Backup_Activity_Restore" xml:space="preserve">
+    <value>Restore</value>
+  </data>
+  <data name="Web_Backup_Activity_RestoreSource" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="Web_Backup_Activity_RestoreTarget" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="Web_Backup_Activity_RestoreFilesValue" xml:space="preserve">
+    <value>{0} files ({1})</value>
+  </data>
+  <data name="Web_Backup_Activity_RestoreConflicts" xml:space="preserve">
+    <value>Existing files</value>
+  </data>
+  <data name="Web_Backup_Activity_RestoreConflictsValue" xml:space="preserve">
+    <value>{0} overwritten ({1} versions kept), {2} unchanged, {3} skipped, {4} renamed</value>
+  </data>
+  <data name="Web_Backup_Activity_RestoreAclValue" xml:space="preserve">
+    <value>{0} permission entries restored</value>
+  </data>
+  <data name="Web_Backup_Activity_SkippedPrincipals" xml:space="preserve">
+    <value>{0} users/groups no longer exist (skipped)</value>
+  </data>
+  <data name="Web_Backup_Activity_SkippedItems" xml:space="preserve">
+    <value>{0} entries not restored</value>
+  </data>
+  <data name="Web_Backup_Error_snapshot_missing" xml:space="preserve">
+    <value>The backup point no longer exists. Refresh the list.</value>
+  </data>
+  <data name="Web_Backup_Error_item_missing" xml:space="preserve">
+    <value>The entry does not exist in this backup point.</value>
+  </data>
+  <data name="Web_Backup_Error_target_unavailable" xml:space="preserve">
+    <value>The target share folder does not exist (pool not mounted?).</value>
+  </data>
+  <data name="Web_Backup_Error_target_folder_missing" xml:space="preserve">
+    <value>The target folder does not exist.</value>
+  </data>
+  <data name="Web_Backup_Error_manifest_missing" xml:space="preserve">
+    <value>This backup point contains no permissions to restore.</value>
+  </data>
+  <data name="Web_Backup_Error_manifest_invalid" xml:space="preserve">
+    <value>The permissions in this backup point could not be read.</value>
+  </data>
+  <data name="Web_Backup_Error_request_invalid" xml:space="preserve">
+    <value>The restore request is invalid.</value>
+  </data>
 </root>

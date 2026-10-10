@@ -471,6 +471,16 @@ builder.Services.AddHostedService<CloudSyncSchedulerService>();
 builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.ResticClient>();
 builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.ResticTargetResolver>();
 builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupJobExecutor>();
+// Singleton like the runner: versions and change log go through the per-call-scope wrappers.
+builder.Services.AddSingleton(sp => new Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRestoreExecutor(
+    sp.GetRequiredService<Microsoft.EntityFrameworkCore.IDbContextFactory<Kaimo_File_Server.Infrastructure.Persistence.ApplicationDbContext>>(),
+    sp.GetRequiredService<Kaimo_File_Server.Infrastructure.Backup.Restic.ResticTargetResolver>(),
+    sp.GetRequiredService<Kaimo_File_Server.Infrastructure.Backup.Restic.ResticClient>(),
+    new ScopedFileVersionService(sp),
+    new ScopedFileChangeLog(sp),
+    sp.GetRequiredService<ShareLockManager>(),
+    sp.GetRequiredService<TimeProvider>(),
+    sp.GetRequiredService<ILogger<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRestoreExecutor>>()));
 builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRunner>();
 builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.IBackupRunner>(
     sp => sp.GetRequiredService<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRunner>());

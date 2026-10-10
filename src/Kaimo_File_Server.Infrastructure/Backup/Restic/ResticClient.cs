@@ -33,6 +33,12 @@ public sealed record ResticSnapshotInfo(
     long FileCount,
     long TotalBytes);
 
+/// <summary>One entry of <c>restic ls --json</c>; <see cref="Path"/> is absolute inside the snapshot.</summary>
+public sealed record ResticNode(string Name, string Path, bool IsDirectory, long Size, DateTime? ModifiedUtc);
+
+/// <summary>Outcome of <c>restic restore</c>.</summary>
+public sealed record ResticRestoreResult(long FilesRestored, long BytesRestored);
+
 /// <summary>What a backup should contain.</summary>
 public sealed record ResticBackupRequest(
     IReadOnlyList<string> Paths,
@@ -126,6 +132,101 @@ public sealed class ResticClient(IProcessRunner runner, IConfiguration configura
         return ParseSnapshots(string.Join('\n', lines));
     }
 
+    /// <summary>The direct children of <paramref name="directory"/> (an absolute path inside the snapshot).</summary>
+    public async Task<IReadOnlyList<ResticNode>> ListDirectoryAsync(
+        ResticTarget target, string snapshotId, string directory, CancellationToken ct)
+    {
+        var dir = TrimDirectory(directory);
+        var nodes = new List<ResticNode>();
+        // restic also prints the listed directory itself.
+        await ListAsync(target, snapshotId, dir, recursive: false, node => { if (node.Path != dir) nodes.Add(node); }, ct);
+        return nodes;
+    }
+
+    /// <summary>Streams the nodes below <paramref name="path"/> (the path itself included).</summary>
+    public async Task ListAsync(
+        ResticTarget target, string snapshotId, string path, bool recursive, Action<ResticNode> onNode, CancellationToken ct)
+    {
+        var args = new List<string> { "ls" };
+        if (recursive)
+            args.Add("--recursive");
+        args.AddRange(["--", snapshotId, TrimDirectory(path)]);
+        var result = await RunAsync(target, args, line =>
+        {
+            if (ParseNode(line) is { } node)
+                onNode(node);
+        }, ct, lockRetry: "10s");
+        ThrowOnFailure(result, "ls");
+    }
+
+    /// <summary>
+    /// Restores entries of <paramref name="folder"/> into <paramref name="targetDirectory"/>:
+    /// the named children only, or all of them when <paramref name="names"/> is empty.
+    /// <c>--verify</c> reads every restored file back.
+    /// </summary>
+    public async Task<ResticRestoreResult> RestoreAsync(
+        ResticTarget target, string snapshotId, string folder, IReadOnlyList<string> names, string targetDirectory,
+        Action<double>? onProgress, CancellationToken ct)
+    {
+        long files = 0, bytes = 0;
+        var errors = new List<string>();
+        var result = await RunAsync(target, BuildRestoreArgs(snapshotId, folder, names, targetDirectory), line =>
+        {
+            using var doc = TryParse(line);
+            if (doc is null)
+                return;
+            var root = doc.RootElement;
+            switch (Type(doc))
+            {
+                case "status":
+                    onProgress?.Invoke(GetDouble(root, "percent_done"));
+                    break;
+                case "error" when errors.Count < MaximumKeptWarnings:
+                    var message = root.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Object
+                        ? GetString(error, "message") : null;
+                    errors.Add($"{GetString(root, "item")}: {message}");
+                    break;
+                case "summary":
+                    files = GetLong(root, "files_restored");
+                    bytes = GetLong(root, "bytes_restored");
+                    break;
+            }
+        }, ct, lockRetry: "30m");
+        if (result.ExitCode != 0 && errors.Count > 0)
+            result = result with { StandardError = string.Join('\n', errors) + "\n" + result.StandardError };
+        ThrowOnFailure(result, "restore");
+        return new ResticRestoreResult(files, bytes);
+    }
+
+    /// <summary>
+    /// Writes one file (raw) or one directory (as ZIP archive) of the snapshot to <paramref name="output"/>.
+    /// Runs without <c>--json</c>, so nothing but the content ever reaches the output.
+    /// </summary>
+    public async Task DumpAsync(
+        ResticTarget target, string snapshotId, string path, bool asZipArchive, Stream output, CancellationToken ct)
+    {
+        var args = BuildGlobalArgs(target, json: false, lockRetry: "10s");
+        args.Add("dump");
+        if (asZipArchive)
+            args.AddRange(["--archive", "zip"]);
+        // "<snapshot>:<parent>" makes the parent the root, so a ZIP holds "<name>/…" instead of
+        // the full server path of the share.
+        var full = TrimDirectory(path);
+        var cut = full.LastIndexOf('/');
+        var parent = cut > 0 ? full[..cut] : "/";
+        args.AddRange(["--", snapshotId + ":" + parent, full[cut..]]);
+        ProcessResult result;
+        try
+        {
+            result = await runner.RunToStreamAsync(Binary, args, target.Environment, output, clearEnvironment: true, ct);
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            throw new ResticException("restic_unavailable", "The restic binary is not installed.", ex);
+        }
+        ThrowOnFailure(result, "dump");
+    }
+
     // ── argument building ───────────────────────────────────────────────
 
     internal static List<string> BuildBackupArgs(ResticBackupRequest request)
@@ -143,15 +244,78 @@ public sealed class ResticClient(IProcessRunner runner, IConfiguration configura
         return args;
     }
 
-    private async Task<ProcessResult> RunAsync(
-        ResticTarget target, IReadOnlyList<string> command, Action<string>? onLine, CancellationToken ct, string? lockRetry)
+    internal static List<string> BuildRestoreArgs(string snapshotId, string folder, IReadOnlyList<string> names, string targetDirectory)
     {
-        // Global flags go BEFORE the command: a command may end with "--" followed by paths,
-        // and anything after that separator would be taken as a path to back up.
-        var args = new List<string> { "--json", "--cache-dir", CacheDirectory };
+        // "<snapshot>:<folder>" makes the folder the restore root, so includes are "/<name>".
+        var args = new List<string> { "restore", "--target", targetDirectory, "--verify" };
+        foreach (var name in names)
+        {
+            if (string.IsNullOrEmpty(name) || name.Contains('/') || name is "." or "..")
+                throw new ResticException("path_invalid", "Only entries of the selected folder can be restored.");
+            args.AddRange(["--include", "/" + EscapePattern(name)]);
+        }
+        args.Add("--");
+        args.Add(snapshotId + ":" + TrimDirectory(folder));
+        return args;
+    }
+
+    /// <summary>restic include/exclude values are glob patterns; a literal name must escape them.</summary>
+    internal static string EscapePattern(string name)
+    {
+        var sb = new System.Text.StringBuilder(name.Length + 4);
+        foreach (var c in name)
+        {
+            if (c is '\\' or '*' or '?' or '[')
+                sb.Append('\\');
+            sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Snapshot paths are absolute POSIX paths; "/" stays the root.</summary>
+    internal static string TrimDirectory(string path)
+    {
+        var p = path.Replace('\\', '/');
+        return p.Length > 1 ? p.TrimEnd('/') : p;
+    }
+
+    internal static ResticNode? ParseNode(string line)
+    {
+        using var doc = TryParse(line);
+        if (doc is null)
+            return null;
+        var root = doc.RootElement;
+        // restic ≥ 0.17 sets message_type, older versions struct_type.
+        if ((GetString(root, "message_type") ?? GetString(root, "struct_type")) != "node")
+            return null;
+        var path = GetString(root, "path");
+        var name = GetString(root, "name");
+        if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(name))
+            return null;
+        DateTime? modified = DateTimeOffset.TryParse(GetString(root, "mtime"), CultureInfo.InvariantCulture, DateTimeStyles.None, out var t)
+            ? t.UtcDateTime
+            : null;
+        return new ResticNode(name, path, GetString(root, "type") == "dir", GetLong(root, "size"), modified);
+    }
+
+    // Global flags go BEFORE the command: a command may end with "--" followed by paths,
+    // and anything after that separator would be taken as a path to back up.
+    private List<string> BuildGlobalArgs(ResticTarget target, bool json, string? lockRetry)
+    {
+        var args = new List<string>();
+        if (json)
+            args.Add("--json");
+        args.AddRange(["--cache-dir", CacheDirectory]);
         if (lockRetry is not null)
             args.AddRange(["--retry-lock", lockRetry]);
         args.AddRange(target.GlobalArguments);
+        return args;
+    }
+
+    private async Task<ProcessResult> RunAsync(
+        ResticTarget target, IReadOnlyList<string> command, Action<string>? onLine, CancellationToken ct, string? lockRetry)
+    {
+        var args = BuildGlobalArgs(target, json: true, lockRetry);
         args.AddRange(command);
         // With --json, restic reports fatal errors as an "exit_error" line on stdout instead of
         // stderr; fold them into the error text so mapping and log excerpts see them.

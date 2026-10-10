@@ -210,6 +210,267 @@
     overflow-wrap: anywhere;
 }
 
+/* ── Restore ── */
+
+.backup-page ::deep .backup-browse-path {
+    margin: var(--space-3) 0;
+    font-size: 13px;
+}
+
+.backup-page ::deep .backup-browse-crumb {
+    max-width: 22ch;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+    .backup-page ::deep .backup-browse-crumb:hover:not(:disabled) {
+        color: var(--accent-strong);
+    }
+
+    .backup-page ::deep .backup-browse-crumb:disabled {
+        color: var(--text-primary);
+        font-weight: 600;
+        cursor: default;
+    }
+
+.backup-page ::deep .backup-restore-toolbar {
+    margin-bottom: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+}
+
+/* Always visible (it also restores the whole folder), but accent only while something is selected. */
+.backup-page ::deep .backup-restore-toolbar--idle {
+    border-color: var(--border);
+    background: var(--bg-secondary);
+    animation: none;
+}
+
+.backup-page ::deep .backup-browse {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+}
+
+    .backup-page ::deep .backup-browse > .empty-state,
+    .backup-page ::deep .backup-browse > .loading-state {
+        min-height: 0;
+        padding: var(--space-5) var(--space-4);
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+    }
+
+.backup-page ::deep .backup-browse-row {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 90px 150px;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 38px;
+    padding: 0 var(--space-3);
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+    .backup-page ::deep .backup-browse-row:last-child {
+        border-bottom: 0;
+    }
+
+    .backup-page ::deep .backup-browse-row:not(.backup-browse-head):hover {
+        background: var(--bg-hover);
+    }
+
+.backup-page ::deep .backup-browse-row--selected,
+.backup-page ::deep .backup-browse-row--selected:not(.backup-browse-head):hover {
+    background: var(--accent-selected);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.backup-page ::deep .backup-browse-head {
+    min-height: 32px;
+    border-bottom-color: var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .045em;
+    text-transform: uppercase;
+}
+
+.backup-page ::deep .backup-browse-check {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    cursor: pointer;
+}
+
+    .backup-page ::deep .backup-browse-check:disabled {
+        cursor: not-allowed;
+    }
+
+.backup-page ::deep .backup-browse-name {
+    min-width: 0;
+}
+
+.backup-page ::deep .backup-browse-open,
+.backup-page ::deep .backup-browse-file {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    max-width: 100%;
+    min-width: 0;
+}
+
+    .backup-page ::deep .backup-browse-open > span,
+    .backup-page ::deep .backup-browse-file > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+.backup-page ::deep .backup-browse-open {
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+
+    .backup-page ::deep .backup-browse-open:hover:not(:disabled) {
+        color: var(--accent-strong);
+        text-decoration: underline;
+    }
+
+    .backup-page ::deep .backup-browse-open:disabled {
+        cursor: wait;
+    }
+
+.backup-page ::deep .backup-browse-file {
+    color: var(--text-primary);
+}
+
+.backup-page ::deep .backup-browse-size,
+.backup-page ::deep .backup-browse-date {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.backup-page ::deep .backup-browse-head .backup-browse-size,
+.backup-page ::deep .backup-browse-head .backup-browse-date {
+    font-size: 11px;
+}
+
+/* Restore dialog */
+
+.backup-page ::deep .backup-restore-dialog {
+    width: min(520px, calc(100vw - 2 * var(--space-4)));
+    max-width: 520px;
+    max-height: calc(100vh - 2 * var(--space-5));
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+.backup-page ::deep .backup-restore-modes {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-4);
+    padding: 0;
+    border: 0;
+}
+
+    .backup-page ::deep .backup-restore-modes > legend {
+        margin-bottom: var(--space-2);
+        padding: 0;
+        color: var(--text-tertiary);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .045em;
+        text-transform: uppercase;
+    }
+
+.backup-page ::deep .backup-restore-mode {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-tertiary);
+    cursor: pointer;
+    transition: background 110ms ease, border-color 110ms ease;
+}
+
+    .backup-page ::deep .backup-restore-mode:hover {
+        background: var(--bg-hover);
+    }
+
+    .backup-page ::deep .backup-restore-mode:focus-within {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+
+    .backup-page ::deep .backup-restore-mode input {
+        margin: 3px 0 0;
+    }
+
+    .backup-page ::deep .backup-restore-mode strong,
+    .backup-page ::deep .backup-restore-mode small {
+        display: block;
+    }
+
+    .backup-page ::deep .backup-restore-mode strong {
+        color: var(--text-primary);
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .backup-page ::deep .backup-restore-mode small {
+        margin-top: 2px;
+        color: var(--text-secondary);
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
+.backup-page ::deep .backup-restore-mode--active {
+    border-color: var(--accent-border);
+    background: var(--accent-subtle);
+}
+
+    .backup-page ::deep .backup-restore-mode--active:hover {
+        background: var(--accent-selected);
+    }
+
+.backup-page ::deep .backup-restore-mode--disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+    .backup-page ::deep .backup-restore-mode--disabled:hover {
+        background: var(--bg-tertiary);
+    }
+
+.backup-page ::deep .backup-restore-options .toggle-row > span {
+    display: grid;
+    gap: 2px;
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
 @media (max-width: 760px) {
     .backup-page ::deep .backup-toolbar {
         flex-direction: column;
@@ -217,6 +478,24 @@
     }
 
     .backup-page ::deep .backup-overview-meta {
+        display: none;
+    }
+
+    .backup-page ::deep .backup-browse-row {
+        grid-template-columns: 28px minmax(0, 1fr) 80px;
+    }
+
+    .backup-page ::deep .backup-browse-date {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .backup-page ::deep .backup-browse-row {
+        grid-template-columns: 28px minmax(0, 1fr);
+    }
+
+    .backup-page ::deep .backup-browse-size {
         display: none;
     }
 }

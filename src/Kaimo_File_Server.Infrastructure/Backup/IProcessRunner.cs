@@ -39,4 +39,18 @@ public interface IProcessRunner
         bool clearEnvironment,
         CancellationToken cancellationToken = default)
         => throw new NotSupportedException("This process runner does not support streaming.");
+
+    /// <summary>
+    /// Like <see cref="RunStreamingAsync"/>, but copies stdout unchanged (binary) into
+    /// <paramref name="stdoutTarget"/>, e.g. an archive streamed to an HTTP response.
+    /// Cancellation kills the process.
+    /// </summary>
+    Task<ProcessResult> RunToStreamAsync(
+        string fileName,
+        IReadOnlyList<string> arguments,
+        IReadOnlyDictionary<string, string>? environment,
+        Stream stdoutTarget,
+        bool clearEnvironment,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("This process runner does not support binary streaming.");
 }

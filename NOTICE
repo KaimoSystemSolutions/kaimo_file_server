@@ -78,5 +78,17 @@ Third-party binaries (installed into the Web container image):
 
   - restic (https://restic.net) -- BSD 2-Clause License, Copyright (c) 2014,
     Alexander Neumann. The official, checksum-pinned release binary is installed
-    as /usr/local/bin/restic; the license is kept in third-party/restic/LICENSE
-    and shipped in the image as /usr/share/doc/restic/LICENSE.
+    unmodified as /usr/local/bin/restic; the license is kept in
+    third-party/restic/LICENSE and shipped in the image as
+    /usr/share/doc/restic/LICENSE.
+
+    As a statically linked Go program, the binary also contains the Go standard
+    library (BSD-3-Clause) and the Go modules restic depends on (Apache-2.0, MIT,
+    BSD-2-Clause, BSD-3-Clause and one MPL-2.0 module, hashicorp/golang-lru, used
+    unmodified; its source is linked there). Their license texts and NOTICE files
+    are kept in third-party/restic/THIRD_PARTY_LICENSES.txt and shipped in the
+    image as /usr/share/doc/restic/THIRD_PARTY_LICENSES.txt. Regenerate that file
+    with third-party/restic/update-licenses.py whenever RESTIC_VERSION changes.
+
+    restic runs as a separate process (command line invocation); it is not linked
+    into the AGPL code, so its permissive licenses and the AGPL do not interact.

@@ -7,8 +7,8 @@
 @inject NavigationManager Nav
 
 @*
-    restic file backup: overview, jobs (scoped to the shares an admin manages), repositories
-    (Global) and the activity log. Gated by the file-backup permission bits; every action is
+    restic file backup: overview, jobs (scoped to the shares an admin manages), restore,
+    repositories (Global) and the activity log. Gated by the file-backup permission bits; every action is
     re-authorized in BackupCatalogService.
 *@
 
@@ -42,6 +42,10 @@ else
                 {
                     <Tab Active="@(_tab == BackupTab.Jobs)" Icon="history.svg" Label="@R("Web_Backup_Tab_Jobs")" OnClick="() => SwitchTab(BackupTab.Jobs)" />
                 }
+                @if (VM.Access.CanRestore)
+                {
+                    <Tab Active="@(_tab == BackupTab.Restore)" Icon="cloud-download.svg" Label="@R("Web_Backup_Tab_Restore")" OnClick="() => SwitchTab(BackupTab.Restore)" />
+                }
                 @if (VM.Access.CanManageRepositories)
                 {
                     <Tab Active="@(_tab == BackupTab.Repositories)" Icon="archive.svg" Label="@R("Web_Backup_Tab_Repositories")" OnClick="() => SwitchTab(BackupTab.Repositories)" />
@@ -54,6 +58,9 @@ else
         {
             case BackupTab.Jobs:
                 <BackupJobs SelectedJobId="_selectedId" />
+                break;
+            case BackupTab.Restore:
+                <BackupRestore />
                 break;
             case BackupTab.Repositories:
                 <BackupRepositories SelectedRepositoryId="_selectedId" />
@@ -70,7 +77,7 @@ else
 }
 
 @code {
-    private enum BackupTab { Overview, Jobs, Repositories, Activity }
+    private enum BackupTab { Overview, Jobs, Restore, Repositories, Activity }
 
     [SupplyParameterFromQuery(Name = "tab")] public string? TabQuery { get; set; }
 
@@ -90,9 +97,14 @@ else
 
     protected override void OnParametersSet()
     {
-        _tab = Enum.TryParse<BackupTab>(TabQuery, ignoreCase: true, out var tab) ? tab : BackupTab.Overview;
+        // A restore-only operator has no jobs to oversee: start on the restore tab.
+        var home = VM.Access.CanRestore && !VM.Access.CanManageJobs && !VM.Access.CanManageRepositories
+            ? BackupTab.Restore
+            : BackupTab.Overview;
+        _tab = Enum.TryParse<BackupTab>(TabQuery, ignoreCase: true, out var tab) ? tab : home;
         if (_tab == BackupTab.Repositories && !VM.Access.CanManageRepositories) _tab = BackupTab.Overview;
         if (_tab == BackupTab.Jobs && !VM.Access.CanManageJobs) _tab = BackupTab.Overview;
+        if (_tab == BackupTab.Restore && !VM.Access.CanRestore) _tab = BackupTab.Overview;
     }
 
     private void SwitchTab(BackupTab tab, Guid? selectId = null)

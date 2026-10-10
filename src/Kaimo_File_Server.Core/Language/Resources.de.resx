@@ -6302,4 +6302,217 @@ WIEDERHERSTELLEN MIT DER RESTIC-KOMMANDOZEILE (funktioniert ohne Kaimo-Server)
   <data name="Web_Backup_Error_timeout" xml:space="preserve">
     <value>Der Speicherort hat nicht rechtzeitig geantwortet. Prüfe Adresse und Zugangsdaten.</value>
   </data>
+  <data name="Web_Backup_Tab_Restore" xml:space="preserve">
+    <value>Wiederherstellen</value>
+  </data>
+  <data name="Web_Backup_Restore_Help" xml:space="preserve">
+    <value>Durchsuche die Sicherungsstände einer Freigabe und stelle einzelne Dateien, Ordner oder die ganze Freigabe wieder her: in einen neuen Ordner, an den ursprünglichen Ort oder in eine andere Freigabe. Downloads kommen direkt aus dem Repository.</value>
+  </data>
+  <data name="Web_Backup_Restore_Shares" xml:space="preserve">
+    <value>Freigaben</value>
+  </data>
+  <data name="Web_Backup_Restore_NoShares" xml:space="preserve">
+    <value>Es gibt keine Sicherungen von Freigaben, die du wiederherstellen darfst.</value>
+  </data>
+  <data name="Web_Backup_Restore_PointCount" xml:space="preserve">
+    <value>{0} Sicherungsstände · zuletzt {1}</value>
+  </data>
+  <data name="Web_Backup_Restore_Browser" xml:space="preserve">
+    <value>Inhalt der Sicherung</value>
+  </data>
+  <data name="Web_Backup_Restore_Point" xml:space="preserve">
+    <value>Sicherungsstand</value>
+  </data>
+  <data name="Web_Backup_Restore_PointFiles" xml:space="preserve">
+    <value>{0} Dateien, {1}</value>
+  </data>
+  <data name="Web_Backup_Restore_Path" xml:space="preserve">
+    <value>Ordner in der Sicherung</value>
+  </data>
+  <data name="Web_Backup_Restore_NothingSelected" xml:space="preserve">
+    <value>Nichts ausgewählt: der ganze Ordner wird wiederhergestellt</value>
+  </data>
+  <data name="Web_Backup_Restore_Selected" xml:space="preserve">
+    <value>{0} ausgewählt</value>
+  </data>
+  <data name="Web_Backup_Restore_Download" xml:space="preserve">
+    <value>Herunterladen</value>
+  </data>
+  <data name="Web_Backup_Restore_DownloadHint" xml:space="preserve">
+    <value>Wähle genau einen Eintrag aus. Ordner werden als ZIP-Datei heruntergeladen.</value>
+  </data>
+  <data name="Web_Backup_Restore_RestoreFolder" xml:space="preserve">
+    <value>Ordner wiederherstellen…</value>
+  </data>
+  <data name="Web_Backup_Restore_RestoreSelected" xml:space="preserve">
+    <value>Auswahl wiederherstellen…</value>
+  </data>
+  <data name="Web_Backup_Restore_SelectAll" xml:space="preserve">
+    <value>Alle auswählen</value>
+  </data>
+  <data name="Web_Backup_Restore_SelectEntry" xml:space="preserve">
+    <value>{0} auswählen</value>
+  </data>
+  <data name="Web_Backup_Restore_Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Web_Backup_Restore_Size" xml:space="preserve">
+    <value>Größe</value>
+  </data>
+  <data name="Web_Backup_Restore_Modified" xml:space="preserve">
+    <value>Geändert</value>
+  </data>
+  <data name="Web_Backup_Restore_Reading" xml:space="preserve">
+    <value>Sicherung wird gelesen…</value>
+  </data>
+  <data name="Web_Backup_Restore_NoPoints" xml:space="preserve">
+    <value>Für diese Freigabe gibt es keine Sicherungsstände.</value>
+  </data>
+  <data name="Web_Backup_Restore_EmptyFolder" xml:space="preserve">
+    <value>Dieser Ordner ist in der Sicherung leer.</value>
+  </data>
+  <data name="Web_Backup_Restore_SelectHint" xml:space="preserve">
+    <value>Wähle eine Freigabe aus, um ihre Sicherungen zu durchsuchen.</value>
+  </data>
+  <data name="Web_Backup_Restore_DialogTitle" xml:space="preserve">
+    <value>Aus Sicherung wiederherstellen</value>
+  </data>
+  <data name="Web_Backup_Restore_WhatFolder" xml:space="preserve">
+    <value>Alle Einträge von {0}</value>
+  </data>
+  <data name="Web_Backup_Restore_WhatEntries" xml:space="preserve">
+    <value>{0} ausgewählte Einträge von {1}</value>
+  </data>
+  <data name="Web_Backup_Restore_WhatEntry" xml:space="preserve">
+    <value>1 ausgewählter Eintrag von {0}</value>
+  </data>
+  <data name="Web_Backup_Restore_WhatPoint" xml:space="preserve">
+    <value>Sicherungsstand: {0}</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode" xml:space="preserve">
+    <value>Wiederherstellen nach</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_NewFolder" xml:space="preserve">
+    <value>Neuer Ordner</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_NewFolder_Help" xml:space="preserve">
+    <value>Legt im aktuellen Ordner einen Ordner „Wiederhergestellt &lt;Datum&gt;“ an. Vorhandene Daten bleiben unverändert.</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_InPlace" xml:space="preserve">
+    <value>Ursprünglicher Ort</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_InPlace_Help" xml:space="preserve">
+    <value>Legt die Einträge an ihren ursprünglichen Ort zurück. Fehlende Dateien werden neu angelegt, vorhandene wie unten gewählt behandelt. Es wird nichts gelöscht.</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_OtherShare" xml:space="preserve">
+    <value>Andere Freigabe</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_OtherShare_Help" xml:space="preserve">
+    <value>Legt in einem Ordner einer anderen Freigabe einen Ordner „Wiederhergestellt &lt;Datum&gt;“ an.</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="Web_Backup_Restore_ModeNotAllowed" xml:space="preserve">
+    <value>Dafür fehlt dir die Berechtigung auf dieser Freigabe.</value>
+  </data>
+  <data name="Web_Backup_Restore_Conflict" xml:space="preserve">
+    <value>Vorhandene Dateien</value>
+  </data>
+  <data name="Web_Backup_Restore_Conflict_Overwrite" xml:space="preserve">
+    <value>Überschreiben (aktueller Inhalt bleibt als Dateiversion erhalten)</value>
+  </data>
+  <data name="Web_Backup_Restore_Conflict_Skip" xml:space="preserve">
+    <value>Überspringen</value>
+  </data>
+  <data name="Web_Backup_Restore_Conflict_Rename" xml:space="preserve">
+    <value>Daneben unter neuem Namen wiederherstellen</value>
+  </data>
+  <data name="Web_Backup_Restore_NeverDeletes" xml:space="preserve">
+    <value>Dateien, die es zum Zeitpunkt der Sicherung noch nicht gab, bleiben erhalten.</value>
+  </data>
+  <data name="Web_Backup_Restore_TargetShare" xml:space="preserve">
+    <value>Zielfreigabe</value>
+  </data>
+  <data name="Web_Backup_Restore_TargetFolder" xml:space="preserve">
+    <value>Zielordner</value>
+  </data>
+  <data name="Web_Backup_Restore_TargetFolderPlaceholder" xml:space="preserve">
+    <value>z. B. projekte/2026 (leer = Freigabe-Stamm)</value>
+  </data>
+  <data name="Web_Backup_Restore_TargetFolderHelp" xml:space="preserve">
+    <value>Der Ordner muss existieren; die Wiederherstellung legt darin einen neuen Unterordner an.</value>
+  </data>
+  <data name="Web_Backup_Restore_Permissions" xml:space="preserve">
+    <value>Berechtigungen wiederherstellen</value>
+  </data>
+  <data name="Web_Backup_Restore_PermissionsHelp" xml:space="preserve">
+    <value>Besitzer und Berechtigungen wie zum Zeitpunkt der Sicherung. Nicht mehr vorhandene Benutzer und Gruppen werden übersprungen und aufgelistet.</value>
+  </data>
+  <data name="Web_Backup_Restore_PermissionsNotAllowed" xml:space="preserve">
+    <value>Erfordert die Berechtigung „Am Originalort wiederherstellen“ auf der Zielfreigabe.</value>
+  </data>
+  <data name="Web_Backup_Restore_Start" xml:space="preserve">
+    <value>Wiederherstellung starten</value>
+  </data>
+  <data name="Web_Backup_Restore_Started" xml:space="preserve">
+    <value>Wiederherstellung gestartet. Fortschritt und Ergebnis erscheinen im Aktivitätsprotokoll.</value>
+  </data>
+  <data name="Web_Backup_Restore_FolderName" xml:space="preserve">
+    <value>Wiederhergestellt {0}</value>
+  </data>
+  <data name="Web_Backup_Restore_RenameSuffix" xml:space="preserve">
+    <value>wiederhergestellt {0}</value>
+  </data>
+  <data name="Web_Backup_Restore_JobTitle" xml:space="preserve">
+    <value>Wiederherstellung {0}</value>
+  </data>
+  <data name="Web_Backup_Activity_Restore" xml:space="preserve">
+    <value>Wiederherstellung</value>
+  </data>
+  <data name="Web_Backup_Activity_RestoreSource" xml:space="preserve">
+    <value>Aus</value>
+  </data>
+  <data name="Web_Backup_Activity_RestoreTarget" xml:space="preserve">
+    <value>Nach</value>
+  </data>
+  <data name="Web_Backup_Activity_RestoreFilesValue" xml:space="preserve">
+    <value>{0} Dateien ({1})</value>
+  </data>
+  <data name="Web_Backup_Activity_RestoreConflicts" xml:space="preserve">
+    <value>Vorhandene Dateien</value>
+  </data>
+  <data name="Web_Backup_Activity_RestoreConflictsValue" xml:space="preserve">
+    <value>{0} überschrieben ({1} Versionen gesichert), {2} unverändert, {3} übersprungen, {4} umbenannt</value>
+  </data>
+  <data name="Web_Backup_Activity_RestoreAclValue" xml:space="preserve">
+    <value>{0} Berechtigungseinträge wiederhergestellt</value>
+  </data>
+  <data name="Web_Backup_Activity_SkippedPrincipals" xml:space="preserve">
+    <value>{0} Benutzer/Gruppen existieren nicht mehr (übersprungen)</value>
+  </data>
+  <data name="Web_Backup_Activity_SkippedItems" xml:space="preserve">
+    <value>{0} Einträge nicht wiederhergestellt</value>
+  </data>
+  <data name="Web_Backup_Error_snapshot_missing" xml:space="preserve">
+    <value>Der Sicherungsstand existiert nicht mehr. Aktualisiere die Liste.</value>
+  </data>
+  <data name="Web_Backup_Error_item_missing" xml:space="preserve">
+    <value>Der Eintrag existiert in diesem Sicherungsstand nicht.</value>
+  </data>
+  <data name="Web_Backup_Error_target_unavailable" xml:space="preserve">
+    <value>Der Ordner der Zielfreigabe existiert nicht (Pool nicht eingehängt?).</value>
+  </data>
+  <data name="Web_Backup_Error_target_folder_missing" xml:space="preserve">
+    <value>Der Zielordner existiert nicht.</value>
+  </data>
+  <data name="Web_Backup_Error_manifest_missing" xml:space="preserve">
+    <value>Dieser Sicherungsstand enthält keine Berechtigungen zum Wiederherstellen.</value>
+  </data>
+  <data name="Web_Backup_Error_manifest_invalid" xml:space="preserve">
+    <value>Die Berechtigungen in diesem Sicherungsstand konnten nicht gelesen werden.</value>
+  </data>
+  <data name="Web_Backup_Error_request_invalid" xml:space="preserve">
+    <value>Die Wiederherstellungsanfrage ist ungültig.</value>
+  </data>
 </root>

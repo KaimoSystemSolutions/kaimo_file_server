@@ -1,0 +1,307 @@
+@using Kaimo_File_Server.Core.Helpers
+@using Kaimo_File_Server.Core.Services.Notifications
+@using Kaimo_File_Server.Infrastructure.Backup.Restic
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.ViewModels.Backup
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+@implements IDisposable
+@inject BackupViewModel VM
+@inject DateFormatService DateFmt
+@inject NavigationManager Nav
+
+@*
+    Restore: shares with backup points on the left; on the right the chosen backup point is
+    browsed folder by folder (read from the repository), entries are selected and either
+    downloaded or restored through the dialog (new folder, in place, other share).
+*@
+
+<div class="backup-toolbar">
+    <p class="subtitle">@R("Web_Backup_Restore_Help")</p>
+</div>
+
+<div class="workspace workspace--wide-detail">
+    <section class="workspace-list" aria-label="@R("Web_Backup_Restore_Shares")">
+        <div class="workspace-list-header">
+            <span>@R("Web_Backup_Restore_Shares")</span>
+            <button type="button" class="btn-secondary btn-secondary--sm" disabled="@VM.IsBusy" @onclick="VM.ReloadAsync">@R("Web_Backup_Refresh")</button>
+        </div>
+        @if (VM.RestoreShares.Count == 0)
+        {
+            <div class="empty-state"><p>@R("Web_Backup_Restore_NoShares")</p></div>
+        }
+        @foreach (var item in VM.RestoreShares)
+        {
+            var selected = VM.RestoreShare?.ShareId == item.ShareId;
+            <button type="button" class="workspace-row @(selected ? "workspace-row--selected" : "")"
+                    aria-pressed="@(selected ? "true" : "false")" disabled="@VM.IsBusy" @onclick="() => VM.SelectRestoreShareAsync(item.ShareId)">
+                <span class="workspace-row-icon">@Assets.SVG("folder.svg", new SvgOptions(Width: 16, Height: 16))</span>
+                <span class="workspace-row-text">
+                    <strong>@item.Name</strong>
+                    <small>@string.Format(R("Web_Backup_Restore_PointCount"), item.BackupPointCount, DateFmt.FormatDateTime(item.LatestUtc))</small>
+                </span>
+            </button>
+        }
+    </section>
+
+    <aside class="workspace-detail" aria-label="@R("Web_Backup_Restore_Browser")">
+        @if (VM.RestoreShare is { } share)
+        {
+            <div class="workspace-heading">
+                <div>
+                    <h3>@share.Name</h3>
+                    <span class="workspace-heading-sub">@R("Web_Backup_Restore_Browser")</span>
+                </div>
+            </div>
+
+            <div class="workspace-form">
+                <label>
+                    <span>@R("Web_Backup_Restore_Point")</span>
+                    <select class="edit-input" disabled="@VM.IsBusy" value="@(VM.BackupPoint is { } p ? BackupViewModel.PointKey(p) : "")"
+                            @onchange="e => VM.SelectBackupPointAsync(e.Value?.ToString() ?? string.Empty)">
+                        @foreach (var point in VM.BackupPoints)
+                        {
+                            <option value="@BackupViewModel.PointKey(point)">@PointLabel(point)</option>
+                        }
+                    </select>
+                </label>
+            </div>
+
+            <nav class="breadcrumb-bar backup-browse-path" aria-label="@R("Web_Backup_Restore_Path")">
+                <button type="button" class="backup-browse-crumb" disabled="@(VM.IsBusy || VM.BrowseFolder.Length == 0)" @onclick="() => VM.OpenFolderAsync(string.Empty)">@share.Name</button>
+                @foreach (var (name, path) in Crumbs(VM.BrowseFolder))
+                {
+                    <span class="breadcrumb-sep" aria-hidden="true">/</span>
+                    <button type="button" class="backup-browse-crumb" disabled="@(VM.IsBusy || path == VM.BrowseFolder)" @onclick="() => VM.OpenFolderAsync(path)">@name</button>
+                }
+            </nav>
+
+            <div class="selection-toolbar backup-restore-toolbar @(VM.SelectedEntries.Count == 0 ? "backup-restore-toolbar--idle" : "")">
+                <div class="toolbar-left">
+                    <span class="toolbar-count @(VM.SelectedEntries.Count == 0 ? "toolbar-count--muted" : "")">
+                        @(VM.SelectedEntries.Count == 0 ? R("Web_Backup_Restore_NothingSelected") : string.Format(R("Web_Backup_Restore_Selected"), VM.SelectedEntries.Count))
+                    </span>
+                </div>
+                <div class="toolbar-actions">
+                    <button type="button" class="toolbar-btn" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo || !VM.RestoreRights.FromBackup || VM.SelectedEntries.Count != 1)"
+                            title="@R("Web_Backup_Restore_DownloadHint")" @onclick="Download">
+                        @Assets.SVG("download.svg", new SvgOptions(Width: 14, Height: 14))
+                        <span>@R("Web_Backup_Restore_Download")</span>
+                    </button>
+                    <button type="button" class="btn-primary" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo || VM.BackupPoint is null || VM.BrowseEntries.Count == 0 || !(VM.RestoreRights.FromBackup || VM.RestoreRights.InPlace))"
+                            @onclick="OpenDialogAsync">
+                        @(VM.RestoresWholeFolder ? R("Web_Backup_Restore_RestoreFolder") : R("Web_Backup_Restore_RestoreSelected"))
+                    </button>
+                </div>
+            </div>
+
+            <div class="backup-browse" role="table" aria-label="@R("Web_Backup_Restore_Browser")">
+                <div class="backup-browse-row backup-browse-head" role="row">
+                    <span role="columnheader">
+                        <input type="checkbox" class="backup-browse-check" aria-label="@R("Web_Backup_Restore_SelectAll")"
+                               checked="@(VM.BrowseEntries.Count > 0 && VM.SelectedEntries.Count == VM.BrowseEntries.Count)"
+                               disabled="@(VM.BrowseEntries.Count == 0)" @onchange="e => VM.SelectAllEntries(e.Value is true)" />
+                    </span>
+                    <span role="columnheader">@R("Web_Backup_Restore_Name")</span>
+                    <span role="columnheader" class="backup-browse-size">@R("Web_Backup_Restore_Size")</span>
+                    <span role="columnheader" class="backup-browse-date">@R("Web_Backup_Restore_Modified")</span>
+                </div>
+                @if (VM.IsBrowsing)
+                {
+                    <div class="loading-state"><div class="spinner"></div><p>@R("Web_Backup_Restore_Reading")</p></div>
+                }
+                else if (VM.BrowseEntries.Count == 0)
+                {
+                    <div class="empty-state"><p>@(VM.BackupPoint is null ? R("Web_Backup_Restore_NoPoints") : R("Web_Backup_Restore_EmptyFolder"))</p></div>
+                }
+                else
+                {
+                    @foreach (var entry in VM.BrowseEntries)
+                    {
+                        var isSelected = VM.SelectedEntries.Contains(entry.Name);
+                        <div class="backup-browse-row @(isSelected ? "backup-browse-row--selected" : "")" role="row">
+                            <span role="cell">
+                                <input type="checkbox" class="backup-browse-check" checked="@isSelected"
+                                       aria-label="@string.Format(R("Web_Backup_Restore_SelectEntry"), entry.Name)" @onchange="() => VM.ToggleEntry(entry.Name)" />
+                            </span>
+                            <span role="cell" class="backup-browse-name">
+                                @if (entry.IsDirectory)
+                                {
+                                    <button type="button" class="backup-browse-open" disabled="@VM.IsBusy"
+                                            @onclick="() => VM.OpenFolderAsync(ShareRelativePath.Combine(VM.BrowseFolder, entry.Name))">
+                                        @Assets.SVG("folder.svg", new SvgOptions(Width: 16, Height: 16, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)"))
+                                        <span>@entry.Name</span>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="backup-browse-file">
+                                        @Assets.SVG("file.svg", new SvgOptions(Width: 16, Height: 16))
+                                        <span>@entry.Name</span>
+                                    </span>
+                                }
+                            </span>
+                            <span role="cell" class="backup-browse-size">@(entry.IsDirectory ? "–" : NotificationEvents.FormatSize(entry.Size))</span>
+                            <span role="cell" class="backup-browse-date">@DateFmt.FormatDateTime(entry.ModifiedUtc)</span>
+                        </div>
+                    }
+                }
+            </div>
+        }
+        else
+        {
+            <div class="detail-empty"><p>@R("Web_Backup_Restore_SelectHint")</p></div>
+        }
+    </aside>
+</div>
+
+@if (_dialogOpen && VM.RestoreShare is { } dialogShare && VM.BackupPoint is { } dialogPoint)
+{
+    var form = VM.RestoreForm;
+    <div class="modal-backdrop" @onclick="CloseDialog">
+        <div class="modal-dialog backup-restore-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-restore-title" @onclick:stopPropagation="true">
+            <h2 class="modal-title" id="backup-restore-title">@R("Web_Backup_Restore_DialogTitle")</h2>
+            <p class="modal-text">
+                @(VM.RestoresWholeFolder
+                    ? string.Format(R("Web_Backup_Restore_WhatFolder"), FolderLabel(dialogShare.Name))
+                    : VM.SelectedEntries.Count == 1
+                        ? string.Format(R("Web_Backup_Restore_WhatEntry"), FolderLabel(dialogShare.Name))
+                        : string.Format(R("Web_Backup_Restore_WhatEntries"), VM.SelectedEntries.Count, FolderLabel(dialogShare.Name)))
+                <br />@string.Format(R("Web_Backup_Restore_WhatPoint"), PointLabel(dialogPoint))
+            </p>
+
+            <fieldset class="backup-restore-modes">
+                <legend>@R("Web_Backup_Restore_Mode")</legend>
+                @foreach (var mode in Modes)
+                {
+                    var allowed = IsModeAllowed(mode);
+                    <label class="backup-restore-mode @(form.Mode == mode ? "backup-restore-mode--active" : "") @(allowed ? "" : "backup-restore-mode--disabled")">
+                        <input type="radio" name="backup-restore-mode" checked="@(form.Mode == mode)" disabled="@(!allowed)"
+                               @onchange="() => SetMode(mode)" />
+                        <span>
+                            <strong>@R("Web_Backup_Restore_Mode_" + mode)</strong>
+                            <small>@(allowed ? R("Web_Backup_Restore_Mode_" + mode + "_Help") : R("Web_Backup_Restore_ModeNotAllowed"))</small>
+                        </span>
+                    </label>
+                }
+            </fieldset>
+
+            <div class="workspace-form backup-restore-options">
+                @if (form.Mode == BackupRestoreMode.InPlace)
+                {
+                    <label>
+                        <span>@R("Web_Backup_Restore_Conflict")</span>
+                        <select class="edit-input" @bind="form.Conflict">
+                            @foreach (var conflict in Enum.GetValues<BackupRestoreConflict>())
+                            {
+                                <option value="@conflict">@R("Web_Backup_Restore_Conflict_" + conflict)</option>
+                            }
+                        </select>
+                        <small>@R("Web_Backup_Restore_NeverDeletes")</small>
+                    </label>
+                }
+                @if (form.Mode == BackupRestoreMode.OtherShare)
+                {
+                    <label>
+                        <span>@R("Web_Backup_Restore_TargetShare")</span>
+                        <select class="edit-input" @bind="form.TargetShareId">
+                            @foreach (var target in VM.RestoreTargets)
+                            {
+                                <option value="@target.Id">@target.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>
+                        <span>@R("Web_Backup_Restore_TargetFolder")</span>
+                        <input class="edit-input" maxlength="1024" placeholder="@R("Web_Backup_Restore_TargetFolderPlaceholder")" @bind="form.TargetFolder" @bind:event="oninput" />
+                        <small>@R("Web_Backup_Restore_TargetFolderHelp")</small>
+                    </label>
+                }
+                <div class="toggle-row">
+                    <span>
+                        @R("Web_Backup_Restore_Permissions")
+                        <small class="form-hint">@(VM.CanRestorePermissions ? R("Web_Backup_Restore_PermissionsHelp") : R("Web_Backup_Restore_PermissionsNotAllowed"))</small>
+                    </span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" @bind="form.RestorePermissions" disabled="@(!VM.CanRestorePermissions)" aria-label="@R("Web_Backup_Restore_Permissions")" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" @onclick="CloseDialog">@R("Web_Button_Cancel")</button>
+                <button type="button" class="btn-primary" disabled="@(VM.IsBusy || !CanStart)" @onclick="StartAsync">@R("Web_Backup_Restore_Start")</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // Results and runner progress are announced by the view model; the page does not
+    // re-render this component on its own.
+    protected override void OnInitialized() => VM.Changed += Refresh;
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => VM.Changed -= Refresh;
+
+    private static readonly BackupRestoreMode[] Modes = [BackupRestoreMode.NewFolder, BackupRestoreMode.InPlace, BackupRestoreMode.OtherShare];
+
+    private bool _dialogOpen;
+
+    private bool IsModeAllowed(BackupRestoreMode mode) => mode switch
+    {
+        BackupRestoreMode.NewFolder => VM.RestoreRights.FromBackup,
+        BackupRestoreMode.InPlace => VM.RestoreRights.InPlace,
+        _ => VM.RestoreRights.FromBackup && VM.RestoreTargets.Count > 0,
+    };
+
+    private bool CanStart => IsModeAllowed(VM.RestoreForm.Mode)
+                             && (VM.RestoreForm.Mode != BackupRestoreMode.OtherShare || VM.RestoreForm.TargetShareId != Guid.Empty);
+
+    private void SetMode(BackupRestoreMode mode)
+    {
+        VM.RestoreForm.Mode = mode;
+        if (!VM.CanRestorePermissions)
+            VM.RestoreForm.RestorePermissions = false;
+    }
+
+    private async Task OpenDialogAsync()
+    {
+        if (await VM.PrepareRestoreAsync())
+            _dialogOpen = true;
+    }
+
+    private void CloseDialog() => _dialogOpen = false;
+
+    private async Task StartAsync()
+    {
+        if (await VM.StartRestoreAsync())
+            _dialogOpen = false;
+    }
+
+    private void Download()
+    {
+        if (VM.SelectedEntries.Count == 1 && VM.CreateEntryDownloadUrl(Nav.BaseUri, VM.SelectedEntries.First()) is { } url)
+            Nav.NavigateTo(url, forceLoad: true);
+    }
+
+    private string PointLabel(BackupPointView point)
+        => $"{DateFmt.FormatDateTime(point.TimeUtc)} · {point.RepositoryName}"
+           + (point.JobName is null ? "" : " · " + point.JobName)
+           + (point.FileCount > 0 ? $" · {string.Format(R("Web_Backup_Restore_PointFiles"), point.FileCount, NotificationEvents.FormatSize(point.TotalBytes))}" : "");
+
+    private string FolderLabel(string shareName)
+        => VM.BrowseFolder.Length == 0 ? shareName : shareName + "/" + VM.BrowseFolder;
+
+    private static IEnumerable<(string Name, string Path)> Crumbs(string folder)
+    {
+        var path = string.Empty;
+        foreach (var segment in folder.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            path = ShareRelativePath.Combine(path, segment);
+            yield return (segment, path);
+        }
+    }
+
+    private static string R(string key) => BackupViewModel.R(key);
+}

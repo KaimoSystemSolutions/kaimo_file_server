@@ -70,6 +70,38 @@ public sealed class ProcessRunner : IProcessRunner
         bool clearEnvironment,
         CancellationToken cancellationToken = default)
     {
+        var stdout = new StringBuilder();
+        return await RunCoreAsync(fileName, arguments, environment, clearEnvironment, process => Task.Run(async () =>
+        {
+            while (await process.StandardOutput.ReadLineAsync(CancellationToken.None) is { } line)
+            {
+                if (onStdoutLine is not null) onStdoutLine(line);
+                else stdout.AppendLine(line);
+            }
+        }, CancellationToken.None), () => stdout.ToString(), cancellationToken);
+    }
+
+    public Task<ProcessResult> RunToStreamAsync(
+        string fileName,
+        IReadOnlyList<string> arguments,
+        IReadOnlyDictionary<string, string>? environment,
+        Stream stdoutTarget,
+        bool clearEnvironment,
+        CancellationToken cancellationToken = default)
+        // A failing target (client disconnected) surfaces from the copy task; cancellation kills the process.
+        => RunCoreAsync(fileName, arguments, environment, clearEnvironment,
+            process => process.StandardOutput.BaseStream.CopyToAsync(stdoutTarget, cancellationToken),
+            () => string.Empty, cancellationToken);
+
+    private static async Task<ProcessResult> RunCoreAsync(
+        string fileName,
+        IReadOnlyList<string> arguments,
+        IReadOnlyDictionary<string, string>? environment,
+        bool clearEnvironment,
+        Func<Process, Task> readStdout,
+        Func<string> stdoutText,
+        CancellationToken cancellationToken)
+    {
         var startInfo = new ProcessStartInfo
         {
             FileName = fileName,
@@ -102,16 +134,8 @@ public sealed class ProcessRunner : IProcessRunner
         using var process = new Process { StartInfo = startInfo };
         process.Start();
 
-        var stdout = new StringBuilder();
         var stderrTail = new StringBuilder();
-        var stdoutTask = Task.Run(async () =>
-        {
-            while (await process.StandardOutput.ReadLineAsync(CancellationToken.None) is { } line)
-            {
-                if (onStdoutLine is not null) onStdoutLine(line);
-                else stdout.AppendLine(line);
-            }
-        }, CancellationToken.None);
+        var stdoutTask = readStdout(process);
         var stderrTask = Task.Run(async () =>
         {
             while (await process.StandardError.ReadLineAsync(CancellationToken.None) is { } line)
@@ -124,19 +148,24 @@ public sealed class ProcessRunner : IProcessRunner
 
         try
         {
-            await process.WaitForExitAsync(cancellationToken);
+            var exited = process.WaitForExitAsync(cancellationToken);
+            // A failing stdout consumer (e.g. the download client went away) must not leave the
+            // process blocked on a full pipe until it is cancelled.
+            if (await Task.WhenAny(exited, stdoutTask) == stdoutTask && stdoutTask.IsFaulted)
+                await stdoutTask;
+            await exited;
+            await Task.WhenAll(stdoutTask, stderrTask);
         }
-        catch (OperationCanceledException)
+        catch (Exception)
         {
             TryKill(process);
             throw;
         }
-        await Task.WhenAll(stdoutTask, stderrTask);
 
         var tail = stderrTail.ToString();
         if (tail.Length > StderrTailCharacters)
             tail = tail[^StderrTailCharacters..];
-        return new ProcessResult(process.ExitCode, stdout.ToString(), tail);
+        return new ProcessResult(process.ExitCode, stdoutText(), tail);
     }
 
     private static void TryKill(Process process)

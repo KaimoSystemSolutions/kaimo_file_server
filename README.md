@@ -61,6 +61,9 @@ Exceptions and details are in [`NOTICE`](NOTICE):
 - **`src/samba-vfs/`** is **GPL-3.0-or-later** (it is a Samba-derived module),
   see [`src/samba-vfs/LICENSE`](src/samba-vfs/LICENSE).
 - Bundled NuGet dependencies are permissive (MIT / Apache-2.0 / BSD / PostgreSQL).
+- The Web image ships the unmodified **restic** binary (BSD-2-Clause) for file
+  backups; its license and those of the Go modules compiled into it are in
+  [`third-party/restic/`](third-party/restic/).
 
 > **Commercial use:** a separate commercial license is available from the copyright
 holder for those who cannot meet the AGPL obligations or want to build

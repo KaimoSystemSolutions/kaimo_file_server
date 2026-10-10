@@ -67,7 +67,7 @@
                 </label>
                 <div class="workspace-field">
                     <span>@R("Web_Backup_Jobs_Sources")</span>
-                    <MultiSelect T="ShareDefinition" Items="form.Shares" Label="s => s.Name"
+                    <MultiSelect T="ShareDefinition" Items="form.Shares" Label="s => s.Name" OnChanged="StateHasChanged"
                                  PlaceholderText="@R("Web_Backup_Jobs_SourcesPlaceholder")"
                                  EmptyText="@R("Web_Backup_Jobs_NoShares")" />
                     <small>@R("Web_Backup_Jobs_SourcesHelp")</small>

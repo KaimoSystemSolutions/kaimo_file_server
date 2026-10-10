@@ -21,7 +21,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # restic (file backup/restore) — the pinned official release binary, verified
 # against its published SHA-256 before installation. Bump all three ARGs
 # together (checksums from the release's SHA256SUMS file). BSD-2-Clause; the
-# license ships with the image (see NOTICE, "Third-party binaries").
+# license ships with the image (see NOTICE, "Third-party binaries"), together with
+# the licenses of the Go modules compiled into the binary. After a version bump,
+# regenerate them with third-party/restic/update-licenses.py — the build below
+# fails while THIRD_PARTY_LICENSES.txt belongs to another restic version.
 ARG TARGETARCH
 ARG RESTIC_VERSION=0.19.1
 ARG RESTIC_SHA256_AMD64=f415415624dcc452f2a02b8c33641791a8c6d6d3b65bbb3543fcf9a25151585c
@@ -42,7 +45,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl bzip2 \
     && apt-get purge -y --auto-remove curl bzip2 \
     && rm -rf /var/lib/apt/lists/* \
     && restic version
-COPY --chmod=0644 third-party/restic/LICENSE /usr/share/doc/restic/LICENSE
+COPY --chmod=0644 third-party/restic/LICENSE third-party/restic/THIRD_PARTY_LICENSES.txt /usr/share/doc/restic/
+# COPY --chmod also applies to the directory it creates; make it traversable again.
+RUN chmod 0755 /usr/share/doc/restic \
+    && grep -q "^restic ${RESTIC_VERSION} " /usr/share/doc/restic/THIRD_PARTY_LICENSES.txt \
+    || { echo "third-party/restic/THIRD_PARTY_LICENSES.txt is not for restic ${RESTIC_VERSION}: run update-licenses.py" >&2; exit 1; }
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
