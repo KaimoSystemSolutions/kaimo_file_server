@@ -29,6 +29,9 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("AlertAfterDays")
+                        .HasColumnType("integer");
+
                     b.Property<int>("ContentLevel")
                         .HasColumnType("integer");
 
@@ -63,6 +66,10 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
 
                     b.Property<Guid>("RepositoryId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Retention")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("Schedule")
                         .IsRequired()
@@ -139,20 +146,42 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.Property<DateTime?>("KitDownloadedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("LastCheckAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool?>("LastCheckOk")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("LastErrorCode")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<DateTime?>("LastMaintenanceSlotUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("LastReachableAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("LastReadDataAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MaintenanceSchedule")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<int>("MinFreeSpaceGb")
                         .HasColumnType("integer");
+
+                    b.Property<Guid?>("MirrorTargetId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("ReadDataMonthly")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("ResticRepositoryId")
                         .HasMaxLength(128)
@@ -165,10 +194,15 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.Property<int>("State")
                         .HasColumnType("integer");
 
+                    b.Property<int>("TestRestoreSampleSize")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("MirrorTargetId");
 
                     b.HasIndex("Name")
                         .IsUnique();
@@ -1964,6 +1998,14 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ShareId")
                         .OnDelete(DeleteBehavior.Cascade);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupRepository", b =>
+                {
+                    b.HasOne("Kaimo_File_Server.Core.Domain.Backup.BackupRepository", null)
+                        .WithMany()
+                        .HasForeignKey("MirrorTargetId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupRepositoryDepartment", b =>

@@ -6515,4 +6515,190 @@ WIEDERHERSTELLEN MIT DER RESTIC-KOMMANDOZEILE (funktioniert ohne Kaimo-Server)
   <data name="Web_Backup_Error_request_invalid" xml:space="preserve">
     <value>Die Wiederherstellungsanfrage ist ungültig.</value>
   </data>
+  <data name="Notification_Event_backup_restic_stale" xml:space="preserve">
+    <value>Dateisicherung überfällig</value>
+  </data>
+  <data name="Notification_Event_backup_restic_stale_Desc" xml:space="preserve">
+    <value>Ein geplanter Sicherungsauftrag hat länger als seine Warnschwelle keine erfolgreiche Sicherung erstellt.</value>
+  </data>
+  <data name="Notification_Event_backup_restic_check_failed" xml:space="preserve">
+    <value>Sicherungs-Repository beschädigt</value>
+  </data>
+  <data name="Notification_Event_backup_restic_check_failed_Desc" xml:space="preserve">
+    <value>Die Integritätsprüfung eines Sicherungs-Repositorys hat Fehler gefunden.</value>
+  </data>
+  <data name="Notification_Event_backup_restic_test_restore_mismatch" xml:space="preserve">
+    <value>Test-Wiederherstellung weicht ab</value>
+  </data>
+  <data name="Notification_Event_backup_restic_test_restore_mismatch_Desc" xml:space="preserve">
+    <value>Testweise wiederhergestellte Dateien weichen von ihren unveränderten Originalen ab.</value>
+  </data>
+  <data name="Notification_Event_backup_restic_repo_unreachable" xml:space="preserve">
+    <value>Sicherungs-Repository nicht erreichbar</value>
+  </data>
+  <data name="Notification_Event_backup_restic_repo_unreachable_Desc" xml:space="preserve">
+    <value>Ein Sicherungs-Repository ist nicht mehr erreichbar oder lehnt den Zugriff ab.</value>
+  </data>
+  <data name="Notification_Event_backup_restic_maintenance_failed" xml:space="preserve">
+    <value>Sicherungswartung fehlgeschlagen</value>
+  </data>
+  <data name="Notification_Event_backup_restic_maintenance_failed_Desc" xml:space="preserve">
+    <value>Ein Wartungsschritt eines Sicherungs-Repositorys (Aufbewahrung, Aufräumen, Spiegeln, Test-Wiederherstellung) ist fehlgeschlagen.</value>
+  </data>
+  <data name="Web_Backup_Maintenance" xml:space="preserve">
+    <value>Wartung</value>
+  </data>
+  <data name="Web_Backup_Maintenance_JobTitle" xml:space="preserve">
+    <value>Wartung {0}</value>
+  </data>
+  <data name="Web_Backup_Maintenance_Help" xml:space="preserve">
+    <value>Zu diesen Zeiten werden nicht mehr benötigte Daten aufgeräumt, das Repository geprüft, eine Stichprobe von Dateien testweise wiederhergestellt und neue Sicherungsstände in den Spiegel kopiert. Die Aufbewahrungsregeln der Aufträge werden erneut angewendet (auch auf gespiegelte Sicherungsstände).</value>
+  </data>
+  <data name="Web_Backup_Maintenance_ReadData" xml:space="preserve">
+    <value>Daten monatlich lesen</value>
+  </data>
+  <data name="Web_Backup_Maintenance_ReadDataHelp" xml:space="preserve">
+    <value>Die erste Prüfung jedes Monats liest und verifiziert zusätzlich ein Zwölftel der gespeicherten Daten, so wird einmal im Jahr alles gelesen. Bei entfernten Repositorys verursacht das Download-Verkehr.</value>
+  </data>
+  <data name="Web_Backup_Maintenance_SampleSize" xml:space="preserve">
+    <value>Test-Wiederherstellung (Dateien)</value>
+  </data>
+  <data name="Web_Backup_Maintenance_SampleSizeHelp" xml:space="preserve">
+    <value>Anzahl zufällig gewählter Dateien (je bis 256 MB), die aus dem neuesten Sicherungsstand jeder Freigabe wiederhergestellt und mit der aktuellen Datei verglichen werden. Seit der Sicherung geänderte oder gelöschte Dateien werden übersprungen. 0 schaltet die Test-Wiederherstellung ab.</value>
+  </data>
+  <data name="Web_Backup_Maintenance_Mirror" xml:space="preserve">
+    <value>Spiegel</value>
+  </data>
+  <data name="Web_Backup_Maintenance_MirrorHelp" xml:space="preserve">
+    <value>Nach einer erfolgreichen Prüfung werden neue Sicherungsstände in dieses zweite Repository kopiert, idealerweise auf einem anderen Medium oder an einem anderen Ort (3-2-1-Regel).</value>
+  </data>
+  <data name="Web_Backup_Maintenance_NoMirror" xml:space="preserve">
+    <value>Kein Spiegel</value>
+  </data>
+  <data name="Web_Backup_Maintenance_AppendOnlyHint" xml:space="preserve">
+    <value>Append-only: Aufbewahrung und Aufräumen entfallen; alte Sicherungsstände müssen auf dem Server selbst entfernt werden.</value>
+  </data>
+  <data name="Web_Backup_Maintenance_Next" xml:space="preserve">
+    <value>Nächste Wartung</value>
+  </data>
+  <data name="Web_Backup_Maintenance_LastCheck" xml:space="preserve">
+    <value>Letzte Prüfung</value>
+  </data>
+  <data name="Web_Backup_Maintenance_CheckOk" xml:space="preserve">
+    <value>Fehlerfrei</value>
+  </data>
+  <data name="Web_Backup_Maintenance_CheckFailed" xml:space="preserve">
+    <value>Fehler gefunden</value>
+  </data>
+  <data name="Web_Backup_Maintenance_RunNow" xml:space="preserve">
+    <value>Wartung jetzt starten</value>
+  </data>
+  <data name="Web_Backup_Maintenance_Started" xml:space="preserve">
+    <value>Wartung gestartet. Die Schritte erscheinen im Verlauf.</value>
+  </data>
+  <data name="Web_Backup_Repo_State_CheckFailed" xml:space="preserve">
+    <value>Prüfung fehlgeschlagen</value>
+  </data>
+  <data name="Web_Backup_Retention" xml:space="preserve">
+    <value>Aufbewahrung</value>
+  </data>
+  <data name="Web_Backup_Retention_Help" xml:space="preserve">
+    <value>Wie viele Sicherungsstände jeder Freigabe erhalten bleiben. Ältere werden nach jeder erfolgreichen Sicherung entfernt; der Speicherplatz wird bei der Wartung des Repositorys freigegeben. 0 schaltet eine Regel ab.</value>
+  </data>
+  <data name="Web_Backup_Retention_Last" xml:space="preserve">
+    <value>Letzte</value>
+  </data>
+  <data name="Web_Backup_Retention_Daily" xml:space="preserve">
+    <value>Täglich</value>
+  </data>
+  <data name="Web_Backup_Retention_Weekly" xml:space="preserve">
+    <value>Wöchentlich</value>
+  </data>
+  <data name="Web_Backup_Retention_Monthly" xml:space="preserve">
+    <value>Monatlich</value>
+  </data>
+  <data name="Web_Backup_Retention_Yearly" xml:space="preserve">
+    <value>Jährlich</value>
+  </data>
+  <data name="Web_Backup_Retention_KeepAll" xml:space="preserve">
+    <value>Alle behalten</value>
+  </data>
+  <data name="Web_Backup_Retention_KeepAllHint" xml:space="preserve">
+    <value>Keine Regel gesetzt: Jeder Sicherungsstand bleibt erhalten und das Repository wächst stetig.</value>
+  </data>
+  <data name="Web_Backup_Retention_LastValue" xml:space="preserve">
+    <value>{0} letzte</value>
+  </data>
+  <data name="Web_Backup_Retention_DailyValue" xml:space="preserve">
+    <value>{0} tägliche</value>
+  </data>
+  <data name="Web_Backup_Retention_WeeklyValue" xml:space="preserve">
+    <value>{0} wöchentliche</value>
+  </data>
+  <data name="Web_Backup_Retention_MonthlyValue" xml:space="preserve">
+    <value>{0} monatliche</value>
+  </data>
+  <data name="Web_Backup_Retention_YearlyValue" xml:space="preserve">
+    <value>{0} jährliche</value>
+  </data>
+  <data name="Web_Backup_AlertAfterDays" xml:space="preserve">
+    <value>Warnen nach (Tagen)</value>
+  </data>
+  <data name="Web_Backup_AlertAfterDaysHelp" xml:space="preserve">
+    <value>Sendet eine Benachrichtigung, wenn ein geplanter Auftrag so viele Tage keine erfolgreiche Sicherung hatte, gezählt ab dem letzten Erfolg oder der letzten Änderung am Auftrag. Nie bevor ein geplanter Lauf ausgefallen ist (ein wöchentlicher Auftrag: frühestens nach 8 Tagen). 0 schaltet die Warnung ab.</value>
+  </data>
+  <data name="Web_Backup_AlertAfterDaysValue" xml:space="preserve">
+    <value>{0} Tage ohne Erfolg</value>
+  </data>
+  <data name="Web_Backup_AlertOff" xml:space="preserve">
+    <value>Aus</value>
+  </data>
+  <data name="Web_Backup_Activity_Forgotten" xml:space="preserve">
+    <value>Entfernte Sicherungsstände</value>
+  </data>
+  <data name="Web_Backup_Activity_ForgottenValue" xml:space="preserve">
+    <value>{0} (Aufträge mit Aufbewahrung: {1})</value>
+  </data>
+  <data name="Web_Backup_Activity_ReadData" xml:space="preserve">
+    <value>Daten gelesen</value>
+  </data>
+  <data name="Web_Backup_Activity_TestRestore" xml:space="preserve">
+    <value>Verglichene Dateien</value>
+  </data>
+  <data name="Web_Backup_Activity_TestRestoreValue" xml:space="preserve">
+    <value>{0} identisch, {1} seit der Sicherung geändert oder gelöscht (übersprungen), {2} abweichend</value>
+  </data>
+  <data name="Web_Backup_Activity_CopiedValue" xml:space="preserve">
+    <value>{0} neue Sicherungsstände</value>
+  </data>
+  <data name="Web_Backup_Activity_CheckErrors" xml:space="preserve">
+    <value>{0} Fehler anzeigen</value>
+  </data>
+  <data name="Web_Backup_Activity_Mismatches" xml:space="preserve">
+    <value>{0} abweichende Dateien</value>
+  </data>
+  <data name="Web_Backup_Error_retention_empty" xml:space="preserve">
+    <value>Die Aufbewahrung enthält keine Regel.</value>
+  </data>
+  <data name="Web_Backup_Error_retention_invalid" xml:space="preserve">
+    <value>Die Werte für Aufbewahrung oder Warnung liegen außerhalb des erlaubten Bereichs.</value>
+  </data>
+  <data name="Web_Backup_Error_mirror_conflict" xml:space="preserve">
+    <value>Beide Repositorys nutzen denselben Speichertyp mit unterschiedlichen Zugangsdaten oder Optionen; restic kann nicht in einem Schritt zwischen ihnen kopieren.</value>
+  </data>
+  <data name="Web_Backup_Error_mirror_invalid" xml:space="preserve">
+    <value>Dieser Spiegel würde in das Repository selbst zurückkopieren.</value>
+  </data>
+  <data name="Web_Backup_Error_mirror_not_active" xml:space="preserve">
+    <value>Das Spiegel-Repository ist nicht aktiv.</value>
+  </data>
+  <data name="Web_Backup_Error_check_failed" xml:space="preserve">
+    <value>Die Integritätsprüfung hat Fehler gefunden.</value>
+  </data>
+  <data name="Web_Backup_Error_test_restore_mismatch" xml:space="preserve">
+    <value>Wiederhergestellte Dateien weichen von den Originalen ab.</value>
+  </data>
+  <data name="Web_Backup_Maintenance_MirrorRule" xml:space="preserve">
+    <value>Angeboten werden nur Repositorys, in die in einem Schritt kopiert werden kann: ein anderer Speichertyp, ein lokaler Ordner oder derselbe Speichertyp mit demselben Zugang (SFTP: dieselbe SSH-Verbindung; S3 und REST: dieselben Zugangsdaten).</value>
+  </data>
 </root>

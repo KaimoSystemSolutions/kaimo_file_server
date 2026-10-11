@@ -109,6 +109,27 @@ public sealed class BackupRepository
     /// <summary>Minimum free space (GB) a local repository target must keep; a backup aborts below it.</summary>
     public int MinFreeSpaceGb { get; set; } = 5;
 
+    /// <summary>When retention, prune, check, test restore and mirror copy run (empty = manual only).</summary>
+    public BackupSchedule MaintenanceSchedule { get; set; } = BackupSchedule.DefaultMaintenance();
+
+    /// <summary>The newest maintenance slot already handled (persisted before enqueueing).</summary>
+    public DateTime? LastMaintenanceSlotUtc { get; set; }
+
+    /// <summary>The first check of each month also reads a twelfth of all pack data (whole repository once a year).</summary>
+    public bool ReadDataMonthly { get; set; } = true;
+
+    /// <summary>Files restored and compared with the live files during maintenance (0 = no test restore).</summary>
+    public int TestRestoreSampleSize { get; set; } = 20;
+
+    /// <summary>Second repository every new backup point is copied to after a successful check (3-2-1).</summary>
+    public Guid? MirrorTargetId { get; set; }
+
+    public DateTime? LastCheckAtUtc { get; set; }
+    public bool? LastCheckOk { get; set; }
+
+    /// <summary>Last check that included <c>--read-data-subset</c>; drives the monthly data read.</summary>
+    public DateTime? LastReadDataAtUtc { get; set; }
+
     public DateTime? KitDownloadedAtUtc { get; set; }
     public DateTime? KitConfirmedAtUtc { get; set; }
     public Guid? KitConfirmedByUserId { get; set; }
@@ -141,6 +162,38 @@ public sealed class BackupSchedule
         => string.IsNullOrWhiteSpace(value)
             ? new BackupSchedule()
             : JsonSerializer.Deserialize<BackupSchedule>(value) ?? new BackupSchedule();
+
+    /// <summary>Default repository maintenance: Sundays at 03:00.</summary>
+    public static BackupSchedule DefaultMaintenance() => new() { Times = [new TimeOnly(3, 0)], Days = [DayOfWeek.Sunday] };
+}
+
+/// <summary>
+/// Which backup points of a job survive <c>restic forget</c>. A value of 0 disables that rule;
+/// all zero keeps everything.
+/// </summary>
+public sealed class BackupRetention
+{
+    public const int MaximumValue = 10_000;
+
+    public int KeepLast { get; set; }
+    public int KeepDaily { get; set; }
+    public int KeepWeekly { get; set; }
+    public int KeepMonthly { get; set; }
+    public int KeepYearly { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsEmpty => KeepLast <= 0 && KeepDaily <= 0 && KeepWeekly <= 0 && KeepMonthly <= 0 && KeepYearly <= 0;
+
+    /// <summary>Default of new jobs: 7 daily, 4 weekly, 12 monthly backup points.</summary>
+    public static BackupRetention Default() => new() { KeepDaily = 7, KeepWeekly = 4, KeepMonthly = 12 };
+
+    public static string Serialize(BackupRetention? value)
+        => JsonSerializer.Serialize(value ?? new BackupRetention());
+
+    public static BackupRetention Deserialize(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? new BackupRetention()
+            : JsonSerializer.Deserialize<BackupRetention>(value) ?? new BackupRetention();
 }
 
 /// <summary>A backup job: which sources go into which repository and when.</summary>
@@ -156,6 +209,12 @@ public sealed class BackupJob
     public bool IncludeRecycleBin { get; set; }
 
     public BackupSchedule Schedule { get; set; } = new();
+
+    /// <summary>Applied per job (<c>forget --tag job:&lt;id&gt;</c>) during repository maintenance.</summary>
+    public BackupRetention Retention { get; set; } = new();
+
+    /// <summary>A scheduled job without a successful run for this many days raises a "stale" alert (0 = off).</summary>
+    public int AlertAfterDays { get; set; } = 3;
 
     /// <summary>The newest schedule slot already handled (persisted before enqueueing).</summary>
     public DateTime? LastScheduledSlotUtc { get; set; }

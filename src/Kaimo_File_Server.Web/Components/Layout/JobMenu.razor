@@ -8,6 +8,9 @@
 @inject JobService JobService
 @inject ICloudSyncJobRunner SyncJobRunner
 @inject Kaimo_File_Server.Infrastructure.Backup.Restic.IBackupRunner BackupRunner
+@inject Kaimo_File_Server.Infrastructure.Backup.Restic.BackupCatalogService BackupCatalog
+@inject Kaimo_File_Server.Core.Repositories.IUserContextFactory UserContexts
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthState
 @inject ISearchAdminService SearchAdmin
 @inject DateFormatService DateFmt
 @inherits AppComponentBase
@@ -142,14 +145,17 @@
                                     <strong>@($"{Text("Web_Nav_Backup", "Backup")} · {run.Title}")</strong>
                                     <small>@(run.IsRunning ? run.Detail : Text("Web_Backup_Queued", "Queued"))</small>
                                 </div>
-                                <button class="job-cancel"
-                                        type="button"
-                                        disabled="@run.IsCancellationRequested"
-                                        title="@Text("Web_Jobs_Cancel", "Cancel job")"
-                                        aria-label="@Text("Web_Jobs_Cancel", "Cancel job")"
-                                        @onclick="() => BackupRunner.Cancel(run.RunId)">
-                                    @Assets.SVG("close.svg", new SvgOptions(Width: 13, Height: 13, StrokeWidth: 2))
-                                </button>
+                                @if (!run.IsMaintenance || _canCancelMaintenance)
+                                {
+                                    <button class="job-cancel"
+                                            type="button"
+                                            disabled="@run.IsCancellationRequested"
+                                            title="@Text("Web_Jobs_Cancel", "Cancel job")"
+                                            aria-label="@Text("Web_Jobs_Cancel", "Cancel job")"
+                                            @onclick="() => CancelBackupRunAsync(run.RunId)">
+                                        @Assets.SVG("close.svg", new SvgOptions(Width: 13, Height: 13, StrokeWidth: 2))
+                                    </button>
+                                }
                             </div>
                             <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@run.Progress">
                                 <div class="job-progress-fill" style="width: @(run.Progress)%"></div>
@@ -214,6 +220,34 @@
     // Ensure the configured time format is loaded even if this menu renders before
     // the layout's own initialization; InitializeAsync is idempotent.
     protected override Task OnInitializedAsync() => DateFmt.InitializeAsync();
+
+    // The layout resolves CanSeeBackups asynchronously, so it may turn true only after init.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (CanSeeBackups && !_backupAccessLoaded)
+        {
+            _backupAccessLoaded = true;
+            if (await GetActorAsync() is { } actor)
+                _canCancelMaintenance = (await BackupCatalog.GetAccessAsync(actor)).CanManageRepositories;
+        }
+    }
+
+    // Maintenance may only be cancelled by repository administrators.
+    private bool _canCancelMaintenance;
+    private bool _backupAccessLoaded;
+
+    /// <summary>Cancels through the catalog, which re-checks who may cancel which run.</summary>
+    private async Task CancelBackupRunAsync(Guid runId)
+    {
+        if (await GetActorAsync() is { } actor)
+            await BackupCatalog.CancelRunAsync(actor, runId);
+    }
+
+    private async Task<Kaimo_File_Server.Core.Domain.Identity.UserContext?> GetActorAsync()
+    {
+        var name = (await AuthState.GetAuthenticationStateAsync()).User.Identity?.Name;
+        return string.IsNullOrEmpty(name) ? null : await UserContexts.CreateByUsernameAsync(name);
+    }
 
     protected override void OnInitialized()
     {

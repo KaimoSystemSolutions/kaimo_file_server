@@ -39,6 +39,9 @@ public sealed record ResticNode(string Name, string Path, bool IsDirectory, long
 /// <summary>Outcome of <c>restic restore</c>.</summary>
 public sealed record ResticRestoreResult(long FilesRestored, long BytesRestored);
 
+/// <summary>Outcome of <c>restic check</c>: <see cref="Ok"/> is false when restic found damage.</summary>
+public sealed record ResticCheckResult(bool Ok, IReadOnlyList<string> Errors, string OutputTail);
+
 /// <summary>What a backup should contain.</summary>
 public sealed record ResticBackupRequest(
     IReadOnlyList<string> Paths,
@@ -167,10 +170,22 @@ public sealed class ResticClient(IProcessRunner runner, IConfiguration configura
     public async Task<ResticRestoreResult> RestoreAsync(
         ResticTarget target, string snapshotId, string folder, IReadOnlyList<string> names, string targetDirectory,
         Action<double>? onProgress, CancellationToken ct)
+        => await RunRestoreAsync(target, BuildRestoreArgs(snapshotId, folder, names, targetDirectory), onProgress, ct);
+
+    /// <summary>
+    /// Restores single entries by their absolute snapshot path into
+    /// <c>&lt;targetDirectory&gt;/&lt;absolute path&gt;</c> (test restore).
+    /// </summary>
+    public async Task<ResticRestoreResult> RestorePathsAsync(
+        ResticTarget target, string snapshotId, IReadOnlyList<string> absolutePaths, string targetDirectory, CancellationToken ct)
+        => await RunRestoreAsync(target, BuildRestorePathsArgs(snapshotId, absolutePaths, targetDirectory), null, ct);
+
+    private async Task<ResticRestoreResult> RunRestoreAsync(
+        ResticTarget target, IReadOnlyList<string> args, Action<double>? onProgress, CancellationToken ct)
     {
         long files = 0, bytes = 0;
         var errors = new List<string>();
-        var result = await RunAsync(target, BuildRestoreArgs(snapshotId, folder, names, targetDirectory), line =>
+        var result = await RunAsync(target, args, line =>
         {
             using var doc = TryParse(line);
             if (doc is null)
@@ -227,7 +242,177 @@ public sealed class ResticClient(IProcessRunner runner, IConfiguration configura
         ThrowOnFailure(result, "dump");
     }
 
+    /// <summary>Applies a job's retention to its backup points; returns how many were removed.</summary>
+    public async Task<int> ForgetAsync(ResticTarget target, Guid jobId, Core.Domain.Backup.BackupRetention retention, CancellationToken ct)
+    {
+        var lines = new List<string>();
+        var result = await RunAsync(target, BuildForgetArgs(retention, jobId), lines.Add, ct, lockRetry: "30m");
+        ThrowOnFailure(result, "forget");
+        return CountForgotten(lines);
+    }
+
+    /// <summary>Deletes data no longer referenced by any backup point.</summary>
+    public async Task PruneAsync(ResticTarget target, CancellationToken ct)
+    {
+        var result = await RunAsync(target, ["prune"], null, ct, lockRetry: "30m");
+        ThrowOnFailure(result, "prune");
+    }
+
+    /// <summary>
+    /// Verifies the repository structure; with <paramref name="readDataSubset"/> (e.g. "3/12")
+    /// also reads and verifies that part of the pack data. Damage is a result, not an exception;
+    /// an unreachable repository still throws.
+    /// </summary>
+    public async Task<ResticCheckResult> CheckAsync(ResticTarget target, string? readDataSubset, CancellationToken ct)
+    {
+        // restic 0.19: the summary (num_errors) goes to stdout, every finding as a JSON "error"
+        // line to stderr.
+        long reportedErrors = 0;
+        var errors = new List<string>();
+        var output = new System.Text.StringBuilder();
+        void Collect(string line)
+        {
+            using var doc = TryParse(line);
+            if (doc is null)
+            {
+                if (!string.IsNullOrWhiteSpace(line))
+                    output.AppendLine(line);
+                return;
+            }
+            switch (Type(doc))
+            {
+                case "summary":
+                    reportedErrors = GetLong(doc.RootElement, "num_errors");
+                    break;
+                case "error" when errors.Count < MaximumKeptWarnings:
+                    if (GetString(doc.RootElement, "message")?.Trim() is { Length: > 0 } message)
+                        errors.Add(message);
+                    break;
+            }
+        }
+
+        var args = new List<string> { "check" };
+        if (readDataSubset is not null)
+            args.AddRange(["--read-data-subset", readDataSubset]);
+        var result = await RunAsync(target, args, Collect, ct, lockRetry: "30m");
+        foreach (var line in result.StandardError.Split('\n'))
+            Collect(line.TrimEnd('\r'));
+
+        var tail = (string.Join('\n', errors) + "\n" + output).Trim();
+        tail = tail.Length <= 8 * 1024 ? tail : tail[^(8 * 1024)..];
+        if (result.ExitCode == 0)
+            return new ResticCheckResult(true, errors, tail);
+        // Only restic's own error count proves damage. Any other abort (unreachable, locked,
+        // network drop, out of memory) says nothing about the data and throws like everywhere
+        // else, so it never raises a false "repository damaged" alarm.
+        if (reportedErrors == 0)
+            ThrowOnFailure(result, "check");
+        return new ResticCheckResult(false, errors, tail);
+    }
+
+    /// <summary>
+    /// Copies every backup point of <paramref name="source"/> that is missing in
+    /// <paramref name="destination"/> (restic skips points copied before).
+    /// </summary>
+    public async Task CopyAsync(ResticTarget destination, ResticTarget source, CancellationToken ct)
+    {
+        var merged = BuildCopyTarget(destination, source);
+        var result = await RunAsync(merged, ["copy"], null, ct, lockRetry: "30m");
+        ThrowOnFailure(result, "copy");
+    }
+
     // ── argument building ───────────────────────────────────────────────
+
+    /// <summary>
+    /// <c>forget</c> for one job: grouped by host and paths (one group per share), never by
+    /// tags — the unique <c>run:</c> tag would make every snapshot its own group and keep all.
+    /// </summary>
+    internal static List<string> BuildForgetArgs(Core.Domain.Backup.BackupRetention retention, Guid jobId)
+    {
+        if (retention.IsEmpty)
+            throw new ResticException("retention_empty", "A retention without any rule would keep or remove everything.");
+        var args = new List<string> { "forget", "--tag", "job:" + jobId.ToString("N"), "--group-by", "host,paths" };
+        void Keep(string flag, int value)
+        {
+            if (value > 0)
+                args.AddRange([flag, value.ToString(CultureInfo.InvariantCulture)]);
+        }
+        Keep("--keep-last", retention.KeepLast);
+        Keep("--keep-daily", retention.KeepDaily);
+        Keep("--keep-weekly", retention.KeepWeekly);
+        Keep("--keep-monthly", retention.KeepMonthly);
+        Keep("--keep-yearly", retention.KeepYearly);
+        return args;
+    }
+
+    /// <summary>Sums the "remove" lists of <c>forget --json</c> (one array of groups).</summary>
+    internal static int CountForgotten(IEnumerable<string> lines)
+    {
+        var removed = 0;
+        foreach (var line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line) || line.TrimStart()[0] != '[')
+                continue;
+            try
+            {
+                using var doc = JsonDocument.Parse(line);
+                foreach (var group in doc.RootElement.EnumerateArray())
+                {
+                    if (group.ValueKind == JsonValueKind.Object
+                        && group.TryGetProperty("remove", out var remove) && remove.ValueKind == JsonValueKind.Array)
+                        removed += remove.GetArrayLength();
+                }
+            }
+            catch (JsonException) { }
+        }
+        return removed;
+    }
+
+    /// <summary>
+    /// One invocation for <c>restic copy</c>: the destination is the main repository, the source
+    /// goes into <c>RESTIC_FROM_*</c>. Backend variables and options are not namespaced per
+    /// repository, so differing values for the same name cannot work and are rejected (the
+    /// mirror form validates this up front). Both <c>sftp.command</c>s of one SSH connection only
+    /// differ in their temporary key path, so the destination's serves both.
+    /// </summary>
+    internal static ResticTarget BuildCopyTarget(ResticTarget destination, ResticTarget source)
+    {
+        var env = new Dictionary<string, string>(destination.Environment);
+        foreach (var (key, value) in source.Environment)
+        {
+            switch (key)
+            {
+                case "RESTIC_REPOSITORY": env["RESTIC_FROM_REPOSITORY"] = value; break;
+                case "RESTIC_PASSWORD": env["RESTIC_FROM_PASSWORD"] = value; break;
+                default:
+                    if (env.TryGetValue(key, out var existing) && existing != value)
+                        throw new ResticException("mirror_conflict", $"Both repositories need different values for {key}.");
+                    env[key] = value;
+                    break;
+            }
+        }
+
+        var args = destination.GlobalArguments.ToList();
+        var options = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var i = 0; i + 1 < args.Count; i += 2)
+            if (args[i] == "-o")
+                options[OptionName(args[i + 1])] = args[i + 1];
+        for (var i = 0; i + 1 < source.GlobalArguments.Count; i += 2)
+        {
+            var (flag, value) = (source.GlobalArguments[i], source.GlobalArguments[i + 1]);
+            if (flag == "-o" && options.TryGetValue(OptionName(value), out var current))
+            {
+                if (current != value && OptionName(value) != "sftp.command")
+                    throw new ResticException("mirror_conflict", $"Both repositories need different values for {OptionName(value)}.");
+                continue;
+            }
+            // --cacert may repeat; every listed CA is trusted for both repositories.
+            args.AddRange([flag, value]);
+        }
+        return new ResticTarget(destination.RepositoryUrl, env, args, null);
+
+        static string OptionName(string option) => option.Split('=', 2)[0];
+    }
 
     internal static List<string> BuildBackupArgs(ResticBackupRequest request)
     {
@@ -256,6 +441,22 @@ public sealed class ResticClient(IProcessRunner runner, IConfiguration configura
         }
         args.Add("--");
         args.Add(snapshotId + ":" + TrimDirectory(folder));
+        return args;
+    }
+
+    internal static List<string> BuildRestorePathsArgs(string snapshotId, IReadOnlyList<string> absolutePaths, string targetDirectory)
+    {
+        if (absolutePaths.Count == 0)
+            throw new ResticException("path_invalid", "Nothing to restore.");
+        var args = new List<string> { "restore", "--target", targetDirectory, "--verify" };
+        foreach (var path in absolutePaths)
+        {
+            var p = TrimDirectory(path);
+            if (!p.StartsWith('/') || p.Split('/').Any(s => s is "." or ".."))
+                throw new ResticException("path_invalid", "Only absolute snapshot paths can be restored.");
+            args.AddRange(["--include", EscapePattern(p)]);
+        }
+        args.AddRange(["--", snapshotId]);
         return args;
     }
 

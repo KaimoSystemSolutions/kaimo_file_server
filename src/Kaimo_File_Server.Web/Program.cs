@@ -481,6 +481,7 @@ builder.Services.AddSingleton(sp => new Kaimo_File_Server.Infrastructure.Backup.
     sp.GetRequiredService<ShareLockManager>(),
     sp.GetRequiredService<TimeProvider>(),
     sp.GetRequiredService<ILogger<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRestoreExecutor>>()));
+builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupMaintenanceExecutor>();
 builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRunner>();
 builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.IBackupRunner>(
     sp => sp.GetRequiredService<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRunner>());

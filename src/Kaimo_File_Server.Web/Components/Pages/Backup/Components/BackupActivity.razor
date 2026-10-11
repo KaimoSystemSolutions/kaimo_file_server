@@ -153,6 +153,61 @@
                 </section>
             }
 
+            @* Prune records no details; it shows only the common fields above. *@
+            @if (current.Type is BackupRunType.Forget or BackupRunType.Check or BackupRunType.TestRestore or BackupRunType.Copy
+                 && BackupMaintenanceDetails.TryParse(current.DetailsJson) is { } maintenance)
+            {
+                <section class="workspace-section">
+                    <h4>@R("Web_Backup_Activity_Detail")</h4>
+                    <dl class="workspace-dl">
+                        @if (maintenance.SnapshotsRemoved is { } removed)
+                        {
+                            <dt>@R("Web_Backup_Activity_Forgotten")</dt>
+                            <dd>@string.Format(R("Web_Backup_Activity_ForgottenValue"), removed, maintenance.JobsApplied ?? 0)</dd>
+                        }
+                        @if (current.Type == BackupRunType.Check)
+                        {
+                            <dt>@R("Web_Backup_Activity_ReadData")</dt>
+                            <dd>@(maintenance.ReadDataSubset ?? R("Web_Common_No"))</dd>
+                        }
+                        @if (maintenance.FilesVerified is { } verified)
+                        {
+                            <dt>@R("Web_Backup_Activity_TestRestore")</dt>
+                            <dd>@string.Format(R("Web_Backup_Activity_TestRestoreValue"), verified, maintenance.FilesChanged ?? 0, maintenance.Mismatches?.Count ?? 0)</dd>
+                        }
+                        @if (maintenance.MirrorName is { } mirror)
+                        {
+                            <dt>@R("Web_Backup_Maintenance_Mirror")</dt>
+                            <dd>@mirror@(maintenance.SnapshotsCopied is { } copied ? " · " + string.Format(R("Web_Backup_Activity_CopiedValue"), copied) : "")</dd>
+                        }
+                    </dl>
+                    @if (maintenance.CheckErrors is { Count: > 0 } errors)
+                    {
+                        <details class="backup-details">
+                            <summary>@string.Format(R("Web_Backup_Activity_CheckErrors"), errors.Count)</summary>
+                            <ul>
+                                @foreach (var error in errors)
+                                {
+                                    <li><code>@error</code></li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                    @if (maintenance.Mismatches is { Count: > 0 } mismatches)
+                    {
+                        <details class="backup-details" open>
+                            <summary>@string.Format(R("Web_Backup_Activity_Mismatches"), mismatches.Count)</summary>
+                            <ul>
+                                @foreach (var file in mismatches)
+                                {
+                                    <li><code>@file</code></li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                </section>
+            }
+
             @if (!string.IsNullOrWhiteSpace(current.LogExcerpt))
             {
                 <section class="workspace-section">

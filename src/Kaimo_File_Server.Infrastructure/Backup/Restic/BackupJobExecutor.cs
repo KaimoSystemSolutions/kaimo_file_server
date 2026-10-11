@@ -53,6 +53,7 @@ public sealed class BackupJobExecutor(
 
         var outcomes = new List<BackupSourceOutcome>();
         string? stderrTail = null;
+        var previousRepositoryError = repository.LastErrorCode;
         try
         {
             if (job is null)
@@ -92,7 +93,7 @@ public sealed class BackupJobExecutor(
             run.Status = BackupRunStatus.Failed;
             run.ErrorCode = ex is ResticException re ? re.Code : "unexpected_error";
             stderrTail = ex.Data["stderr"] as string;
-            if (ex is ResticException { Code: "repo_unreachable" or "repo_not_found" or "wrong_password" or "access_denied" or "tls_error" })
+            if (BackupMaintenanceExecutor.IsRepositoryError(run.ErrorCode))
                 repository.LastErrorCode = run.ErrorCode;
             if (ex is not ResticException)
                 logger.LogError(ex, "Backup run {RunId} failed unexpectedly.", runId);
@@ -125,6 +126,66 @@ public sealed class BackupJobExecutor(
 
         if (job is not null)
             await PublishAsync(run, job, repository, outcomes);
+        if (previousRepositoryError is null && repository.LastErrorCode is { } repositoryError)
+            await notifications.PublishAsync(NotificationEvents.FileBackupRepositoryUnreachable(repository.Id, repository.Name, repositoryError));
+
+        if (job is not null && run.Status is BackupRunStatus.Succeeded or BackupRunStatus.SucceededWithWarnings
+            && !job.Retention.IsEmpty && !repository.IsAppendOnly)
+        {
+            report(BackupUiText.RunType(BackupRunType.Forget), 100);
+            await ApplyRetentionAsync(db, repository, job, run.Trigger, ct);
+        }
+    }
+
+    /// <summary>
+    /// Applies the job's retention right after a successful backup, as its own run. Only the
+    /// backup points are removed here; their data is freed by the next repository maintenance
+    /// (prune), which needs an exclusive lock and is too expensive for every run.
+    /// </summary>
+    private async Task ApplyRetentionAsync(ApplicationDbContext db, BackupRepository repository, BackupJob job, BackupRunTrigger trigger, CancellationToken ct)
+    {
+        var now = time.GetUtcNow().UtcDateTime;
+        var run = new BackupRun
+        {
+            RepositoryId = repository.Id,
+            JobId = job.Id,
+            Type = BackupRunType.Forget,
+            Trigger = trigger,
+            Status = BackupRunStatus.Running,
+            QueuedAtUtc = now,
+            StartedAtUtc = now,
+        };
+        db.BackupRuns.Add(run);
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var details = new BackupMaintenanceDetails { JobsApplied = 1 };
+        try
+        {
+            using var target = await resolver.ResolveAsync(repository, ct);
+            details.SnapshotsRemoved = await restic.ForgetAsync(target, job.Id, job.Retention, ct);
+            if (details.SnapshotsRemoved > 0)
+                await RefreshSnapshotCacheAsync(db, repository.Id, target, ct);
+            run.Status = BackupRunStatus.Succeeded;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            run.Status = BackupRunStatus.Cancelled;
+            run.ErrorCode = "cancelled";
+        }
+        catch (Exception ex)
+        {
+            run.Status = BackupRunStatus.Failed;
+            run.ErrorCode = ex is ResticException re ? re.Code : "unexpected_error";
+            run.LogExcerpt = Tail(ex.Data["stderr"] as string);
+            if (ex is not ResticException)
+                logger.LogError(ex, "Retention of backup job {Job} failed unexpectedly.", job.Name);
+            await notifications.PublishAsync(NotificationEvents.FileBackupMaintenanceFailed(
+                repository.Id, repository.Name, BackupUiText.RunType(BackupRunType.Forget), run.ErrorCode));
+        }
+
+        run.FinishedAtUtc = time.GetUtcNow().UtcDateTime;
+        run.DetailsJson = details.Serialize();
+        await db.SaveChangesAsync(CancellationToken.None);
     }
 
     private async Task<BackupSourceOutcome> BackupShareAsync(

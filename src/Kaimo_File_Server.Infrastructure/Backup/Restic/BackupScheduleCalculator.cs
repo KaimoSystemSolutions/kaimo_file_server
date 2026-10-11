@@ -53,6 +53,18 @@ public static class BackupScheduleCalculator
         return null;
     }
 
+    /// <summary>Most days between two consecutive scheduled weekdays (7 for once a week, 1 for daily, 0 if unscheduled).</summary>
+    public static int LongestGapDays(BackupSchedule schedule)
+    {
+        if (schedule.IsEmpty)
+            return 0;
+        var days = schedule.Days.Select(d => (int)d).Distinct().Order().ToList();
+        var gap = 7 - days[^1] + days[0];
+        for (var i = 1; i < days.Count; i++)
+            gap = Math.Max(gap, days[i] - days[i - 1]);
+        return gap;
+    }
+
     private static IEnumerable<DateTime> SlotsOn(BackupSchedule schedule, DateTime localDate, TimeZoneInfo zone)
     {
         if (!schedule.Days.Contains(localDate.DayOfWeek))

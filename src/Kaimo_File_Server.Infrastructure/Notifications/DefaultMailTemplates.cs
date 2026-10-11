@@ -101,6 +101,31 @@ public static class DefaultMailTemplates
         [(C.FileBackupWarnings, "en")] = new("File backup \"{{ job.name }}\" completed with warnings",
             "<p>The backup job <strong>{{ job.name }}</strong> completed, but {{ warningCount }} files could not be read (for example because they changed or were locked during the backup). See the backup activity for details.</p>" + LoginLink),
 
+        [(C.FileBackupStale, "de")] = new("Datensicherung „{{ job.name }}“ seit {{ days }} Tagen ohne Erfolg",
+            "<p>Der Sicherungsauftrag <strong>{{ job.name }}</strong> (Repository <strong>{{ repository.name }}</strong>) hat seit mehr als {{ days }} Tagen keine erfolgreiche Sicherung erstellt.</p><p>Letzte erfolgreiche Sicherung: {{ lastSuccess }}</p>" + LoginLink),
+        [(C.FileBackupStale, "en")] = new("File backup \"{{ job.name }}\" without success for {{ days }} days",
+            "<p>The backup job <strong>{{ job.name }}</strong> (repository <strong>{{ repository.name }}</strong>) has not completed a successful backup for more than {{ days }} days.</p><p>Last successful backup: {{ lastSuccess }}</p>" + LoginLink),
+
+        [(C.FileBackupCheckFailed, "de")] = new("Prüfung des Sicherungs-Repositorys „{{ repository.name }}“ hat Fehler gefunden",
+            "<p>Die Integritätsprüfung des Repositorys <strong>{{ repository.name }}</strong> hat {{ errorCount }} Fehler gefunden. Gesicherte Daten sind möglicherweise beschädigt.</p><p>Prüfe die Details im Verlauf der Sicherung und lege bei Bedarf ein neues Repository an.</p>" + LoginLink),
+        [(C.FileBackupCheckFailed, "en")] = new("Check of backup repository \"{{ repository.name }}\" found errors",
+            "<p>The integrity check of the repository <strong>{{ repository.name }}</strong> found {{ errorCount }} errors. Backed-up data may be damaged.</p><p>See the backup activity for details and create a new repository if needed.</p>" + LoginLink),
+
+        [(C.FileBackupTestRestoreMismatch, "de")] = new("Test-Wiederherstellung aus „{{ repository.name }}“ weicht ab",
+            "<p>Bei der Test-Wiederherstellung aus dem Repository <strong>{{ repository.name }}</strong> stimmten {{ mismatchCount }} unveränderte Dateien nicht mit dem Original überein:</p><p><code>{{ files }}</code></p>" + LoginLink),
+        [(C.FileBackupTestRestoreMismatch, "en")] = new("Test restore from \"{{ repository.name }}\" does not match",
+            "<p>During the test restore from the repository <strong>{{ repository.name }}</strong>, {{ mismatchCount }} unchanged files did not match the original:</p><p><code>{{ files }}</code></p>" + LoginLink),
+
+        [(C.FileBackupRepositoryUnreachable, "de")] = new("Sicherungs-Repository „{{ repository.name }}“ nicht erreichbar",
+            "<p>Das Repository <strong>{{ repository.name }}</strong> ist nicht erreichbar oder lehnt den Zugriff ab (<code>{{ errorCode }}</code>). Bis das behoben ist, schlagen Sicherungen in dieses Repository fehl.</p>" + LoginLink),
+        [(C.FileBackupRepositoryUnreachable, "en")] = new("Backup repository \"{{ repository.name }}\" unreachable",
+            "<p>The repository <strong>{{ repository.name }}</strong> is unreachable or rejects the access (<code>{{ errorCode }}</code>). Backups into this repository fail until this is fixed.</p>" + LoginLink),
+
+        [(C.FileBackupMaintenanceFailed, "de")] = new("Wartung des Sicherungs-Repositorys „{{ repository.name }}“ fehlgeschlagen",
+            "<p>Der Wartungsschritt <strong>{{ step }}</strong> des Repositorys <strong>{{ repository.name }}</strong> ist fehlgeschlagen.</p><p>Fehlercode: <code>{{ errorCode }}</code><br>Zeitpunkt: {{ event.time }}</p>" + LoginLink),
+        [(C.FileBackupMaintenanceFailed, "en")] = new("Maintenance of backup repository \"{{ repository.name }}\" failed",
+            "<p>The maintenance step <strong>{{ step }}</strong> of the repository <strong>{{ repository.name }}</strong> failed.</p><p>Error code: <code>{{ errorCode }}</code><br>Time: {{ event.time }}</p>" + LoginLink),
+
         [(C.DeviceRegistered, "de")] = new("Neues Gerät angemeldet: {{ device.name }}",
             "<p>Hallo {{ recipient.name }},</p><p>mit deinem Konto <strong>{{ user.username }}</strong> wurde ein neues Gerät angemeldet: <strong>{{ device.name }}</strong> ({{ device.platform }}), {{ event.time }}.</p><p>Warst du das nicht, ändere bitte dein Passwort und informiere deinen Administrator.</p>"),
         [(C.DeviceRegistered, "en")] = new("New device signed in: {{ device.name }}",

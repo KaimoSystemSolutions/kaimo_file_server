@@ -18,7 +18,9 @@ public sealed record BackupRunSnapshot(
     DateTimeOffset QueuedAt,
     bool IsRunning,
     bool IsCancellationRequested,
-    bool IsRestore = false);
+    bool IsRestore = false,
+    bool IsMaintenance = false,
+    Guid RepositoryId = default);
 
 /// <summary>Queues backup runs and executes them off the UI thread (Web process only).</summary>
 public interface IBackupRunner
@@ -38,6 +40,13 @@ public interface IBackupRunner
     /// </summary>
     Task<Guid> EnqueueRestoreAsync(BackupRestoreRequest request, string title, Guid actorUserId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Queues the maintenance of a repository on the backup lane (never parallel to a backup).
+    /// Returns an id for cancelling; the steps record their own run rows. An already queued or
+    /// running maintenance of the repository is returned instead of starting a second one.
+    /// </summary>
+    Task<Guid> EnqueueMaintenanceAsync(Guid repositoryId, string title, BackupRunTrigger trigger, Guid? actorUserId, CancellationToken ct = default);
+
     bool Cancel(Guid runId);
 }
 
@@ -50,6 +59,7 @@ public sealed class BackupRunner(
     IDbContextFactory<ApplicationDbContext> dbFactory,
     BackupJobExecutor executor,
     BackupRestoreExecutor restoreExecutor,
+    BackupMaintenanceExecutor maintenanceExecutor,
     ResticTargetResolver resolver,
     DemoModeOptions demo,
     TimeProvider time,
@@ -166,6 +176,33 @@ public sealed class BackupRunner(
         return run.Id;
     }
 
+    public async Task<Guid> EnqueueMaintenanceAsync(Guid repositoryId, string title, BackupRunTrigger trigger, Guid? actorUserId, CancellationToken ct = default)
+    {
+        if (demo.ReadOnly)
+            throw new ReadOnlyDemoException();
+        await _recovered.Task.WaitAsync(ct);
+
+        // Not persisted while queued: a restart only loses the queue entry, never a row.
+        var runId = Guid.NewGuid();
+        lock (_gate)
+        {
+            var existing = _runs.Values.FirstOrDefault(r => r.IsMaintenance && r.RepositoryId == repositoryId);
+            if (existing is not null)
+                return existing.RunId;
+            _runs[runId] = new RunState(runId, Guid.Empty, title,
+                CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token), time.GetUtcNow())
+            {
+                IsMaintenance = true,
+                RepositoryId = repositoryId,
+                Trigger = trigger,
+                ActorUserId = actorUserId,
+            };
+        }
+        _queue.Writer.TryWrite(runId);
+        NotifyChanged();
+        return runId;
+    }
+
     public bool Cancel(Guid runId)
     {
         RunState? state;
@@ -257,7 +294,9 @@ public sealed class BackupRunner(
 
             long lastNotify = 0;
             Func<Guid, Action<string?, int>, CancellationToken, Task> execute =
-                state.IsRestore ? restoreExecutor.ExecuteAsync : executor.ExecuteAsync;
+                state.IsRestore ? restoreExecutor.ExecuteAsync
+                : state.IsMaintenance ? (_, report, token) => maintenanceExecutor.ExecuteAsync(state.RepositoryId, state.Trigger, state.ActorUserId, report, token)
+                : executor.ExecuteAsync;
             await execute(runId, (detail, progress) =>
             {
                 lock (_gate)
@@ -335,8 +374,12 @@ public sealed class BackupRunner(
         public bool IsRunning { get; set; }
         public bool CancelRequested { get; set; }
         public bool IsRestore { get; init; }
+        public bool IsMaintenance { get; init; }
+        public Guid RepositoryId { get; init; }
+        public BackupRunTrigger Trigger { get; init; }
+        public Guid? ActorUserId { get; init; }
 
         public BackupRunSnapshot ToSnapshot()
-            => new(RunId, JobId, Title, Detail, Progress, QueuedAt, IsRunning, CancelRequested, IsRestore);
+            => new(RunId, JobId, Title, Detail, Progress, QueuedAt, IsRunning, CancelRequested, IsRestore, IsMaintenance, RepositoryId);
     }
 }

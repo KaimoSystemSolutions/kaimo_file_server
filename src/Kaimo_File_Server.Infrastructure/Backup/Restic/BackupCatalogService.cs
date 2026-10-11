@@ -49,7 +49,11 @@ public sealed record BackupRepositoryDraft(
     ResticBackendSecrets Secrets,
     bool IsAppendOnly,
     int MinFreeSpaceGb,
-    IReadOnlyList<Guid> DepartmentIds);
+    IReadOnlyList<Guid> DepartmentIds,
+    BackupSchedule? MaintenanceSchedule = null,
+    bool ReadDataMonthly = true,
+    int TestRestoreSampleSize = 20,
+    Guid? MirrorTargetId = null);
 
 /// <summary>Input of the job form.</summary>
 public sealed record BackupJobDraft(
@@ -60,7 +64,9 @@ public sealed record BackupJobDraft(
     bool IncludeRecycleBin,
     IReadOnlyList<Guid> ShareIds,
     IReadOnlyList<TimeOnly> Times,
-    IReadOnlyList<DayOfWeek> Days);
+    IReadOnlyList<DayOfWeek> Days,
+    BackupRetention? Retention = null,
+    int AlertAfterDays = 3);
 
 /// <summary>Result of probing a repository location before creating it.</summary>
 public enum BackupRepositoryProbe
@@ -103,6 +109,8 @@ public sealed class BackupCatalogService(
     ILogger<BackupCatalogService> logger)
 {
     public const int MaximumScheduleTimes = 24;
+    public const int MaximumTestRestoreSample = 1000;
+    public const int MaximumAlertAfterDays = 365;
 
     // ══════════════════════════════════════════
     //  Access
@@ -212,6 +220,8 @@ public sealed class BackupCatalogService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         if (await db.BackupRepositories.AnyAsync(r => r.Name == repository.Name, ct))
             throw new ResticException("name_taken", "A repository with this name already exists.");
+        ApplyMaintenance(repository, draft, time.GetUtcNow().UtcDateTime);
+        await ValidateMirrorAsync(db, repository, draft.Secrets, ct);
 
         var run = new BackupRun
         {
@@ -290,6 +300,8 @@ public sealed class BackupCatalogService(
         repository.IsAppendOnly = draft.IsAppendOnly;
         repository.MinFreeSpaceGb = Math.Clamp(draft.MinFreeSpaceGb, 0, 100_000);
         repository.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
+        ApplyMaintenance(repository, draft, repository.UpdatedAtUtc);
+        await ValidateMirrorAsync(db, repository, secrets, ct);
 
         var existing = await db.BackupRepositoryDepartments.Where(x => x.RepositoryId == repositoryId).ToListAsync(ct);
         var wanted = draft.DepartmentIds.ToHashSet();
@@ -298,6 +310,103 @@ public sealed class BackupCatalogService(
             db.BackupRepositoryDepartments.Add(new BackupRepositoryDepartment { RepositoryId = repositoryId, DepartmentId = id });
 
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Maintenance settings of the form. A changed schedule starts counting from now, so a
+    /// slot that already passed today does not trigger an immediate catch-up run.
+    /// </summary>
+    private static void ApplyMaintenance(BackupRepository repository, BackupRepositoryDraft draft, DateTime nowUtc)
+    {
+        var schedule = NormalizeSchedule(draft.MaintenanceSchedule?.Times ?? [], draft.MaintenanceSchedule?.Days ?? []);
+        if (BackupSchedule.Serialize(schedule) != BackupSchedule.Serialize(repository.MaintenanceSchedule) || repository.LastMaintenanceSlotUtc is null)
+            repository.LastMaintenanceSlotUtc = nowUtc;
+        repository.MaintenanceSchedule = schedule;
+        repository.ReadDataMonthly = draft.ReadDataMonthly;
+        repository.TestRestoreSampleSize = Math.Clamp(draft.TestRestoreSampleSize, 0, MaximumTestRestoreSample);
+        repository.MirrorTargetId = draft.MirrorTargetId is { } id && id != Guid.Empty ? id : null;
+    }
+
+    /// <summary>
+    /// The mirror must exist, must not lead back to this repository (a copy cycle) and must be
+    /// servable by one <c>restic copy</c> call (see <see cref="ResticBackend.ValidateMirror"/>).
+    /// </summary>
+    private async Task ValidateMirrorAsync(ApplicationDbContext db, BackupRepository repository, ResticBackendSecrets secrets, CancellationToken ct)
+    {
+        if (repository.MirrorTargetId is not { } mirrorId)
+            return;
+        var all = await db.BackupRepositories.AsNoTracking().ToDictionaryAsync(r => r.Id, ct);
+        if (!all.TryGetValue(mirrorId, out var mirror))
+            throw new ResticException("repository_missing", "The mirror repository no longer exists.");
+        if (LeadsBackTo(all, mirrorId, repository.Id))
+            throw new ResticException("mirror_invalid", "The mirror would copy back into this repository.");
+        ResticBackend.ValidateMirror(repository, secrets, mirror, resolver.ReadSecrets(mirror));
+    }
+
+    /// <summary>True when following the mirror chain from <paramref name="startId"/> reaches <paramref name="repositoryId"/> (a copy cycle).</summary>
+    private static bool LeadsBackTo(IReadOnlyDictionary<Guid, BackupRepository> all, Guid startId, Guid repositoryId)
+    {
+        var seen = new HashSet<Guid>();
+        for (Guid? next = startId; next is { } id && seen.Add(id); next = all.GetValueOrDefault(id)?.MirrorTargetId)
+        {
+            if (id == repositoryId)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Repositories the repository being edited (<paramref name="repositoryId"/>, null while
+    /// creating) can mirror into with the form's current settings: active, no copy cycle, and
+    /// servable by one <c>restic copy</c> call. Empty secret fields mean "keep the stored ones".
+    /// The current mirror stays listed even if it is no longer active, so the form can show it.
+    /// </summary>
+    public async Task<IReadOnlyList<BackupRepositoryChoice>> ListMirrorCandidatesAsync(
+        UserContext actor, Guid? repositoryId, BackupRepositoryDraft draft, CancellationToken ct = default)
+    {
+        await RequireRepositoriesAsync(actor);
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var all = await db.BackupRepositories.AsNoTracking().ToDictionaryAsync(r => r.Id, ct);
+        var stored = repositoryId is { } id ? all.GetValueOrDefault(id) : null;
+        var source = NewRepository(stored?.Id ?? Guid.NewGuid(), draft);
+        var secrets = stored is null ? draft.Secrets : MergeSecrets(resolver.ReadSecrets(stored), draft.Secrets);
+
+        bool Compatible(BackupRepository mirror)
+        {
+            try
+            {
+                ResticBackend.ValidateMirror(source, secrets, mirror, resolver.ReadSecrets(mirror));
+                return true;
+            }
+            catch (ResticException)
+            {
+                return false;
+            }
+        }
+
+        return all.Values
+            .Where(m => m.Id != source.Id
+                        && (m.State == BackupRepositoryState.Active || m.Id == stored?.MirrorTargetId)
+                        && !LeadsBackTo(all, m.Id, source.Id)
+                        && Compatible(m))
+            .OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase)
+            .Select(m => new BackupRepositoryChoice(m.Id, m.Name, m.Backend))
+            .ToList();
+    }
+
+    /// <summary>Queues the maintenance of a repository now (Global).</summary>
+    public async Task<Guid> RunMaintenanceNowAsync(UserContext actor, Guid repositoryId)
+    {
+        await RequireRepositoriesAsync(actor);
+        RequireWritable();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var repository = await db.BackupRepositories.AsNoTracking().FirstOrDefaultAsync(r => r.Id == repositoryId)
+                         ?? throw new ResticException("repository_missing", "The repository no longer exists.");
+        if (repository.State != BackupRepositoryState.Active)
+            throw new ResticException("repository_not_active", "The repository is not active.");
+        var title = string.Format(CultureInfo.CurrentCulture,
+            Resources.ResourceManager.GetString("Web_Backup_Maintenance_JobTitle") ?? "Maintenance {0}", repository.Name);
+        return await runner.EnqueueMaintenanceAsync(repositoryId, title, BackupRunTrigger.Manual, actor.User.Id);
     }
 
     /// <summary>Disables or re-enables a repository. Re-enabling requires a confirmed recovery kit.</summary>
@@ -543,6 +652,11 @@ public sealed class BackupCatalogService(
             throw new ResticException("sources_required", "Select at least one share.");
         if (draft.Times.Count > MaximumScheduleTimes)
             throw new ResticException("schedule_invalid", "Too many start times.");
+        var retention = draft.Retention ?? new BackupRetention();
+        if (new[] { retention.KeepLast, retention.KeepDaily, retention.KeepWeekly, retention.KeepMonthly, retention.KeepYearly }
+                .Any(v => v is < 0 or > BackupRetention.MaximumValue)
+            || draft.AlertAfterDays is < 0 or > MaximumAlertAfterDays)
+            throw new ResticException("retention_invalid", "The retention or alert values are out of range.");
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var shares = await db.ShareDefinitions.AsNoTracking().Where(s => shareIds.Contains(s.Id)).ToListAsync();
@@ -581,13 +695,7 @@ public sealed class BackupCatalogService(
         if (await db.BackupJobs.AnyAsync(j => j.Id != job.Id && j.Name == draft.Name.Trim()))
             throw new ResticException("name_taken", "A backup job with this name already exists.");
 
-        // Without start times or without weekdays the job runs manually only; store it as fully empty.
-        var manualOnly = draft.Times.Count == 0 || draft.Days.Count == 0;
-        var schedule = new BackupSchedule
-        {
-            Times = manualOnly ? [] : draft.Times.Distinct().Order().ToList(),
-            Days = manualOnly ? [] : draft.Days.Distinct().Order().ToList(),
-        };
+        var schedule = NormalizeSchedule(draft.Times, draft.Days);
         // A changed schedule starts counting from now: a newly added time that already
         // passed today must not trigger an immediate "catch-up" run.
         if (BackupSchedule.Serialize(schedule) != BackupSchedule.Serialize(job.Schedule) || !job.Enabled && draft.Enabled)
@@ -599,6 +707,15 @@ public sealed class BackupCatalogService(
         job.IncludeRecycleBin = draft.IncludeRecycleBin;
         job.ContentLevel = BackupContentLevel.Files;
         job.Schedule = schedule;
+        job.Retention = new BackupRetention
+        {
+            KeepLast = retention.KeepLast,
+            KeepDaily = retention.KeepDaily,
+            KeepWeekly = retention.KeepWeekly,
+            KeepMonthly = retention.KeepMonthly,
+            KeepYearly = retention.KeepYearly,
+        };
+        job.AlertAfterDays = draft.AlertAfterDays;
         job.UpdatedAtUtc = now;
 
         var removed = job.Sources.Where(s => s.ShareId is null || !shareIds.Contains(s.ShareId.Value)).ToList();
@@ -610,6 +727,19 @@ public sealed class BackupCatalogService(
 
         await db.SaveChangesAsync();
         return job;
+    }
+
+    /// <summary>Without start times or without weekdays a schedule means "manual only"; it is stored fully empty.</summary>
+    private static BackupSchedule NormalizeSchedule(IReadOnlyCollection<TimeOnly> times, IReadOnlyCollection<DayOfWeek> days)
+    {
+        if (times.Count > MaximumScheduleTimes)
+            throw new ResticException("schedule_invalid", "Too many start times.");
+        var manualOnly = times.Count == 0 || days.Count == 0;
+        return new BackupSchedule
+        {
+            Times = manualOnly ? [] : times.Distinct().Order().ToList(),
+            Days = manualOnly ? [] : days.Distinct().Order().ToList(),
+        };
     }
 
     public async Task DeleteJobAsync(UserContext actor, Guid jobId)
@@ -650,6 +780,8 @@ public sealed class BackupCatalogService(
         var run = runner.Runs.FirstOrDefault(r => r.RunId == runId);
         if (run is null)
             return false;
+        if (run.IsMaintenance)
+            return access.CanManageRepositories && runner.Cancel(runId);
         await using var db = await dbFactory.CreateDbContextAsync();
         if (run.IsRestore)
         {
@@ -964,6 +1096,7 @@ public sealed class BackupCatalogService(
         SettingsJson = draft.Settings.Serialize(),
         IsAppendOnly = draft.IsAppendOnly,
         MinFreeSpaceGb = Math.Clamp(draft.MinFreeSpaceGb, 0, 100_000),
+        MirrorTargetId = draft.MirrorTargetId is { } mirrorId && mirrorId != Guid.Empty ? mirrorId : null,
     };
 
     private static void ValidateName(string? name)

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Kaimo_File_Server.Core.Domain.Backup;
 using Kaimo_File_Server.Web.Components.Shared;
 
@@ -38,7 +39,7 @@ public static class BackupUi
     {
         BackupRepositoryState.Disabled => StatusTone.Neutral,
         BackupRepositoryState.PendingRecoveryKit => StatusTone.Warning,
-        _ when !string.IsNullOrEmpty(repo.LastErrorCode) => StatusTone.Negative,
+        _ when !string.IsNullOrEmpty(repo.LastErrorCode) || repo.LastCheckOk == false => StatusTone.Negative,
         _ => StatusTone.Positive,
     };
 
@@ -47,6 +48,45 @@ public static class BackupUi
         BackupRepositoryState.Disabled => R("Web_Backup_Disabled"),
         BackupRepositoryState.PendingRecoveryKit => R("Web_Backup_Repo_State_PendingKit"),
         _ when !string.IsNullOrEmpty(repo.LastErrorCode) => R("Web_Backup_Repo_State_Error"),
+        _ when repo.LastCheckOk == false => R("Web_Backup_Repo_State_CheckFailed"),
         _ => R("Web_Backup_Repo_State_Active"),
     };
+
+    // ── schedules ──
+
+    /// <summary>Monday first, as on the server side weekdays are plain DayOfWeek values.</summary>
+    public static readonly DayOfWeek[] WeekDays =
+        [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
+
+    public static string DayName(DayOfWeek day)
+        => CultureInfo.CurrentUICulture.DateTimeFormat.GetAbbreviatedDayName(day);
+
+    public static string ScheduleText(BackupSchedule schedule)
+    {
+        if (schedule.IsEmpty)
+            return R("Web_Backup_Schedule_ManualOnly");
+        var days = schedule.Days.Count == 7
+            ? R("Web_Backup_Schedule_Daily")
+            : string.Join(", ", WeekDays.Where(schedule.Days.Contains).Select(DayName));
+        return days + " · " + string.Join(", ", schedule.Times.Select(t => t.ToString("HH:mm", CultureInfo.InvariantCulture)));
+    }
+
+    /// <summary>"7 daily · 4 weekly · 12 monthly", or "keep all".</summary>
+    public static string RetentionText(BackupRetention retention)
+    {
+        if (retention.IsEmpty)
+            return R("Web_Backup_Retention_KeepAll");
+        var parts = new List<string>();
+        void Add(int value, string key)
+        {
+            if (value > 0)
+                parts.Add(string.Format(CultureInfo.CurrentCulture, R(key), value));
+        }
+        Add(retention.KeepLast, "Web_Backup_Retention_LastValue");
+        Add(retention.KeepDaily, "Web_Backup_Retention_DailyValue");
+        Add(retention.KeepWeekly, "Web_Backup_Retention_WeeklyValue");
+        Add(retention.KeepMonthly, "Web_Backup_Retention_MonthlyValue");
+        Add(retention.KeepYearly, "Web_Backup_Retention_YearlyValue");
+        return string.Join(" · ", parts);
+    }
 }

@@ -78,6 +78,7 @@
                 </span>
                 <span class="backup-overview-meta">
                     <span>@R("Web_Backup_LastReachable"): @DateFmt.FormatDateTime(repo.LastReachableAtUtc, R("Web_Backup_Never"))</span>
+                    <span>@R("Web_Backup_Maintenance_LastCheck"): @DateFmt.FormatDateTime(repo.LastCheckAtUtc, R("Web_Backup_Never"))</span>
                 </span>
                 <StatusBadge Tone="@BackupUi.RepositoryTone(repo)" Label="@BackupUi.RepositoryStateLabel(repo)" />
             </button>

@@ -6581,4 +6581,190 @@ RESTORE WITH THE RESTIC COMMAND LINE (works without the Kaimo server)
   <data name="Web_Backup_Error_request_invalid" xml:space="preserve">
     <value>The restore request is invalid.</value>
   </data>
+  <data name="Notification_Event_backup_restic_stale" xml:space="preserve">
+    <value>File backup overdue</value>
+  </data>
+  <data name="Notification_Event_backup_restic_stale_Desc" xml:space="preserve">
+    <value>A scheduled backup job has not completed a successful backup for longer than its alert threshold.</value>
+  </data>
+  <data name="Notification_Event_backup_restic_check_failed" xml:space="preserve">
+    <value>Backup repository damaged</value>
+  </data>
+  <data name="Notification_Event_backup_restic_check_failed_Desc" xml:space="preserve">
+    <value>The integrity check of a backup repository found errors.</value>
+  </data>
+  <data name="Notification_Event_backup_restic_test_restore_mismatch" xml:space="preserve">
+    <value>Test restore does not match</value>
+  </data>
+  <data name="Notification_Event_backup_restic_test_restore_mismatch_Desc" xml:space="preserve">
+    <value>Files restored as a test differ from their unchanged originals.</value>
+  </data>
+  <data name="Notification_Event_backup_restic_repo_unreachable" xml:space="preserve">
+    <value>Backup repository unreachable</value>
+  </data>
+  <data name="Notification_Event_backup_restic_repo_unreachable_Desc" xml:space="preserve">
+    <value>A backup repository became unreachable or rejects the access.</value>
+  </data>
+  <data name="Notification_Event_backup_restic_maintenance_failed" xml:space="preserve">
+    <value>Backup maintenance failed</value>
+  </data>
+  <data name="Notification_Event_backup_restic_maintenance_failed_Desc" xml:space="preserve">
+    <value>A maintenance step of a backup repository (retention, clean-up, mirror, test restore) failed.</value>
+  </data>
+  <data name="Web_Backup_Maintenance" xml:space="preserve">
+    <value>Maintenance</value>
+  </data>
+  <data name="Web_Backup_Maintenance_JobTitle" xml:space="preserve">
+    <value>Maintenance {0}</value>
+  </data>
+  <data name="Web_Backup_Maintenance_Help" xml:space="preserve">
+    <value>At these times unused data is cleaned up, the repository is checked, a sample of files is restored as a test and new backup points are copied to the mirror. Job retentions are applied once more (also to mirrored backup points).</value>
+  </data>
+  <data name="Web_Backup_Maintenance_ReadData" xml:space="preserve">
+    <value>Read data monthly</value>
+  </data>
+  <data name="Web_Backup_Maintenance_ReadDataHelp" xml:space="preserve">
+    <value>The first check of each month also reads and verifies one twelfth of the stored data, so all data is read once a year. This causes download traffic on remote repositories.</value>
+  </data>
+  <data name="Web_Backup_Maintenance_SampleSize" xml:space="preserve">
+    <value>Test restore (files)</value>
+  </data>
+  <data name="Web_Backup_Maintenance_SampleSizeHelp" xml:space="preserve">
+    <value>Number of randomly chosen files (up to 256 MB each) restored from the newest backup point of every share and compared with the live file. Files changed or deleted since the backup are skipped. 0 turns the test restore off.</value>
+  </data>
+  <data name="Web_Backup_Maintenance_Mirror" xml:space="preserve">
+    <value>Mirror</value>
+  </data>
+  <data name="Web_Backup_Maintenance_MirrorHelp" xml:space="preserve">
+    <value>After a successful check, new backup points are copied into this second repository, ideally on another medium or at another location (3-2-1 rule).</value>
+  </data>
+  <data name="Web_Backup_Maintenance_NoMirror" xml:space="preserve">
+    <value>No mirror</value>
+  </data>
+  <data name="Web_Backup_Maintenance_AppendOnlyHint" xml:space="preserve">
+    <value>Append-only: retention and clean-up are skipped; old backup points must be removed on the server itself.</value>
+  </data>
+  <data name="Web_Backup_Maintenance_Next" xml:space="preserve">
+    <value>Next maintenance</value>
+  </data>
+  <data name="Web_Backup_Maintenance_LastCheck" xml:space="preserve">
+    <value>Last check</value>
+  </data>
+  <data name="Web_Backup_Maintenance_CheckOk" xml:space="preserve">
+    <value>No errors</value>
+  </data>
+  <data name="Web_Backup_Maintenance_CheckFailed" xml:space="preserve">
+    <value>Errors found</value>
+  </data>
+  <data name="Web_Backup_Maintenance_RunNow" xml:space="preserve">
+    <value>Run maintenance now</value>
+  </data>
+  <data name="Web_Backup_Maintenance_Started" xml:space="preserve">
+    <value>Maintenance started. The steps appear in the activity log.</value>
+  </data>
+  <data name="Web_Backup_Repo_State_CheckFailed" xml:space="preserve">
+    <value>Check failed</value>
+  </data>
+  <data name="Web_Backup_Retention" xml:space="preserve">
+    <value>Retention</value>
+  </data>
+  <data name="Web_Backup_Retention_Help" xml:space="preserve">
+    <value>How many backup points of each share are kept. Older ones are removed after every successful backup; the freed storage is reclaimed during the maintenance of the repository. 0 disables a rule.</value>
+  </data>
+  <data name="Web_Backup_Retention_Last" xml:space="preserve">
+    <value>Last</value>
+  </data>
+  <data name="Web_Backup_Retention_Daily" xml:space="preserve">
+    <value>Daily</value>
+  </data>
+  <data name="Web_Backup_Retention_Weekly" xml:space="preserve">
+    <value>Weekly</value>
+  </data>
+  <data name="Web_Backup_Retention_Monthly" xml:space="preserve">
+    <value>Monthly</value>
+  </data>
+  <data name="Web_Backup_Retention_Yearly" xml:space="preserve">
+    <value>Yearly</value>
+  </data>
+  <data name="Web_Backup_Retention_KeepAll" xml:space="preserve">
+    <value>Keep all</value>
+  </data>
+  <data name="Web_Backup_Retention_KeepAllHint" xml:space="preserve">
+    <value>No rule set: every backup point is kept and the repository keeps growing.</value>
+  </data>
+  <data name="Web_Backup_Retention_LastValue" xml:space="preserve">
+    <value>{0} last</value>
+  </data>
+  <data name="Web_Backup_Retention_DailyValue" xml:space="preserve">
+    <value>{0} daily</value>
+  </data>
+  <data name="Web_Backup_Retention_WeeklyValue" xml:space="preserve">
+    <value>{0} weekly</value>
+  </data>
+  <data name="Web_Backup_Retention_MonthlyValue" xml:space="preserve">
+    <value>{0} monthly</value>
+  </data>
+  <data name="Web_Backup_Retention_YearlyValue" xml:space="preserve">
+    <value>{0} yearly</value>
+  </data>
+  <data name="Web_Backup_AlertAfterDays" xml:space="preserve">
+    <value>Alert after (days)</value>
+  </data>
+  <data name="Web_Backup_AlertAfterDaysHelp" xml:space="preserve">
+    <value>Sends a notification when a scheduled job had no successful backup for this many days, counted from the last success or the last change to the job. Never before the job missed one scheduled run (a weekly job: after 8 days at the earliest). 0 turns the alert off.</value>
+  </data>
+  <data name="Web_Backup_AlertAfterDaysValue" xml:space="preserve">
+    <value>{0} days without success</value>
+  </data>
+  <data name="Web_Backup_AlertOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="Web_Backup_Activity_Forgotten" xml:space="preserve">
+    <value>Removed backup points</value>
+  </data>
+  <data name="Web_Backup_Activity_ForgottenValue" xml:space="preserve">
+    <value>{0} (jobs with retention: {1})</value>
+  </data>
+  <data name="Web_Backup_Activity_ReadData" xml:space="preserve">
+    <value>Data read</value>
+  </data>
+  <data name="Web_Backup_Activity_TestRestore" xml:space="preserve">
+    <value>Compared files</value>
+  </data>
+  <data name="Web_Backup_Activity_TestRestoreValue" xml:space="preserve">
+    <value>{0} identical, {1} changed or deleted since the backup (skipped), {2} different</value>
+  </data>
+  <data name="Web_Backup_Activity_CopiedValue" xml:space="preserve">
+    <value>{0} new backup points</value>
+  </data>
+  <data name="Web_Backup_Activity_CheckErrors" xml:space="preserve">
+    <value>Show {0} errors</value>
+  </data>
+  <data name="Web_Backup_Activity_Mismatches" xml:space="preserve">
+    <value>{0} different files</value>
+  </data>
+  <data name="Web_Backup_Error_retention_empty" xml:space="preserve">
+    <value>The retention has no rule.</value>
+  </data>
+  <data name="Web_Backup_Error_retention_invalid" xml:space="preserve">
+    <value>The retention or alert values are out of range.</value>
+  </data>
+  <data name="Web_Backup_Error_mirror_conflict" xml:space="preserve">
+    <value>Both repositories use the same storage type with different credentials or options; restic cannot copy between them in one step.</value>
+  </data>
+  <data name="Web_Backup_Error_mirror_invalid" xml:space="preserve">
+    <value>This mirror would copy back into the repository itself.</value>
+  </data>
+  <data name="Web_Backup_Error_mirror_not_active" xml:space="preserve">
+    <value>The mirror repository is not active.</value>
+  </data>
+  <data name="Web_Backup_Error_check_failed" xml:space="preserve">
+    <value>The integrity check found errors.</value>
+  </data>
+  <data name="Web_Backup_Error_test_restore_mismatch" xml:space="preserve">
+    <value>Restored files differ from the originals.</value>
+  </data>
+  <data name="Web_Backup_Maintenance_MirrorRule" xml:space="preserve">
+    <value>Only repositories that can be copied into in one step are offered: another storage type, a local folder, or the same storage type with the same access (SFTP: the same SSH connection; S3 and REST: the same credentials).</value>
+  </data>
 </root>

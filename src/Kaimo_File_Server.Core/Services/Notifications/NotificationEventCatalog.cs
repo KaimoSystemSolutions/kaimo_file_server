@@ -62,6 +62,11 @@ public static class NotificationEventCatalog
     public const string BackupSucceeded = "backup.succeeded";
     public const string FileBackupFailed = "backup.restic.failed";
     public const string FileBackupWarnings = "backup.restic.warnings";
+    public const string FileBackupStale = "backup.restic.stale";
+    public const string FileBackupCheckFailed = "backup.restic.check_failed";
+    public const string FileBackupTestRestoreMismatch = "backup.restic.test_restore_mismatch";
+    public const string FileBackupRepositoryUnreachable = "backup.restic.repo_unreachable";
+    public const string FileBackupMaintenanceFailed = "backup.restic.maintenance_failed";
     public const string DeviceRegistered = "device.registered";
     public const string CertificateRenewed = "certificate.renewed";
     public const string CertificateRenewalFailed = "certificate.renewal_failed";
@@ -124,6 +129,26 @@ public static class NotificationEventCatalog
         new(FileBackupWarnings, "filebackup", [NotificationContextRoles.JobCreator],
             [P("job.name", "Projekte nachts"), P("repository.name", "NAS Keller"), P("warningCount", "3")],
             [Role(NotificationContextRoles.JobCreator), Holders("ManageBackupJobs")],
+            DefaultThrottleMinutes: 1440),
+        new(FileBackupStale, "filebackup", [NotificationContextRoles.JobCreator],
+            [P("job.name", "Projekte nachts"), P("repository.name", "NAS Keller"), P("lastSuccess", "2026-09-25 02:04"), P("days", "3")],
+            [Role(NotificationContextRoles.JobCreator), Holders("ManageBackupJobs")],
+            DefaultThrottleMinutes: 1440),
+        new(FileBackupCheckFailed, "filebackup", [],
+            [P("repository.name", "NAS Keller"), P("errorCount", "2")],
+            [Holders("ManageBackupRepositories")],
+            DefaultThrottleMinutes: 1440),
+        new(FileBackupTestRestoreMismatch, "filebackup", [],
+            [P("repository.name", "NAS Keller"), P("mismatchCount", "1"), P("files", "/data/storage/pool01/projekte/plan.xlsx")],
+            [Holders("ManageBackupRepositories")],
+            DefaultThrottleMinutes: 1440),
+        new(FileBackupRepositoryUnreachable, "filebackup", [],
+            [P("repository.name", "NAS Keller"), P("errorCode", "repo_unreachable")],
+            [Holders("ManageBackupRepositories")],
+            DefaultThrottleMinutes: 360),
+        new(FileBackupMaintenanceFailed, "filebackup", [],
+            [P("repository.name", "NAS Keller"), P("step", "Prune"), P("errorCode", "lock_failed")],
+            [Holders("ManageBackupRepositories")],
             DefaultThrottleMinutes: 1440),
         new(DeviceRegistered, "devices", [NotificationContextRoles.Affected],
             [P("device.name", "Erikas iPhone"), P("device.platform", "ios"), P("user.username", "erika")],

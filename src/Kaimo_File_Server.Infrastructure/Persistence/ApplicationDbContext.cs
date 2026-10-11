@@ -663,6 +663,14 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.EncryptedPassword).HasColumnType("text");
                 entity.Property(e => e.ResticRepositoryId).HasMaxLength(128);
                 entity.Property(e => e.LastErrorCode).HasMaxLength(200);
+                entity.Property(e => e.MaintenanceSchedule)
+                    .HasConversion(
+                        value => BackupSchedule.Serialize(value),
+                        value => BackupSchedule.Deserialize(value))
+                    .HasColumnType("text");
+                // A mirror target that is removed simply stops being mirrored to.
+                entity.HasOne<BackupRepository>().WithMany().HasForeignKey(e => e.MirrorTargetId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<BackupRepositoryDepartment>(entity =>
@@ -688,6 +696,11 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                     .HasConversion(
                         value => BackupSchedule.Serialize(value),
                         value => BackupSchedule.Deserialize(value))
+                    .HasColumnType("text");
+                entity.Property(e => e.Retention)
+                    .HasConversion(
+                        value => BackupRetention.Serialize(value),
+                        value => BackupRetention.Deserialize(value))
                     .HasColumnType("text");
                 entity.HasIndex(e => e.RepositoryId);
                 // A repository with jobs cannot be deleted; the jobs must go first.

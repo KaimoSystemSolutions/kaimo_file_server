@@ -76,6 +76,10 @@ builders in `NotificationEvents` keep every call site to one line.
 | `sync.failed` | `CloudSyncExecutionService` | syncCreator | Sync creator + sync administrators, 6 h throttle |
 | `sync.needs_reauthorization` | `CloudSyncExecutionService` | syncCreator | Sync creator + sync administrators, 24 h throttle |
 | `backup.failed` / `backup.succeeded` | `DatabaseBackupService` (Host and Web) | – | `ManageBackups` holders |
+| `backup.restic.failed` / `backup.restic.warnings` | `BackupJobExecutor` (file backup run) | jobCreator | Job creator + `ManageBackupJobs` holders, 6 h / 24 h throttle |
+| `backup.restic.stale` | `BackupSchedulerService` (scheduled job without success for `AlertAfterDays`) | jobCreator | Job creator + `ManageBackupJobs` holders, 24 h throttle |
+| `backup.restic.repo_unreachable` | `BackupJobExecutor` / `BackupMaintenanceExecutor` (only when a repository turns unreachable) | – | `ManageBackupRepositories` holders, 6 h throttle |
+| `backup.restic.check_failed` / `backup.restic.test_restore_mismatch` / `backup.restic.maintenance_failed` | `BackupMaintenanceExecutor` | – | `ManageBackupRepositories` holders, 24 h throttle |
 | `device.registered` | `AuthApiController` (new device only) | affected | Device owner |
 | `certificate.renewed` / `certificate.renewal_failed` | `CertificateRenewalService` | – | `ManageCertificates` holders |
 

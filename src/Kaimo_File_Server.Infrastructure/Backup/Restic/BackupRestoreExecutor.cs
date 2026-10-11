@@ -392,7 +392,7 @@ public sealed class BackupRestoreExecutor(
         return " (" + string.Format(CultureInfo.InvariantCulture, template, local.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)) + ")";
     }
 
-    private static void EnsureFreeSpace(string path, long required)
+    internal static void EnsureFreeSpace(string path, long required)
     {
         long free;
         try { free = new DriveInfo(path).AvailableFreeSpace; }
@@ -511,7 +511,7 @@ public sealed class BackupRestoreExecutor(
         }
     }
 
-    private static void CreatePrivateDirectory(string path)
+    internal static void CreatePrivateDirectory(string path)
     {
         if (OperatingSystem.IsWindows())
             Directory.CreateDirectory(path);
@@ -519,7 +519,7 @@ public sealed class BackupRestoreExecutor(
             Directory.CreateDirectory(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
     }
 
-    private static void TryDeleteDirectory(string path)
+    internal static void TryDeleteDirectory(string path)
     {
         try { if (Directory.Exists(path)) Directory.Delete(path, recursive: true); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }

@@ -99,6 +99,37 @@
     gap: var(--space-1);
 }
 
+/* Retention: five small number fields side by side, wrapping on narrow screens. */
+.backup-page ::deep .backup-retention {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+}
+
+    .backup-page ::deep .backup-retention > label {
+        display: grid;
+        gap: var(--space-1);
+        color: var(--text-secondary);
+        font-size: 12px;
+    }
+
+.backup-page ::deep .backup-alert-days {
+    max-width: 240px;
+    margin-top: var(--space-3);
+}
+
+.backup-page ::deep .backup-maintenance-form {
+    margin-top: var(--space-3);
+}
+
+.backup-page ::deep .backup-inline-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
 .backup-page ::deep .backup-progress {
     display: grid;
     gap: var(--space-1);

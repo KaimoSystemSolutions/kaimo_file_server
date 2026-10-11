@@ -1,0 +1,65 @@
+@using System.Globalization
+@using Kaimo_File_Server.Web.Components.ViewModels.Backup
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+
+@* Fixed start times + weekday chips; shared by the job form and the repository maintenance. *@
+
+<div class="backup-times">
+    @for (var i = 0; i < Times.Count; i++)
+    {
+        var index = i;
+        <span class="backup-time">
+            <input class="edit-input" type="time" value="@Times[index].ToString("HH:mm", CultureInfo.InvariantCulture)"
+                   aria-label="@R("Web_Backup_Schedule_Time")" @onchange="e => SetTime(index, e.Value)" />
+            <button type="button" class="btn-icon btn-icon--small btn-icon--danger" title="@R("Web_Backup_Schedule_RemoveTime")"
+                    aria-label="@R("Web_Backup_Schedule_RemoveTime")" @onclick="() => Times.RemoveAt(index)">
+                @Assets.SVG("close.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2))
+            </button>
+        </span>
+    }
+    <button type="button" class="btn-secondary btn-secondary--sm" disabled="@(Times.Count >= 24)" @onclick="AddTime">
+        @Assets.SVG("plus.svg", new SvgOptions(Width: 12, Height: 12))
+        <span>@R("Web_Backup_Schedule_AddTime")</span>
+    </button>
+</div>
+<div class="backup-days" role="group" aria-label="@R("Web_Backup_Schedule_Days")">
+    @foreach (var day in BackupUi.WeekDays)
+    {
+        var on = Days.Contains(day);
+        <button type="button" class="preset-chip @(on ? "preset-chip--active" : "")" aria-pressed="@(on ? "true" : "false")"
+                @onclick="() => ToggleDay(day)">@BackupUi.DayName(day)</button>
+    }
+</div>
+@if (Times.Count == 0 || Days.Count == 0)
+{
+    <p class="form-hint">@R("Web_Backup_Schedule_ManualOnly")</p>
+}
+
+@code {
+    /// <summary>Edited in place.</summary>
+    [Parameter, EditorRequired] public List<TimeOnly> Times { get; set; } = [];
+
+    /// <summary>Edited in place.</summary>
+    [Parameter, EditorRequired] public HashSet<DayOfWeek> Days { get; set; } = [];
+
+    private void AddTime()
+    {
+        var last = Times.Count > 0 ? Times[^1] : new TimeOnly(1, 0);
+        Times.Add(last.AddHours(1));
+    }
+
+    private void SetTime(int index, object? value)
+    {
+        if (TimeOnly.TryParse(value?.ToString(), CultureInfo.InvariantCulture, out var time) && index < Times.Count)
+            Times[index] = time;
+    }
+
+    private void ToggleDay(DayOfWeek day)
+    {
+        if (!Days.Remove(day))
+            Days.Add(day);
+    }
+
+    private static string R(string key) => BackupViewModel.R(key);
+}

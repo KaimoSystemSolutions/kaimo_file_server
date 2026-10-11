@@ -81,6 +81,31 @@ public static class NotificationEvents
             [("job.name", jobName), ("repository.name", repositoryName), ("warningCount", warningCount.ToString(System.Globalization.CultureInfo.InvariantCulture))],
             "filebackup-warnings:" + jobId.ToString("N"));
 
+    public static NotificationEvent FileBackupStale(Guid jobId, string jobName, string repositoryName, Guid? creatorId, string lastSuccess, int days)
+        => Build(C.FileBackupStale, null, Roles((R.JobCreator, creatorId)),
+            [("job.name", jobName), ("repository.name", repositoryName), ("lastSuccess", lastSuccess), ("days", days.ToString(System.Globalization.CultureInfo.InvariantCulture))],
+            "filebackup-stale:" + jobId.ToString("N"));
+
+    public static NotificationEvent FileBackupCheckFailed(Guid repositoryId, string repositoryName, int errorCount)
+        => Build(C.FileBackupCheckFailed, null, Roles(),
+            [("repository.name", repositoryName), ("errorCount", errorCount.ToString(System.Globalization.CultureInfo.InvariantCulture))],
+            "filebackup-check:" + repositoryId.ToString("N"));
+
+    public static NotificationEvent FileBackupTestRestoreMismatch(Guid repositoryId, string repositoryName, IReadOnlyList<string> files)
+        => Build(C.FileBackupTestRestoreMismatch, null, Roles(),
+            [("repository.name", repositoryName), ("mismatchCount", files.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)), ("files", Truncate(string.Join(", ", files), 1000))],
+            "filebackup-testrestore:" + repositoryId.ToString("N"));
+
+    public static NotificationEvent FileBackupRepositoryUnreachable(Guid repositoryId, string repositoryName, string errorCode)
+        => Build(C.FileBackupRepositoryUnreachable, null, Roles(),
+            [("repository.name", repositoryName), ("errorCode", errorCode)],
+            "filebackup-unreachable:" + repositoryId.ToString("N"));
+
+    public static NotificationEvent FileBackupMaintenanceFailed(Guid repositoryId, string repositoryName, string step, string errorCode)
+        => Build(C.FileBackupMaintenanceFailed, null, Roles(),
+            [("repository.name", repositoryName), ("step", step), ("errorCode", errorCode)],
+            "filebackup-maintenance:" + repositoryId.ToString("N"));
+
     public static NotificationEvent DeviceRegistered(Guid userId, string username, string deviceName, string platform)
         => Build(C.DeviceRegistered, userId, Roles((R.Affected, userId)),
             [("device.name", deviceName), ("device.platform", platform), ("user.username", username)]);

@@ -194,6 +194,49 @@
                 </div>
             </div>
 
+            <section class="workspace-section">
+                <h4>@R("Web_Backup_Maintenance")</h4>
+                <p>@R("Web_Backup_Maintenance_Help")</p>
+                <BackupScheduleEditor Times="form.MaintenanceTimes" Days="form.MaintenanceDays" />
+                <div class="workspace-form backup-maintenance-form">
+                    <div class="toggle-row">
+                        <span class="backup-label-with-info">
+                            @R("Web_Backup_Maintenance_ReadData")
+                            <InfoButton Text="@R("Web_Backup_Maintenance_ReadDataHelp")" />
+                        </span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" @bind="form.ReadDataMonthly" aria-label="@R("Web_Backup_Maintenance_ReadData")" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <label>
+                        <span class="backup-label-with-info">
+                            @R("Web_Backup_Maintenance_SampleSize")
+                            <InfoButton Text="@R("Web_Backup_Maintenance_SampleSizeHelp")" />
+                        </span>
+                        <input class="edit-input" type="number" min="0" max="@BackupCatalogService.MaximumTestRestoreSample" @bind="form.TestRestoreSampleSize" />
+                    </label>
+                    <label>
+                        <span class="backup-label-with-info">
+                            @R("Web_Backup_Maintenance_Mirror")
+                            <InfoButton Text="@R("Web_Backup_Maintenance_MirrorHelp")" />
+                        </span>
+                        <select class="edit-input" @bind="form.MirrorTargetId">
+                            <option value="@Guid.Empty">@R("Web_Backup_Maintenance_NoMirror")</option>
+                            @foreach (var candidate in VM.MirrorCandidates)
+                            {
+                                <option value="@candidate.Id">@candidate.Name (@BackupUi.BackendLabel(candidate.Backend))</option>
+                            }
+                        </select>
+                        <small>@R("Web_Backup_Maintenance_MirrorRule")</small>
+                    </label>
+                </div>
+                @if (form.Backend == BackupBackend.Rest && form.IsAppendOnly)
+                {
+                    <p class="form-hint">@R("Web_Backup_Maintenance_AppendOnlyHint")</p>
+                }
+            </section>
+
             @if (isNew)
             {
                 <section class="workspace-section">
@@ -242,6 +285,20 @@
                 <StatusBadge Tone="@BackupUi.RepositoryTone(repo)" Label="@BackupUi.RepositoryStateLabel(repo)" />
             </div>
 
+            @if (VM.ActiveMaintenance(repo.Id) is { } maintenance)
+            {
+                <div class="backup-progress">
+                    <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@maintenance.Progress">
+                        <div class="job-progress-fill" style="width: @(maintenance.Progress)%"></div>
+                    </div>
+                    <span class="form-hint">
+                        @(maintenance.IsCancellationRequested ? R("Web_Jobs_Cancelling")
+                            : maintenance.IsRunning ? string.Format(R("Web_Backup_Running"), maintenance.Progress) + (maintenance.Detail is null ? "" : " · " + maintenance.Detail)
+                            : R("Web_Backup_Queued"))
+                    </span>
+                </div>
+            }
+
             @if (repo.State == BackupRepositoryState.PendingRecoveryKit)
             {
                 <section class="workspace-section backup-kit">
@@ -286,9 +343,41 @@
                 {
                     <dt>@R("Web_Backup_Repos_AppendOnly")</dt><dd>@(repo.IsAppendOnly ? R("Web_Common_Yes") : R("Web_Common_No"))</dd>
                 }
+                <dt>@R("Web_Backup_Maintenance")</dt><dd>@BackupUi.ScheduleText(repo.MaintenanceSchedule)</dd>
+                <dt>@R("Web_Backup_Maintenance_Next")</dt><dd>@DateFmt.FormatDateTime(VM.NextMaintenanceUtc(repo), R("Web_Backup_NoSchedule"))</dd>
+                <dt>@R("Web_Backup_Maintenance_LastCheck")</dt>
+                <dd class="backup-inline-status">
+                    @if (repo.LastCheckAtUtc is { } checkedAt)
+                    {
+                        <StatusBadge Tone="@(repo.LastCheckOk == true ? StatusTone.Positive : StatusTone.Negative)"
+                                     Label="@(repo.LastCheckOk == true ? R("Web_Backup_Maintenance_CheckOk") : R("Web_Backup_Maintenance_CheckFailed"))" />
+                        <span class="form-hint">@DateFmt.FormatDateTime(checkedAt)</span>
+                    }
+                    else
+                    {
+                        @R("Web_Backup_Never")
+                    }
+                </dd>
+                <dt>@R("Web_Backup_Maintenance_Mirror")</dt>
+                <dd>@(repo.MirrorTargetId is { } mirrorId ? VM.RepositoryName(mirrorId) : R("Web_Backup_Maintenance_NoMirror"))</dd>
             </dl>
 
             <div class="detail-actions">
+                @if (repo.State == BackupRepositoryState.Active)
+                {
+                    if (VM.ActiveMaintenance(repo.Id) is { } running)
+                    {
+                        <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || running.IsCancellationRequested)" @onclick="() => VM.CancelRunAsync(running.RunId)">
+                            @R("Web_Jobs_Cancel")
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => VM.RunMaintenanceAsync(repo.Id)">
+                            @R("Web_Backup_Maintenance_RunNow")
+                        </button>
+                    }
+                }
                 <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => StartEdit(view)">@R("Web_Backup_Edit")</button>
                 @if (repo.State != BackupRepositoryState.PendingRecoveryKit)
                 {
@@ -373,24 +462,28 @@
         _kitCode = string.Empty;
     }
 
-    private void StartCreate()
+    private async Task StartCreate()
     {
         VM.NewRepository();
         _editing = true;
+        await VM.RefreshMirrorCandidatesAsync();
     }
 
-    private void StartEdit(BackupRepositoryView view)
+    private async Task StartEdit(BackupRepositoryView view)
     {
         VM.EditRepository(view);
         _editing = true;
         _confirmDelete = false;
+        await VM.RefreshMirrorCandidatesAsync();
     }
 
-    // Any change to the target invalidates an earlier test result.
-    private void Changed()
+    // Any change to the target invalidates an earlier test result and may change which
+    // repositories can serve as its mirror (same storage type needs the same access).
+    private async Task Changed()
     {
         if (VM.RepositoryForm.Id is null)
             VM.ResetProbe();
+        await VM.RefreshMirrorCandidatesAsync();
     }
 
     private async Task CreateAsync(bool connectExisting)

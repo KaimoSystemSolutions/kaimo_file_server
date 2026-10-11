@@ -33,6 +33,11 @@ public sealed class BackupRepositoryForm
     public bool IsAppendOnly { get; set; }
     public int MinFreeSpaceGb { get; set; } = 5;
     public List<CheckboxItem<Department>> Departments { get; set; } = [];
+    public List<TimeOnly> MaintenanceTimes { get; set; } = [.. BackupSchedule.DefaultMaintenance().Times];
+    public HashSet<DayOfWeek> MaintenanceDays { get; set; } = [.. BackupSchedule.DefaultMaintenance().Days];
+    public bool ReadDataMonthly { get; set; } = true;
+    public int TestRestoreSampleSize { get; set; } = 20;
+    public Guid MirrorTargetId { get; set; }
 
     /// <summary>Password typed for "connect existing"; never stored in the form after use.</summary>
     public string ExistingPassword { get; set; } = string.Empty;
@@ -59,7 +64,11 @@ public sealed class BackupRepositoryForm
         },
         IsAppendOnly,
         MinFreeSpaceGb,
-        Departments.Where(d => d.IsChecked).Select(d => d.Item.Id).ToList());
+        Departments.Where(d => d.IsChecked).Select(d => d.Item.Id).ToList(),
+        new BackupSchedule { Times = MaintenanceTimes.ToList(), Days = MaintenanceDays.ToList() },
+        ReadDataMonthly,
+        TestRestoreSampleSize,
+        MirrorTargetId == Guid.Empty ? null : MirrorTargetId);
 
     private static string? Blank(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
@@ -75,12 +84,32 @@ public sealed class BackupJobForm
     public List<CheckboxItem<ShareDefinition>> Shares { get; set; } = [];
     public List<TimeOnly> Times { get; set; } = [new(2, 0)];
     public HashSet<DayOfWeek> Days { get; set; } = [.. Enum.GetValues<DayOfWeek>()];
+    public int KeepLast { get; set; }
+    public int KeepDaily { get; set; }
+    public int KeepWeekly { get; set; }
+    public int KeepMonthly { get; set; }
+    public int KeepYearly { get; set; }
+    public int AlertAfterDays { get; set; } = 3;
 
     public IEnumerable<Guid> SelectedShareIds => Shares.Where(s => s.IsChecked).Select(s => s.Item.Id);
 
+    public BackupRetention ToRetention() => new()
+    {
+        KeepLast = KeepLast, KeepDaily = KeepDaily, KeepWeekly = KeepWeekly, KeepMonthly = KeepMonthly, KeepYearly = KeepYearly,
+    };
+
+    public void SetRetention(BackupRetention retention)
+    {
+        KeepLast = retention.KeepLast;
+        KeepDaily = retention.KeepDaily;
+        KeepWeekly = retention.KeepWeekly;
+        KeepMonthly = retention.KeepMonthly;
+        KeepYearly = retention.KeepYearly;
+    }
+
     public BackupJobDraft ToDraft() => new(
         Id, Name, RepositoryId, Enabled, IncludeRecycleBin,
-        SelectedShareIds.ToList(), Times.ToList(), Days.ToList());
+        SelectedShareIds.ToList(), Times.ToList(), Days.ToList(), ToRetention(), AlertAfterDays);
 }
 
 /// <summary>Editable state of the restore dialog.</summary>
@@ -271,8 +300,45 @@ public sealed class BackupViewModel(
             IsAppendOnly = r.IsAppendOnly,
             MinFreeSpaceGb = r.MinFreeSpaceGb,
             Departments = AllDepartments.Select(d => new CheckboxItem<Department>(d, view.DepartmentIds.Contains(d.Id))).ToList(),
+            MaintenanceTimes = r.MaintenanceSchedule.Times.ToList(),
+            MaintenanceDays = r.MaintenanceSchedule.Days.ToHashSet(),
+            ReadDataMonthly = r.ReadDataMonthly,
+            TestRestoreSampleSize = r.TestRestoreSampleSize,
+            MirrorTargetId = r.MirrorTargetId ?? Guid.Empty,
         };
     }
+
+    /// <summary>Repositories the form's repository can mirror into; computed server-side (needs the secrets).</summary>
+    public IReadOnlyList<BackupRepositoryChoice> MirrorCandidates { get; private set; } = [];
+
+    /// <summary>Re-evaluates <see cref="MirrorCandidates"/> for the form's current backend and credentials.</summary>
+    public async Task RefreshMirrorCandidatesAsync()
+    {
+        if (_actor is null || !Access.CanManageRepositories)
+            return;
+        try
+        {
+            MirrorCandidates = await catalog.ListMirrorCandidatesAsync(_actor, RepositoryForm.Id, RepositoryForm.ToDraft());
+        }
+        catch (Exception ex) when (ex is ResticException or UnauthorizedAccessException)
+        {
+            MirrorCandidates = [];
+        }
+    }
+
+    public DateTime? NextMaintenanceUtc(BackupRepository repository)
+        => repository.State == BackupRepositoryState.Active
+            ? BackupScheduleCalculator.NextSlot(repository.MaintenanceSchedule, time.GetUtcNow().UtcDateTime, time.LocalTimeZone)
+            : null;
+
+    public BackupRunSnapshot? ActiveMaintenance(Guid repositoryId)
+        => runner.Runs.FirstOrDefault(r => r.IsMaintenance && r.RepositoryId == repositoryId);
+
+    public Task<bool> RunMaintenanceAsync(Guid repositoryId) => RunAsync(async actor =>
+    {
+        await catalog.RunMaintenanceNowAsync(actor, repositoryId);
+        SuccessMessage = R("Web_Backup_Maintenance_Started");
+    });
 
     public void ResetProbe() => ProbeResult = null;
 
@@ -348,6 +414,7 @@ public sealed class BackupViewModel(
         {
             Shares = SelectableShares.Select(s => new CheckboxItem<ShareDefinition>(s, false)).ToList(),
         };
+        JobForm.SetRetention(BackupRetention.Default());
     }
 
     public void EditJob(BackupJobView view)
@@ -365,7 +432,9 @@ public sealed class BackupViewModel(
             Shares = SelectableShares.Select(s => new CheckboxItem<ShareDefinition>(s, selected.Contains(s.Id))).ToList(),
             Times = job.Schedule.Times.ToList(),
             Days = job.Schedule.Days.ToHashSet(),
+            AlertAfterDays = job.AlertAfterDays,
         };
+        JobForm.SetRetention(job.Retention);
     }
 
     public Task<bool> SaveJobAsync() => RunAsync(async actor =>

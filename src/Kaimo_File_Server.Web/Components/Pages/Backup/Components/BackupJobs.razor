@@ -1,4 +1,3 @@
-@using System.Globalization
 @using Kaimo_File_Server.Core.Domain
 @using Kaimo_File_Server.Core.Domain.Backup
 @using Kaimo_File_Server.Infrastructure.Backup.Restic
@@ -98,36 +97,45 @@
             <section class="workspace-section">
                 <h4>@R("Web_Backup_Schedule")</h4>
                 <p>@R("Web_Backup_Schedule_Help")</p>
-                <div class="backup-times">
-                    @for (var i = 0; i < form.Times.Count; i++)
-                    {
-                        var index = i;
-                        <span class="backup-time">
-                            <input class="edit-input" type="time" value="@form.Times[index].ToString("HH:mm", CultureInfo.InvariantCulture)"
-                                   aria-label="@R("Web_Backup_Schedule_Time")" @onchange="e => SetTime(index, e.Value)" />
-                            <button type="button" class="btn-icon btn-icon--small btn-icon--danger" title="@R("Web_Backup_Schedule_RemoveTime")"
-                                    aria-label="@R("Web_Backup_Schedule_RemoveTime")" @onclick="() => form.Times.RemoveAt(index)">
-                                @Assets.SVG("close.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2))
-                            </button>
-                        </span>
-                    }
-                    <button type="button" class="btn-secondary btn-secondary--sm" disabled="@(form.Times.Count >= 24)" @onclick="AddTime">
-                        @Assets.SVG("plus.svg", new SvgOptions(Width: 12, Height: 12))
-                        <span>@R("Web_Backup_Schedule_AddTime")</span>
-                    </button>
+                <BackupScheduleEditor Times="form.Times" Days="form.Days" />
+            </section>
+
+            <section class="workspace-section">
+                <h4>@R("Web_Backup_Retention")</h4>
+                <p>@R("Web_Backup_Retention_Help")</p>
+                <div class="backup-retention">
+                    <label>
+                        <span>@R("Web_Backup_Retention_Last")</span>
+                        <input class="edit-input" type="number" min="0" max="@BackupRetention.MaximumValue" @bind="form.KeepLast" />
+                    </label>
+                    <label>
+                        <span>@R("Web_Backup_Retention_Daily")</span>
+                        <input class="edit-input" type="number" min="0" max="@BackupRetention.MaximumValue" @bind="form.KeepDaily" />
+                    </label>
+                    <label>
+                        <span>@R("Web_Backup_Retention_Weekly")</span>
+                        <input class="edit-input" type="number" min="0" max="@BackupRetention.MaximumValue" @bind="form.KeepWeekly" />
+                    </label>
+                    <label>
+                        <span>@R("Web_Backup_Retention_Monthly")</span>
+                        <input class="edit-input" type="number" min="0" max="@BackupRetention.MaximumValue" @bind="form.KeepMonthly" />
+                    </label>
+                    <label>
+                        <span>@R("Web_Backup_Retention_Yearly")</span>
+                        <input class="edit-input" type="number" min="0" max="@BackupRetention.MaximumValue" @bind="form.KeepYearly" />
+                    </label>
                 </div>
-                <div class="backup-days" role="group" aria-label="@R("Web_Backup_Schedule_Days")">
-                    @foreach (var day in WeekDays)
-                    {
-                        var on = form.Days.Contains(day);
-                        <button type="button" class="preset-chip @(on ? "preset-chip--active" : "")" aria-pressed="@(on ? "true" : "false")"
-                                @onclick="() => ToggleDay(day)">@DayName(day)</button>
-                    }
-                </div>
-                @if (form.Times.Count == 0 || form.Days.Count == 0)
+                @if (form.ToRetention().IsEmpty)
                 {
-                    <p class="form-hint">@R("Web_Backup_Schedule_ManualOnly")</p>
+                    <p class="form-hint">@R("Web_Backup_Retention_KeepAllHint")</p>
                 }
+                <label class="workspace-field backup-alert-days">
+                    <span class="backup-label-with-info">
+                        @R("Web_Backup_AlertAfterDays")
+                        <InfoButton Text="@R("Web_Backup_AlertAfterDaysHelp")" />
+                    </span>
+                    <input class="edit-input" type="number" min="0" max="@BackupCatalogService.MaximumAlertAfterDays" @bind="form.AlertAfterDays" />
+                </label>
             </section>
 
             <div class="detail-actions">
@@ -164,7 +172,9 @@
             <dl class="workspace-dl">
                 <dt>@R("Web_Backup_Jobs_Sources")</dt><dd>@string.Join(", ", view.Shares.Select(s => s.Name))</dd>
                 <dt>@R("Web_Backup_Repository")</dt><dd>@view.RepositoryName</dd>
-                <dt>@R("Web_Backup_Schedule")</dt><dd>@ScheduleText(job.Schedule)</dd>
+                <dt>@R("Web_Backup_Schedule")</dt><dd>@BackupUi.ScheduleText(job.Schedule)</dd>
+                <dt>@R("Web_Backup_Retention")</dt><dd>@BackupUi.RetentionText(job.Retention)</dd>
+                <dt>@R("Web_Backup_AlertAfterDays")</dt><dd>@(job.AlertAfterDays > 0 ? string.Format(R("Web_Backup_AlertAfterDaysValue"), job.AlertAfterDays) : R("Web_Backup_AlertOff"))</dd>
                 <dt>@R("Web_Backup_Jobs_IncludeRecycleBin")</dt><dd>@(job.IncludeRecycleBin ? R("Web_Common_Yes") : R("Web_Common_No"))</dd>
                 <dt>@R("Web_Backup_LastRun")</dt><dd>@DateFmt.FormatDateTime(job.LastRunAtUtc, R("Web_Backup_Never"))</dd>
                 <dt>@R("Web_Backup_LastSuccess")</dt><dd>@DateFmt.FormatDateTime(job.LastSuccessAtUtc, R("Web_Backup_Never"))</dd>
@@ -220,10 +230,6 @@
     private bool _editing;
     private bool _confirmDelete;
 
-    // Monday first, as on the server side weekdays are plain DayOfWeek values.
-    private static readonly DayOfWeek[] WeekDays =
-        [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
-
     protected override void OnParametersSet()
     {
         if (SelectedJobId is not null)
@@ -273,37 +279,6 @@
         if (await VM.DeleteJobAsync(id))
             _selectedId = null;
         _confirmDelete = false;
-    }
-
-    private void AddTime()
-    {
-        var last = VM.JobForm.Times.Count > 0 ? VM.JobForm.Times[^1] : new TimeOnly(1, 0);
-        VM.JobForm.Times.Add(last.AddHours(1));
-    }
-
-    private void SetTime(int index, object? value)
-    {
-        if (TimeOnly.TryParse(value?.ToString(), CultureInfo.InvariantCulture, out var time) && index < VM.JobForm.Times.Count)
-            VM.JobForm.Times[index] = time;
-    }
-
-    private void ToggleDay(DayOfWeek day)
-    {
-        if (!VM.JobForm.Days.Remove(day))
-            VM.JobForm.Days.Add(day);
-    }
-
-    private static string DayName(DayOfWeek day)
-        => CultureInfo.CurrentUICulture.DateTimeFormat.GetAbbreviatedDayName(day);
-
-    private static string ScheduleText(BackupSchedule schedule)
-    {
-        if (schedule.IsEmpty)
-            return R("Web_Backup_Schedule_ManualOnly");
-        var days = schedule.Days.Count == 7
-            ? R("Web_Backup_Schedule_Daily")
-            : string.Join(", ", WeekDays.Where(schedule.Days.Contains).Select(DayName));
-        return days + " · " + string.Join(", ", schedule.Times.Select(t => t.ToString("HH:mm", CultureInfo.InvariantCulture)));
     }
 
     private static string R(string key) => BackupViewModel.R(key);

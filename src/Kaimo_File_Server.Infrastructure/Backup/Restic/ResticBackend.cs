@@ -176,6 +176,35 @@ public static partial class ResticBackend
     }
 
     /// <summary>
+    /// Rejects a mirror pairing that one <c>restic copy</c> call cannot serve: backend credentials
+    /// and options are process-wide (not per repository), so two repositories of the same
+    /// backend type must share them (SFTP: the same SSH connection).
+    /// </summary>
+    public static void ValidateMirror(
+        BackupRepository source, ResticBackendSecrets sourceSecrets, BackupRepository mirror, ResticBackendSecrets mirrorSecrets)
+    {
+        if (source.Id == mirror.Id)
+            throw new ResticException("mirror_invalid", "A repository cannot mirror into itself.");
+        if (source.Backend != mirror.Backend)
+            return;
+        var a = ResticRepositorySettings.Parse(source.SettingsJson);
+        var b = ResticRepositorySettings.Parse(mirror.SettingsJson);
+        var compatible = source.Backend switch
+        {
+            BackupBackend.Sftp => a.StorageConnectionId == b.StorageConnectionId,
+            BackupBackend.Rest => (sourceSecrets.RestUsername ?? "") == (mirrorSecrets.RestUsername ?? "")
+                                  && (sourceSecrets.RestPassword ?? "") == (mirrorSecrets.RestPassword ?? ""),
+            BackupBackend.S3 => sourceSecrets.S3AccessKeyId == mirrorSecrets.S3AccessKeyId
+                                && sourceSecrets.S3SecretAccessKey == mirrorSecrets.S3SecretAccessKey
+                                && (a.Region ?? "") == (b.Region ?? "")
+                                && a.S3PathStyle == b.S3PathStyle,
+            _ => true,
+        };
+        if (!compatible)
+            throw new ResticException("mirror_conflict", "Both repositories use the same backend type with different credentials or options.");
+    }
+
+    /// <summary>
     /// The <c>sftp.command</c> restic runs: the same hardened ssh invocation the rsync
     /// provider uses (pinned known_hosts, batch mode, key only) plus the sftp subsystem.
     /// </summary>
