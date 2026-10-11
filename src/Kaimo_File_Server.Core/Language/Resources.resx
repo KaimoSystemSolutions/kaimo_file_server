@@ -5724,8 +5724,13 @@ Credentials of the storage target (S3 keys, REST user, SSH key) are NOT part of 
 LAYOUT
 ------
 Every backup run creates one snapshot per share, tagged:
-  kaimo, job:&lt;job id&gt;, run:&lt;run id&gt;, level:files, share:&lt;share id&gt;
+  kaimo, job:&lt;job id&gt;, run:&lt;run id&gt;, level:files|db|full, share:&lt;share id&gt;
 A snapshot contains the share folder and kaimo-acl-manifest.json (owners and permissions of the share).
+Jobs of global administrators may also create:
+  - one snapshot per pool (tag pool:&lt;pool name&gt;): the whole pool folder plus one ACL manifest per share;
+  - one system snapshot (tag kind:system, levels db and full) with kaimo-database.dump (pg_dump),
+    kaimo-backup-info.json (shares, pools, paths) and, for level full, the application data folder
+    (/data/kaimo-system: DataProtection keys, certificates).
 
 RESTORE WITH THE RESTIC COMMAND LINE (works without the Kaimo server)
 --------------------------------------------------------------------
@@ -5739,6 +5744,21 @@ RESTORE WITH THE RESTIC COMMAND LINE (works without the Kaimo server)
 5. Restore everything:    restic restore &lt;snapshot id&gt; --target /restore
    Restore one folder:    restic restore &lt;snapshot id&gt;:&lt;share path&gt;/&lt;folder&gt; --target /restore
 6. Copy the restored files back into the share folder. Owners and permissions are listed in kaimo-acl-manifest.json.
+
+DISASTER RECOVERY (server lost completely)
+------------------------------------------
+Needs a job with level "full". Keep the environment secrets of the old server (JWT_SECRET,
+NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
+1. Prepare a new server with the same docker-compose.yml and .env; do not start Kaimo yet.
+2. Newest system snapshot:   restic snapshots --tag kind:system --latest 1
+3. Restore it:               restic restore &lt;snapshot id&gt; --target /restore
+4. Copy /restore/data/kaimo-system/ (or your application data path) into the new application data folder
+   and /restore/data/kaimo-backups/restic-meta/system/kaimo-database.dump into the new backup folder.
+5. Start the stack with KAIMO_DB_RESTORE_FROM=kaimo-database.dump - the database (users, shares, permissions,
+   this repository and its password) comes back.
+6. Restore the files, newest snapshot per pool or share, into their original paths:
+   restic restore &lt;snapshot id&gt;:&lt;pool or share path&gt; --target &lt;same path&gt;
+   Then restart the stack. Restores from the web interface work again.
 </value>
   </data>
   <data name="Web_Nav_Backup" xml:space="preserve">
@@ -5847,7 +5867,7 @@ RESTORE WITH THE RESTIC COMMAND LINE (works without the Kaimo server)
     <value>Files</value>
   </data>
   <data name="Web_Backup_Jobs_Help" xml:space="preserve">
-    <value>A job backs up one or more shares into a repository at fixed times. Each share gets its own backup point including its permissions.</value>
+    <value>A job backs up shares into a repository at fixed times. Each share gets its own backup point including its permissions. Global administrators can also back up whole pools and the database.</value>
   </data>
   <data name="Web_Backup_Jobs_Create" xml:space="preserve">
     <value>New backup job</value>
@@ -6354,7 +6374,7 @@ RESTORE WITH THE RESTIC COMMAND LINE (works without the Kaimo server)
     <value>The kit code does not match. Check the code in the downloaded file.</value>
   </data>
   <data name="Web_Backup_Error_sources_required" xml:space="preserve">
-    <value>Select at least one share.</value>
+    <value>Select at least one share or pool, or a content level with database.</value>
   </data>
   <data name="Web_Backup_Error_schedule_invalid" xml:space="preserve">
     <value>Select start times and weekdays, or neither.</value>
@@ -6766,5 +6786,113 @@ RESTORE WITH THE RESTIC COMMAND LINE (works without the Kaimo server)
   </data>
   <data name="Web_Backup_Maintenance_MirrorRule" xml:space="preserve">
     <value>Only repositories that can be copied into in one step are offered: another storage type, a local folder, or the same storage type with the same access (SFTP: the same SSH connection; S3 and REST: the same credentials).</value>
+  </data>
+  <data name="Web_Backup_Level_FilesAndDatabase" xml:space="preserve">
+    <value>Files + database</value>
+  </data>
+  <data name="Web_Backup_Level_Full" xml:space="preserve">
+    <value>Full (files, database, system data)</value>
+  </data>
+  <data name="Web_Backup_Level_Files_Help" xml:space="preserve">
+    <value>Only the selected shares and pools.</value>
+  </data>
+  <data name="Web_Backup_Level_FilesAndDatabase_Help" xml:space="preserve">
+    <value>Additionally a fresh database dump at the start of every run (users, permissions, settings, file versions).</value>
+  </data>
+  <data name="Web_Backup_Level_Full_Help" xml:space="preserve">
+    <value>Additionally the database dump and the application data (encryption keys, certificates). Needed to rebuild the server after a total loss.</value>
+  </data>
+  <data name="Web_Backup_Jobs_Content" xml:space="preserve">
+    <value>Content</value>
+  </data>
+  <data name="Web_Backup_Jobs_Pools" xml:space="preserve">
+    <value>Pools</value>
+  </data>
+  <data name="Web_Backup_Jobs_PoolsPlaceholder" xml:space="preserve">
+    <value>Select pools</value>
+  </data>
+  <data name="Web_Backup_Jobs_PoolsHelp" xml:space="preserve">
+    <value>A pool is backed up as a whole, including folders that are no share, as one backup point per pool. Restored from the restore tab into the server folder only.</value>
+  </data>
+  <data name="Web_Backup_Jobs_NoPools" xml:space="preserve">
+    <value>No pools found.</value>
+  </data>
+  <data name="Web_Backup_Jobs_IncludeVersions" xml:space="preserve">
+    <value>Include file versions</value>
+  </data>
+  <data name="Web_Backup_Jobs_IncludeVersionsHelp" xml:space="preserve">
+    <value>Also backs up the version store of the selected pools (.kaimo-versions).</value>
+  </data>
+  <data name="Web_Backup_Jobs_IncludeVersionsNeedsDb" xml:space="preserve">
+    <value>Needs a content level with database: versions are useless without their database entries.</value>
+  </data>
+  <data name="Web_Backup_Source_System" xml:space="preserve">
+    <value>Database &amp; system</value>
+  </data>
+  <data name="Web_Backup_Source_Pool" xml:space="preserve">
+    <value>Pool {0}</value>
+  </data>
+  <data name="Web_Backup_Error_database_dump_failed" xml:space="preserve">
+    <value>The database dump (pg_dump) failed. Details are in the log excerpt.</value>
+  </data>
+  <data name="Web_Backup_Error_pool_missing" xml:space="preserve">
+    <value>A selected pool does not exist.</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_ServerFolder" xml:space="preserve">
+    <value>Into the server backup folder</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerSources" xml:space="preserve">
+    <value>System &amp; pools</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerHelp" xml:space="preserve">
+    <value>These backup points are restored as a whole into a new folder below {0} on the server; nothing live is changed. Take the files from there. A database dump is restored with the startup restore (KAIMO_DB_RESTORE_FROM), see the operations guide.</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerRestore" xml:space="preserve">
+    <value>Restore to server folder</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerStarted" xml:space="preserve">
+    <value>Restore started. The target folder is shown in the activity log.</value>
+  </data>
+  <data name="Web_Backup_Activity_Sources" xml:space="preserve">
+    <value>Sources</value>
+  </data>
+  <data name="Web_Backup_Jobs_SourceKind" xml:space="preserve">
+    <value>Back up</value>
+  </data>
+  <data name="Web_Backup_Jobs_SourceKind_Share" xml:space="preserve">
+    <value>Individual shares</value>
+  </data>
+  <data name="Web_Backup_Jobs_SourceKind_Pool" xml:space="preserve">
+    <value>Whole pools (including all their shares)</value>
+  </data>
+  <data name="Web_Backup_Jobs_PoolShares" xml:space="preserve">
+    <value>Contained shares</value>
+  </data>
+  <data name="Web_Backup_Jobs_PoolNoShares" xml:space="preserve">
+    <value>no shares</value>
+  </data>
+  <data name="Web_Backup_Error_sources_mixed" xml:space="preserve">
+    <value>Select either shares or pools, not both: a pool already contains its shares.</value>
+  </data>
+  <data name="Web_Backup_Restore_NoServerPoints" xml:space="preserve">
+    <value>No system or pool backup points yet.</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerConfirmTitle" xml:space="preserve">
+    <value>Restore into the server folder?</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerConfirmText" xml:space="preserve">
+    <value>The whole backup point "{0}" of {1} ({2}) is restored into a new folder below {3}.</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerConfirmHint" xml:space="preserve">
+    <value>The server needs this much free space. Nothing live is changed. The folder may contain the database dump with every credential: remove it when it is no longer needed.</value>
+  </data>
+  <data name="Web_Backup_Activity_DumpCheck" xml:space="preserve">
+    <value>Database dump</value>
+  </data>
+  <data name="Web_Backup_Activity_DumpOk" xml:space="preserve">
+    <value>readable (checked with pg_restore)</value>
+  </data>
+  <data name="Web_Backup_Activity_DumpBroken" xml:space="preserve">
+    <value>NOT readable - the newest database dump is damaged</value>
   </data>
 </root>

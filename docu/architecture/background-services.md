@@ -33,6 +33,8 @@ mapping.
 | `LegacyCloudSyncMigrationHostedService` | Once at startup, imports sync definitions stored in the legacy share-embedded format before scheduled sync work begins |
 | `CertificateRenewalService` | Shortly after start and then daily, renews the self-signed HTTPS certificate when it enters its renewal window |
 | `SecurityMonitorFlushService` | Persists batched login and request activity of `SecurityMonitor` and prunes old records |
+| `BackupSchedulerService` | Every minute, enqueues due restic backup jobs and repository maintenance (missed slots caught up once, at most 7 days back; the slot is persisted before enqueueing) and raises *stale* alerts for jobs without recent success |
+| `BackupRunner` | Executes restic runs off the request thread: one serial lane for backups and maintenance, one lane for restores. On start, marks runs of the previous process as interrupted and wipes leftover temp, staging and `.kaimo-restore` folders. See [File backup](../operations/file-backup-restic.md) |
 
 ### SmbBridge (`src/Kaimo_File_Server.SmbBridge/Program.cs`)
 

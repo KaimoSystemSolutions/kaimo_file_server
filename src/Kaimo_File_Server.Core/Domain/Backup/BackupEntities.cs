@@ -22,11 +22,18 @@ public enum BackupRepositoryState
     Disabled = 2,
 }
 
-/// <summary>What a job writes into the repository. Only <see cref="Files"/> is offered yet.</summary>
+/// <summary>
+/// What a job writes into the repository besides its file sources. Database and Full add one
+/// "system" backup point per run; both are Global-only.
+/// </summary>
 public enum BackupContentLevel
 {
     Files = 0,
+
+    /// <summary>Plus a fresh database dump (pg_dump) taken at the start of the run.</summary>
     FilesAndDatabase = 1,
+
+    /// <summary>Plus the database dump and the application data (DataProtection keys, certificates).</summary>
     Full = 2,
 }
 
@@ -208,6 +215,12 @@ public sealed class BackupJob
     /// <summary>Include the share recycle bins (<c>.RECYCLE_BIN</c>).</summary>
     public bool IncludeRecycleBin { get; set; }
 
+    /// <summary>
+    /// Include the pools' version store (<c>.kaimo-versions</c>). Only effective for pool sources
+    /// of a job that also backs up the database: the blobs are useless without their rows.
+    /// </summary>
+    public bool IncludeVersions { get; set; }
+
     public BackupSchedule Schedule { get; set; } = new();
 
     /// <summary>Applied per job (<c>forget --tag job:&lt;id&gt;</c>) during repository maintenance.</summary>
@@ -235,6 +248,8 @@ public sealed class BackupJobSource
     public Guid JobId { get; set; }
     public BackupSourceKind Kind { get; set; } = BackupSourceKind.Share;
     public Guid? ShareId { get; set; }
+
+    /// <summary>Full path of the pool folder (e.g. <c>/data/storage/pool01</c>); unlike <see cref="BackupSnapshot.PoolPath"/>.</summary>
     public string? PoolPath { get; set; }
 }
 
@@ -286,6 +301,8 @@ public sealed class BackupSnapshot
     public Guid? JobId { get; set; }
     public Guid? RunId { get; set; }
     public Guid? ShareId { get; set; }
+
+    /// <summary>The pool's folder name from the <c>pool:</c> tag (e.g. <c>pool01</c>), not its full path.</summary>
     public string? PoolPath { get; set; }
     public BackupContentLevel ContentLevel { get; set; }
 

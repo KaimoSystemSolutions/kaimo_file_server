@@ -73,6 +73,7 @@ Every way a client reaches the server from outside. All of them converge on the 
 | Document | Content |
 |---|---|
 | [Database backup and restore](operations/database-backup-and-restore.md) | Scheduled and manual backups, restore, what else to back up |
+| [File backup and restore (restic)](operations/file-backup-restic.md) | Repositories, jobs and content levels, snapshot layout, restores, maintenance, disaster recovery |
 | [WebDAV client setup](operations/webdav-client-setup.md) | Connecting Windows, macOS, Linux and other clients |
 | [Microsoft OneDrive setup](operations/microsoft-onedrive-setup.md) | Entra application, overrides, runtime requirements |
 | [Dropbox setup](operations/dropbox-setup.md) | Dropbox app registration and app key |

@@ -479,6 +479,7 @@ builder.Services.AddSingleton(sp => new Kaimo_File_Server.Infrastructure.Backup.
     new ScopedFileVersionService(sp),
     new ScopedFileChangeLog(sp),
     sp.GetRequiredService<ShareLockManager>(),
+    sp.GetRequiredService<IConfiguration>(),
     sp.GetRequiredService<TimeProvider>(),
     sp.GetRequiredService<ILogger<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRestoreExecutor>>()));
 builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupMaintenanceExecutor>();

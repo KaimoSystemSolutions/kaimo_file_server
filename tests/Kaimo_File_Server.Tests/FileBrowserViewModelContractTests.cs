@@ -85,7 +85,7 @@ public sealed class FileBrowserViewModelContractTests
             [new FileMetadata { Name = "document.txt", Path = "document.txt" }], local, "", cut: true);
 
         Assert.False(result.Success);
-        Assert.Equal("Items from a virtual share can only be copied.", result.Error);
+        Assert.Equal(Kaimo_File_Server.Core.Language.Resources.ResourceManager.GetString("Web_Transfer_Error_RemoteCut"), result.Error);
     }
 
     private sealed class TestRemoteFileBrowserViewModel : RemoteFileBrowserViewModelBase

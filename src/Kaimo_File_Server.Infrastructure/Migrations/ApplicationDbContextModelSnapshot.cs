@@ -47,6 +47,9 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.Property<bool>("IncludeRecycleBin")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IncludeVersions")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime?>("LastRunAtUtc")
                         .HasColumnType("timestamp with time zone");
 

@@ -30,6 +30,9 @@ public sealed class BackupMaintenanceDetails
     public int? FilesChanged { get; set; }
     public List<string>? Mismatches { get; set; }
 
+    /// <summary>Test restore: the newest database dump was read back and pg_restore could parse it (null: no dump).</summary>
+    public bool? DatabaseDumpOk { get; set; }
+
     /// <summary>Copy: the mirror repository and how many backup points it received.</summary>
     public string? MirrorName { get; set; }
     public int? SnapshotsCopied { get; set; }
@@ -61,6 +64,7 @@ public sealed class BackupMaintenanceExecutor(
     BackupJobExecutor jobs,
     TimeProvider time,
     INotificationPublisher notifications,
+    IDatabaseBackupService database,
     ILogger<BackupMaintenanceExecutor> logger)
 {
     /// <summary>Larger files are left out of the test-restore sample to keep maintenance cheap.</summary>
@@ -75,6 +79,7 @@ public sealed class BackupMaintenanceExecutor(
     private BackupJobExecutor Jobs => jobs;
     private TimeProvider Time => time;
     private INotificationPublisher Notifications => notifications;
+    private IDatabaseBackupService Database => database;
     private ILogger Logger => logger;
 
     /// <summary>
@@ -213,7 +218,8 @@ public sealed class BackupMaintenanceExecutor(
                 {
                     var target = await TargetAsync();
                     foreach (var job in retentionJobs)
-                        removed += await Restic.ForgetAsync(target, job.Id, job.Retention, ct);
+                        removed += await Restic.ForgetAsync(target, job.Id, job.Retention, ct,
+                            await BackupJobExecutor.HasSystemPointsAsync(db, repository.Id, job.Id, ct));
                     details.SnapshotsRemoved = removed;
                     details.JobsApplied = retentionJobs.Count;
                     await owner.Jobs.RefreshSnapshotCacheAsync(db, repository.Id, target, ct);
@@ -430,6 +436,13 @@ public sealed class BackupMaintenanceExecutor(
                 }
             }
 
+            if (await VerifyDatabaseDumpAsync(target, run) is { } dumpOk)
+            {
+                details.DatabaseDumpOk = dumpOk;
+                if (!dumpOk)
+                    mismatches.Add(BackupJobExecutor.DatabaseDumpFileName);
+            }
+
             details.FilesVerified = verified;
             details.FilesChanged = changed;
             if (mismatches.Count == 0)
@@ -440,6 +453,41 @@ public sealed class BackupMaintenanceExecutor(
             run.WarningCount = mismatches.Count;
             await owner.Notifications.PublishAsync(NotificationEvents.FileBackupTestRestoreMismatch(repository.Id, repository.Name, details.Mismatches));
             return BackupRunStatus.Failed;
+        }
+
+        /// <summary>
+        /// The database dump is what a disaster recovery depends on: the dump of the newest
+        /// system backup point is read back and must be parseable by <c>pg_restore --list</c>.
+        /// Null when the repository holds no system backup point.
+        /// </summary>
+        private async Task<bool?> VerifyDatabaseDumpAsync(ResticTarget target, BackupRun run)
+        {
+            var system = (await db.BackupSnapshots.AsNoTracking()
+                    .Where(s => s.RepositoryId == repository.Id && s.Kind == BackupSnapshotKind.System)
+                    .ToListAsync(ct))
+                .MaxBy(s => s.TimeUtc);
+            var dumpPath = system is null ? null : BackupRestoreExecutor.DatabaseDumpPath(system);
+            if (dumpPath is null)
+                return null;
+
+            // Private staging in the backup folder (the dump holds every credential).
+            var staging = Path.Combine(owner.Jobs.MetaRoot, "verify-" + run.Id.ToString("N"));
+            try
+            {
+                BackupRestoreExecutor.CreatePrivateDirectory(staging);
+                BackupRestoreExecutor.EnsureFreeSpace(staging, (long)(system!.TotalBytes * 1.1));
+                var file = Path.Combine(staging, BackupJobExecutor.DatabaseDumpFileName);
+                var options = new FileStreamOptions { Mode = FileMode.Create, Access = FileAccess.Write };
+                if (!OperatingSystem.IsWindows())
+                    options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+                await using (var stream = new FileStream(file, options))
+                    await Restic.DumpAsync(target, system.SnapshotId, dumpPath, asZipArchive: false, stream, ct);
+                return await owner.Database.VerifyDumpAsync(file, ct);
+            }
+            finally
+            {
+                BackupRestoreExecutor.TryDeleteDirectory(staging);
+            }
         }
 
         /// <summary>Same size and (to the second) same mtime as in the backup point.</summary>

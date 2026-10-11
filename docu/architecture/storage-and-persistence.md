@@ -157,6 +157,7 @@ Consumers:
 | `.certs/` | Kestrel HTTPS certificate (Data Protection-encrypted), managed by `HttpsCertificateProvider` |
 | `.external-storage/rsync-ssh/` | Client keys for rsync-over-SSH connections |
 | `.kaimo-snapshots/` | Snapshot cache |
+| `.kaimo-restic-cache/`, `.kaimo-restic-tmp/` | restic cache and owner-only temp files (SSH keys, CA files) of running restic processes |
 
 The database, the Data Protection key ring and its key-encryption certificate form one unit: secrets
 stored in the database (connection grants, SMTP password, share-link tokens) can only be decrypted
@@ -167,3 +168,11 @@ with the matching key ring. See [Security model](security-model.md).
 Database backups are `pg_dump` custom-format archives in `/data/kaimo-backups`, created by the Host.
 File content is not part of the database backup. Procedure and configuration:
 [Database backup and restore](../operations/database-backup-and-restore.md).
+
+Encrypted file backups are written by the Web process into restic repositories (local, SFTP, REST
+server, S3): one backup point per share or pool and run, each with an ACL manifest, plus — for the
+content levels *Files + database* and *Full* — one system backup point with a fresh `pg_dump` and
+the application data. Staging for manifests and the dump lives in `/data/kaimo-backups/restic-meta`
+(owner-only, deleted after each run); system and pool restores go to
+`/data/kaimo-backups/restic-restore`. Repositories, jobs, runs and a cache of the snapshot list are
+stored in the `backup_*` tables. See [File backup and restore](../operations/file-backup-restic.md).

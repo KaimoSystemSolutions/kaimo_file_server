@@ -35,6 +35,11 @@ public sealed record BackupRestoreShare(Guid ShareId, string Name, int BackupPoi
 public sealed record BackupPointView(
     Guid RepositoryId, string RepositoryName, string SnapshotId, DateTime TimeUtc, string? JobName, long FileCount, long TotalBytes);
 
+/// <summary>A system, pool or foreign backup point; restored as a whole into the server's backup folder (Global).</summary>
+public sealed record BackupServerPointView(
+    Guid RepositoryId, string RepositoryName, string SnapshotId, DateTime TimeUtc, BackupSnapshotKind Kind,
+    string Source, BackupContentLevel ContentLevel, string? JobName, long FileCount, long TotalBytes);
+
 /// <summary>An entry of a folder inside a backup point.</summary>
 public sealed record BackupBrowseEntry(string Name, bool IsDirectory, long Size, DateTime? ModifiedUtc);
 
@@ -55,7 +60,7 @@ public sealed record BackupRepositoryDraft(
     int TestRestoreSampleSize = 20,
     Guid? MirrorTargetId = null);
 
-/// <summary>Input of the job form.</summary>
+/// <summary>Input of the job form. Pools, database and Full levels are Global-only.</summary>
 public sealed record BackupJobDraft(
     Guid? Id,
     string Name,
@@ -66,7 +71,10 @@ public sealed record BackupJobDraft(
     IReadOnlyList<TimeOnly> Times,
     IReadOnlyList<DayOfWeek> Days,
     BackupRetention? Retention = null,
-    int AlertAfterDays = 3);
+    int AlertAfterDays = 3,
+    BackupContentLevel ContentLevel = BackupContentLevel.Files,
+    IReadOnlyList<string>? PoolPaths = null,
+    bool IncludeVersions = false);
 
 /// <summary>Result of probing a repository location before creating it.</summary>
 public enum BackupRepositoryProbe
@@ -541,12 +549,23 @@ public sealed class BackupCatalogService(
             .ToList();
     }
 
-    /// <summary>A scoped admin sees a job only if every source is within their scope.</summary>
+    /// <summary>
+    /// A scoped admin sees a job only if every source is a share within their scope and the job
+    /// backs up files only (database dumps hold every user's data).
+    /// </summary>
     public static bool IsJobVisible(BackupAccess access, BackupJob job)
         => access.CanManageJobs
            && (access.JobsUnrestricted
-               || (job.Sources.Count > 0 && job.Sources.All(s => s.Kind == BackupSourceKind.Share
-                                                                 && s.ShareId is { } id && access.JobShareIds.Contains(id))));
+               || (job.ContentLevel == BackupContentLevel.Files
+                   && job.Sources.Count > 0 && job.Sources.All(s => s.Kind == BackupSourceKind.Share
+                                                                    && s.ShareId is { } id && access.JobShareIds.Contains(id))));
+
+    /// <summary>Pools a Global job admin may add as job sources (empty for everyone else).</summary>
+    public async Task<IReadOnlyList<string>> ListSelectablePoolsAsync(UserContext actor)
+    {
+        var access = await GetAccessAsync(actor);
+        return access.JobsUnrestricted ? resolver.Pools : [];
+    }
 
     /// <summary>Shares the actor may add as job sources. The homes share is Global-only.</summary>
     public async Task<IReadOnlyList<ShareDefinition>> ListSelectableSharesAsync(UserContext actor)
@@ -648,8 +667,18 @@ public sealed class BackupCatalogService(
         ValidateName(draft.Name);
 
         var shareIds = draft.ShareIds.Distinct().ToList();
-        if (shareIds.Count == 0)
+        var poolPaths = (draft.PoolPaths ?? []).Select(Path.TrimEndingDirectorySeparator).Distinct(StringComparer.Ordinal).ToList();
+        var level = draft.ContentLevel;
+        if (!Enum.IsDefined(level))
+            throw new ResticException("request_invalid", "Unknown content level.");
+        // A database / Full job may consist of its system backup point alone.
+        if (shareIds.Count == 0 && poolPaths.Count == 0 && level == BackupContentLevel.Files)
             throw new ResticException("sources_required", "Select at least one share.");
+        if (!access.JobsUnrestricted && (poolPaths.Count > 0 || level != BackupContentLevel.Files))
+            throw new UnauthorizedAccessException("Pools and database backups need a global administrator.");
+        // A pool already contains its shares: one job backs up either shares or whole pools.
+        if (shareIds.Count > 0 && poolPaths.Count > 0)
+            throw new ResticException("sources_mixed", "Select either shares or pools, not both.");
         if (draft.Times.Count > MaximumScheduleTimes)
             throw new ResticException("schedule_invalid", "Too many start times.");
         var retention = draft.Retention ?? new BackupRetention();
@@ -694,6 +723,10 @@ public sealed class BackupCatalogService(
 
         if (await db.BackupJobs.AnyAsync(j => j.Id != job.Id && j.Name == draft.Name.Trim()))
             throw new ResticException("name_taken", "A backup job with this name already exists.");
+        // Kept pools may be unmounted right now; only newly added ones must exist.
+        var pools = resolver.Pools;
+        if (poolPaths.Any(p => !pools.Contains(p, StringComparer.Ordinal) && job.Sources.All(s => s.PoolPath != p)))
+            throw new ResticException("pool_missing", "A selected pool does not exist.");
 
         var schedule = NormalizeSchedule(draft.Times, draft.Days);
         // A changed schedule starts counting from now: a newly added time that already
@@ -705,7 +738,8 @@ public sealed class BackupCatalogService(
         job.RepositoryId = draft.RepositoryId;
         job.Enabled = draft.Enabled;
         job.IncludeRecycleBin = draft.IncludeRecycleBin;
-        job.ContentLevel = BackupContentLevel.Files;
+        job.ContentLevel = level;
+        job.IncludeVersions = draft.IncludeVersions && poolPaths.Count > 0 && level != BackupContentLevel.Files;
         job.Schedule = schedule;
         job.Retention = new BackupRetention
         {
@@ -718,12 +752,16 @@ public sealed class BackupCatalogService(
         job.AlertAfterDays = draft.AlertAfterDays;
         job.UpdatedAtUtc = now;
 
-        var removed = job.Sources.Where(s => s.ShareId is null || !shareIds.Contains(s.ShareId.Value)).ToList();
+        var removed = job.Sources.Where(s => s.Kind == BackupSourceKind.Pool
+            ? !poolPaths.Contains(s.PoolPath ?? string.Empty, StringComparer.Ordinal)
+            : s.ShareId is null || !shareIds.Contains(s.ShareId.Value)).ToList();
         foreach (var source in removed)
             job.Sources.Remove(source);
         db.BackupJobSources.RemoveRange(removed);
         foreach (var shareId in shareIds.Where(sid => job.Sources.All(s => s.ShareId != sid)))
             job.Sources.Add(new BackupJobSource { JobId = job.Id, Kind = BackupSourceKind.Share, ShareId = shareId });
+        foreach (var pool in poolPaths.Where(p => job.Sources.All(s => s.PoolPath != p)))
+            job.Sources.Add(new BackupJobSource { JobId = job.Id, Kind = BackupSourceKind.Pool, PoolPath = pool });
 
         await db.SaveChangesAsync();
         return job;
@@ -785,8 +823,10 @@ public sealed class BackupCatalogService(
         await using var db = await dbFactory.CreateDbContextAsync();
         if (run.IsRestore)
         {
+            // Server-folder restores are started by repository admins, who may hold no restore bit.
             var starter = await db.BackupRuns.AsNoTracking().Where(r => r.Id == runId).Select(r => r.ActorUserId).FirstOrDefaultAsync();
-            return access.CanRestore && (access.RestoreUnrestricted || starter == actor.User.Id) && runner.Cancel(runId);
+            return (access.CanRestore || access.CanManageRepositories)
+                   && (access.RestoreUnrestricted || starter == actor.User.Id) && runner.Cancel(runId);
         }
         if (!access.CanManageJobs)
             return false;
@@ -1037,6 +1077,48 @@ public sealed class BackupCatalogService(
                 await db.SaveChangesAsync(CancellationToken.None);
             }
         });
+    }
+
+    /// <summary>System, pool and foreign backup points, newest first (Global repository admins).</summary>
+    public async Task<IReadOnlyList<BackupServerPointView>> ListServerBackupPointsAsync(UserContext actor)
+    {
+        var access = await GetAccessAsync(actor);
+        if (!access.CanManageRepositories)
+            return [];
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var snapshots = (await db.BackupSnapshots.AsNoTracking().Where(s => s.Kind != BackupSnapshotKind.Share).ToListAsync())
+            .OrderByDescending(s => s.TimeUtc).ToList();
+        var repoNames = await db.BackupRepositories.AsNoTracking().ToDictionaryAsync(r => r.Id, r => r.Name);
+        var jobNames = await db.BackupJobs.AsNoTracking().ToDictionaryAsync(j => j.Id, j => j.Name);
+        return snapshots.Select(s => new BackupServerPointView(
+            s.RepositoryId, repoNames.GetValueOrDefault(s.RepositoryId) ?? "?", s.SnapshotId, s.TimeUtc, s.Kind,
+            BackupRestoreExecutor.SourceLabel(s), s.ContentLevel,
+            s.JobId is { } jobId ? jobNames.GetValueOrDefault(jobId) : null, s.FileCount, s.TotalBytes)).ToList();
+    }
+
+    /// <summary>
+    /// Queues the restore of a whole system, pool or foreign backup point into a new folder
+    /// below the server's backup folder (Global <see cref="ManagementPermission.ManageBackupRepositories"/>:
+    /// a system backup point holds the database dump with every credential).
+    /// </summary>
+    public async Task<Guid> EnqueueServerRestoreAsync(UserContext actor, Guid repositoryId, string snapshotId, CancellationToken ct = default)
+    {
+        await RequireRepositoriesAsync(actor);
+        RequireWritable();
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var snapshot = await db.BackupSnapshots.AsNoTracking()
+                           .FirstOrDefaultAsync(s => s.RepositoryId == repositoryId && s.SnapshotId == snapshotId, ct)
+                       ?? throw new ResticException("snapshot_missing", "The backup point no longer exists.");
+        if (snapshot.Kind == BackupSnapshotKind.Share)
+            throw new ResticException("request_invalid", "Share backup points are restored into their share.");
+        var source = BackupRestoreExecutor.SourceLabel(snapshot);
+        var request = new BackupRestoreRequest(repositoryId, snapshotId, Guid.Empty, string.Empty, [],
+            BackupRestoreMode.ServerFolder, BackupRestoreConflict.Skip, false, Culture: CultureInfo.CurrentUICulture.Name);
+        var title = string.Format(CultureInfo.CurrentCulture,
+            Resources.ResourceManager.GetString("Web_Backup_Restore_JobTitle") ?? "Restore {0}", source);
+        logger.LogWarning("Restore of backup point {Snapshot} ({Source}) into the server backup folder requested by {User}.",
+            snapshotId, source, actor.User.Username);
+        return await runner.EnqueueRestoreAsync(request, title, actor.User.Id, ct);
     }
 
     // ══════════════════════════════════════════

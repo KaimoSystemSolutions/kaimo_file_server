@@ -79,6 +79,18 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
         var fileName = BackupFileNaming.Build(createdAt, trigger);
         var targetPath = Path.Combine(BackupRootPath, fileName);
 
+        _logger.LogInformation(
+            "Creating {Trigger} database backup at {Path}.", trigger, targetPath);
+        await DumpToAsync(targetPath, cancellationToken);
+
+        var size = new FileInfo(targetPath).Length;
+        _logger.LogInformation(
+            "Database backup {FileName} created ({Size} bytes).", fileName, size);
+        return new BackupFileInfo(fileName, size, createdAt, trigger);
+    }
+
+    public async Task DumpToAsync(string targetPath, CancellationToken cancellationToken = default)
+    {
         var arguments = new List<string>
         {
             "--format=custom",
@@ -91,9 +103,6 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
             "--dbname", _connection.Database ?? "kaimo_file_server",
         };
 
-        _logger.LogInformation(
-            "Creating {Trigger} database backup at {Path}.", trigger, targetPath);
-
         var result = await _runner.RunAsync("pg_dump", arguments, PasswordEnvironment(), cancellationToken);
         if (!result.Succeeded)
         {
@@ -103,10 +112,6 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
         }
 
         RestrictToOwner(targetPath);
-        var size = new FileInfo(targetPath).Length;
-        _logger.LogInformation(
-            "Database backup {FileName} created ({Size} bytes).", fileName, size);
-        return new BackupFileInfo(fileName, size, createdAt, trigger);
     }
 
     /// <summary>
@@ -125,6 +130,14 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
         {
             _logger.LogWarning(exception, "Could not restrict permissions of backup {Path}.", path);
         }
+    }
+
+    public async Task<bool> VerifyDumpAsync(string path, CancellationToken cancellationToken = default)
+    {
+        var result = await _runner.RunAsync("pg_restore", ["--list", path], null, cancellationToken);
+        if (!result.Succeeded)
+            _logger.LogWarning("pg_restore --list rejected the dump {Path}: {Error}", path, result.StandardError.Trim());
+        return result.Succeeded && result.StandardOutput.Contains("TABLE DATA", StringComparison.Ordinal);
     }
 
     public IReadOnlyList<BackupFileInfo> ListBackups()

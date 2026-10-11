@@ -676,6 +676,46 @@ public class ResticBackupTests
     }
 
     [Fact]
+    public void BuildPoolExcludes_ExcludesInternalEntries_AndReincludesVersionsOnlyWhenWanted()
+    {
+        var homes = new ShareDefinition("users", "/data/storage/pool01/users") { IsUserHomes = true };
+
+        var excludes = BackupJobExecutor.BuildPoolExcludes("/data/storage/pool01/", [homes], includeRecycleBin: false, includeVersions: false);
+        Assert.Equal("/data/storage/pool01/.kaimo-*", excludes[0]);
+        Assert.Contains("/data/storage/pool01/*/.kaimo-*", excludes);
+        Assert.Contains("/data/storage/pool01/users/*/.RECYCLE_BIN", excludes);
+        Assert.Equal(excludes.Count, excludes.Distinct().Count());
+        Assert.DoesNotContain(excludes, e => e.StartsWith('!'));
+
+        // restic: the negated pattern must come last to win over ".kaimo-*".
+        excludes = BackupJobExecutor.BuildPoolExcludes("/data/storage/pool01", [homes], includeRecycleBin: true, includeVersions: true);
+        Assert.Equal("!/data/storage/pool01/.kaimo-versions", excludes[^1]);
+        Assert.DoesNotContain(excludes, e => e.EndsWith(ShareEntryPolicy.RecycleBinName));
+    }
+
+    [Fact]
+    public void IncludesVersions_OnlyWithADatabaseLevel()
+    {
+        Assert.False(BackupJobExecutor.IncludesVersions(new BackupJob { IncludeVersions = true, ContentLevel = BackupContentLevel.Files }));
+        Assert.True(BackupJobExecutor.IncludesVersions(new BackupJob { IncludeVersions = true, ContentLevel = BackupContentLevel.FilesAndDatabase }));
+        Assert.False(BackupJobExecutor.IncludesVersions(new BackupJob { ContentLevel = BackupContentLevel.Full }));
+    }
+
+    [Fact]
+    public void ApplySnapshotInfo_RecognizesPoolAndSystemBackupPoints()
+    {
+        var pool = new BackupSnapshot();
+        BackupJobExecutor.ApplySnapshotInfo(pool, new ResticSnapshotInfo("p", DateTime.UtcNow, ["/data/storage/pool01"],
+            ["kaimo", "level:db", "pool:pool01"], "kaimo", 1, 1));
+        Assert.Equal((BackupSnapshotKind.Pool, "pool01", BackupContentLevel.FilesAndDatabase), (pool.Kind, pool.PoolPath, pool.ContentLevel));
+
+        var system = new BackupSnapshot();
+        BackupJobExecutor.ApplySnapshotInfo(system, new ResticSnapshotInfo("s", DateTime.UtcNow, ["/x"], ["kaimo", "level:full", "kind:system"], "kaimo", 1, 1));
+        Assert.Equal((BackupSnapshotKind.System, BackupContentLevel.Full), (system.Kind, system.ContentLevel));
+        Assert.Equal("pool_01", BackupJobExecutor.PoolTag("/data/storage/pool,01/"));
+    }
+
+    [Fact]
     public void GuardSource_RefusesMissingOrSuddenlyEmptySources()
     {
         var dir = Directory.CreateTempSubdirectory("kaimo-guard-").FullName;
@@ -765,6 +805,46 @@ public class ResticBackupTests
         Assert.Equal("12", args[args.IndexOf("--keep-monthly") + 1]);
         Assert.DoesNotContain("--keep-last", args);
         Assert.DoesNotContain("--prune", args);
+    }
+
+    [Fact]
+    public void ForgetArgs_SystemPass_GroupsAllSystemPointsOfTheJobTogether()
+    {
+        var job = Guid.NewGuid();
+        var args = ResticClient.BuildForgetArgs(new BackupRetention { KeepLast = 3 }, job, systemPointsOnly: true);
+
+        // One tag list = both tags required; no paths grouping, so a changed content level
+        // (other system paths) does not leave an old group behind.
+        Assert.Equal("job:" + job.ToString("N") + ",kind:system", args[args.IndexOf("--tag") + 1]);
+        Assert.Equal("host", args[args.IndexOf("--group-by") + 1]);
+        Assert.Equal("3", args[args.IndexOf("--keep-last") + 1]);
+    }
+
+    [Fact]
+    public void GuardSource_UnmountedPoolWithRecreatedFolders_CountsAsEmpty()
+    {
+        var pool = Directory.CreateTempSubdirectory("kaimo-pool-guard-").FullName;
+        try
+        {
+            // What Kaimo recreates on an unmounted pool: share folders, their internal folders,
+            // home folders, plus the pool's own version store.
+            Directory.CreateDirectory(Path.Combine(pool, "projects", ".kaimo-close-captures"));
+            var home = Directory.CreateDirectory(Path.Combine(pool, "users", Guid.NewGuid().ToString())).FullName;
+            Directory.CreateDirectory(Path.Combine(pool, ".kaimo-versions", "ab"));
+            File.WriteAllText(Path.Combine(pool, ".kaimo-versions", "ab", "blob"), "x");
+            File.WriteAllText(Path.Combine(pool, "projects", ".kaimo-close-captures", "c"), "x");
+
+            Assert.Equal("source_empty", Assert.Throws<ResticException>(() =>
+                BackupJobExecutor.GuardSource(pool, hadContentBefore: true)).Code);
+            BackupJobExecutor.GuardSource(pool, hadContentBefore: false); // a new, empty pool is fine
+
+            File.WriteAllText(Path.Combine(home, "notes.txt"), "x");
+            BackupJobExecutor.GuardSource(pool, hadContentBefore: true);
+        }
+        finally
+        {
+            Directory.Delete(pool, recursive: true);
+        }
     }
 
     [Fact]

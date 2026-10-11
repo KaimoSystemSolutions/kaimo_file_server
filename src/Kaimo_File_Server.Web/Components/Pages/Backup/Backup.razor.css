@@ -406,6 +406,71 @@
     font-size: 11px;
 }
 
+/* Job form: the shares a pool backup covers */
+
+.backup-page ::deep .backup-pool-shares {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.backup-page ::deep .backup-pool-shares-title {
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.backup-page ::deep .backup-pool-shares-line {
+    display: flex;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+    .backup-page ::deep .backup-pool-shares-line strong {
+        flex: none;
+        color: var(--text-primary);
+        font-weight: 600;
+    }
+
+    .backup-page ::deep .backup-pool-shares-line span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+/* System and pool backup points (restored as a whole into the server folder) */
+
+.backup-page ::deep .backup-server-help {
+    margin: 0 0 var(--space-3);
+}
+
+.backup-page ::deep .backup-browse-row.backup-server-row {
+    grid-template-columns: minmax(0, 1fr) 90px auto;
+}
+
+.backup-page ::deep .backup-server-row:not(.backup-browse-head) {
+    padding-block: var(--space-2);
+}
+
+.backup-page ::deep .backup-server-point {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+    .backup-page ::deep .backup-server-point small {
+        color: var(--text-tertiary);
+        font-size: 12px;
+        overflow-wrap: anywhere;
+    }
+
 /* Restore dialog */
 
 .backup-page ::deep .backup-restore-dialog {
@@ -495,7 +560,8 @@
         background: var(--bg-tertiary);
     }
 
-.backup-page ::deep .backup-restore-options .toggle-row > span {
+.backup-page ::deep .backup-restore-options .toggle-row > span,
+.backup-page ::deep .workspace-form .toggle-row > span {
     display: grid;
     gap: 2px;
     color: var(--text-primary);
@@ -524,6 +590,10 @@
 @media (max-width: 480px) {
     .backup-page ::deep .backup-browse-row {
         grid-template-columns: 28px minmax(0, 1fr);
+    }
+
+    .backup-page ::deep .backup-browse-row.backup-server-row {
+        grid-template-columns: minmax(0, 1fr) auto;
     }
 
     .backup-page ::deep .backup-browse-size {

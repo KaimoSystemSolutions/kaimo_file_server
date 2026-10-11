@@ -1,7 +1,11 @@
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Backup;
 using Kaimo_File_Server.Core.Helpers;
+using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Services.Notifications;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -22,8 +26,10 @@ public sealed record BackupSourceOutcome(
 /// <summary>
 /// Executes one queued backup run: one restic snapshot per source (so scoping, retention
 /// groups and parent detection stay per share, and one failing share does not fail the
-/// others), each carrying the share's ACL manifest. Afterwards the snapshot cache is
-/// reconciled and failures/warnings are published as notifications.
+/// others), each carrying the ACL manifests of its shares. Database and Full jobs dump the
+/// database first and finish with one "system" snapshot (dump, run info and, for Full, the
+/// application data). Afterwards the snapshot cache is reconciled and failures/warnings are
+/// published as notifications.
 /// </summary>
 public sealed class BackupJobExecutor(
     IDbContextFactory<ApplicationDbContext> dbFactory,
@@ -32,9 +38,14 @@ public sealed class BackupJobExecutor(
     IConfiguration configuration,
     TimeProvider time,
     INotificationPublisher notifications,
+    IDatabaseBackupService database,
     ILogger<BackupJobExecutor> logger)
 {
     private const int MaximumLogExcerpt = 8 * 1024;
+
+    /// <summary>File names inside the system snapshot (part of the documented recovery layout).</summary>
+    public const string DatabaseDumpFileName = "kaimo-database.dump";
+    public const string BackupInfoFileName = "kaimo-backup-info.json";
 
     /// <summary>Staging folder for ACL manifests; the per-share sub path must stay stable across runs.</summary>
     public string MetaRoot => configuration["Backup:Restic:MetaDirectory"]
@@ -66,16 +77,67 @@ public sealed class BackupJobExecutor(
             await restic.UnlockAsync(target, ct);
 
             var sources = job.Sources.Where(s => s.Kind == BackupSourceKind.Share && s.ShareId is not null).ToList();
+            var pools = job.Sources.Where(s => s.Kind == BackupSourceKind.Pool && !string.IsNullOrWhiteSpace(s.PoolPath))
+                .Select(s => s.PoolPath!).Distinct(StringComparer.Ordinal).ToList();
+            var withSystem = job.ContentLevel != BackupContentLevel.Files;
             var shareIds = sources.Select(s => s.ShareId!.Value).ToList();
             var shares = await db.ShareDefinitions.AsNoTracking().Where(s => shareIds.Contains(s.Id)).ToListAsync(ct);
+            var total = Math.Max(1, sources.Count + pools.Count + (withSystem ? 1 : 0));
+            var done = 0;
+            Action<double> Progress(string? name) => pct => report(name, (int)((done + pct) * 100 / total));
 
-            for (var i = 0; i < sources.Count; i++)
+            // The database is dumped before any file is read, so the files of this run are not
+            // older than the database (a version cleanup between dump and pool backup can still
+            // remove blobs the dump references).
+            string? systemDir = null;
+            string? dumpError = null;
+            try
             {
-                ct.ThrowIfCancellationRequested();
-                var share = shares.FirstOrDefault(s => s.Id == sources[i].ShareId);
-                var index = i;
-                outcomes.Add(await BackupShareAsync(db, target, repository, job, run, share, sources[i].ShareId!.Value,
-                    pct => report(share?.Name, (int)((index + pct) * 100 / sources.Count)), ct));
+                if (withSystem)
+                {
+                    systemDir = Path.Combine(MetaRoot, "system");
+                    CreatePrivateDirectory(systemDir);
+                    report(SystemSourceName(), 0);
+                    try
+                    {
+                        await database.DumpToAsync(Path.Combine(systemDir, DatabaseDumpFileName), ct);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        dumpError = "database_dump_failed";
+                        // pg_dump's stderr; restic warnings of the file sources are appended after it.
+                        run.LogExcerpt = Tail(ex.Message);
+                        logger.LogWarning(ex, "Database dump of backup run {RunId} failed.", runId);
+                    }
+                }
+
+                foreach (var source in sources)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var share = shares.FirstOrDefault(s => s.Id == source.ShareId);
+                    outcomes.Add(await BackupShareAsync(db, target, repository, job, run, share, source.ShareId!.Value, Progress(share?.Name), ct));
+                    done++;
+                }
+
+                foreach (var pool in pools)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    outcomes.Add(await BackupPoolAsync(db, target, repository, job, run, pool, Progress(PoolTag(pool)), ct));
+                    done++;
+                }
+
+                if (withSystem)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    outcomes.Add(dumpError is not null
+                        ? new(null, SystemSourceKey, null, dumpError, 0, [])
+                        : await BackupSystemAsync(db, target, job, run, systemDir!, Progress(SystemSourceName()), ct));
+                }
+            }
+            finally
+            {
+                if (systemDir is not null)
+                    TryDeleteDirectory(systemDir);
             }
 
             report(null, 100);
@@ -137,6 +199,10 @@ public sealed class BackupJobExecutor(
         }
     }
 
+    /// <summary>True when the repository holds system backup points of the job (they need their own retention pass).</summary>
+    internal static Task<bool> HasSystemPointsAsync(ApplicationDbContext db, Guid repositoryId, Guid jobId, CancellationToken ct)
+        => db.BackupSnapshots.AnyAsync(s => s.RepositoryId == repositoryId && s.JobId == jobId && s.Kind == BackupSnapshotKind.System, ct);
+
     /// <summary>
     /// Applies the job's retention right after a successful backup, as its own run. Only the
     /// backup points are removed here; their data is freed by the next repository maintenance
@@ -162,7 +228,8 @@ public sealed class BackupJobExecutor(
         try
         {
             using var target = await resolver.ResolveAsync(repository, ct);
-            details.SnapshotsRemoved = await restic.ForgetAsync(target, job.Id, job.Retention, ct);
+            details.SnapshotsRemoved = await restic.ForgetAsync(target, job.Id, job.Retention, ct,
+                await HasSystemPointsAsync(db, repository.Id, job.Id, ct));
             if (details.SnapshotsRemoved > 0)
                 await RefreshSnapshotCacheAsync(db, repository.Id, target, ct);
             run.Status = BackupRunStatus.Succeeded;
@@ -214,24 +281,13 @@ public sealed class BackupJobExecutor(
                 ],
                 BuildShareExcludes(share, job.IncludeRecycleBin));
 
-            var result = await restic.BackupAsync(target, request,
-                p => progress(Math.Clamp(p.PercentDone, 0, 1)), ct);
-
-            run.FilesNew += result.FilesNew;
-            run.FilesChanged += result.FilesChanged;
-            run.FilesUnmodified += result.FilesUnmodified;
-            run.BytesAdded += result.BytesAdded;
-            run.BytesProcessed += result.BytesProcessed;
-            if (result.HasWarnings && !string.IsNullOrWhiteSpace(result.StderrTail))
-                run.LogExcerpt = Tail((run.LogExcerpt + "\n" + result.StderrTail).Trim());
+            var result = await RunBackupAsync(target, run, request, progress, ct);
             return new(share.Id, share.Name, result.SnapshotId, null, result.WarningCount, result.Warnings);
         }
         catch (ResticException ex)
         {
             logger.LogWarning("Backup of share {Share} in run {RunId} failed: {Code}.", share.Name, run.Id, ex.Code);
-            // Repository-level failures abort the whole run; share-level ones only this source.
-            if (ex.Code is "repo_unreachable" or "repo_not_found" or "wrong_password" or "lock_failed"
-                or "access_denied" or "tls_error" or "restic_unavailable" or "insufficient_space")
+            if (AbortsRun(ex))
                 throw;
             return new(share.Id, share.Name, null, ex.Code, 0, []);
         }
@@ -240,6 +296,201 @@ public sealed class BackupJobExecutor(
             if (metaDir is not null)
                 TryDeleteDirectory(metaDir);
         }
+    }
+
+    private async Task<ResticBackupResult> RunBackupAsync(
+        ResticTarget target, BackupRun run, ResticBackupRequest request, Action<double> progress, CancellationToken ct)
+    {
+        var result = await restic.BackupAsync(target, request, p => progress(Math.Clamp(p.PercentDone, 0, 1)), ct);
+        run.FilesNew += result.FilesNew;
+        run.FilesChanged += result.FilesChanged;
+        run.FilesUnmodified += result.FilesUnmodified;
+        run.BytesAdded += result.BytesAdded;
+        run.BytesProcessed += result.BytesProcessed;
+        if (result.HasWarnings && !string.IsNullOrWhiteSpace(result.StderrTail))
+            run.LogExcerpt = Tail((run.LogExcerpt + "\n" + result.StderrTail).Trim());
+        return result;
+    }
+
+    /// <summary>Repository-level failures abort the whole run; source-level ones only that source.</summary>
+    private static bool AbortsRun(ResticException ex)
+        => ex.Code is "repo_unreachable" or "repo_not_found" or "wrong_password" or "lock_failed"
+            or "access_denied" or "tls_error" or "restic_unavailable" or "insufficient_space";
+
+    /// <summary>
+    /// A whole pool (Global-only): every share folder in it plus folders that are no share, and
+    /// one ACL manifest per share of the pool. Kaimo-internal entries are excluded like for a
+    /// share; the version store only when the job asks for it.
+    /// </summary>
+    private async Task<BackupSourceOutcome> BackupPoolAsync(
+        ApplicationDbContext db, ResticTarget target, BackupRepository repository, BackupJob job, BackupRun run,
+        string pool, Action<double> progress, CancellationToken ct)
+    {
+        var name = PoolTag(pool);
+        string? metaDir = null;
+        try
+        {
+            var shares = (await db.ShareDefinitions.AsNoTracking().ToListAsync(ct))
+                .Where(s => IsInside(s.Path, pool)).ToList();
+            // Every pool backup point holds one manifest file per share besides the pool's files.
+            GuardSource(pool, await db.BackupSnapshots.AnyAsync(
+                s => s.RepositoryId == repository.Id && s.PoolPath == name && s.FileCount > shares.Count, ct));
+
+            metaDir = Path.Combine(MetaRoot, "pool-" + PathHash(pool));
+            CreatePrivateDirectory(metaDir);
+            progress(0);
+            var now = time.GetUtcNow().UtcDateTime;
+            foreach (var share in shares)
+                await BackupAclManifest.WriteAsync(db, share, Path.Combine(metaDir, share.Id.ToString("N") + "-" + BackupAclManifest.FileName), now, ct);
+
+            var request = new ResticBackupRequest(
+                [Path.TrimEndingDirectorySeparator(pool), metaDir],
+                [
+                    "kaimo", "job:" + job.Id.ToString("N"), "run:" + run.Id.ToString("N"),
+                    "level:" + LevelTag(job.ContentLevel), "pool:" + name,
+                ],
+                BuildPoolExcludes(pool, shares, job.IncludeRecycleBin, IncludesVersions(job)));
+            var result = await RunBackupAsync(target, run, request, progress, ct);
+            return new(null, name, result.SnapshotId, null, result.WarningCount, result.Warnings);
+        }
+        catch (ResticException ex)
+        {
+            logger.LogWarning("Backup of pool {Pool} in run {RunId} failed: {Code}.", name, run.Id, ex.Code);
+            if (AbortsRun(ex))
+                throw;
+            return new(null, name, null, ex.Code, 0, []);
+        }
+        finally
+        {
+            if (metaDir is not null)
+                TryDeleteDirectory(metaDir);
+        }
+    }
+
+    /// <summary>
+    /// The "system" backup point: database dump and run info, for Full also the application
+    /// data (DataProtection keys, certificates) and an external DataProtection certificate.
+    /// </summary>
+    private async Task<BackupSourceOutcome> BackupSystemAsync(
+        ApplicationDbContext db, ResticTarget target, BackupJob job, BackupRun run, string systemDir,
+        Action<double> progress, CancellationToken ct)
+    {
+        try
+        {
+            var paths = new List<string> { systemDir };
+            var excludes = new List<string>();
+            if (job.ContentLevel == BackupContentLevel.Full)
+            {
+                var applicationData = Path.TrimEndingDirectorySeparator(resolver.ApplicationDataPath);
+                if (!Directory.Exists(applicationData))
+                    throw new ResticException("source_unavailable", "The application data folder does not exist.");
+                paths.Add(applicationData);
+                // Caches and temp files (restic cache, SMB snapshot cache, ...) are no recovery data.
+                excludes.Add(applicationData.Replace('\\', '/') + "/" + ShareEntryPolicy.InternalNamespacePrefix + "*");
+                excludes.Add(ResticClient.TrimDirectory(restic.CacheDirectory));
+                excludes.Add(ResticClient.TrimDirectory(resolver.TempRoot));
+                var certificate = configuration["DataProtection:CertificatePath"];
+                if (!string.IsNullOrWhiteSpace(certificate) && File.Exists(certificate) && !IsInside(certificate, applicationData))
+                    paths.Add(certificate);
+            }
+
+            await WriteBackupInfoAsync(db, job, run, Path.Combine(systemDir, BackupInfoFileName), ct);
+            var request = new ResticBackupRequest(
+                paths,
+                [
+                    "kaimo", "job:" + job.Id.ToString("N"), "run:" + run.Id.ToString("N"),
+                    "level:" + LevelTag(job.ContentLevel), "kind:system",
+                ],
+                excludes);
+            var result = await RunBackupAsync(target, run, request, progress, ct);
+            return new(null, SystemSourceKey, result.SnapshotId, null, result.WarningCount, result.Warnings);
+        }
+        catch (ResticException ex)
+        {
+            logger.LogWarning("System backup in run {RunId} failed: {Code}.", run.Id, ex.Code);
+            if (AbortsRun(ex))
+                throw;
+            return new(null, SystemSourceKey, null, ex.Code, 0, []);
+        }
+    }
+
+    /// <summary>What a disaster recovery needs to know besides the dump: where things lived.</summary>
+    private async Task WriteBackupInfoAsync(ApplicationDbContext db, BackupJob job, BackupRun run, string path, CancellationToken ct)
+    {
+        var shares = await db.ShareDefinitions.AsNoTracking().OrderBy(s => s.Name)
+            .Select(s => new { id = s.Id, name = s.Name, path = s.Path, isUserHomes = s.IsUserHomes }).ToListAsync(ct);
+        var dump = new FileInfo(Path.Combine(Path.GetDirectoryName(path)!, DatabaseDumpFileName));
+        var info = new
+        {
+            formatVersion = 1,
+            createdAtUtc = time.GetUtcNow().UtcDateTime,
+            kaimoVersion = typeof(BackupJobExecutor).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
+            jobId = job.Id,
+            jobName = job.Name,
+            runId = run.Id,
+            contentLevel = LevelTag(job.ContentLevel),
+            database = new { file = DatabaseDumpFileName, format = "pg_dump custom", sizeBytes = dump.Exists ? dump.Length : 0 },
+            applicationDataPath = resolver.ApplicationDataPath,
+            dataProtectionCertificatePath = configuration["DataProtection:CertificatePath"],
+            pools = resolver.Pools,
+            shares,
+        };
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(info, new JsonSerializerOptions { WriteIndented = true }), ct);
+    }
+
+    /// <summary>
+    /// Stored as the name of the system source in run outcomes; the UI shows it in its own
+    /// language (runs execute without one).
+    /// </summary>
+    public const string SystemSourceKey = "kaimo:system";
+
+    /// <summary>Display name of the system source in <paramref name="culture"/> (default: the thread's UI culture).</summary>
+    public static string SystemSourceName(System.Globalization.CultureInfo? culture = null)
+        => Resources.ResourceManager.GetString("Web_Backup_Source_System", culture) ?? "Database & system";
+
+    /// <summary>Display name of a pool source ("Pool pool01").</summary>
+    public static string PoolSourceName(string poolName, System.Globalization.CultureInfo? culture = null)
+        => string.Format(culture ?? System.Globalization.CultureInfo.CurrentCulture,
+            Resources.ResourceManager.GetString("Web_Backup_Source_Pool", culture) ?? "Pool {0}", poolName);
+
+    /// <summary>The pool's folder name, usable as a restic tag value (no comma: restic splits tag lists on it).</summary>
+    public static string PoolTag(string pool)
+        => Path.GetFileName(Path.TrimEndingDirectorySeparator(pool)).Replace(',', '_');
+
+    /// <summary>Stable per pool path, so the manifest staging path (part of the snapshot paths) never changes.</summary>
+    private static string PathHash(string path)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.TrimEndingDirectorySeparator(path))))[..16].ToLowerInvariant();
+
+    public static bool IsInside(string path, string folder)
+    {
+        var p = Path.TrimEndingDirectorySeparator(path).Replace('\\', '/');
+        var f = Path.TrimEndingDirectorySeparator(folder).Replace('\\', '/');
+        return p.StartsWith(f + "/", StringComparison.Ordinal);
+    }
+
+    /// <summary>Version blobs are useless without their database rows, so they need a database level.</summary>
+    public static bool IncludesVersions(BackupJob job)
+        => job.IncludeVersions && job.ContentLevel != BackupContentLevel.Files;
+
+    /// <summary>
+    /// Excludes of a pool: its own internal entries (<c>.kaimo-*</c>: version store, space
+    /// reservations, ...), the internal folders of every folder in it and the excludes of each
+    /// of its shares (recycle bins, home folders). The version store is re-included last
+    /// (restic negated pattern) when wanted.
+    /// </summary>
+    internal static List<string> BuildPoolExcludes(string pool, IEnumerable<ShareDefinition> shares, bool includeRecycleBin, bool includeVersions)
+    {
+        var root = Path.TrimEndingDirectorySeparator(pool).Replace('\\', '/');
+        var excludes = new List<string>
+        {
+            root + "/" + ShareEntryPolicy.InternalNamespacePrefix + "*",
+            root + "/*/" + ShareEntryPolicy.InternalNamespacePrefix + "*",
+        };
+        foreach (var share in shares)
+            excludes.AddRange(BuildShareExcludes(share, includeRecycleBin).Where(e => !excludes.Contains(e)));
+        if (includeVersions)
+            excludes.Add("!" + root + "/" + ResticClient.EscapePattern(Services.PoolVersionStorageLocator.FolderName));
+        return excludes;
     }
 
     /// <summary>
@@ -262,19 +513,41 @@ public sealed class BackupJobExecutor(
     }
 
     /// <summary>
-    /// Refuses to back up a missing source or a source that suddenly became empty although
+    /// Refuses to back up a missing source or a source that suddenly holds no file although
     /// earlier snapshots had content — the classic sign of an unmounted pool, which would
-    /// otherwise silently produce an "everything deleted" snapshot.
+    /// otherwise silently produce an "everything deleted" snapshot that retention then uses to
+    /// push out the good ones.
     /// </summary>
     internal static void GuardSource(string path, bool hadContentBefore)
     {
         if (!Directory.Exists(path))
             throw new ResticException("source_unavailable", "The share folder does not exist (pool not mounted?).");
-        // Kaimo itself recreates internal ".kaimo-*" folders in a share folder (also on an
-        // unmounted pool), so only user-visible entries count as content.
-        if (hadContentBefore && !Directory.EnumerateFileSystemEntries(path)
-                .Any(e => !Path.GetFileName(e).StartsWith(ShareEntryPolicy.InternalNamespacePrefix, StringComparison.Ordinal)))
-            throw new ResticException("source_empty", "The share folder is empty although earlier backups had content (pool not mounted?).");
+        if (hadContentBefore && !HasUserFile(path))
+            throw new ResticException("source_empty", "The source holds no file although earlier backups had content (pool not mounted?).");
+    }
+
+    /// <summary>
+    /// True when a file exists anywhere below <paramref name="root"/> outside Kaimo-internal
+    /// folders. Folders do not count: on an unmounted pool Kaimo itself recreates share folders,
+    /// their <c>.kaimo-*</c> folders and the home folders, but never files. Stops at the first file.
+    /// </summary>
+    internal static bool HasUserFile(string root)
+    {
+        var options = new EnumerationOptions { IgnoreInaccessible = true, AttributesToSkip = 0 };
+        var pending = new Stack<DirectoryInfo>([new DirectoryInfo(root)]);
+        while (pending.TryPop(out var directory))
+        {
+            foreach (var entry in directory.EnumerateFileSystemInfos("*", options))
+            {
+                if (entry.Name.StartsWith(ShareEntryPolicy.InternalNamespacePrefix, StringComparison.Ordinal))
+                    continue;
+                if (entry is FileInfo)
+                    return true;
+                if (!entry.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                    pending.Push((DirectoryInfo)entry);
+            }
+        }
+        return false;
     }
 
     private static Task<bool> HadContentBeforeAsync(ApplicationDbContext db, Guid repositoryId, Guid shareId, CancellationToken ct)
@@ -348,7 +621,8 @@ public sealed class BackupJobExecutor(
     {
         if (run.Status == BackupRunStatus.Failed)
         {
-            var failed = outcomes.Where(o => o.ErrorCode is not null).Select(o => o.Name).ToList();
+            var failed = outcomes.Where(o => o.ErrorCode is not null)
+                .Select(o => o.Name == SystemSourceKey ? SystemSourceName() : o.Name).ToList();
             await notifications.PublishAsync(NotificationEvents.FileBackupFailed(
                 job.Id, job.Name, repository.Name, job.CreatedByUserId, run.ErrorCode ?? "restic_failed",
                 failed.Count > 0 ? string.Join(", ", failed) : "-"));

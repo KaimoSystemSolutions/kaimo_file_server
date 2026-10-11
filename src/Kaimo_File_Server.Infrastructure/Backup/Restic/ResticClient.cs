@@ -180,6 +180,11 @@ public sealed class ResticClient(IProcessRunner runner, IConfiguration configura
         ResticTarget target, string snapshotId, IReadOnlyList<string> absolutePaths, string targetDirectory, CancellationToken ct)
         => await RunRestoreAsync(target, BuildRestorePathsArgs(snapshotId, absolutePaths, targetDirectory), null, ct);
 
+    /// <summary>Restores a whole snapshot; its absolute paths are recreated below <paramref name="targetDirectory"/>.</summary>
+    public async Task<ResticRestoreResult> RestoreSnapshotAsync(
+        ResticTarget target, string snapshotId, string targetDirectory, Action<double>? onProgress, CancellationToken ct)
+        => await RunRestoreAsync(target, ["restore", "--target", targetDirectory, "--verify", "--", snapshotId], onProgress, ct);
+
     private async Task<ResticRestoreResult> RunRestoreAsync(
         ResticTarget target, IReadOnlyList<string> args, Action<double>? onProgress, CancellationToken ct)
     {
@@ -242,13 +247,26 @@ public sealed class ResticClient(IProcessRunner runner, IConfiguration configura
         ThrowOnFailure(result, "dump");
     }
 
-    /// <summary>Applies a job's retention to its backup points; returns how many were removed.</summary>
-    public async Task<int> ForgetAsync(ResticTarget target, Guid jobId, Core.Domain.Backup.BackupRetention retention, CancellationToken ct)
+    /// <summary>
+    /// Applies a job's retention to its backup points; returns how many were removed. With
+    /// <paramref name="includeSystemPass"/> a second pass applies it to the job's system backup
+    /// points as one group: their paths change with the content level (or an external
+    /// certificate), and a path group nobody writes to anymore would keep its points forever.
+    /// </summary>
+    public async Task<int> ForgetAsync(
+        ResticTarget target, Guid jobId, Core.Domain.Backup.BackupRetention retention, CancellationToken ct, bool includeSystemPass = false)
     {
-        var lines = new List<string>();
-        var result = await RunAsync(target, BuildForgetArgs(retention, jobId), lines.Add, ct, lockRetry: "30m");
-        ThrowOnFailure(result, "forget");
-        return CountForgotten(lines);
+        var removed = 0;
+        foreach (var args in includeSystemPass
+                     ? new[] { BuildForgetArgs(retention, jobId), BuildForgetArgs(retention, jobId, systemPointsOnly: true) }
+                     : new[] { BuildForgetArgs(retention, jobId) })
+        {
+            var lines = new List<string>();
+            var result = await RunAsync(target, args, lines.Add, ct, lockRetry: "30m");
+            ThrowOnFailure(result, "forget");
+            removed += CountForgotten(lines);
+        }
+        return removed;
     }
 
     /// <summary>Deletes data no longer referenced by any backup point.</summary>
@@ -327,11 +345,14 @@ public sealed class ResticClient(IProcessRunner runner, IConfiguration configura
     /// <c>forget</c> for one job: grouped by host and paths (one group per share), never by
     /// tags — the unique <c>run:</c> tag would make every snapshot its own group and keep all.
     /// </summary>
-    internal static List<string> BuildForgetArgs(Core.Domain.Backup.BackupRetention retention, Guid jobId)
+    internal static List<string> BuildForgetArgs(Core.Domain.Backup.BackupRetention retention, Guid jobId, bool systemPointsOnly = false)
     {
         if (retention.IsEmpty)
             throw new ResticException("retention_empty", "A retention without any rule would keep or remove everything.");
-        var args = new List<string> { "forget", "--tag", "job:" + jobId.ToString("N"), "--group-by", "host,paths" };
+        // "--tag a,b" matches points carrying both tags.
+        var args = systemPointsOnly
+            ? new List<string> { "forget", "--tag", "job:" + jobId.ToString("N") + ",kind:system", "--group-by", "host" }
+            : new List<string> { "forget", "--tag", "job:" + jobId.ToString("N"), "--group-by", "host,paths" };
         void Keep(string flag, int value)
         {
             if (value > 0)

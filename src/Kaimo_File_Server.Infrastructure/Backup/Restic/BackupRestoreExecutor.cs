@@ -10,6 +10,7 @@ using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Infrastructure.Backup.Restic;
@@ -28,6 +29,12 @@ public enum BackupRestoreMode
 
     /// <summary>Streamed to the browser (file raw, folder as ZIP); only recorded, never queued.</summary>
     Download = 3,
+
+    /// <summary>
+    /// A whole system or pool backup point into a new private folder below the server's backup
+    /// folder (Global only). Nothing live is touched.
+    /// </summary>
+    ServerFolder = 4,
 }
 
 /// <summary>What happens when an in-place restore meets an existing entry. Never deletes anything.</summary>
@@ -130,11 +137,16 @@ public sealed class BackupRestoreExecutor(
     IFileVersionService versions,
     IFileChangeLog changeLog,
     ShareLockManager locks,
+    IConfiguration configuration,
     TimeProvider time,
     ILogger<BackupRestoreExecutor> logger)
 {
     public const string StagingFolderName = ShareEntryPolicy.InternalNamespacePrefix + "restore";
     private const double RequiredSpaceFactor = 1.1;
+
+    /// <summary>Where system and pool backup points are restored to (one new folder per restore).</summary>
+    public string ServerRestoreRoot => configuration["Backup:Restic:RestoreDirectory"]
+        ?? Path.Combine(configuration["Backup:RootPath"] ?? "/data/kaimo-backups", "restic-restore");
 
     public async Task ExecuteAsync(Guid runId, Action<string?, int> report, CancellationToken ct)
     {
@@ -145,6 +157,12 @@ public sealed class BackupRestoreExecutor(
         run.Status = BackupRunStatus.Running;
         run.StartedAtUtc = time.GetUtcNow().UtcDateTime;
         await db.SaveChangesAsync(CancellationToken.None);
+
+        if (details?.Request.Mode == BackupRestoreMode.ServerFolder)
+        {
+            await RestoreToServerFolderAsync(db, run, details, report, ct);
+            return;
+        }
 
         var outcome = new BackupRestoreOutcome();
         string? staging = null;
@@ -296,6 +314,96 @@ public sealed class BackupRestoreExecutor(
         await db.SaveChangesAsync(CancellationToken.None);
         logger.LogInformation("Restore run {RunId} finished: {Status} ({Code}).", runId, run.Status, run.ErrorCode);
     }
+
+    /// <summary>
+    /// Restores a whole system, pool or foreign backup point into a new owner-only folder below
+    /// <see cref="ServerRestoreRoot"/>; the snapshot's absolute paths are kept below it. The
+    /// admin takes the database dump (startup restore runbook) or files from there. A failed or
+    /// cancelled restore removes its partial folder.
+    /// </summary>
+    private async Task RestoreToServerFolderAsync(
+        ApplicationDbContext db, BackupRun run, BackupRestoreDetails details, Action<string?, int> report, CancellationToken ct)
+    {
+        var outcome = new BackupRestoreOutcome();
+        string? folder = null;
+        try
+        {
+            var repository = await db.BackupRepositories.FirstAsync(r => r.Id == run.RepositoryId, ct);
+            var snapshot = await db.BackupSnapshots.AsNoTracking()
+                               .FirstOrDefaultAsync(s => s.RepositoryId == repository.Id && s.SnapshotId == details.Request.SnapshotId, ct)
+                           ?? throw new ResticException("snapshot_missing", "The backup point no longer exists.");
+            if (snapshot.Kind == BackupSnapshotKind.Share)
+                throw new ResticException("request_invalid", "Share backup points are restored into their share.");
+            outcome.SourceShareName = SourceLabel(snapshot, details.Request.GetUiCulture());
+
+            CreatePrivateDirectory(ServerRestoreRoot);
+            EnsureFreeSpace(ServerRestoreRoot, (long)(snapshot.TotalBytes * RequiredSpaceFactor));
+            var local = TimeZoneInfo.ConvertTimeFromUtc(time.GetUtcNow().UtcDateTime, TimeZoneInfo.Local);
+            var name = local.ToString("yyyy-MM-dd_HHmmss", CultureInfo.InvariantCulture);
+            var final = Path.Combine(ServerRestoreRoot, name);
+            for (var n = 2; Path.Exists(final) || Path.Exists(final + PartialSuffix); n++)
+                final = Path.Combine(ServerRestoreRoot, $"{name}-{n}");
+            // Restored under a ".partial" name and renamed when complete, so leftovers of a
+            // crashed process are recognizable and removed on the next start.
+            folder = final + PartialSuffix;
+            CreatePrivateDirectory(folder);
+            outcome.DestinationPath = final;
+
+            using var target = await resolver.ResolveAsync(repository, ct);
+            report(outcome.SourceShareName, 1);
+            var restored = await restic.RestoreSnapshotAsync(target, snapshot.SnapshotId, folder,
+                p => report(null, 5 + (int)(Math.Clamp(p, 0, 1) * 90)), ct);
+            Directory.Move(folder, final);
+            folder = null;
+            outcome.FilesRestored = restored.FilesRestored;
+            outcome.BytesRestored = restored.BytesRestored;
+            run.FilesNew = restored.FilesRestored;
+            run.BytesProcessed = restored.BytesRestored;
+            run.Status = BackupRunStatus.Succeeded;
+            repository.LastReachableAtUtc = time.GetUtcNow().UtcDateTime;
+            report(null, 100);
+            logger.LogWarning("Backup point {Snapshot} restored into server folder {Folder}.", snapshot.SnapshotId, folder);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            run.Status = BackupRunStatus.Cancelled;
+            run.ErrorCode = "cancelled";
+        }
+        catch (Exception ex)
+        {
+            run.Status = BackupRunStatus.Failed;
+            run.ErrorCode = ex is ResticException re ? re.Code : "unexpected_error";
+            if (ex.Data["stderr"] is string stderr && stderr.Length > 0)
+                run.LogExcerpt = stderr.Length <= 8 * 1024 ? stderr : stderr[^(8 * 1024)..];
+            if (ex is not ResticException)
+                logger.LogError(ex, "Restore run {RunId} failed unexpectedly.", run.Id);
+        }
+
+        if (folder is not null)
+            TryDeleteDirectory(folder);
+        run.FinishedAtUtc = time.GetUtcNow().UtcDateTime;
+        run.DetailsJson = (details with { Result = outcome }).Serialize();
+        await db.SaveChangesAsync(CancellationToken.None);
+    }
+
+    private const string PartialSuffix = ".partial";
+
+    /// <summary>
+    /// Display name of a non-share backup point in <paramref name="culture"/> (default: the
+    /// thread's UI culture): "Pool pool01", the system label or the recorded paths.
+    /// </summary>
+    internal static string SourceLabel(BackupSnapshot snapshot, CultureInfo? culture = null) => snapshot.Kind switch
+    {
+        BackupSnapshotKind.Pool => BackupJobExecutor.PoolSourceName(snapshot.PoolPath ?? "?", culture),
+        BackupSnapshotKind.System => BackupJobExecutor.SystemSourceName(culture),
+        _ => string.Join(", ", Paths(snapshot)),
+    };
+
+    /// <summary>The database dump inside a system backup point, or null when it records none.</summary>
+    internal static string? DatabaseDumpPath(BackupSnapshot snapshot)
+        => Paths(snapshot).FirstOrDefault(p => p.EndsWith("/system", StringComparison.Ordinal)) is { } system
+            ? system + "/" + BackupJobExecutor.DatabaseDumpFileName
+            : null;
 
     private async Task AppendChangeAsync(Guid shareId, string path)
     {
@@ -500,9 +608,17 @@ public sealed class BackupRestoreExecutor(
     //  Housekeeping
     // ══════════════════════════════════════════
 
-    /// <summary>Removes restore staging left behind by a crashed process. Called once on startup.</summary>
+    /// <summary>
+    /// Removes restore staging and unfinished server-folder restores left behind by a crashed
+    /// process. Called once on startup.
+    /// </summary>
     public async Task WipeStagingAsync(CancellationToken ct)
     {
+        if (Directory.Exists(ServerRestoreRoot))
+        {
+            foreach (var partial in Directory.EnumerateDirectories(ServerRestoreRoot, "*" + PartialSuffix))
+                TryDeleteDirectory(partial);
+        }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         foreach (var path in await db.ShareDefinitions.AsNoTracking().Select(s => s.Path).ToListAsync(ct))
         {

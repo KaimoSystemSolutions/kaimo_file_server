@@ -17,6 +17,26 @@ public static class BackupUi
 
     public static string TriggerLabel(BackupRunTrigger trigger) => R("Web_Backup_Trigger_" + trigger);
 
+    public static string LevelLabel(BackupContentLevel level) => R("Web_Backup_Level_" + level);
+
+    public static string PoolName(string poolPath) => Path.GetFileName(Path.TrimEndingDirectorySeparator(poolPath));
+
+    /// <summary>Name of a source in a run outcome; the system source is stored as a key and shown in the UI language.</summary>
+    public static string SourceName(string name)
+        => name == Infrastructure.Backup.Restic.BackupJobExecutor.SystemSourceKey ? R("Web_Backup_Source_System") : name;
+
+    /// <summary>"Projects, Pool pool01, Database &amp; system": every source of a job.</summary>
+    public static string SourcesText(Infrastructure.Backup.Restic.BackupJobView view)
+    {
+        var parts = view.Shares.Select(s => s.Name)
+            .Concat(view.Job.Sources.Where(s => s.Kind == BackupSourceKind.Pool && s.PoolPath is not null)
+                .Select(s => string.Format(CultureInfo.CurrentCulture, R("Web_Backup_Source_Pool"), PoolName(s.PoolPath!))))
+            .ToList();
+        if (view.Job.ContentLevel != BackupContentLevel.Files)
+            parts.Add(R("Web_Backup_Source_System"));
+        return string.Join(", ", parts);
+    }
+
     public static StatusTone RunTone(BackupRunStatus status) => status switch
     {
         BackupRunStatus.Succeeded => StatusTone.Positive,

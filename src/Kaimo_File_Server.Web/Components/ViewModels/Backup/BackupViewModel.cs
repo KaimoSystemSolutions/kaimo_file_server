@@ -90,8 +90,26 @@ public sealed class BackupJobForm
     public int KeepMonthly { get; set; }
     public int KeepYearly { get; set; }
     public int AlertAfterDays { get; set; } = 3;
+    public BackupContentLevel ContentLevel { get; set; } = BackupContentLevel.Files;
+    public List<CheckboxItem<string>> Pools { get; set; } = [];
+    public bool IncludeVersions { get; set; }
 
-    public IEnumerable<Guid> SelectedShareIds => Shares.Where(s => s.IsChecked).Select(s => s.Item.Id);
+    /// <summary>
+    /// A job backs up either single shares or whole pools (which contain their shares). The
+    /// selection of the other kind is kept while switching but never sent.
+    /// </summary>
+    public BackupSourceKind SourceKind { get; set; } = BackupSourceKind.Share;
+
+    public IEnumerable<Guid> SelectedShareIds => SourceKind == BackupSourceKind.Share
+        ? Shares.Where(s => s.IsChecked).Select(s => s.Item.Id)
+        : [];
+
+    public IEnumerable<string> SelectedPools => SourceKind == BackupSourceKind.Pool
+        ? Pools.Where(p => p.IsChecked).Select(p => p.Item)
+        : [];
+
+    /// <summary>A database or Full job needs no file source; a files job at least one.</summary>
+    public bool HasSources => SelectedShareIds.Any() || SelectedPools.Any() || ContentLevel != BackupContentLevel.Files;
 
     public BackupRetention ToRetention() => new()
     {
@@ -109,7 +127,8 @@ public sealed class BackupJobForm
 
     public BackupJobDraft ToDraft() => new(
         Id, Name, RepositoryId, Enabled, IncludeRecycleBin,
-        SelectedShareIds.ToList(), Times.ToList(), Days.ToList(), ToRetention(), AlertAfterDays);
+        SelectedShareIds.ToList(), Times.ToList(), Days.ToList(), ToRetention(), AlertAfterDays,
+        ContentLevel, SelectedPools.ToList(), IncludeVersions);
 }
 
 /// <summary>Editable state of the restore dialog.</summary>
@@ -134,6 +153,7 @@ public sealed class BackupViewModel(
     IBackupRunner runner,
     IDepartmentRepository departments,
     BackupDownloadTokenService downloadTokens,
+    BackupRestoreExecutor restoreExecutor,
     DemoModeOptions demo,
     TimeProvider time,
     ILogger<BackupViewModel> logger)
@@ -151,6 +171,7 @@ public sealed class BackupViewModel(
     public IReadOnlyList<BackupRepositoryView> Repositories { get; private set; } = [];
     public IReadOnlyList<BackupRun> Runs { get; private set; } = [];
     public IReadOnlyList<ShareDefinition> SelectableShares { get; private set; } = [];
+    public IReadOnlyList<string> SelectablePools { get; private set; } = [];
     public BackupRepositoryChoices RepositoryChoices { get; private set; } = new([], new Dictionary<Guid, IReadOnlySet<Guid>>());
     public IReadOnlyList<Department> AllDepartments { get; private set; } = [];
     public IReadOnlyList<(Guid Id, string Name)> SshConnections { get; private set; } = [];
@@ -206,6 +227,7 @@ public sealed class BackupViewModel(
         if (Access.CanManageJobs)
         {
             SelectableShares = await catalog.ListSelectableSharesAsync(_actor);
+            SelectablePools = await catalog.ListSelectablePoolsAsync(_actor);
             RepositoryChoices = await catalog.GetRepositoryChoicesAsync(_actor);
         }
         if (Access.CanManageRepositories)
@@ -213,6 +235,7 @@ public sealed class BackupViewModel(
             Repositories = await catalog.ListRepositoriesAsync(_actor);
             AllDepartments = (await departments.GetAllAsync()).OrderByGlobalFirst().ToList();
             SshConnections = await catalog.ListSshConnectionsAsync(_actor);
+            ServerPoints = await catalog.ListServerBackupPointsAsync(_actor);
         }
         if (Access.CanRestore)
         {
@@ -238,6 +261,11 @@ public sealed class BackupViewModel(
         => job.Enabled ? BackupScheduleCalculator.NextSlot(job.Schedule, time.GetUtcNow().UtcDateTime, time.LocalTimeZone) : null;
 
     public bool IsJobActive(Guid jobId) => runner.Runs.Any(r => r.JobId == jobId);
+
+    /// <summary>Names of the shares stored in a pool (the shares a pool backup covers).</summary>
+    public IReadOnlyList<string> SharesInPool(string pool)
+        => SelectableShares.Where(s => BackupJobExecutor.IsInside(s.Path, pool))
+            .Select(s => s.Name).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
 
     public string RepositoryName(Guid id)
         => Repositories.FirstOrDefault(r => r.Repository.Id == id)?.Repository.Name
@@ -413,6 +441,7 @@ public sealed class BackupViewModel(
         JobForm = new BackupJobForm
         {
             Shares = SelectableShares.Select(s => new CheckboxItem<ShareDefinition>(s, false)).ToList(),
+            Pools = SelectablePools.Select(p => new CheckboxItem<string>(p, false)).ToList(),
         };
         JobForm.SetRetention(BackupRetention.Default());
     }
@@ -422,6 +451,7 @@ public sealed class BackupViewModel(
         ClearMessages();
         var job = view.Job;
         var selected = view.Shares.Select(s => s.ShareId).ToHashSet();
+        var pools = job.Sources.Where(s => s.Kind == BackupSourceKind.Pool && s.PoolPath is not null).Select(s => s.PoolPath!).ToHashSet();
         JobForm = new BackupJobForm
         {
             Id = job.Id,
@@ -433,6 +463,12 @@ public sealed class BackupViewModel(
             Times = job.Schedule.Times.ToList(),
             Days = job.Schedule.Days.ToHashSet(),
             AlertAfterDays = job.AlertAfterDays,
+            ContentLevel = job.ContentLevel,
+            IncludeVersions = job.IncludeVersions,
+            SourceKind = pools.Count > 0 ? BackupSourceKind.Pool : BackupSourceKind.Share,
+            // A kept pool that is not mounted right now stays selectable.
+            Pools = SelectablePools.Union(pools).Order(StringComparer.Ordinal)
+                .Select(p => new CheckboxItem<string>(p, pools.Contains(p))).ToList(),
         };
         JobForm.SetRetention(job.Retention);
     }
@@ -465,6 +501,29 @@ public sealed class BackupViewModel(
     // ══════════════════════════════════════════
 
     public IReadOnlyList<BackupRestoreShare> RestoreShares { get; private set; } = [];
+
+    /// <summary>System, pool and foreign backup points (Global repository admins only).</summary>
+    public IReadOnlyList<BackupServerPointView> ServerPoints { get; private set; } = [];
+
+    /// <summary>The selected group of <see cref="ServerPoints"/> (by <see cref="BackupServerPointView.Source"/>).</summary>
+    public string? ServerSource { get; private set; }
+
+    /// <summary>Folder below which system and pool backup points are restored.</summary>
+    public string ServerRestoreRoot => restoreExecutor.ServerRestoreRoot;
+
+    public void SelectServerSource(string source)
+    {
+        ClearMessages();
+        RestoreShare = null;
+        ServerSource = source;
+    }
+
+    public Task<bool> RestoreServerPointAsync(BackupServerPointView point) => RunAsync(async actor =>
+    {
+        await catalog.EnqueueServerRestoreAsync(actor, point.RepositoryId, point.SnapshotId);
+        Runs = await catalog.ListRunsAsync(actor);
+        SuccessMessage = R("Web_Backup_Restore_ServerStarted");
+    });
     public BackupRestoreShare? RestoreShare { get; private set; }
     public IReadOnlyList<BackupPointView> BackupPoints { get; private set; } = [];
     public BackupPointView? BackupPoint { get; private set; }
@@ -487,6 +546,7 @@ public sealed class BackupViewModel(
     public Task<bool> SelectRestoreShareAsync(Guid shareId) => RunAsync(async actor =>
     {
         RestoreShare = RestoreShares.FirstOrDefault(s => s.ShareId == shareId);
+        ServerSource = null;
         BackupPoints = await catalog.ListBackupPointsAsync(actor, shareId);
         RestoreRights = await catalog.GetRestoreRightsAsync(actor, shareId);
         BackupPoint = BackupPoints.FirstOrDefault();

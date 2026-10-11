@@ -42,7 +42,7 @@ else
                 {
                     <Tab Active="@(_tab == BackupTab.Jobs)" Icon="history.svg" Label="@R("Web_Backup_Tab_Jobs")" OnClick="() => SwitchTab(BackupTab.Jobs)" />
                 }
-                @if (VM.Access.CanRestore)
+                @if (VM.Access.CanRestore || VM.Access.CanManageRepositories)
                 {
                     <Tab Active="@(_tab == BackupTab.Restore)" Icon="cloud-download.svg" Label="@R("Web_Backup_Tab_Restore")" OnClick="() => SwitchTab(BackupTab.Restore)" />
                 }
@@ -104,7 +104,7 @@ else
         _tab = Enum.TryParse<BackupTab>(TabQuery, ignoreCase: true, out var tab) ? tab : home;
         if (_tab == BackupTab.Repositories && !VM.Access.CanManageRepositories) _tab = BackupTab.Overview;
         if (_tab == BackupTab.Jobs && !VM.Access.CanManageJobs) _tab = BackupTab.Overview;
-        if (_tab == BackupTab.Restore && !VM.Access.CanRestore) _tab = BackupTab.Overview;
+        if (_tab == BackupTab.Restore && !(VM.Access.CanRestore || VM.Access.CanManageRepositories)) _tab = BackupTab.Overview;
     }
 
     private void SwitchTab(BackupTab tab, Guid? selectId = null)

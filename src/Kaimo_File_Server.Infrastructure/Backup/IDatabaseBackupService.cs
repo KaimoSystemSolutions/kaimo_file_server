@@ -19,6 +19,19 @@ public interface IDatabaseBackupService
     /// </summary>
     Task<BackupFileInfo> CreateBackupAsync(BackupTrigger trigger, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Writes a custom-format dump to <paramref name="targetPath"/> (owner-only) without
+    /// registering it as a backup of the backup folder and without notifications. Used by the
+    /// restic file backup, which ships the dump inside its encrypted repository.
+    /// </summary>
+    Task DumpToAsync(string targetPath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// True when <c>pg_restore --list</c> can read the dump at <paramref name="path"/> (its table
+    /// of contents is intact). Needs no database connection.
+    /// </summary>
+    Task<bool> VerifyDumpAsync(string path, CancellationToken cancellationToken = default);
+
     /// <summary>Lists existing backups, newest first.</summary>
     IReadOnlyList<BackupFileInfo> ListBackups();
 

@@ -5658,8 +5658,13 @@ Zugangsdaten des Speicherziels (S3-Schlüssel, REST-Benutzer, SSH-Schlüssel) si
 AUFBAU
 ------
 Jeder Sicherungslauf erzeugt pro Freigabe einen Snapshot mit den Tags:
-  kaimo, job:&lt;Auftrags-ID&gt;, run:&lt;Lauf-ID&gt;, level:files, share:&lt;Freigabe-ID&gt;
+  kaimo, job:&lt;Auftrags-ID&gt;, run:&lt;Lauf-ID&gt;, level:files|db|full, share:&lt;Freigabe-ID&gt;
 Ein Snapshot enthält den Freigabe-Ordner und kaimo-acl-manifest.json (Besitzer und Berechtigungen der Freigabe).
+Aufträge globaler Administratoren können zusätzlich erzeugen:
+  - pro Pool einen Snapshot (Tag pool:&lt;Pool-Name&gt;): den ganzen Pool-Ordner plus ein ACL-Manifest pro Freigabe;
+  - einen System-Snapshot (Tag kind:system, Stufen db und full) mit kaimo-database.dump (pg_dump),
+    kaimo-backup-info.json (Freigaben, Pools, Pfade) und bei Stufe full dem Anwendungsdaten-Ordner
+    (/data/kaimo-system: DataProtection-Schlüssel, Zertifikate).
 
 WIEDERHERSTELLEN MIT DER RESTIC-KOMMANDOZEILE (funktioniert ohne Kaimo-Server)
 ------------------------------------------------------------------------------
@@ -5673,6 +5678,21 @@ WIEDERHERSTELLEN MIT DER RESTIC-KOMMANDOZEILE (funktioniert ohne Kaimo-Server)
 5. Alles wiederherstellen:     restic restore &lt;Snapshot-ID&gt; --target /restore
    Einen Ordner:               restic restore &lt;Snapshot-ID&gt;:&lt;Freigabe-Pfad&gt;/&lt;Ordner&gt; --target /restore
 6. Die wiederhergestellten Dateien zurück in den Freigabe-Ordner kopieren. Besitzer und Berechtigungen stehen in kaimo-acl-manifest.json.
+
+NOTFALL-WIEDERHERSTELLUNG (Server komplett verloren)
+----------------------------------------------------
+Braucht einen Auftrag mit Stufe "full". Die Umgebungs-Geheimnisse des alten Servers (JWT_SECRET,
+NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherung enthalten.
+1. Neuen Server mit derselben docker-compose.yml und .env vorbereiten; Kaimo noch nicht starten.
+2. Neuester System-Snapshot:   restic snapshots --tag kind:system --latest 1
+3. Wiederherstellen:           restic restore &lt;Snapshot-ID&gt; --target /restore
+4. /restore/data/kaimo-system/ (bzw. deinen Anwendungsdaten-Pfad) in den neuen Anwendungsdaten-Ordner kopieren
+   und /restore/data/kaimo-backups/restic-meta/system/kaimo-database.dump in den neuen Sicherungsordner.
+5. Stack mit KAIMO_DB_RESTORE_FROM=kaimo-database.dump starten - die Datenbank (Benutzer, Freigaben,
+   Berechtigungen, dieses Repository samt Passwort) ist wieder da.
+6. Dateien wiederherstellen, jeweils neuester Snapshot pro Pool oder Freigabe, an ihre ursprünglichen Pfade:
+   restic restore &lt;Snapshot-ID&gt;:&lt;Pool- oder Freigabe-Pfad&gt; --target &lt;derselbe Pfad&gt;
+   Danach den Stack neu starten. Wiederherstellungen über die Weboberfläche funktionieren wieder.
 </value>
   </data>
   <data name="Web_Nav_Backup" xml:space="preserve">
@@ -5781,7 +5801,7 @@ WIEDERHERSTELLEN MIT DER RESTIC-KOMMANDOZEILE (funktioniert ohne Kaimo-Server)
     <value>Dateien</value>
   </data>
   <data name="Web_Backup_Jobs_Help" xml:space="preserve">
-    <value>Ein Auftrag sichert eine oder mehrere Freigaben zu festen Zeiten in ein Repository. Jede Freigabe erhält einen eigenen Sicherungsstand inklusive ihrer Berechtigungen.</value>
+    <value>Ein Auftrag sichert Freigaben zu festen Zeiten in ein Repository. Jede Freigabe erhält einen eigenen Sicherungsstand inklusive ihrer Berechtigungen. Globale Administratoren können zusätzlich ganze Pools und die Datenbank sichern.</value>
   </data>
   <data name="Web_Backup_Jobs_Create" xml:space="preserve">
     <value>Neuer Sicherungsauftrag</value>
@@ -6288,7 +6308,7 @@ WIEDERHERSTELLEN MIT DER RESTIC-KOMMANDOZEILE (funktioniert ohne Kaimo-Server)
     <value>Der Kit-Code stimmt nicht. Prüfe den Code in der heruntergeladenen Datei.</value>
   </data>
   <data name="Web_Backup_Error_sources_required" xml:space="preserve">
-    <value>Wähle mindestens eine Freigabe.</value>
+    <value>Wähle mindestens eine Freigabe oder einen Pool oder einen Inhalt mit Datenbank.</value>
   </data>
   <data name="Web_Backup_Error_schedule_invalid" xml:space="preserve">
     <value>Wähle Startzeiten und Wochentage – oder keines von beiden.</value>
@@ -6700,5 +6720,179 @@ WIEDERHERSTELLEN MIT DER RESTIC-KOMMANDOZEILE (funktioniert ohne Kaimo-Server)
   </data>
   <data name="Web_Backup_Maintenance_MirrorRule" xml:space="preserve">
     <value>Angeboten werden nur Repositorys, in die in einem Schritt kopiert werden kann: ein anderer Speichertyp, ein lokaler Ordner oder derselbe Speichertyp mit demselben Zugang (SFTP: dieselbe SSH-Verbindung; S3 und REST: dieselben Zugangsdaten).</value>
+  </data>
+  <data name="Web_Backup_Level_FilesAndDatabase" xml:space="preserve">
+    <value>Dateien + Datenbank</value>
+  </data>
+  <data name="Web_Backup_Level_Full" xml:space="preserve">
+    <value>Vollständig (Dateien, Datenbank, Systemdaten)</value>
+  </data>
+  <data name="Web_Backup_Level_Files_Help" xml:space="preserve">
+    <value>Nur die ausgewählten Freigaben und Pools.</value>
+  </data>
+  <data name="Web_Backup_Level_FilesAndDatabase_Help" xml:space="preserve">
+    <value>Zusätzlich bei jedem Lauf zuerst ein frischer Datenbank-Dump (Benutzer, Berechtigungen, Einstellungen, Dateiversionen).</value>
+  </data>
+  <data name="Web_Backup_Level_Full_Help" xml:space="preserve">
+    <value>Zusätzlich Datenbank-Dump und Anwendungsdaten (Schlüssel, Zertifikate). Nötig, um den Server nach einem Totalausfall neu aufzubauen.</value>
+  </data>
+  <data name="Web_Backup_Jobs_Content" xml:space="preserve">
+    <value>Inhalt</value>
+  </data>
+  <data name="Web_Backup_Jobs_Pools" xml:space="preserve">
+    <value>Pools</value>
+  </data>
+  <data name="Web_Backup_Jobs_PoolsPlaceholder" xml:space="preserve">
+    <value>Pools auswählen</value>
+  </data>
+  <data name="Web_Backup_Jobs_PoolsHelp" xml:space="preserve">
+    <value>Ein Pool wird als Ganzes gesichert, auch Ordner, die keine Freigabe sind, als ein Sicherungsstand pro Pool. Wiederherstellung nur in den Server-Ordner.</value>
+  </data>
+  <data name="Web_Backup_Jobs_NoPools" xml:space="preserve">
+    <value>Keine Pools gefunden.</value>
+  </data>
+  <data name="Web_Backup_Jobs_IncludeVersions" xml:space="preserve">
+    <value>Dateiversionen einschließen</value>
+  </data>
+  <data name="Web_Backup_Jobs_IncludeVersionsHelp" xml:space="preserve">
+    <value>Sichert auch den Versionsspeicher der ausgewählten Pools (.kaimo-versions).</value>
+  </data>
+  <data name="Web_Backup_Jobs_IncludeVersionsNeedsDb" xml:space="preserve">
+    <value>Braucht einen Inhalt mit Datenbank: Versionen sind ohne ihre Datenbankeinträge wertlos.</value>
+  </data>
+  <data name="Web_Backup_Source_System" xml:space="preserve">
+    <value>Datenbank &amp; System</value>
+  </data>
+  <data name="Web_Backup_Source_Pool" xml:space="preserve">
+    <value>Pool {0}</value>
+  </data>
+  <data name="Web_Backup_Error_database_dump_failed" xml:space="preserve">
+    <value>Der Datenbank-Dump (pg_dump) ist fehlgeschlagen. Details im Protokollauszug.</value>
+  </data>
+  <data name="Web_Backup_Error_pool_missing" xml:space="preserve">
+    <value>Ein ausgewählter Pool existiert nicht.</value>
+  </data>
+  <data name="Web_Backup_Restore_Mode_ServerFolder" xml:space="preserve">
+    <value>In den Sicherungsordner des Servers</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerSources" xml:space="preserve">
+    <value>System &amp; Pools</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerHelp" xml:space="preserve">
+    <value>Diese Sicherungsstände werden als Ganzes in einen neuen Ordner unter {0} auf dem Server wiederhergestellt; laufende Daten bleiben unverändert. Die Dateien von dort übernehmen. Ein Datenbank-Dump wird über die Start-Wiederherstellung (KAIMO_DB_RESTORE_FROM) eingespielt, siehe Betriebshandbuch.</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerRestore" xml:space="preserve">
+    <value>In Server-Ordner wiederherstellen</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerStarted" xml:space="preserve">
+    <value>Wiederherstellung gestartet. Der Zielordner steht im Verlauf.</value>
+  </data>
+  <data name="Web_Backup_Activity_Sources" xml:space="preserve">
+    <value>Quellen</value>
+  </data>
+  <data name="Web_Backup_Jobs_SourceKind" xml:space="preserve">
+    <value>Sichern</value>
+  </data>
+  <data name="Web_Backup_Jobs_SourceKind_Share" xml:space="preserve">
+    <value>Einzelne Freigaben</value>
+  </data>
+  <data name="Web_Backup_Jobs_SourceKind_Pool" xml:space="preserve">
+    <value>Ganze Pools (mit allen enthaltenen Freigaben)</value>
+  </data>
+  <data name="Web_Backup_Jobs_PoolShares" xml:space="preserve">
+    <value>Enthaltene Freigaben</value>
+  </data>
+  <data name="Web_Backup_Jobs_PoolNoShares" xml:space="preserve">
+    <value>keine Freigaben</value>
+  </data>
+  <data name="Web_Backup_Error_sources_mixed" xml:space="preserve">
+    <value>Wähle entweder Freigaben oder Pools, nicht beides: Ein Pool enthält seine Freigaben bereits.</value>
+  </data>
+  <data name="Web_Backup_Restore_NoServerPoints" xml:space="preserve">
+    <value>Noch keine System- oder Pool-Sicherungsstände.</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerConfirmTitle" xml:space="preserve">
+    <value>In den Server-Ordner wiederherstellen?</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerConfirmText" xml:space="preserve">
+    <value>Der ganze Sicherungsstand „{0}“ vom {1} ({2}) wird in einen neuen Ordner unter {3} wiederhergestellt.</value>
+  </data>
+  <data name="Web_Backup_Restore_ServerConfirmHint" xml:space="preserve">
+    <value>Der Server braucht entsprechend freien Speicher. Laufende Daten bleiben unverändert. Der Ordner kann den Datenbank-Dump mit allen Zugangsdaten enthalten: lösche ihn, sobald er nicht mehr gebraucht wird.</value>
+  </data>
+  <data name="Web_Backup_Activity_DumpCheck" xml:space="preserve">
+    <value>Datenbank-Dump</value>
+  </data>
+  <data name="Web_Backup_Activity_DumpOk" xml:space="preserve">
+    <value>lesbar (mit pg_restore geprüft)</value>
+  </data>
+  <data name="Web_Backup_Activity_DumpBroken" xml:space="preserve">
+    <value>NICHT lesbar - der neueste Datenbank-Dump ist beschädigt</value>
+  </data>
+  <data name="Web_Transfer_Error_NoSelection" xml:space="preserve">
+    <value>Wähle mindestens ein Element aus.</value>
+  </data>
+  <data name="Web_Transfer_Error_RemoteCut" xml:space="preserve">
+    <value>Elemente aus einer virtuellen Freigabe können nur kopiert werden.</value>
+  </data>
+  <data name="Web_Transfer_Error_InvalidPath" xml:space="preserve">
+    <value>Der Zielordner ist ungültig.</value>
+  </data>
+  <data name="Web_Transfer_Error_SignInRequired" xml:space="preserve">
+    <value>Eine Anmeldung ist erforderlich.</value>
+  </data>
+  <data name="Web_Transfer_Error_AccessDenied" xml:space="preserve">
+    <value>Du hast keine Berechtigung, diese Elemente zu übertragen.</value>
+  </data>
+  <data name="Web_Transfer_Error_Cancelled" xml:space="preserve">
+    <value>Die Übertragung wurde abgebrochen.</value>
+  </data>
+  <data name="Web_Transfer_Error_Failed" xml:space="preserve">
+    <value>Die Elemente konnten nicht übertragen werden.</value>
+  </data>
+  <data name="Web_Transfer_CopySuccess" xml:space="preserve">
+    <value>Elemente erfolgreich kopiert.</value>
+  </data>
+  <data name="Web_Transfer_CutSuccess" xml:space="preserve">
+    <value>Elemente erfolgreich verschoben.</value>
+  </data>
+  <data name="Web_Transfer_Copy" xml:space="preserve">
+    <value>Kopieren</value>
+  </data>
+  <data name="Web_Transfer_Cut" xml:space="preserve">
+    <value>Ausschneiden</value>
+  </data>
+  <data name="Web_Transfer_Paste" xml:space="preserve">
+    <value>Einfügen</value>
+  </data>
+  <data name="Web_Transfer_CopyingOne" xml:space="preserve">
+    <value>Kopieren: {0}</value>
+  </data>
+  <data name="Web_Transfer_CopyingMany" xml:space="preserve">
+    <value>{0} Elemente kopieren</value>
+  </data>
+  <data name="Web_Transfer_CuttingOne" xml:space="preserve">
+    <value>Ausschneiden: {0}</value>
+  </data>
+  <data name="Web_Transfer_CuttingMany" xml:space="preserve">
+    <value>{0} Elemente ausschneiden</value>
+  </data>
+  <data name="Web_Jobs_FileTransfer_Title" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="Web_Transfer_JobCopy" xml:space="preserve">
+    <value>Kopieren</value>
+  </data>
+  <data name="Web_Transfer_JobCut" xml:space="preserve">
+    <value>Verschieben</value>
+  </data>
+  <data name="Web_Transfer_Progress" xml:space="preserve">
+    <value>Übertragung wird vorbereitet…</value>
+  </data>
+  <data name="Web_Transfer_ProgressItem" xml:space="preserve">
+    <value>Übertrage: {0}</value>
+  </data>
+  <data name="Web_Properties_SizeUnavailable" xml:space="preserve">
+    <value>Nicht verfügbar</value>
   </data>
 </root>

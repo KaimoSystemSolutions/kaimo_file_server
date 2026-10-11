@@ -13,7 +13,7 @@
 
 <div class="backup-toolbar">
     <p class="subtitle">@R("Web_Backup_Jobs_Help")</p>
-    <button class="btn-primary" type="button" disabled="@(VM.IsReadOnlyDemo || VM.SelectableShares.Count == 0)" @onclick="StartCreate">
+    <button class="btn-primary" type="button" disabled="@(VM.IsReadOnlyDemo || (VM.SelectableShares.Count == 0 && !VM.Access.JobsUnrestricted))" @onclick="StartCreate">
         @R("Web_Backup_Jobs_Create")
     </button>
 </div>
@@ -33,7 +33,7 @@
                 <span class="workspace-row-icon">@Assets.SVG("history.svg", new SvgOptions(Width: 16, Height: 16))</span>
                 <span class="workspace-row-text">
                     <strong>@job.Name</strong>
-                    <small>@string.Join(", ", view.Shares.Select(s => s.Name)) → @view.RepositoryName</small>
+                    <small>@BackupUi.SourcesText(view) → @view.RepositoryName</small>
                 </span>
                 <StatusBadge Tone="@BackupUi.JobTone(job)" Label="@BackupUi.JobStatusLabel(job)" />
             </button>
@@ -48,7 +48,7 @@
             <div class="workspace-heading">
                 <div>
                     <h3>@(form.Id is null ? R("Web_Backup_Jobs_Create") : R("Web_Backup_Jobs_Edit"))</h3>
-                    <span class="workspace-heading-sub">@R("Web_Backup_Level_Files")</span>
+                    <span class="workspace-heading-sub">@BackupUi.LevelLabel(form.ContentLevel)</span>
                 </div>
                 <label class="workspace-enabled">
                     <span class="toggle-switch">
@@ -64,13 +64,66 @@
                     <span>@R("Web_Backup_Name")</span>
                     <input class="edit-input" maxlength="200" @bind="form.Name" @bind:event="oninput" />
                 </label>
-                <div class="workspace-field">
-                    <span>@R("Web_Backup_Jobs_Sources")</span>
-                    <MultiSelect T="ShareDefinition" Items="form.Shares" Label="s => s.Name" OnChanged="StateHasChanged"
-                                 PlaceholderText="@R("Web_Backup_Jobs_SourcesPlaceholder")"
-                                 EmptyText="@R("Web_Backup_Jobs_NoShares")" />
-                    <small>@R("Web_Backup_Jobs_SourcesHelp")</small>
-                </div>
+                @if (VM.Access.JobsUnrestricted)
+                {
+                    <label>
+                        <span>@R("Web_Backup_Jobs_SourceKind")</span>
+                        <select class="edit-input" @bind="form.SourceKind">
+                            <option value="@BackupSourceKind.Share">@R("Web_Backup_Jobs_SourceKind_Share")</option>
+                            <option value="@BackupSourceKind.Pool">@R("Web_Backup_Jobs_SourceKind_Pool")</option>
+                        </select>
+                    </label>
+                }
+                @if (form.SourceKind == BackupSourceKind.Share)
+                {
+                    <div class="workspace-field">
+                        <span>@R("Web_Backup_Jobs_Sources")</span>
+                        <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                              Items='form.Shares.ToPickerItems(PrincipalKind.Share, s => s.Id, s => s.Name, s => s.Path)'
+                                              SelectedIds="form.Shares.CheckedIds(s => s.Id)"
+                                              SelectedIdsChanged="ids => form.Shares.ApplySelection(ids, s => s.Id)"
+                                              Title="@R("Web_Backup_Jobs_Sources")"
+                                              Placeholder="@(form.Shares.Count == 0 ? R("Web_Backup_Jobs_NoShares") : R("Web_Backup_Jobs_SourcesPlaceholder"))" />
+                        <small>@R("Web_Backup_Jobs_SourcesHelp")</small>
+                    </div>
+                }
+                else
+                {
+                    <div class="workspace-field">
+                        <span>@R("Web_Backup_Jobs_Pools")</span>
+                        <MultiSelect T="string" Items="form.Pools" Label="BackupUi.PoolName" OnChanged="StateHasChanged"
+                                     PlaceholderText="@R("Web_Backup_Jobs_PoolsPlaceholder")"
+                                     EmptyText="@R("Web_Backup_Jobs_NoPools")" />
+                        <small>@R("Web_Backup_Jobs_PoolsHelp")</small>
+                    </div>
+                    @if (form.SelectedPools.Any())
+                    {
+                        <div class="backup-pool-shares" role="group" aria-label="@R("Web_Backup_Jobs_PoolShares")">
+                            <span class="backup-pool-shares-title">@R("Web_Backup_Jobs_PoolShares")</span>
+                            @foreach (var pool in form.SelectedPools)
+                            {
+                                var names = VM.SharesInPool(pool);
+                                <span class="backup-pool-shares-line">
+                                    <strong>@BackupUi.PoolName(pool)</strong>
+                                    <span>@(names.Count == 0 ? R("Web_Backup_Jobs_PoolNoShares") : string.Join(", ", names))</span>
+                                </span>
+                            }
+                        </div>
+                    }
+                }
+                @if (VM.Access.JobsUnrestricted)
+                {
+                    <label>
+                        <span>@R("Web_Backup_Jobs_Content")</span>
+                        <select class="edit-input" @bind="form.ContentLevel">
+                            @foreach (var level in Enum.GetValues<BackupContentLevel>())
+                            {
+                                <option value="@level">@BackupUi.LevelLabel(level)</option>
+                            }
+                        </select>
+                        <small>@R("Web_Backup_Level_" + form.ContentLevel + "_Help")</small>
+                    </label>
+                }
                 <label>
                     <span>@R("Web_Backup_Repository")</span>
                     <select class="edit-input" @bind="form.RepositoryId">
@@ -92,6 +145,21 @@
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
+                @if (VM.Access.JobsUnrestricted && form.SelectedPools.Any())
+                {
+                    var needsDatabase = form.ContentLevel == BackupContentLevel.Files;
+                    <div class="toggle-row">
+                        <span>
+                            @R("Web_Backup_Jobs_IncludeVersions")
+                            <small class="form-hint">@(needsDatabase ? R("Web_Backup_Jobs_IncludeVersionsNeedsDb") : R("Web_Backup_Jobs_IncludeVersionsHelp"))</small>
+                        </span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" checked="@(form.IncludeVersions && !needsDatabase)" disabled="@needsDatabase"
+                                   aria-label="@R("Web_Backup_Jobs_IncludeVersions")" @onchange="e => form.IncludeVersions = e.Value is true" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                }
             </div>
 
             <section class="workspace-section">
@@ -170,7 +238,19 @@
             }
 
             <dl class="workspace-dl">
-                <dt>@R("Web_Backup_Jobs_Sources")</dt><dd>@string.Join(", ", view.Shares.Select(s => s.Name))</dd>
+                @if (view.Shares.Count > 0)
+                {
+                    <dt>@R("Web_Backup_Jobs_Sources")</dt><dd>@string.Join(", ", view.Shares.Select(s => s.Name))</dd>
+                }
+                @if (job.Sources.Any(s => s.Kind == BackupSourceKind.Pool))
+                {
+                    <dt>@R("Web_Backup_Jobs_Pools")</dt>
+                    <dd>@string.Join(", ", job.Sources.Where(s => s.Kind == BackupSourceKind.Pool && s.PoolPath is not null).Select(s => BackupUi.PoolName(s.PoolPath!)))</dd>
+                    <dt>@R("Web_Backup_Jobs_PoolShares")</dt>
+                    <dd>@string.Join(", ", job.Sources.Where(s => s.Kind == BackupSourceKind.Pool && s.PoolPath is not null).SelectMany(s => VM.SharesInPool(s.PoolPath!)).Distinct())</dd>
+                    <dt>@R("Web_Backup_Jobs_IncludeVersions")</dt><dd>@(BackupJobExecutor.IncludesVersions(job) ? R("Web_Common_Yes") : R("Web_Common_No"))</dd>
+                }
+                <dt>@R("Web_Backup_Jobs_Content")</dt><dd>@BackupUi.LevelLabel(job.ContentLevel)</dd>
                 <dt>@R("Web_Backup_Repository")</dt><dd>@view.RepositoryName</dd>
                 <dt>@R("Web_Backup_Schedule")</dt><dd>@BackupUi.ScheduleText(job.Schedule)</dd>
                 <dt>@R("Web_Backup_Retention")</dt><dd>@BackupUi.RetentionText(job.Retention)</dd>
@@ -239,7 +319,7 @@
     private BackupJobView? Selected => VM.Jobs.FirstOrDefault(j => j.Job.Id == _selectedId);
 
     private bool CanSave => !string.IsNullOrWhiteSpace(VM.JobForm.Name)
-                            && VM.JobForm.SelectedShareIds.Any()
+                            && VM.JobForm.HasSources
                             && VM.JobForm.RepositoryId != Guid.Empty;
 
     private void Select(Guid id)

@@ -1,3 +1,4 @@
+@using Kaimo_File_Server.Core.Domain.Backup
 @using Kaimo_File_Server.Core.Helpers
 @using Kaimo_File_Server.Core.Services.Notifications
 @using Kaimo_File_Server.Infrastructure.Backup.Restic
@@ -22,13 +23,17 @@
 
 <div class="workspace workspace--wide-detail">
     <section class="workspace-list" aria-label="@R("Web_Backup_Restore_Shares")">
-        <div class="workspace-list-header">
-            <span>@R("Web_Backup_Restore_Shares")</span>
-            <button type="button" class="btn-secondary btn-secondary--sm" disabled="@VM.IsBusy" @onclick="VM.ReloadAsync">@R("Web_Backup_Refresh")</button>
-        </div>
-        @if (VM.RestoreShares.Count == 0)
+        @* Repository admins without a restore bit only get the system & pools section. *@
+        @if (VM.Access.CanRestore)
         {
-            <div class="empty-state"><p>@R("Web_Backup_Restore_NoShares")</p></div>
+            <div class="workspace-list-header">
+                <span>@R("Web_Backup_Restore_Shares")</span>
+                <button type="button" class="btn-secondary btn-secondary--sm" disabled="@VM.IsBusy" @onclick="VM.ReloadAsync">@R("Web_Backup_Refresh")</button>
+            </div>
+            @if (VM.RestoreShares.Count == 0)
+            {
+                <div class="empty-state"><p>@R("Web_Backup_Restore_NoShares")</p></div>
+            }
         }
         @foreach (var item in VM.RestoreShares)
         {
@@ -41,6 +46,32 @@
                     <small>@string.Format(R("Web_Backup_Restore_PointCount"), item.BackupPointCount, DateFmt.FormatDateTime(item.LatestUtc))</small>
                 </span>
             </button>
+        }
+        @if (VM.Access.CanManageRepositories)
+        {
+            <div class="workspace-list-header">
+                <span>@R("Web_Backup_Restore_ServerSources")</span>
+                @if (!VM.Access.CanRestore)
+                {
+                    <button type="button" class="btn-secondary btn-secondary--sm" disabled="@VM.IsBusy" @onclick="VM.ReloadAsync">@R("Web_Backup_Refresh")</button>
+                }
+            </div>
+            @if (VM.ServerPoints.Count == 0)
+            {
+                <div class="empty-state"><p>@R("Web_Backup_Restore_NoServerPoints")</p></div>
+            }
+            @foreach (var group in VM.ServerPoints.GroupBy(p => p.Source))
+            {
+                var selected = VM.ServerSource == group.Key;
+                <button type="button" class="workspace-row @(selected ? "workspace-row--selected" : "")"
+                        aria-pressed="@(selected ? "true" : "false")" disabled="@VM.IsBusy" @onclick="() => VM.SelectServerSource(group.Key)">
+                    <span class="workspace-row-icon">@Assets.SVG(group.First().Kind == BackupSnapshotKind.System ? "gear.svg" : "archive.svg", new SvgOptions(Width: 16, Height: 16))</span>
+                    <span class="workspace-row-text">
+                        <strong>@group.Key</strong>
+                        <small>@string.Format(R("Web_Backup_Restore_PointCount"), group.Count(), DateFmt.FormatDateTime(group.Max(p => p.TimeUtc)))</small>
+                    </span>
+                </button>
+            }
         }
     </section>
 
@@ -148,12 +179,63 @@
                 }
             </div>
         }
+        else if (VM.ServerSource is { } source)
+        {
+            <div class="workspace-heading">
+                <div>
+                    <h3>@source</h3>
+                    <span class="workspace-heading-sub">@R("Web_Backup_Restore_ServerSources")</span>
+                </div>
+            </div>
+            <p class="form-hint backup-server-help">@string.Format(R("Web_Backup_Restore_ServerHelp"), VM.ServerRestoreRoot)</p>
+            <div class="backup-browse" role="table" aria-label="@source">
+                <div class="backup-browse-row backup-server-row backup-browse-head" role="row">
+                    <span role="columnheader">@R("Web_Backup_Restore_Point")</span>
+                    <span role="columnheader" class="backup-browse-size">@R("Web_Backup_Restore_Size")</span>
+                    <span role="columnheader" aria-label="@R("Web_Backup_Restore_ServerRestore")"></span>
+                </div>
+                @foreach (var point in VM.ServerPoints.Where(p => p.Source == source))
+                {
+                    <div class="backup-browse-row backup-server-row" role="row">
+                        <span role="cell" class="backup-server-point">
+                            <strong>@DateFmt.FormatDateTime(point.TimeUtc)</strong>
+                            <small>@point.RepositoryName@(point.JobName is null ? "" : " · " + point.JobName) · @BackupUi.LevelLabel(point.ContentLevel)</small>
+                        </span>
+                        <span role="cell" class="backup-browse-size">@NotificationEvents.FormatSize(point.TotalBytes)</span>
+                        <span role="cell">
+                            <button type="button" class="btn-secondary btn-secondary--sm" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)"
+                                    @onclick="() => _serverPoint = point">
+                                @R("Web_Backup_Restore_ServerRestore")
+                            </button>
+                        </span>
+                    </div>
+                }
+            </div>
+        }
         else
         {
             <div class="detail-empty"><p>@R("Web_Backup_Restore_SelectHint")</p></div>
         }
     </aside>
 </div>
+
+@if (_serverPoint is { } confirmPoint)
+{
+    <div class="modal-backdrop" @onclick="() => _serverPoint = null">
+        <div class="modal-dialog backup-restore-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-server-restore-title" @onclick:stopPropagation="true">
+            <h2 class="modal-title" id="backup-server-restore-title">@R("Web_Backup_Restore_ServerConfirmTitle")</h2>
+            <p class="modal-text">
+                @string.Format(R("Web_Backup_Restore_ServerConfirmText"), confirmPoint.Source, DateFmt.FormatDateTime(confirmPoint.TimeUtc),
+                    NotificationEvents.FormatSize(confirmPoint.TotalBytes), VM.ServerRestoreRoot)
+            </p>
+            <p class="modal-text form-hint">@R("Web_Backup_Restore_ServerConfirmHint")</p>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" @onclick="() => _serverPoint = null">@R("Web_Button_Cancel")</button>
+                <button type="button" class="btn-primary" disabled="@VM.IsBusy" @onclick="ConfirmServerRestoreAsync">@R("Web_Backup_Restore_ServerRestore")</button>
+            </div>
+        </div>
+    </div>
+}
 
 @if (_dialogOpen && VM.RestoreShare is { } dialogShare && VM.BackupPoint is { } dialogPoint)
 {
@@ -247,6 +329,15 @@
     private static readonly BackupRestoreMode[] Modes = [BackupRestoreMode.NewFolder, BackupRestoreMode.InPlace, BackupRestoreMode.OtherShare];
 
     private bool _dialogOpen;
+
+    /// <summary>System or pool backup point waiting for confirmation (a pool may be terabytes).</summary>
+    private BackupServerPointView? _serverPoint;
+
+    private async Task ConfirmServerRestoreAsync()
+    {
+        if (_serverPoint is { } point && await VM.RestoreServerPointAsync(point))
+            _serverPoint = null;
+    }
 
     private bool IsModeAllowed(BackupRestoreMode mode) => mode switch
     {

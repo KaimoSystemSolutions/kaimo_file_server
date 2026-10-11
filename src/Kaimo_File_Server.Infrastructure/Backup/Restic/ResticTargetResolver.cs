@@ -19,7 +19,20 @@ public sealed class ResticTargetResolver(
     ICredentialVault vault,
     IConfiguration configuration)
 {
-    private string ApplicationDataPath => configuration["Storage:ApplicationDataPath"] ?? "/data/kaimo-system";
+    /// <summary>Internal application data (DataProtection keys, certificates); part of Full backups.</summary>
+    public string ApplicationDataPath => configuration["Storage:ApplicationDataPath"] ?? "/data/kaimo-system";
+
+    /// <summary>The storage pools: direct child folders of the storage root, as the hosts discover them.</summary>
+    public IReadOnlyList<string> Pools
+    {
+        get
+        {
+            var root = configuration["Storage:RootPath"] ?? "/data/storage";
+            return Directory.Exists(root)
+                ? Directory.GetDirectories(root).Select(Path.TrimEndingDirectorySeparator).Order(StringComparer.Ordinal).ToList()
+                : [];
+        }
+    }
 
     /// <summary>Private temp files (SSH keys, CA certificates) of running restic processes.</summary>
     public string TempRoot => configuration["Backup:Restic:TempDirectory"]

@@ -38,7 +38,7 @@
             <span class="workspace-row-icon">@Assets.SVG("history.svg", new SvgOptions(Width: 16, Height: 16))</span>
             <span class="workspace-row-text">
                 <strong>@job.Name</strong>
-                <small>@string.Join(", ", view.Shares.Select(s => s.Name)) → @view.RepositoryName</small>
+                <small>@BackupUi.SourcesText(view) → @view.RepositoryName</small>
             </span>
             <span class="backup-overview-meta">
                 <span>@R("Web_Backup_LastSuccess"): @DateFmt.FormatDateTime(job.LastSuccessAtUtc, R("Web_Backup_Never"))</span>

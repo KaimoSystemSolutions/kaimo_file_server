@@ -64,7 +64,9 @@ The database backup does not contain:
   users set their passwords again.
 
 Back up the database, `/data/kaimo-system` and the secrets from the same point in time and restore
-them together.
+them together. A restic backup job with content level **Full** covers the database, `/data/kaimo-system`
+and the file content in one encrypted run; only the secrets remain to be kept separately. See
+[File backup and restore](file-backup-restic.md).
 
 ## Restoring a backup
 
