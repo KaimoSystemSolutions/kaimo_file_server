@@ -92,3 +92,31 @@ Third-party binaries (installed into the Web container image):
 
     restic runs as a separate process (command line invocation); it is not linked
     into the AGPL code, so its permissive licenses and the AGPL do not interact.
+
+  - rclone (https://rclone.org) -- MIT License, Copyright (C) 2012 by Nick
+    Craig-Wood. The official, checksum-pinned release binary is installed
+    unmodified as /usr/local/bin/rclone (backend of restic repositories of type
+    "rclone"); the license is kept in third-party/rclone/LICENSE and shipped in
+    the image as /usr/share/doc/rclone/LICENSE.
+
+    The binary also contains the Go standard library and the Go modules rclone
+    depends on (Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, CC0-1.0,
+    eight MPL-2.0 modules and one LGPL-3.0 module, cloudsoda/sddl, all used
+    unmodified; the MPL sources are linked there). Their license texts and
+    NOTICE files (including those of the enclosing repositories of Apache-2.0
+    sub-modules) are kept in third-party/rclone/THIRD_PARTY_LICENSES.txt and
+    shipped in the image as /usr/share/doc/rclone/THIRD_PARTY_LICENSES.txt.
+
+    For the LGPL-3.0 library, as required by LGPL-3.0 section 4: that file also
+    contains the full texts of the LGPL-3.0 and of the GNU GPL v3 it
+    incorporates; the library's complete, unmodified source is kept in
+    third-party/rclone/source/ and shipped as /usr/share/doc/rclone/source/;
+    the section "SOURCE CODE AND RELINKING" of that file says where the rclone
+    source (MIT) of the exact release is published and how to relink rclone
+    with a modified version of the library.
+
+    Regenerate these files with third-party/restic/update-licenses.py whenever
+    KAIMO_RCLONE_VERSION changes.
+
+    rclone runs as a separate process started by restic; it is not linked into
+    the AGPL code.

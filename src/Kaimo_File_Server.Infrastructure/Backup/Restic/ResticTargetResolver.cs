@@ -5,6 +5,8 @@ using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Kaimo_File_Server.Infrastructure.Backup.Restic;
 
@@ -17,8 +19,11 @@ namespace Kaimo_File_Server.Infrastructure.Backup.Restic;
 public sealed class ResticTargetResolver(
     IDbContextFactory<ApplicationDbContext> dbFactory,
     ICredentialVault vault,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    ILogger<ResticTargetResolver>? logger = null)
 {
+    private readonly ILogger _logger = logger ?? NullLogger<ResticTargetResolver>.Instance;
+
     /// <summary>Internal application data (DataProtection keys, certificates); part of Full backups.</summary>
     public string ApplicationDataPath => configuration["Storage:ApplicationDataPath"] ?? "/data/kaimo-system";
 
@@ -34,7 +39,7 @@ public sealed class ResticTargetResolver(
         }
     }
 
-    /// <summary>Private temp files (SSH keys, CA certificates) of running restic processes.</summary>
+    /// <summary>Private temp files (SSH keys, CA certificates, GCS keys, rclone configs) of running restic processes.</summary>
     public string TempRoot => configuration["Backup:Restic:TempDirectory"]
         ?? Path.Combine(ApplicationDataPath, ".kaimo-restic-tmp");
 
@@ -69,13 +74,23 @@ public sealed class ResticTargetResolver(
     public string ProtectPassword(Guid repositoryId, string password)
         => vault.Protect(password, ResticBackend.PasswordContext(repositoryId));
 
-    /// <summary>Resolves a stored repository with its stored password and secrets.</summary>
+    /// <summary>
+    /// Resolves a stored repository with its stored password and secrets. Configuration rclone
+    /// rewrites during the run (refreshed OAuth tokens) is stored back on dispose.
+    /// </summary>
     public Task<ResticTarget> ResolveAsync(BackupRepository repository, CancellationToken ct)
-        => ResolveAsync(repository, ReadSecrets(repository), ReadPassword(repository), ct);
+        => ResolveCoreAsync(repository, ReadSecrets(repository), ReadPassword(repository), storeRcloneUpdates: true, ct);
 
-    /// <summary>Resolves with explicit secrets/password (repository creation, "connect existing").</summary>
-    public async Task<ResticTarget> ResolveAsync(
+    /// <summary>
+    /// Resolves with explicit secrets/password (repository creation, "connect existing", probing
+    /// edited credentials). Nothing is written back: the secrets may not be the stored ones.
+    /// </summary>
+    public Task<ResticTarget> ResolveAsync(
         BackupRepository repository, ResticBackendSecrets secrets, string password, CancellationToken ct)
+        => ResolveCoreAsync(repository, secrets, password, storeRcloneUpdates: false, ct);
+
+    private async Task<ResticTarget> ResolveCoreAsync(
+        BackupRepository repository, ResticBackendSecrets secrets, string password, bool storeRcloneUpdates, CancellationToken ct)
     {
         var settings = ResticRepositorySettings.Parse(repository.SettingsJson);
         ResticBackend.Validate(repository.Backend, settings, secrets, LocalRoots);
@@ -121,13 +136,63 @@ public sealed class ResticTargetResolver(
 
             var url = ResticBackend.BuildUrl(repository.Backend, settings, ssh);
             var env = ResticBackend.BuildEnvironment(repository.Backend, settings, secrets, password, url);
-            return new ResticTarget(url, env, arguments, tempDir);
+
+            if (repository.Backend == BackupBackend.Gcs)
+            {
+                tempDir ??= CreateTempDirectory();
+                var keyPath = Path.Combine(tempDir, "gcs-key.json");
+                await ProtocolTemporaryFile.WriteRestrictedTextAsync(keyPath, secrets.GcsCredentialsJson!, ct);
+                env["GOOGLE_APPLICATION_CREDENTIALS"] = keyPath;
+            }
+            Action? beforeCleanup = null;
+            if (repository.Backend == BackupBackend.Rclone)
+            {
+                tempDir ??= CreateTempDirectory();
+                var configPath = Path.Combine(tempDir, "rclone.conf");
+                var written = ResticBackend.ParseRcloneConfig(secrets.RcloneConfig).Config;
+                await ProtocolTemporaryFile.WriteRestrictedTextAsync(configPath, written, ct);
+                env["RCLONE_CONFIG"] = configPath;
+                if (storeRcloneUpdates)
+                    beforeCleanup = () => StoreRcloneUpdate(repository.Id, configPath, written);
+            }
+            return new ResticTarget(url, env, arguments, tempDir, beforeCleanup);
         }
         catch
         {
             if (tempDir is not null)
                 new ResticTarget(string.Empty, new Dictionary<string, string>(), [], tempDir).Dispose();
             throw;
+        }
+    }
+
+    /// <summary>
+    /// rclone saves refreshed OAuth tokens into its config file. Providers whose refresh tokens
+    /// rotate and expire (OneDrive) would otherwise fail once the pasted token runs out, so a
+    /// changed config is validated like pasted input and replaces the stored section.
+    /// </summary>
+    internal void StoreRcloneUpdate(Guid repositoryId, string configPath, string written)
+    {
+        try
+        {
+            if (!File.Exists(configPath))
+                return;
+            var updated = ResticBackend.ParseRcloneConfig(File.ReadAllText(configPath)).Config;
+            if (updated == written)
+                return;
+            using var db = dbFactory.CreateDbContext();
+            var repository = db.BackupRepositories.FirstOrDefault(r => r.Id == repositoryId);
+            if (repository is null)
+                return;
+            var secrets = ReadSecrets(repository);
+            secrets.RcloneConfig = updated;
+            repository.EncryptedSecrets = ProtectSecrets(repositoryId, secrets);
+            db.SaveChanges();
+            _logger.LogInformation("Stored the rclone configuration of backup repository {Name} updated by rclone (refreshed token).", repository.Name);
+        }
+        catch (Exception ex)
+        {
+            // Never fails the run: the previous token stays stored and may still be valid.
+            _logger.LogWarning(ex, "Could not store the rclone configuration updated during a run of backup repository {Id}.", repositoryId);
         }
     }
 

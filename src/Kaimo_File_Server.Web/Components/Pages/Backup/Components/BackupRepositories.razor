@@ -61,7 +61,7 @@
                 </label>
                 <label>
                     <span>@R("Web_Backup_Repos_Backend")</span>
-                    <select class="edit-input" @bind="form.Backend" @bind:after="Changed" disabled="@(!isNew)">
+                    <select class="edit-input" @bind="form.Backend" @bind:after="BackendChanged" disabled="@(!isNew)">
                         @foreach (var backend in Enum.GetValues<BackupBackend>())
                         {
                             <option value="@backend">@BackupUi.BackendLabel(backend)</option>
@@ -150,9 +150,103 @@
                             </label>
                         </div>
                         break;
+                    case BackupBackend.B2:
+                        <label>
+                            <span>@R("Web_Backup_Repos_Bucket")</span>
+                            <input class="edit-input" @bind="form.Bucket" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_Prefix")</span>
+                            <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_B2KeyId")</span>
+                            <input class="edit-input" @bind="form.B2AccountId" @bind:event="oninput" @bind:after="Changed" autocomplete="off"
+                                   placeholder="@(isNew ? "" : R("Web_Backup_Repos_KeepSecret"))" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_B2Key")</span>
+                            <input class="edit-input" type="password" @bind="form.B2AccountKey" @bind:event="oninput" @bind:after="Changed" autocomplete="new-password"
+                                   placeholder="@(isNew ? "" : R("Web_Backup_Repos_KeepSecret"))" />
+                        </label>
+                        break;
+                    case BackupBackend.Azure:
+                        <label>
+                            <span>@R("Web_Backup_Repos_AzureAccount")</span>
+                            <input class="edit-input" @bind="form.AzureAccountName" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_Container")</span>
+                            <input class="edit-input" @bind="form.Bucket" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_Prefix")</span>
+                            <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_AzureKey")</span>
+                            <input class="edit-input" type="password" @bind="form.AzureAccountKey" @bind:event="oninput" @bind:after="Changed" autocomplete="new-password"
+                                   placeholder="@(isNew ? "" : R("Web_Backup_Repos_KeepSecret"))" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_AzureSas")</span>
+                            <input class="edit-input" type="password" @bind="form.AzureSasToken" @bind:event="oninput" @bind:after="Changed" autocomplete="new-password"
+                                   placeholder="@(isNew ? "" : R("Web_Backup_Repos_KeepSecret"))" />
+                            <small>@R("Web_Backup_Repos_AzureCredentialsHelp")</small>
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_AzureSuffix")</span>
+                            <input class="edit-input" @bind="form.AzureEndpointSuffix" @bind:event="oninput" @bind:after="Changed" spellcheck="false" placeholder="core.windows.net" />
+                            <small>@R("Web_Backup_Repos_AzureSuffixHelp")</small>
+                        </label>
+                        break;
+                    case BackupBackend.Gcs:
+                        <label>
+                            <span>@R("Web_Backup_Repos_Bucket")</span>
+                            <input class="edit-input" @bind="form.Bucket" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_Prefix")</span>
+                            <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_GcsKey")</span>
+                            <textarea class="edit-input backup-pem" rows="4" spellcheck="false" autocomplete="off" @bind="form.GcsCredentialsJson" @bind:event="oninput" @bind:after="Changed"
+                                      placeholder="@(isNew ? "{ \"type\": \"service_account\", … }" : R("Web_Backup_Repos_KeepSecret"))"></textarea>
+                            <small>@R("Web_Backup_Repos_GcsKeyHelp")</small>
+                        </label>
+                        break;
+                    case BackupBackend.Swift:
+                        <label>
+                            <span>@R("Web_Backup_Repos_Container")</span>
+                            <input class="edit-input" @bind="form.Bucket" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_Prefix")</span>
+                            <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_SwiftEnv")</span>
+                            <textarea class="edit-input backup-pem" rows="6" spellcheck="false" autocomplete="off" @bind="form.SwiftEnvironment" @bind:event="oninput" @bind:after="Changed"
+                                      placeholder="@(isNew ? "OS_AUTH_URL=https://keystone.example.com:5000/v3\nOS_USERNAME=…\nOS_PASSWORD=…" : R("Web_Backup_Repos_KeepSecret"))"></textarea>
+                            <small>@R("Web_Backup_Repos_SwiftEnvHelp")</small>
+                        </label>
+                        break;
+                    case BackupBackend.Rclone:
+                        <label>
+                            <span>@R("Web_Backup_Repos_RcloneConfig")</span>
+                            <textarea class="edit-input backup-pem" rows="6" spellcheck="false" autocomplete="off" @bind="form.RcloneConfig" @bind:event="oninput" @bind:after="Changed"
+                                      placeholder="@(isNew ? "[onedrive]\ntype = onedrive\ntoken = {…}" : R("Web_Backup_Repos_KeepSecret"))"></textarea>
+                            <small>@R("Web_Backup_Repos_RcloneConfigHelp")</small>
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_RclonePath")</span>
+                            <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" placeholder="kaimo-backup" />
+                        </label>
+                        break;
                 }
 
-                @if (form.Backend is BackupBackend.Rest or BackupBackend.S3)
+                @if (form.Backend is BackupBackend.Rest or BackupBackend.S3 or BackupBackend.Swift)
                 {
                     <label>
                         <span>@R("Web_Backup_Repos_CaCertificate")</span>
@@ -448,6 +542,9 @@
                 BackupBackend.Sftp => f.ConnectionId != Guid.Empty && !string.IsNullOrWhiteSpace(f.Path),
                 BackupBackend.Rest => !string.IsNullOrWhiteSpace(f.Endpoint),
                 BackupBackend.S3 => !string.IsNullOrWhiteSpace(f.Endpoint) && !string.IsNullOrWhiteSpace(f.Bucket),
+                BackupBackend.Azure => !string.IsNullOrWhiteSpace(f.AzureAccountName) && !string.IsNullOrWhiteSpace(f.Bucket),
+                BackupBackend.B2 or BackupBackend.Gcs or BackupBackend.Swift => !string.IsNullOrWhiteSpace(f.Bucket),
+                BackupBackend.Rclone => !string.IsNullOrWhiteSpace(f.Path),
                 _ => false,
             };
         }
@@ -484,6 +581,12 @@
         if (VM.RepositoryForm.Id is null)
             VM.ResetProbe();
         await VM.RefreshMirrorCandidatesAsync();
+    }
+
+    private Task BackendChanged()
+    {
+        VM.ApplyBackendDefaults();
+        return Changed();
     }
 
     private async Task CreateAsync(bool connectExisting)
@@ -537,7 +640,8 @@
             BackupBackend.Sftp => "sftp: " + s.Path,
             BackupBackend.Rest => s.Endpoint + (string.IsNullOrEmpty(s.Path) ? "" : "/" + s.Path.Trim('/')),
             BackupBackend.S3 => s.Endpoint + "/" + s.Bucket + (string.IsNullOrEmpty(s.Path) ? "" : "/" + s.Path.Trim('/')),
-            _ => "–",
+            // The URL of the remaining backends holds no secret.
+            _ => ResticBackend.BuildUrl(repo.Backend, s),
         };
     }
 

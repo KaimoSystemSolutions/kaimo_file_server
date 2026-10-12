@@ -836,4 +836,52 @@ public class ResticBackupDatabaseTests : DatabaseTestBase
         Assert.Equal(2, forgets.Count);
         Assert.Contains("job:" + jobId.ToString("N") + ",kind:system", forgets[1]);
     }
+
+    [Fact]
+    public async Task Rclone_TokenRefreshedDuringARun_IsStoredBack_ButNeverFromProbedSecrets()
+    {
+        var vault = new Web.Services.DataProtectionCredentialVault(
+            Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("KaimoRcloneTests"));
+        var tempRoot = Path.Combine(Path.GetTempPath(), "kaimo-rclone-" + Guid.NewGuid().ToString("N"));
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Backup:Restic:TempDirectory"] = tempRoot }).Build();
+        var resolver = new ResticTargetResolver(DbFactory, vault, config);
+        var repo = new BackupRepository
+        {
+            Name = "OneDrive",
+            Backend = BackupBackend.Rclone,
+            State = BackupRepositoryState.Active,
+            SettingsJson = new ResticRepositorySettings { Path = "kaimo" }.Serialize(),
+        };
+        repo.EncryptedPassword = resolver.ProtectPassword(repo.Id, "pw");
+        repo.EncryptedSecrets = resolver.ProtectSecrets(repo.Id, new ResticBackendSecrets { RcloneConfig = "[od]\ntype = onedrive\ntoken = OLD" });
+        await using (var db = NewContext())
+        {
+            db.BackupRepositories.Add(repo);
+            await db.SaveChangesAsync();
+        }
+
+        // rclone rewrites its config file while restic runs (simulated).
+        void RcloneRefreshes(ResticTarget target, string token)
+            => File.WriteAllText(target.Environment["RCLONE_CONFIG"], $"[kaimo]\ntype = onedrive\ntoken = {token}\n\n");
+        async Task<string?> StoredConfigAsync()
+        {
+            await using var db = NewContext();
+            return resolver.ReadSecrets(await db.BackupRepositories.SingleAsync(r => r.Id == repo.Id)).RcloneConfig;
+        }
+
+        using (var probe = await resolver.ResolveAsync(repo, new ResticBackendSecrets { RcloneConfig = "type = onedrive\ntoken = TYPED" }, "pw", default))
+            RcloneRefreshes(probe, "PROBED");
+        Assert.Contains("token = OLD", await StoredConfigAsync());
+
+        using (var run = await resolver.ResolveAsync(repo, default))
+            RcloneRefreshes(run, "NEW");
+        Assert.Equal("[kaimo]\ntype = onedrive\ntoken = NEW\n", await StoredConfigAsync());
+
+        // A rewritten config that would no longer pass validation is ignored.
+        using (var run = await resolver.ResolveAsync(repo, default))
+            File.WriteAllText(run.Environment["RCLONE_CONFIG"], "[kaimo]\ntype = local\n");
+        Assert.Contains("token = NEW", await StoredConfigAsync());
+        Assert.False(Directory.EnumerateFileSystemEntries(tempRoot).Any());
+    }
 }

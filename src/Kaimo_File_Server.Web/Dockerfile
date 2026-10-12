@@ -50,6 +50,37 @@ COPY --chmod=0644 third-party/restic/LICENSE third-party/restic/THIRD_PARTY_LICE
 RUN chmod 0755 /usr/share/doc/restic \
     && grep -q "^restic ${RESTIC_VERSION} " /usr/share/doc/restic/THIRD_PARTY_LICENSES.txt \
     || { echo "third-party/restic/THIRD_PARTY_LICENSES.txt is not for restic ${RESTIC_VERSION}: run update-licenses.py" >&2; exit 1; }
+# rclone — backend of restic repositories of type "rclone" (restic starts
+# "rclone serve restic --stdio"). Pinned official release, verified like restic
+# (checksums from the release's SHA256SUMS file). MIT; its license and the
+# licenses of its Go modules ship like restic's (third-party/rclone/, regenerate
+# with third-party/restic/update-licenses.py after a version bump). The ARGs
+# must not start with RCLONE_: rclone reads every RCLONE_* variable as a flag.
+ARG KAIMO_RCLONE_VERSION=1.75.2
+ARG KAIMO_RCLONE_SHA256_AMD64=349ac8fba6ff65d6247043f1750cdcb518ec5d500ef91463a10d37c0ccdf3702
+ARG KAIMO_RCLONE_SHA256_ARM64=7e1e8d69654941b7b7df84ee74c5f7fb09cce7d5496947fb7bf16b55ff427d10
+RUN apt-get update && apt-get install -y --no-install-recommends curl unzip \
+    && arch="${TARGETARCH:-amd64}" \
+    && case "$arch" in \
+         amd64) sha="$KAIMO_RCLONE_SHA256_AMD64" ;; \
+         arm64) sha="$KAIMO_RCLONE_SHA256_ARM64" ;; \
+         *) echo "unsupported architecture for rclone: $arch" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL -o /tmp/rclone.zip \
+        "https://downloads.rclone.org/v${KAIMO_RCLONE_VERSION}/rclone-v${KAIMO_RCLONE_VERSION}-linux-${arch}.zip" \
+    && echo "${sha}  /tmp/rclone.zip" | sha256sum -c - \
+    && unzip -p /tmp/rclone.zip "rclone-v${KAIMO_RCLONE_VERSION}-linux-${arch}/rclone" > /usr/local/bin/rclone \
+    && chmod 0755 /usr/local/bin/rclone \
+    && rm /tmp/rclone.zip \
+    && apt-get purge -y --auto-remove curl unzip \
+    && rm -rf /var/lib/apt/lists/* \
+    && rclone version
+COPY --chmod=0644 third-party/rclone/LICENSE third-party/rclone/THIRD_PARTY_LICENSES.txt /usr/share/doc/rclone/
+# Source of the LGPL-3.0 libraries compiled into rclone (LGPL-3.0 section 4).
+COPY --chmod=0644 third-party/rclone/source/ /usr/share/doc/rclone/source/
+RUN chmod 0755 /usr/share/doc/rclone /usr/share/doc/rclone/source \
+    && grep -q "^rclone ${KAIMO_RCLONE_VERSION} " /usr/share/doc/rclone/THIRD_PARTY_LICENSES.txt \
+    || { echo "third-party/rclone/THIRD_PARTY_LICENSES.txt is not for rclone ${KAIMO_RCLONE_VERSION}: run update-licenses.py" >&2; exit 1; }
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080

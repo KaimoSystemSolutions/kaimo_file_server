@@ -481,6 +481,34 @@ public sealed class BackupCatalogService(
             parameters.AppendLine("RESTIC_REST_USERNAME / RESTIC_REST_PASSWORD");
         if (repository.Backend is BackupBackend.S3)
             parameters.AppendLine("AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY");
+        var secrets = resolver.ReadSecrets(repository);
+        switch (repository.Backend)
+        {
+            case BackupBackend.B2:
+                parameters.AppendLine("B2_ACCOUNT_ID / B2_ACCOUNT_KEY");
+                break;
+            case BackupBackend.Azure:
+                parameters.AppendLine("AZURE_ACCOUNT_NAME=" + settings.AzureAccountName);
+                if (!string.IsNullOrWhiteSpace(settings.AzureEndpointSuffix))
+                    parameters.AppendLine("AZURE_ENDPOINT_SUFFIX=" + settings.AzureEndpointSuffix);
+                parameters.AppendLine(string.IsNullOrEmpty(secrets.AzureSasToken) ? "AZURE_ACCOUNT_KEY" : "AZURE_ACCOUNT_SAS");
+                break;
+            case BackupBackend.Gcs:
+                parameters.AppendLine("GOOGLE_APPLICATION_CREDENTIALS=<service account key file>");
+                if (ResticBackend.GcsProjectId(secrets.GcsCredentialsJson) is { } projectId)
+                    parameters.AppendLine("GOOGLE_PROJECT_ID=" + projectId);
+                break;
+            case BackupBackend.Swift:
+                var swift = ResticBackend.ParseSwiftEnvironment(secrets.SwiftEnvironment);
+                if (swift.TryGetValue("OS_AUTH_URL", out var authUrl))
+                    parameters.AppendLine("OS_AUTH_URL=" + authUrl);
+                parameters.AppendLine(string.Join(" / ", swift.Keys.Where(k => k != "OS_AUTH_URL")));
+                break;
+            case BackupBackend.Rclone:
+                parameters.AppendLine($"rclone remote [{ResticBackend.RcloneRemoteName}], type {ResticBackend.ParseRcloneConfig(secrets.RcloneConfig).Type} (rclone must be installed)");
+                parameters.AppendLine("RCLONE_CONFIG=<rclone.conf with that remote>");
+                break;
+        }
 
         var template = Resources.ResourceManager.GetString("Web_Backup_Kit_Template") ?? DefaultKitTemplate;
         var now = time.GetUtcNow().UtcDateTime;
@@ -1188,17 +1216,32 @@ public sealed class BackupCatalogService(
     }
 
     private static bool HasSecrets(ResticBackendSecrets s)
-        => !string.IsNullOrEmpty(s.RestUsername) || !string.IsNullOrEmpty(s.RestPassword)
-           || !string.IsNullOrEmpty(s.S3AccessKeyId) || !string.IsNullOrEmpty(s.S3SecretAccessKey);
+        => new[]
+        {
+            s.RestUsername, s.RestPassword, s.S3AccessKeyId, s.S3SecretAccessKey, s.B2AccountId, s.B2AccountKey,
+            s.AzureAccountKey, s.AzureSasToken, s.GcsCredentialsJson, s.SwiftEnvironment, s.RcloneConfig,
+        }.Any(v => !string.IsNullOrEmpty(v));
 
     /// <summary>Fields left empty in the form keep their stored value.</summary>
-    private static ResticBackendSecrets MergeSecrets(ResticBackendSecrets stored, ResticBackendSecrets typed) => new()
+    private static ResticBackendSecrets MergeSecrets(ResticBackendSecrets stored, ResticBackendSecrets typed)
     {
-        RestUsername = string.IsNullOrEmpty(typed.RestUsername) ? stored.RestUsername : typed.RestUsername,
-        RestPassword = string.IsNullOrEmpty(typed.RestPassword) ? stored.RestPassword : typed.RestPassword,
-        S3AccessKeyId = string.IsNullOrEmpty(typed.S3AccessKeyId) ? stored.S3AccessKeyId : typed.S3AccessKeyId,
-        S3SecretAccessKey = string.IsNullOrEmpty(typed.S3SecretAccessKey) ? stored.S3SecretAccessKey : typed.S3SecretAccessKey,
-    };
+        // Azure takes either key or SAS token: typing one replaces the stored pair.
+        var azureTyped = !string.IsNullOrEmpty(typed.AzureAccountKey) || !string.IsNullOrEmpty(typed.AzureSasToken);
+        return new()
+        {
+            RestUsername = string.IsNullOrEmpty(typed.RestUsername) ? stored.RestUsername : typed.RestUsername,
+            RestPassword = string.IsNullOrEmpty(typed.RestPassword) ? stored.RestPassword : typed.RestPassword,
+            S3AccessKeyId = string.IsNullOrEmpty(typed.S3AccessKeyId) ? stored.S3AccessKeyId : typed.S3AccessKeyId,
+            S3SecretAccessKey = string.IsNullOrEmpty(typed.S3SecretAccessKey) ? stored.S3SecretAccessKey : typed.S3SecretAccessKey,
+            B2AccountId = string.IsNullOrEmpty(typed.B2AccountId) ? stored.B2AccountId : typed.B2AccountId,
+            B2AccountKey = string.IsNullOrEmpty(typed.B2AccountKey) ? stored.B2AccountKey : typed.B2AccountKey,
+            AzureAccountKey = azureTyped ? typed.AzureAccountKey : stored.AzureAccountKey,
+            AzureSasToken = azureTyped ? typed.AzureSasToken : stored.AzureSasToken,
+            GcsCredentialsJson = string.IsNullOrEmpty(typed.GcsCredentialsJson) ? stored.GcsCredentialsJson : typed.GcsCredentialsJson,
+            SwiftEnvironment = string.IsNullOrEmpty(typed.SwiftEnvironment) ? stored.SwiftEnvironment : typed.SwiftEnvironment,
+            RcloneConfig = string.IsNullOrEmpty(typed.RcloneConfig) ? stored.RcloneConfig : typed.RcloneConfig,
+        };
+    }
 
     // Fallback only; the localized template lives in the resource files.
     private const string DefaultKitTemplate = "Kaimo recovery kit\n\nRepository: {0} ({1})\nRESTIC_REPOSITORY={2}\n{3}\nRESTIC_PASSWORD={4}\nRepository id: {5}\nrestic: {6}\nCreated: {7}\nKit code: {8}\n";

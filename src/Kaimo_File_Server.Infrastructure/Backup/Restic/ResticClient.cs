@@ -394,7 +394,8 @@ public sealed class ResticClient(IProcessRunner runner, IConfiguration configura
     /// goes into <c>RESTIC_FROM_*</c>. Backend variables and options are not namespaced per
     /// repository, so differing values for the same name cannot work and are rejected (the
     /// mirror form validates this up front). Both <c>sftp.command</c>s of one SSH connection only
-    /// differ in their temporary key path, so the destination's serves both.
+    /// differ in their temporary key path, so the destination's serves both; the same holds for
+    /// the GCS key and rclone config files (the mirror validation requires identical content).
     /// </summary>
     internal static ResticTarget BuildCopyTarget(ResticTarget destination, ResticTarget source)
     {
@@ -405,6 +406,7 @@ public sealed class ResticClient(IProcessRunner runner, IConfiguration configura
             {
                 case "RESTIC_REPOSITORY": env["RESTIC_FROM_REPOSITORY"] = value; break;
                 case "RESTIC_PASSWORD": env["RESTIC_FROM_PASSWORD"] = value; break;
+                case "GOOGLE_APPLICATION_CREDENTIALS" or "RCLONE_CONFIG": env.TryAdd(key, value); break;
                 default:
                     if (env.TryGetValue(key, out var existing) && existing != value)
                         throw new ResticException("mirror_conflict", $"Both repositories need different values for {key}.");

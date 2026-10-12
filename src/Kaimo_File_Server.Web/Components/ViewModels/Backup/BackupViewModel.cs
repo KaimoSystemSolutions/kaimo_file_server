@@ -30,6 +30,15 @@ public sealed class BackupRepositoryForm
     public string RestPassword { get; set; } = string.Empty;
     public string S3AccessKeyId { get; set; } = string.Empty;
     public string S3SecretAccessKey { get; set; } = string.Empty;
+    public string AzureAccountName { get; set; } = string.Empty;
+    public string AzureEndpointSuffix { get; set; } = string.Empty;
+    public string B2AccountId { get; set; } = string.Empty;
+    public string B2AccountKey { get; set; } = string.Empty;
+    public string AzureAccountKey { get; set; } = string.Empty;
+    public string AzureSasToken { get; set; } = string.Empty;
+    public string GcsCredentialsJson { get; set; } = string.Empty;
+    public string SwiftEnvironment { get; set; } = string.Empty;
+    public string RcloneConfig { get; set; } = string.Empty;
     public bool IsAppendOnly { get; set; }
     public int MinFreeSpaceGb { get; set; } = 5;
     public List<CheckboxItem<Department>> Departments { get; set; } = [];
@@ -49,11 +58,13 @@ public sealed class BackupRepositoryForm
         {
             Path = Blank(Path),
             Endpoint = Backend is BackupBackend.Rest or BackupBackend.S3 ? Blank(Endpoint) : null,
-            Bucket = Backend == BackupBackend.S3 ? Blank(Bucket) : null,
+            Bucket = Backend is BackupBackend.S3 or BackupBackend.B2 or BackupBackend.Azure or BackupBackend.Gcs or BackupBackend.Swift ? Blank(Bucket) : null,
             Region = Backend == BackupBackend.S3 ? Blank(Region) : null,
             S3PathStyle = Backend == BackupBackend.S3 && S3PathStyle,
             StorageConnectionId = Backend == BackupBackend.Sftp && ConnectionId != Guid.Empty ? ConnectionId : null,
-            CaCertificatePem = Backend is BackupBackend.Rest or BackupBackend.S3 ? Blank(CaCertificatePem) : null,
+            CaCertificatePem = Backend is BackupBackend.Rest or BackupBackend.S3 or BackupBackend.Swift ? Blank(CaCertificatePem) : null,
+            AzureAccountName = Backend == BackupBackend.Azure ? Blank(AzureAccountName) : null,
+            AzureEndpointSuffix = Backend == BackupBackend.Azure ? Blank(AzureEndpointSuffix) : null,
         },
         new ResticBackendSecrets
         {
@@ -61,6 +72,13 @@ public sealed class BackupRepositoryForm
             RestPassword = Backend == BackupBackend.Rest ? Blank(RestPassword) : null,
             S3AccessKeyId = Backend == BackupBackend.S3 ? Blank(S3AccessKeyId) : null,
             S3SecretAccessKey = Backend == BackupBackend.S3 ? Blank(S3SecretAccessKey) : null,
+            B2AccountId = Backend == BackupBackend.B2 ? Blank(B2AccountId) : null,
+            B2AccountKey = Backend == BackupBackend.B2 ? Blank(B2AccountKey) : null,
+            AzureAccountKey = Backend == BackupBackend.Azure ? Blank(AzureAccountKey) : null,
+            AzureSasToken = Backend == BackupBackend.Azure ? Blank(AzureSasToken) : null,
+            GcsCredentialsJson = Backend == BackupBackend.Gcs ? Blank(GcsCredentialsJson) : null,
+            SwiftEnvironment = Backend == BackupBackend.Swift ? Blank(SwiftEnvironment) : null,
+            RcloneConfig = Backend == BackupBackend.Rclone ? Blank(RcloneConfig) : null,
         },
         IsAppendOnly,
         MinFreeSpaceGb,
@@ -302,9 +320,26 @@ public sealed class BackupViewModel(
         ProbeResult = null;
         RepositoryForm = new BackupRepositoryForm
         {
-            Path = LocalRoots.Count > 0 ? LocalRoots[0].TrimEnd('/') + "/" : string.Empty,
+            Path = LocalPathSuggestion,
             Departments = AllDepartments.Select(d => new CheckboxItem<Department>(d, false)).ToList(),
         };
+    }
+
+    private string LocalPathSuggestion => LocalRoots.Count > 0 ? LocalRoots[0].TrimEnd('/') + "/" : string.Empty;
+
+    /// <summary>
+    /// The path field means a local folder only for local repositories (elsewhere a prefix or
+    /// remote path): the local suggestion must not silently become a bucket prefix.
+    /// </summary>
+    public void ApplyBackendDefaults()
+    {
+        var form = RepositoryForm;
+        if (form.Id is not null)
+            return;
+        if (form.Backend == BackupBackend.Local && string.IsNullOrWhiteSpace(form.Path))
+            form.Path = LocalPathSuggestion;
+        else if (form.Backend != BackupBackend.Local && form.Path == LocalPathSuggestion)
+            form.Path = string.Empty;
     }
 
     public void EditRepository(BackupRepositoryView view)
@@ -325,6 +360,8 @@ public sealed class BackupViewModel(
             S3PathStyle = settings.S3PathStyle,
             ConnectionId = settings.StorageConnectionId ?? Guid.Empty,
             CaCertificatePem = settings.CaCertificatePem ?? string.Empty,
+            AzureAccountName = settings.AzureAccountName ?? string.Empty,
+            AzureEndpointSuffix = settings.AzureEndpointSuffix ?? string.Empty,
             IsAppendOnly = r.IsAppendOnly,
             MinFreeSpaceGb = r.MinFreeSpaceGb,
             Departments = AllDepartments.Select(d => new CheckboxItem<Department>(d, view.DepartmentIds.Contains(d.Id))).ToList(),

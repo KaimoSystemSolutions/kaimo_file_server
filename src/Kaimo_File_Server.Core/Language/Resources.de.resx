@@ -5653,7 +5653,7 @@ RESTIC_PASSWORD={4}
 Weitere Parameter / Zugangsdaten, die du selbst angeben musst:
 {3}
 
-Zugangsdaten des Speicherziels (S3-Schlüssel, REST-Benutzer, SSH-Schlüssel) sind NICHT Teil dieses Kits. Bewahre sie getrennt auf.
+Zugangsdaten des Speicherziels (Zugriffsschlüssel, REST-Benutzer, SSH-Schlüssel, Dienstkonto, rclone-Konfiguration) sind NICHT Teil dieses Kits. Bewahre sie getrennt auf.
 
 AUFBAU
 ------
@@ -5671,7 +5671,7 @@ WIEDERHERSTELLEN MIT DER RESTIC-KOMMANDOZEILE (funktioniert ohne Kaimo-Server)
 1. restic installieren (https://restic.net), obige Version oder neuer.
 2. export RESTIC_REPOSITORY='&lt;Wert oben&gt;'
    export RESTIC_PASSWORD='&lt;Wert oben&gt;'
-   dazu die Zugangsdaten des Speicherziels (z. B. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).
+   dazu die Zugangsdaten des Speicherziels (siehe "Weitere Parameter" oben, z. B. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).
 3. Sicherungen auflisten:      restic snapshots --tag kaimo
    Nur eine Freigabe:          restic snapshots --tag share:&lt;Freigabe-ID&gt;
 4. Sicherung durchsuchen:      restic ls &lt;Snapshot-ID&gt;
@@ -6182,13 +6182,13 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Die Server-URL muss eine http(s)-URL ohne Zugangsdaten sein.</value>
   </data>
   <data name="Web_Backup_Error_bucket_invalid" xml:space="preserve">
-    <value>Der Bucket-Name ist ungültig.</value>
+    <value>Der Name des Buckets oder Containers ist ungültig.</value>
   </data>
   <data name="Web_Backup_Error_region_invalid" xml:space="preserve">
     <value>Die Region ist ungültig.</value>
   </data>
   <data name="Web_Backup_Error_credentials_required" xml:space="preserve">
-    <value>Access Key und Secret Key sind erforderlich.</value>
+    <value>Die Zugangsdaten des Speichers sind erforderlich.</value>
   </data>
   <data name="Web_Backup_Error_backend_unsupported" xml:space="preserve">
     <value>Diese Speicherart wird nicht unterstützt.</value>
@@ -6719,7 +6719,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Wiederhergestellte Dateien weichen von den Originalen ab.</value>
   </data>
   <data name="Web_Backup_Maintenance_MirrorRule" xml:space="preserve">
-    <value>Angeboten werden nur Repositorys, in die in einem Schritt kopiert werden kann: ein anderer Speichertyp, ein lokaler Ordner oder derselbe Speichertyp mit demselben Zugang (SFTP: dieselbe SSH-Verbindung; S3 und REST: dieselben Zugangsdaten).</value>
+    <value>Angeboten werden nur Repositorys, in die in einem Schritt kopiert werden kann: ein anderer Speichertyp, ein lokaler Ordner oder derselbe Speichertyp mit demselben Zugang (SFTP: dieselbe SSH-Verbindung; alle anderen Speichertypen: dieselben Zugangsdaten, bei rclone derselbe Remote-Abschnitt).</value>
   </data>
   <data name="Web_Backup_Level_FilesAndDatabase" xml:space="preserve">
     <value>Dateien + Datenbank</value>
@@ -6894,5 +6894,95 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   </data>
   <data name="Web_Properties_SizeUnavailable" xml:space="preserve">
     <value>Nicht verfügbar</value>
+  </data>
+  <data name="Web_Backup_Backend_B2" xml:space="preserve">
+    <value>Backblaze B2</value>
+  </data>
+  <data name="Web_Backup_Backend_Azure" xml:space="preserve">
+    <value>Azure Blob Storage</value>
+  </data>
+  <data name="Web_Backup_Backend_Gcs" xml:space="preserve">
+    <value>Google Cloud Storage</value>
+  </data>
+  <data name="Web_Backup_Backend_Swift" xml:space="preserve">
+    <value>OpenStack Swift</value>
+  </data>
+  <data name="Web_Backup_Backend_Rclone" xml:space="preserve">
+    <value>rclone (weiterer Cloud-Speicher)</value>
+  </data>
+  <data name="Web_Backup_Repos_Container" xml:space="preserve">
+    <value>Container</value>
+  </data>
+  <data name="Web_Backup_Repos_B2KeyId" xml:space="preserve">
+    <value>Key-ID</value>
+  </data>
+  <data name="Web_Backup_Repos_B2Key" xml:space="preserve">
+    <value>Application Key</value>
+  </data>
+  <data name="Web_Backup_Repos_AzureAccount" xml:space="preserve">
+    <value>Speicherkonto</value>
+  </data>
+  <data name="Web_Backup_Repos_AzureKey" xml:space="preserve">
+    <value>Kontoschlüssel</value>
+  </data>
+  <data name="Web_Backup_Repos_AzureSas" xml:space="preserve">
+    <value>SAS-Token</value>
+  </data>
+  <data name="Web_Backup_Repos_AzureCredentialsHelp" xml:space="preserve">
+    <value>Gib entweder den Kontoschlüssel oder ein SAS-Token an.</value>
+  </data>
+  <data name="Web_Backup_Repos_AzureSuffix" xml:space="preserve">
+    <value>Endpunkt-Suffix (optional)</value>
+  </data>
+  <data name="Web_Backup_Repos_AzureSuffixHelp" xml:space="preserve">
+    <value>Nur für nationale Clouds, z. B. core.chinacloudapi.cn.</value>
+  </data>
+  <data name="Web_Backup_Repos_GcsKey" xml:space="preserve">
+    <value>Dienstkonto-Schlüssel (JSON)</value>
+  </data>
+  <data name="Web_Backup_Repos_GcsKeyHelp" xml:space="preserve">
+    <value>Füge den Inhalt der Schlüsseldatei ein. Das Dienstkonto braucht die Rolle "Storage Object Admin" für den Bucket.</value>
+  </data>
+  <data name="Web_Backup_Repos_SwiftEnv" xml:space="preserve">
+    <value>OpenStack-Zugangsdaten</value>
+  </data>
+  <data name="Web_Backup_Repos_SwiftEnvHelp" xml:space="preserve">
+    <value>Eine Variable pro Zeile wie in einer openrc-Datei (OS_AUTH_URL, OS_USERNAME, OS_PASSWORD, OS_PROJECT_NAME, OS_USER_DOMAIN_NAME, OS_REGION_NAME, …). Nur OS_*- und ST_*-Variablen werden verwendet.</value>
+  </data>
+  <data name="Web_Backup_Repos_RcloneConfig" xml:space="preserve">
+    <value>rclone-Remote</value>
+  </data>
+  <data name="Web_Backup_Repos_RcloneConfigHelp" xml:space="preserve">
+    <value>Füge einen Abschnitt deiner rclone.conf ein (z. B. die Ausgabe von "rclone config show &lt;name&gt;"). Remotes vom Typ local, alias, crypt, union usw. sowie Optionen, die Befehle ausführen oder Dateien auf dem Server lesen, sind nicht erlaubt.</value>
+  </data>
+  <data name="Web_Backup_Repos_RclonePath" xml:space="preserve">
+    <value>Pfad im Remote (z. B. bucket/ordner)</value>
+  </data>
+  <data name="Web_Backup_Error_azure_account_invalid" xml:space="preserve">
+    <value>Der Name des Speicherkontos ist ungültig (3-24 Kleinbuchstaben und Ziffern).</value>
+  </data>
+  <data name="Web_Backup_Error_azure_credentials_invalid" xml:space="preserve">
+    <value>Gib entweder den Kontoschlüssel oder ein SAS-Token an.</value>
+  </data>
+  <data name="Web_Backup_Error_gcs_credentials_invalid" xml:space="preserve">
+    <value>Füge einen Dienstkonto-Schlüssel ein (JSON vom Typ service_account).</value>
+  </data>
+  <data name="Web_Backup_Error_swift_auth_missing" xml:space="preserve">
+    <value>Die OpenStack-Zugangsdaten brauchen OS_AUTH_URL (oder ST_AUTH).</value>
+  </data>
+  <data name="Web_Backup_Error_swift_variable_invalid" xml:space="preserve">
+    <value>In den OpenStack-Zugangsdaten sind nur OS_*- und ST_*-Variablen erlaubt.</value>
+  </data>
+  <data name="Web_Backup_Error_swift_variable_reference" xml:space="preserve">
+    <value>Ersetze Variablenverweise (z. B. $OS_PASSWORD_INPUT) durch die tatsächlichen Werte.</value>
+  </data>
+  <data name="Web_Backup_Error_rclone_config_invalid" xml:space="preserve">
+    <value>Füge genau einen Remote-Abschnitt einer rclone.conf mit einer "type"-Zeile ein.</value>
+  </data>
+  <data name="Web_Backup_Error_rclone_option_blocked" xml:space="preserve">
+    <value>Das rclone-Remote nutzt eine Option, die einen Befehl ausführt oder eine Datei auf dem Server liest. Verwende die Inline-Variante (z. B. service_account_credentials, key_pem).</value>
+  </data>
+  <data name="Web_Backup_Error_rclone_type_blocked" xml:space="preserve">
+    <value>Dieser rclone-Remote-Typ ist nicht erlaubt (local, alias, crypt, union, …).</value>
   </data>
 </root>

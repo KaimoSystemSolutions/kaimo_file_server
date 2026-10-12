@@ -5719,7 +5719,7 @@ RESTIC_PASSWORD={4}
 Further parameters / credentials you must supply yourself:
 {3}
 
-Credentials of the storage target (S3 keys, REST user, SSH key) are NOT part of this kit. Keep them separately.
+Credentials of the storage target (access keys, REST user, SSH key, service account, rclone configuration) are NOT part of this kit. Keep them separately.
 
 LAYOUT
 ------
@@ -5737,7 +5737,7 @@ RESTORE WITH THE RESTIC COMMAND LINE (works without the Kaimo server)
 1. Install restic (https://restic.net), the version above or newer.
 2. export RESTIC_REPOSITORY='&lt;value above&gt;'
    export RESTIC_PASSWORD='&lt;value above&gt;'
-   plus the storage credentials (e.g. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).
+   plus the storage credentials (see "Further parameters" above, e.g. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).
 3. List backups:          restic snapshots --tag kaimo
    Only one share:        restic snapshots --tag share:&lt;share id&gt;
 4. Browse a backup:       restic ls &lt;snapshot id&gt;
@@ -6248,13 +6248,13 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>The server URL must be an http(s) URL without credentials.</value>
   </data>
   <data name="Web_Backup_Error_bucket_invalid" xml:space="preserve">
-    <value>The bucket name is invalid.</value>
+    <value>The bucket or container name is invalid.</value>
   </data>
   <data name="Web_Backup_Error_region_invalid" xml:space="preserve">
     <value>The region is invalid.</value>
   </data>
   <data name="Web_Backup_Error_credentials_required" xml:space="preserve">
-    <value>Access key and secret key are required.</value>
+    <value>The access credentials of the storage are required.</value>
   </data>
   <data name="Web_Backup_Error_backend_unsupported" xml:space="preserve">
     <value>This storage type is not supported.</value>
@@ -6785,7 +6785,7 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>Restored files differ from the originals.</value>
   </data>
   <data name="Web_Backup_Maintenance_MirrorRule" xml:space="preserve">
-    <value>Only repositories that can be copied into in one step are offered: another storage type, a local folder, or the same storage type with the same access (SFTP: the same SSH connection; S3 and REST: the same credentials).</value>
+    <value>Only repositories that can be copied into in one step are offered: another storage type, a local folder, or the same storage type with the same access (SFTP: the same SSH connection; all other storage types: the same credentials, for rclone the same remote section).</value>
   </data>
   <data name="Web_Backup_Level_FilesAndDatabase" xml:space="preserve">
     <value>Files + database</value>
@@ -6894,5 +6894,95 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   </data>
   <data name="Web_Backup_Activity_DumpBroken" xml:space="preserve">
     <value>NOT readable - the newest database dump is damaged</value>
+  </data>
+  <data name="Web_Backup_Backend_B2" xml:space="preserve">
+    <value>Backblaze B2</value>
+  </data>
+  <data name="Web_Backup_Backend_Azure" xml:space="preserve">
+    <value>Azure Blob Storage</value>
+  </data>
+  <data name="Web_Backup_Backend_Gcs" xml:space="preserve">
+    <value>Google Cloud Storage</value>
+  </data>
+  <data name="Web_Backup_Backend_Swift" xml:space="preserve">
+    <value>OpenStack Swift</value>
+  </data>
+  <data name="Web_Backup_Backend_Rclone" xml:space="preserve">
+    <value>rclone (other cloud storage)</value>
+  </data>
+  <data name="Web_Backup_Repos_Container" xml:space="preserve">
+    <value>Container</value>
+  </data>
+  <data name="Web_Backup_Repos_B2KeyId" xml:space="preserve">
+    <value>Key ID</value>
+  </data>
+  <data name="Web_Backup_Repos_B2Key" xml:space="preserve">
+    <value>Application key</value>
+  </data>
+  <data name="Web_Backup_Repos_AzureAccount" xml:space="preserve">
+    <value>Storage account</value>
+  </data>
+  <data name="Web_Backup_Repos_AzureKey" xml:space="preserve">
+    <value>Account key</value>
+  </data>
+  <data name="Web_Backup_Repos_AzureSas" xml:space="preserve">
+    <value>SAS token</value>
+  </data>
+  <data name="Web_Backup_Repos_AzureCredentialsHelp" xml:space="preserve">
+    <value>Enter either the account key or a SAS token.</value>
+  </data>
+  <data name="Web_Backup_Repos_AzureSuffix" xml:space="preserve">
+    <value>Endpoint suffix (optional)</value>
+  </data>
+  <data name="Web_Backup_Repos_AzureSuffixHelp" xml:space="preserve">
+    <value>Only for national clouds, e.g. core.chinacloudapi.cn.</value>
+  </data>
+  <data name="Web_Backup_Repos_GcsKey" xml:space="preserve">
+    <value>Service account key (JSON)</value>
+  </data>
+  <data name="Web_Backup_Repos_GcsKeyHelp" xml:space="preserve">
+    <value>Paste the content of the key file. The service account needs the role "Storage Object Admin" on the bucket.</value>
+  </data>
+  <data name="Web_Backup_Repos_SwiftEnv" xml:space="preserve">
+    <value>OpenStack credentials</value>
+  </data>
+  <data name="Web_Backup_Repos_SwiftEnvHelp" xml:space="preserve">
+    <value>One variable per line, as in an openrc file (OS_AUTH_URL, OS_USERNAME, OS_PASSWORD, OS_PROJECT_NAME, OS_USER_DOMAIN_NAME, OS_REGION_NAME, …). Only OS_* and ST_* variables are used.</value>
+  </data>
+  <data name="Web_Backup_Repos_RcloneConfig" xml:space="preserve">
+    <value>rclone remote</value>
+  </data>
+  <data name="Web_Backup_Repos_RcloneConfigHelp" xml:space="preserve">
+    <value>Paste one section of your rclone.conf (e.g. the output of "rclone config show &lt;name&gt;"). Remotes of type local, alias, crypt, union etc. and options that run commands or read files on the server are not allowed.</value>
+  </data>
+  <data name="Web_Backup_Repos_RclonePath" xml:space="preserve">
+    <value>Path on the remote (e.g. bucket/folder)</value>
+  </data>
+  <data name="Web_Backup_Error_azure_account_invalid" xml:space="preserve">
+    <value>The storage account name is invalid (3-24 lowercase letters and digits).</value>
+  </data>
+  <data name="Web_Backup_Error_azure_credentials_invalid" xml:space="preserve">
+    <value>Enter either the account key or a SAS token.</value>
+  </data>
+  <data name="Web_Backup_Error_gcs_credentials_invalid" xml:space="preserve">
+    <value>Paste a service account key (JSON of type service_account).</value>
+  </data>
+  <data name="Web_Backup_Error_swift_auth_missing" xml:space="preserve">
+    <value>The OpenStack credentials need OS_AUTH_URL (or ST_AUTH).</value>
+  </data>
+  <data name="Web_Backup_Error_swift_variable_invalid" xml:space="preserve">
+    <value>Only OS_* and ST_* variables are allowed in the OpenStack credentials.</value>
+  </data>
+  <data name="Web_Backup_Error_swift_variable_reference" xml:space="preserve">
+    <value>Replace variable references (e.g. $OS_PASSWORD_INPUT) with the actual values.</value>
+  </data>
+  <data name="Web_Backup_Error_rclone_config_invalid" xml:space="preserve">
+    <value>Paste exactly one remote section of an rclone.conf with a "type" line.</value>
+  </data>
+  <data name="Web_Backup_Error_rclone_option_blocked" xml:space="preserve">
+    <value>The rclone remote uses an option that runs a command or reads a file on the server. Use the inline variant (e.g. service_account_credentials, key_pem).</value>
+  </data>
+  <data name="Web_Backup_Error_rclone_type_blocked" xml:space="preserve">
+    <value>This rclone remote type is not allowed (local, alias, crypt, union, …).</value>
   </data>
 </root>

@@ -63,6 +63,31 @@ A repository is created on the Repositories tab: backend, location, credentials,
 | SFTP | Existing SFTP or rsync-over-SSH connection (pinned host key required) plus remote path | SSH key of the connection |
 | REST server | `https://host[:port]`, optional path; optional CA certificate | Optional user and password (`RESTIC_REST_USERNAME/PASSWORD`) |
 | S3 | Endpoint, bucket, optional path, region, path-style flag; optional CA certificate | Access key and secret key |
+| Backblaze B2 | Bucket, optional path (`b2:<bucket>:/<path>`) | Key ID and application key (`B2_ACCOUNT_ID/KEY`) |
+| Azure Blob Storage | Storage account, container, optional path, optional endpoint suffix (national clouds) | Account key **or** SAS token |
+| Google Cloud Storage | Bucket, optional path (`gs:<bucket>:/<path>`) | Service account key (JSON, type `service_account` or `authorized_user`); `project_id` is taken from it |
+| OpenStack Swift | Container, optional path; optional CA certificate | `OS_*` / `ST_*` variables, openrc style (`export OS_X=…`, other lines ignored) |
+| rclone | Path on the remote (incl. bucket) | One pasted rclone.conf remote section |
+
+Secrets are stored vault-encrypted. The GCS key and the rclone section are written to owner-only
+files in `Backup:Restic:TempDirectory` per restic process (`GOOGLE_APPLICATION_CREDENTIALS`,
+`RCLONE_CONFIG`) and deleted afterwards.
+
+**rclone** reaches any storage rclone supports (OneDrive, Google Drive, Dropbox, WebDAV, …) with the
+bundled, checksum-pinned rclone binary (`/usr/local/bin/rclone`). The pasted section is always
+written as remote `[kaimo]` (URL `rclone:kaimo:<path>`), so its original name does not matter. To
+keep the server's file system out of reach, remotes of type `local`, `alias`, `union`, `combine`,
+`crypt`, `chunker`, `hasher`, `compress`, `cache` and `memory` are rejected, as are options that run
+commands or read local files (`ssh`, `*_command`, `*_file`, `*_path`, `ca_cert`, `client_cert`,
+`client_key`, `kerberos_ccache`); use the inline variants (`service_account_credentials`,
+`key_pem`). When rclone refreshes an OAuth token during a run it rewrites its config file; Kaimo
+validates the rewritten section like pasted input and stores it (vault-encrypted) before the temp
+file is deleted, so remotes with rotating refresh tokens (e.g. OneDrive) keep working. Probing
+edited credentials never writes anything back.
+
+Mirrors between two repositories of the same backend type need identical credentials (restic's
+backend variables are process-wide): same B2 key, same Azure account and key/SAS, same GCS key,
+same Swift variables, same rclone section.
 
 "Test" probes the location. **Initialize new** creates a repository with a generated 32-byte
 password; **Connect existing** attaches a repository with its known password (disaster recovery).
@@ -73,8 +98,10 @@ The restic repository id is stored and re-checked whenever the location or crede
 A new repository stays in *Recovery kit pending* and accepts no backups until its recovery kit was
 downloaded and confirmed by typing the kit code printed in it. The kit (`.txt`) contains the
 repository URL, the password, non-secret parameters, the snapshot layout and the CLI and
-disaster-recovery steps. It never contains backend credentials (S3 keys, REST password, SSH key);
-keep those separately. Every kit download is logged. **Without the password nobody can restore the
+disaster-recovery steps. It never contains backend credentials (access keys, REST password, SSH
+key, service account key, Swift password, rclone section) — only the names of the variables to
+set; keep the credentials separately. For rclone repositories, restoring with the CLI needs rclone
+installed and the remote available as `[kaimo]` in the rclone.conf (or adjust the URL). Every kit download is logged. **Without the password nobody can restore the
 repository.**
 
 ### Further settings
@@ -269,7 +296,7 @@ Without a Full job, restore the share backup points the same way and set permiss
 | `Backup:Restic:Binary` | `restic` | restic executable |
 | `Backup:Restic:LocalRoots` | `/data/kaimo-backups/restic` | Folders local repositories may be created in (list or comma-separated) |
 | `Backup:Restic:CacheDirectory` | `/data/kaimo-system/.kaimo-restic-cache` | restic cache (grows with repository size) |
-| `Backup:Restic:TempDirectory` | `/data/kaimo-system/.kaimo-restic-tmp` | Owner-only SSH keys and CA files of running processes |
+| `Backup:Restic:TempDirectory` | `/data/kaimo-system/.kaimo-restic-tmp` | Owner-only SSH keys, CA files, GCS keys and rclone configs of running processes |
 | `Backup:Restic:MetaDirectory` | `/data/kaimo-backups/restic-meta` | Staging of manifests, dump and run info (part of the snapshot paths; keep stable) |
 | `Backup:Restic:RestoreDirectory` | `/data/kaimo-backups/restic-restore` | Target of system and pool restores |
 | `Storage:RootPath` | `/data/storage` | Pools are its direct child folders |

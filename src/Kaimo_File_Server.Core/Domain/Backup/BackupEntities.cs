@@ -9,6 +9,13 @@ public enum BackupBackend
     Sftp = 1,
     Rest = 2,
     S3 = 3,
+    B2 = 4,
+    Azure = 5,
+    Gcs = 6,
+    Swift = 7,
+
+    /// <summary>Any rclone remote (pasted rclone.conf section); restic starts the bundled rclone binary.</summary>
+    Rclone = 8,
 }
 
 /// <summary>
@@ -99,7 +106,7 @@ public sealed class BackupRepository
     /// <summary>Non-secret backend settings (path, endpoint, bucket, …) as JSON.</summary>
     public string SettingsJson { get; set; } = "{}";
 
-    /// <summary>Vault-protected backend credentials (REST/S3 keys); null when the backend needs none.</summary>
+    /// <summary>Vault-protected backend credentials (keys, service account, rclone config); null when the backend needs none.</summary>
     public string? EncryptedSecrets { get; set; }
 
     /// <summary>Vault-protected restic repository password.</summary>
