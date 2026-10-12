@@ -121,10 +121,11 @@ so the router replaces the `NoOpSearchService` fallback. The Elasticsearch URL d
 | Format | Extractor |
 |---|---|
 | PDF | PdfPig |
-| `.docx`, `.docm`, `.xlsx`, `.xlsm`, `.pptx`, `.pptm` | OOXML part parsing (NPOI for Word documents) |
-| `.xls` | NPOI HSSF |
+| `.docx`, `.docm`, `.xlsx`, `.xlsm`, `.pptx`, `.pptm` | OOXML part parsing (`System.IO.Compression` + `XDocument`) |
+| `.xls` | ExcelDataReader |
 | `.odt`, `.ods`, `.odp` | OpenDocument XML |
-| Other | MIME sniffing; text is indexed, binary and archive types are indexed by name only |
+| `.svg` | Not extracted; indexed by name only |
+| Other | Magic bytes: `%PDF-` goes to PdfPig, a ZIP is tried as a Word document; otherwise text is indexed and binary data (media, archives, executables) is indexed by name only |
 
 A file that cannot be parsed (corrupt or encrypted) is still indexed by its name. Plain text is
 stripped of encoded payloads first: runs of at least 60 base64 characters containing a digit

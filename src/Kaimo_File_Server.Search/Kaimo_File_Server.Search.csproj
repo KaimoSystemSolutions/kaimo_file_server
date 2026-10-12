@@ -5,20 +5,16 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <UserSecretsId>dotnet-Kaimo_File_server.Search-1ae611b7-ea46-4731-8b6c-34f544d867a0</UserSecretsId>
-        <!-- NPOI reads Office documents for the search indexer; accept its OSMF license to silence the build prompt. -->
-        <AcceptNPOIOSMFLicense>true</AcceptNPOIOSMFLicense>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Elastic.Clients.Elasticsearch" />
+        <PackageReference Include="ExcelDataReader" />
         <PackageReference Include="Microsoft.Build.Tasks.Git">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.Extensions.Hosting" />
-        <PackageReference Include="Mime-Detective" />
-        <PackageReference Include="Mime-Detective.Definitions.Exhaustive" />
-        <PackageReference Include="NPOI" />
         <PackageReference Include="PdfPig" />
         <!-- Pin up a vulnerable transitive dependency (NU1903, GHSA-w3x6-4m5h-cxqf /
              GHSA-37gx-xxp4-5rgx). 8.0.2 is pulled in transitively; 10.0.8 is patched and

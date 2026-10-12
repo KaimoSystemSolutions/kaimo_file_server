@@ -414,5 +414,14 @@ RUN apt-get update \
 COPY --from=build-runtime /runtime/opt/samba/ /opt/samba/
 COPY --from=build-runtime /runtime/usr/local/bin/ /usr/local/bin/
 
+# GPL text, Samba source pointer (release + SHA-256, applied patches) and the
+# exact list of OS packages in this image (see SOURCE.txt and the repository's
+# NOTICE, "Third-party binaries" and "Operating system packages").
+COPY --chmod=0644 LICENSE SOURCE.txt samba-build.env /usr/share/doc/kaimo/
+COPY --chmod=0644 patches/ /usr/share/doc/kaimo/samba-patches/
+RUN chmod 0755 /usr/share/doc/kaimo /usr/share/doc/kaimo/samba-patches \
+    && dpkg-query -W -f='${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n' \
+        | sort > /usr/share/doc/kaimo/os-packages.txt
+
 EXPOSE 445
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

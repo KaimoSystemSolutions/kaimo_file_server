@@ -57,22 +57,30 @@ public class ContentProviderSizeCapTests
         Assert.Contains("forecast", content);
     }
 
-    // Legacy .xls (HSSF) is the one binary Office format NPOI's .NET build supports.
+    // Legacy .xls (BIFF8) is the one binary Office format that is read.
+    // TestData/annual-report.xls holds a single cell "annual report".
     [Fact]
     public async Task GetContent_LegacyXls_ExtractsCellText()
     {
-        using var stream = new MemoryStream();
-        using (var workbook = new NPOI.HSSF.UserModel.HSSFWorkbook())
-        {
-            var cell = workbook.CreateSheet("Sheet1").CreateRow(0).CreateCell(0);
-            cell.SetCellValue("annual report");
-            workbook.Write(stream, leaveOpen: true);
-        }
-        stream.Position = 0;
+        using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "annual-report.xls"));
 
         var content = await ContentProvider.GetContent(stream, "old.xls");
 
         Assert.Contains("annual report", content);
+    }
+
+    // Without a known extension, binary files (here a PNG header, a plain ZIP) must
+    // be indexed by name only, not as text.
+    [Theory]
+    [InlineData(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0x0D })]
+    [InlineData(new byte[] { 0x50, 0x4B, 0x03, 0x04, 0x14, 0, 0, 0, 0x08, 0 })]
+    public async Task GetContent_UnnamedBinary_ReturnsEmpty(byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes);
+
+        var content = await ContentProvider.GetContent(stream, "blob");
+
+        Assert.Equal(string.Empty, content);
     }
 
     [Fact]

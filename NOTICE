@@ -1,10 +1,6 @@
 Kaimo File Server
-Copyright (C) 2026 Kaimo File Server
-
-  NOTE: Replace "Kaimo File Server" above with the single legal copyright
-  holder (your name or your company). Dual licensing (see below) only works
-  while ONE party holds all rights — confirm the holder before the first
-  external contribution is merged.
+Copyright (C) 2026 KaimoSystemSolutions
+Contact: opensource@familie-hanisch.de
 
 ================================================================================
 Licensing overview
@@ -51,10 +47,21 @@ its GPL obligation stems from Samba, not from this project's own copyright.
 Third-party components
 ================================================================================
 
-Managed (NuGet) dependencies are under permissive licenses (MIT, Apache-2.0,
-BSD-3-Clause, PostgreSQL) and impose no copyleft on this project. See
-Directory.Packages.props for the authoritative list and each package's own
-license for its notice requirements.
+NuGet packages (published into /app of the Host, Web and SMB bridge images):
+
+  The .NET applications contain the unmodified assemblies of every NuGet
+  package in their runtime closure (direct and transitive; versions are set
+  in Directory.Packages.props). The packages are under the MIT, Apache-2.0,
+  BSD-3-Clause and PostgreSQL licenses; none of them is copyleft.
+
+  For each image, the package list (package id, version, license, copyright),
+  the full license texts and any NOTICE / THIRD-PARTY-NOTICES files included
+  in the packages are kept in
+  third-party/nuget/Kaimo_File_Server.<Host|Web|SmbBridge>.THIRD_PARTY_LICENSES.txt
+  and shipped in the image as /usr/share/doc/kaimo/NUGET_THIRD_PARTY_LICENSES.txt.
+  Regenerate these files with third-party/nuget/update-licenses.py whenever a
+  package changes; the image build fails while a file does not match the
+  application's published package list.
 
 Elasticsearch (run as a separate service, not redistributed here) is under
 its own license (SSPL / Elastic License 2.0 / AGPL-3.0). Only the Apache-2.0
@@ -120,3 +127,102 @@ Third-party binaries (installed into the Web container image):
 
     rclone runs as a separate process started by restic; it is not linked into
     the AGPL code.
+
+Third-party binaries (built from source into the Samba container image):
+
+  - Samba (https://www.samba.org) -- GNU General Public License v3.0 or later,
+    Copyright (C) Andrew Tridgell and the Samba Team. The Samba image does not
+    use the distribution's Samba package: it compiles Samba itself (installed
+    under /opt/samba) so that smbd and the Kaimo VFS module come from the same
+    build. The Samba binaries are a MODIFIED version of Samba: the patches in
+    src/samba-vfs/patches/ are applied (each patch describes its change), and
+    the build adds the Kaimo VFS module (src/samba-vfs/module/).
+
+    Corresponding Source (GPL-3.0 section 6(d)) of the image built from a
+    given release tag consists of:
+      - the upstream Samba release named in src/samba-vfs/samba-build.env,
+        verified against the SHA-256 recorded there and published permanently
+        at https://download.samba.org/pub/samba/stable/;
+      - the patches, the VFS module and helper sources, and the build and
+        installation scripts (src/samba-vfs/Dockerfile.vfs and the scripts next
+        to it), all in this repository at the same release tag
+        (https://github.com/KaimoSystemSolutions/kaimo_kile_kerver_core).
+    The image carries the GPL text, samba-build.env, the patches and these
+    directions under /usr/share/doc/kaimo/ (see src/samba-vfs/SOURCE.txt).
+
+================================================================================
+Operating system packages
+================================================================================
+
+All published container images are built on a Linux distribution base and
+install additional distribution packages:
+
+  - kaimo_file_server (Host), kaimo_file_server.web (Web) and
+    kaimo_file_server.samba_bridge: Microsoft's .NET runtime / ASP.NET Core
+    images (mcr.microsoft.com/dotnet/runtime:10.0, aspnet:10.0), which are
+    based on Ubuntu 24.04 LTS. The .NET runtime itself is MIT-licensed; its
+    license and third-party notices are shipped by Microsoft in
+    /usr/share/dotnet/LICENSE.txt and /usr/share/dotnet/ThirdPartyNotices.txt.
+    Added packages: libgssapi-krb5-2 (all three), postgresql-client-17 (Host,
+    Web; from the PostgreSQL Global Development Group (PGDG) apt repository),
+    openssh-client, rsync, smbclient, ca-certificates (Web).
+  - kaimo_file_server.samba: Ubuntu 24.04 LTS (ubuntu:24.04), plus the shared
+    libraries the self-built Samba and the Kaimo helpers link against, python3,
+    jq, wsdd and a few base utilities.
+  - kaimo_file_server.samba_pki: Alpine Linux 3.22 (alpine:3.22) plus openssl.
+
+These packages are redistributed unmodified, as built by Ubuntu, PGDG and
+Alpine. They are under a variety of licenses. Many are permissive (MIT, BSD,
+Apache-2.0, PostgreSQL, OpenLDAP, MPL-2.0, ...); copyleft-licensed packages
+include, among others:
+
+  - all Ubuntu-based images: the base system (bash, coreutils, dash,
+    diffutils, findutils, grep, sed, tar, util-linux, ... -- GPL-2.0/GPL-3.0;
+    the GNU C library and other runtime libraries -- LGPL-2.1+/LGPL-3.0+);
+  - Samba PKI (Alpine): BusyBox and apk-tools (GPL-2.0-only);
+  - Web: rsync (GPL-3.0+), smbclient and the Samba client libraries
+    (GPL-3.0+/LGPL-3.0+), talloc/tdb/tevent (LGPL-3.0+), avahi, dbus and
+    libtirpc client libraries (LGPL-2.1+/GPL-2.0+);
+  - Host and Web: GNU readline (GPL-3.0+, used by psql), gdbm (GPL-3.0+), perl
+    (GPL-1.0+ or Artistic), postgresql-client-common (GPL-2.0+);
+  - Samba: acl/libacl (GPL-2.0+/LGPL-2.1+), GNU readline (GPL-3.0+), the Ceph
+    and GlusterFS client libraries (LGPL), keyutils (GPL-2.0+/LGPL-2.0+).
+
+None of these packages is linked into the AGPL .NET code; they are separate
+programs started as processes or libraries used by such programs.
+
+License texts: every Debian/Ubuntu package keeps its license and copyright
+notice in /usr/share/doc/<package>/copyright inside the image (the Ubuntu base
+images strip other documentation but explicitly retain these files). Alpine
+records each package's license in the apk database (/lib/apk/db/installed).
+
+Exact versions: every image lists the packages it contains in
+/usr/share/doc/kaimo/os-packages.txt, generated during the image build. On
+Ubuntu each line names the binary package and version and the SOURCE package
+and version it was built from; on Alpine each line names the package, version,
+origin (source) package and license. Package versions change whenever an
+image is rebuilt, so this file -- not this NOTICE -- is authoritative for a
+given image. Reproduce it from a pulled image with, for example:
+
+    docker run --rm --entrypoint cat <image> /usr/share/doc/kaimo/os-packages.txt
+
+Source code: the complete source of every package listed there, at exactly
+the listed source version, is available from the distributions' permanent
+archives:
+
+  - Ubuntu: https://launchpad.net/ubuntu/+source/<source-package>/<version>
+    (all published versions, including superseded ones), or
+    https://snapshot.ubuntu.com/, or "apt-get source <source-package>=<version>"
+    on Ubuntu 24.04 with deb-src entries enabled;
+  - PGDG (versions containing "pgdg"): https://apt-archive.postgresql.org/
+    (permanent archive of all versions published on apt.postgresql.org);
+  - Alpine: the build recipes in https://gitlab.alpinelinux.org/alpine/aports
+    (branch 3.22-stable) and the upstream sources mirrored at
+    https://distfiles.alpinelinux.org/distfiles/v3.22/.
+
+Written offer: for at least three years after the last distribution of a
+given image, KaimoSystemSolutions will provide, to any third party, on request
+to opensource@familie-hanisch.de and for no more than the cost of physically
+performing the distribution, a complete machine-readable copy of the
+corresponding source code of every GPL/LGPL-licensed package contained in that
+image, at the version listed in its /usr/share/doc/kaimo/os-packages.txt.

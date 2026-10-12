@@ -19,6 +19,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 \
     && apt-get purge -y --auto-remove curl gnupg \
     && rm -rf /var/lib/apt/lists/*
+# Project license and notices, and the exact list of OS packages in this image
+# with their source packages (see NOTICE, "Operating system packages"). Keep
+# this after the last apt-get install so the list is complete.
+COPY --chmod=0644 LICENSE NOTICE /usr/share/doc/kaimo/
+RUN chmod 0755 /usr/share/doc/kaimo \
+    && dpkg-query -W -f='${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n' \
+        | sort > /usr/share/doc/kaimo/os-packages.txt
 USER $APP_UID
 WORKDIR /app
 
@@ -55,4 +62,12 @@ RUN dotnet publish "./Kaimo_File_Server.Host.csproj" \
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
+# License texts and notices of the NuGet packages published into /app (see
+# NOTICE, "Third-party components"). After a package change, regenerate them with
+# third-party/nuget/update-licenses.py — the build fails while the file belongs
+# to a different package list than this application's deps.json.
+COPY --chmod=0644 third-party/nuget/Kaimo_File_Server.Host.THIRD_PARTY_LICENSES.txt /usr/share/doc/kaimo/NUGET_THIRD_PARTY_LICENSES.txt
+RUN sum=$(grep -o '"path": "[^"]*"' Kaimo_File_Server.Host.deps.json | cut -d'"' -f4 | LC_ALL=C sort -u | sha256sum | cut -d' ' -f1) \
+    && grep -qx "Package list SHA-256: $sum" /usr/share/doc/kaimo/NUGET_THIRD_PARTY_LICENSES.txt \
+    || { echo "third-party/nuget/Kaimo_File_Server.Host.THIRD_PARTY_LICENSES.txt does not match the published packages: run third-party/nuget/update-licenses.py" >&2; exit 1; }
 ENTRYPOINT ["dotnet", "Kaimo_File_Server.Host.dll"]

@@ -81,6 +81,13 @@ COPY --chmod=0644 third-party/rclone/source/ /usr/share/doc/rclone/source/
 RUN chmod 0755 /usr/share/doc/rclone /usr/share/doc/rclone/source \
     && grep -q "^rclone ${KAIMO_RCLONE_VERSION} " /usr/share/doc/rclone/THIRD_PARTY_LICENSES.txt \
     || { echo "third-party/rclone/THIRD_PARTY_LICENSES.txt is not for rclone ${KAIMO_RCLONE_VERSION}: run update-licenses.py" >&2; exit 1; }
+# Project license and notices, and the exact list of OS packages in this image
+# with their source packages (see NOTICE, "Operating system packages"). Keep
+# this after the last apt-get install so the list is complete.
+COPY --chmod=0644 LICENSE NOTICE /usr/share/doc/kaimo/
+RUN chmod 0755 /usr/share/doc/kaimo \
+    && dpkg-query -W -f='${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n' \
+        | sort > /usr/share/doc/kaimo/os-packages.txt
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
@@ -133,4 +140,12 @@ RUN grep -q '"Route":"_framework/blazor.web.js"' \
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
+# License texts and notices of the NuGet packages published into /app (see
+# NOTICE, "Third-party components"). After a package change, regenerate them with
+# third-party/nuget/update-licenses.py — the build fails while the file belongs
+# to a different package list than this application's deps.json.
+COPY --chmod=0644 third-party/nuget/Kaimo_File_Server.Web.THIRD_PARTY_LICENSES.txt /usr/share/doc/kaimo/NUGET_THIRD_PARTY_LICENSES.txt
+RUN sum=$(grep -o '"path": "[^"]*"' Kaimo_File_Server.Web.deps.json | cut -d'"' -f4 | LC_ALL=C sort -u | sha256sum | cut -d' ' -f1) \
+    && grep -qx "Package list SHA-256: $sum" /usr/share/doc/kaimo/NUGET_THIRD_PARTY_LICENSES.txt \
+    || { echo "third-party/nuget/Kaimo_File_Server.Web.THIRD_PARTY_LICENSES.txt does not match the published packages: run third-party/nuget/update-licenses.py" >&2; exit 1; }
 ENTRYPOINT ["dotnet", "Kaimo_File_Server.Web.dll"]

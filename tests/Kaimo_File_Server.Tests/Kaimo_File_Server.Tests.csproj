@@ -35,6 +35,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="TestData\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Referenz auf dein Hauptprojekt anpassen: -->
     <ProjectReference Include="..\..\src\Kaimo_File_Server.Core\Kaimo_File_Server.Core.csproj" />
 	<ProjectReference Include="..\..\src\Kaimo_File_Server.Infrastructure\Kaimo_File_Server.Infrastructure.csproj" />

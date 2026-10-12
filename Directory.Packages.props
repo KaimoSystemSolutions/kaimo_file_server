@@ -48,9 +48,7 @@
 
     <!-- Search: Elasticsearch + document text extraction -->
     <PackageVersion Include="Elastic.Clients.Elasticsearch" Version="9.5.2" />
-    <PackageVersion Include="Mime-Detective" Version="25.8.1" />
-    <PackageVersion Include="Mime-Detective.Definitions.Exhaustive" Version="25.8.1" />
-    <PackageVersion Include="NPOI" Version="2.8.0" />
+    <PackageVersion Include="ExcelDataReader" Version="3.9.0" />
     <PackageVersion Include="PdfPig" Version="0.1.16" />
 
     <!-- Cloud / remote access -->

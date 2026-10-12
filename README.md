@@ -61,9 +61,17 @@ Exceptions and details are in [`NOTICE`](NOTICE):
 - **`src/samba-vfs/`** is **GPL-3.0-or-later** (it is a Samba-derived module),
   see [`src/samba-vfs/LICENSE`](src/samba-vfs/LICENSE).
 - Bundled NuGet dependencies are permissive (MIT / Apache-2.0 / BSD / PostgreSQL).
+  Their license texts are
+  generated into [`third-party/nuget/`](third-party/nuget/) and shipped in each
+  .NET image as `/usr/share/doc/kaimo/NUGET_THIRD_PARTY_LICENSES.txt`.
 - The Web image ships the unmodified **restic** binary (BSD-2-Clause) for file
   backups; its license and those of the Go modules compiled into it are in
   [`third-party/restic/`](third-party/restic/).
+- The Samba image ships a self-built, patched **Samba** (GPL-3.0-or-later); see
+  [`src/samba-vfs/SOURCE.txt`](src/samba-vfs/SOURCE.txt) for its source.
+- All images contain Ubuntu, PGDG or Alpine **OS packages** (some GPL/LGPL);
+  each image lists them in `/usr/share/doc/kaimo/os-packages.txt`, and NOTICE
+  says where their source is available.
 
 > **Commercial use:** a separate commercial license is available from the copyright
 holder for those who cannot meet the AGPL obligations or want to build

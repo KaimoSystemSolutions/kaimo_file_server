@@ -2,6 +2,13 @@ FROM alpine:3.22
 
 RUN apk add --no-cache openssl
 
+# GPL text, source directions and the exact list of OS packages in this image
+# (package, version, origin, license; see SOURCE.txt). /usr/share/doc does not
+# exist on Alpine, so COPY --chmod creates it too: make both traversable again.
+COPY --chmod=0644 LICENSE SOURCE.txt /usr/share/doc/kaimo/
+RUN chmod 0755 /usr/share/doc /usr/share/doc/kaimo \
+    && apk list --installed | sort > /usr/share/doc/kaimo/os-packages.txt
+
 COPY generate-control-plane-certs.sh /usr/local/bin/generate-control-plane-certs
 RUN chmod 755 /usr/local/bin/generate-control-plane-certs
 

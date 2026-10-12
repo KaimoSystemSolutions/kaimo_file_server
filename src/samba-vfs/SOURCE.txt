@@ -1,0 +1,34 @@
+Kaimo File Server -- Samba and Samba PKI container images
+==========================================================
+
+Shipped in the image as /usr/share/doc/kaimo/SOURCE.txt.
+
+The files in this image that come from the Kaimo File Server repository
+(src/samba-vfs/) are licensed under the GNU General Public License v3.0 or
+later; the license text is in /usr/share/doc/kaimo/LICENSE.
+
+Samba (Samba image only)
+------------------------
+/opt/samba contains Samba (GPL-3.0-or-later, Copyright (C) Andrew Tridgell
+and the Samba Team), compiled from source and MODIFIED: the patches in
+/usr/share/doc/kaimo/samba-patches/ are applied, and the Kaimo VFS module
+(vfs_kaimo_bridge) is added to the build.
+
+Corresponding Source:
+  - Samba release and SHA-256: /usr/share/doc/kaimo/samba-build.env; the
+    release tarball is published at
+    https://download.samba.org/pub/samba/stable/samba-<SAMBA_VERSION>.tar.gz
+  - patches, VFS module, helper sources and the build and installation
+    scripts (Dockerfile.vfs, Dockerfile.pki and the scripts next to them):
+    directory src/samba-vfs/ of
+    https://github.com/KaimoSystemSolutions/kaimo_kile_kerver_core
+    at the release tag of this image.
+
+Operating system packages
+-------------------------
+/usr/share/doc/kaimo/os-packages.txt lists every distribution package in this
+image with its version and source package. License texts are in
+/usr/share/doc/<package>/copyright (Ubuntu) or recorded in
+/lib/apk/db/installed (Alpine). Where to obtain the source of these packages,
+and the written offer for it, is described in the section "Operating system
+packages" of the NOTICE file in the repository root.

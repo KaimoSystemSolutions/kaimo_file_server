@@ -2,10 +2,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using MimeDetective;
-using MimeDetective.Definitions;
-using MimeDetective.Definitions.Licensing;
-using NPOI.OpenXmlFormats.Wordprocessing;
+using ExcelDataReader;
 
 namespace Kaimo_File_Server.Search;
 
@@ -13,46 +10,9 @@ namespace Kaimo_File_Server.Search;
 
 public partial class ContentProvider
 {
-    private static readonly IContentInspector Inspector = new ContentInspectorBuilder()
-    {
-        Definitions = new ExhaustiveBuilder()
-        {
-            UsageType = UsageType.PersonalNonCommercial
-        }.Build()
-    }.Build();
-
-    private static readonly HashSet<string> SkipMimeTypes = new()
-    {
-        // Images
-        "image/png", "image/jpeg", "image/gif", "image/bmp",
-        "image/webp", "image/tiff", "image/svg+xml", "image/x-icon",
-
-        // Audio
-        "audio/mpeg", "audio/wav", "audio/ogg", "audio/flac",
-        "audio/aac", "audio/webm",
-
-        // Video
-        "video/mp4", "video/mpeg", "video/webm", "video/x-msvideo",
-        "video/quicktime", "video/x-matroska",
-
-        // Archives
-        "application/zip", "application/gzip", "application/x-rar-compressed",
-        "application/x-7z-compressed", "application/x-tar",
-
-        // Executables
-        "application/x-executable", "application/x-dosexec",
-        "application/vnd.microsoft.portable-executable",
-        "application/x-mach-binary",
-    };
-
-    private static readonly HashSet<string> PdfMimeTypes = new()
-    {
-        "application/pdf",
-    };
-    private static readonly HashSet<string> DocxMimeTypes = new()
-    {
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    };
+    // Legacy .xls files store strings in Windows code pages, which .NET only knows
+    // once the code-pages provider is registered (required by ExcelDataReader).
+    static ContentProvider() => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
     // Hard cap on how much of a file is ever pulled into memory for indexing.
     // Reindex processes files sequentially, but a single unbounded read of a huge
@@ -91,31 +51,27 @@ public partial class ContentProvider
             return TryExtract(ExtractXlsxText, bytes);
         if (ext is ".pptx" or ".pptm")
             return TryExtract(ExtractPptxText, bytes);
-        // Legacy binary Office formats (OLE compound files). NPOI's .NET build only
-        // ships HSSF, so .xls works; .doc (HWPF) and .ppt (HSLF) are not supported
-        // by the library and fall through to filename-only indexing.
+        // Legacy binary Office formats (OLE compound files). Only .xls is read;
+        // .doc and .ppt fall through to filename-only indexing.
         if (ext == ".xls")
             return TryExtract(ExtractXlsText, bytes);
         // OpenDocument (ZIP-boxed) formats: text, spreadsheet, presentation.
         if (ext is ".odt" or ".ods" or ".odp")
             return TryExtract(ExtractOdfText, bytes);
+        // SVG is XML text, but its markup holds no useful words.
+        if (ext == ".svg")
+            return string.Empty;
 
-        var results = Inspector.Inspect(bytes);
-        var mimeType = results.ByMimeType().FirstOrDefault()?.MimeType.ToLower();
+        // No matching extension: sniff the two formats worth extracting by their
+        // magic bytes. A ZIP that is not a Word document yields no text.
+        if (bytes.AsSpan().StartsWith("%PDF-"u8))
+            return TryExtract(ExtractPdfText, bytes);
+        if (bytes.AsSpan().StartsWith("PK\u0003\u0004"u8))
+            return TryExtract(ExtractDocxText, bytes);
 
-        if (mimeType != null)
-        {
-            if (SkipMimeTypes.Contains(mimeType))
-                return string.Empty;
-
-            if (PdfMimeTypes.Contains(mimeType))
-                return TryExtract(ExtractPdfText, bytes);
-
-            if (DocxMimeTypes.Contains(mimeType))
-                return TryExtract(ExtractDocxText, bytes);
-        }
-
-        // No known binary signature matched — try as text
+        // Media, archives and executables contain control bytes and fail the text
+        // check below, so they are indexed by name only.
+        // Try as text
         if (IsLikelyText(bytes))
             return StripEncodedBlobs(Encoding.UTF8.GetString(bytes));
 
@@ -249,25 +205,25 @@ public partial class ContentProvider
         return sb.ToString();
     }
 
-    // ── Legacy binary Office format (.xls) via NPOI/HSSF ──
+    // ── Legacy binary Office format (.xls) via ExcelDataReader ──
 
     private static string ExtractXlsText(byte[] bytes)
     {
         using var stream = new MemoryStream(bytes);
-        var workbook = new NPOI.HSSF.UserModel.HSSFWorkbook(stream);
+        using var reader = ExcelReaderFactory.CreateBinaryReader(stream);
         var sb = new StringBuilder();
-        for (int i = 0; i < workbook.NumberOfSheets; i++)
+        do
         {
-            var sheet = workbook.GetSheetAt(i);
-            foreach (NPOI.SS.UserModel.IRow row in sheet)
+            while (reader.Read())
             {
-                foreach (NPOI.SS.UserModel.ICell cell in row)
+                for (int i = 0; i < reader.FieldCount; i++)
                 {
-                    sb.Append(cell.ToString());
+                    if (reader.GetValue(i) is not { } value) continue;
+                    sb.Append(value);
                     sb.Append(' ');
                 }
             }
-        }
+        } while (reader.NextResult());
         return sb.ToString();
     }
 

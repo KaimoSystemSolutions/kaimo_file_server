@@ -23,7 +23,6 @@
 secrets
 **/secrets
 **/values.dev.yaml
-LICENSE
 README.md
 # Test project source; not needed by any service image.
 tests
