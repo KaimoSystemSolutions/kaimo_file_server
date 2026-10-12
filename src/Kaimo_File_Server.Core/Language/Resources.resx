@@ -6985,4 +6985,34 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Backup_Error_rclone_type_blocked" xml:space="preserve">
     <value>This rclone remote type is not allowed (local, alias, crypt, union, …).</value>
   </data>
+  <data name="Web_Detail_MoreActions" xml:space="preserve">
+    <value>More actions</value>
+  </data>
+  <data name="Web_Detail_Copy" xml:space="preserve">
+    <value>Copy to clipboard</value>
+  </data>
+  <data name="Web_Detail_Copied" xml:space="preserve">
+    <value>Copied to clipboard</value>
+  </data>
+  <data name="Web_Detail_CopyFailed" xml:space="preserve">
+    <value>Could not copy to the clipboard</value>
+  </data>
+  <data name="Web_Detail_Open" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="Web_Backup_Repos_OpenJobs" xml:space="preserve">
+    <value>Show jobs</value>
+  </data>
+  <data name="Web_Backup_Repos_Section_Connection" xml:space="preserve">
+    <value>Connection</value>
+  </data>
+  <data name="Web_Backup_Repos_Section_Recovery" xml:space="preserve">
+    <value>Recovery</value>
+  </data>
+  <data name="Web_Backup_Repos_Section_Technical" xml:space="preserve">
+    <value>Technical details</value>
+  </data>
+  <data name="Web_Backup_Repos_DeleteTitle" xml:space="preserve">
+    <value>Delete repository “{0}”?</value>
+  </data>
 </root>

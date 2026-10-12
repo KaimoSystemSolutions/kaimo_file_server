@@ -371,134 +371,158 @@
         else if (Selected is { } view)
         {
             var repo = view.Repository;
-            <div class="workspace-heading">
-                <div>
-                    <h3>@repo.Name</h3>
-                    <span class="workspace-heading-sub">@BackupUi.BackendLabel(repo.Backend)</span>
+            var maintenance = VM.ActiveMaintenance(repo.Id);
+            <DetailHeader Icon="archive.svg" Title="@repo.Name" Subtitle="@BackupUi.BackendLabel(repo.Backend)">
+                <Status>
+                    <StatusBadge Tone="@BackupUi.RepositoryTone(repo)" Label="@BackupUi.RepositoryStateLabel(repo)" />
+                </Status>
+                <Actions>
+                    <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => StartEdit(view)">
+                        @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
+                        <span>@R("Web_Backup_Edit")</span>
+                    </button>
+                    @if (repo.State == BackupRepositoryState.Active)
+                    {
+                        if (maintenance is not null)
+                        {
+                            <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || maintenance.IsCancellationRequested)" @onclick="() => VM.CancelRunAsync(maintenance.RunId)">
+                                @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14))
+                                <span>@R("Web_Jobs_Cancel")</span>
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => VM.RunMaintenanceAsync(repo.Id)">
+                                @Assets.SVG("refresh.svg", new SvgOptions(Width: 14, Height: 14))
+                                <span>@R("Web_Backup_Maintenance_RunNow")</span>
+                            </button>
+                        }
+                    }
+                </Actions>
+                <MoreActions>
+                    @if (repo.State != BackupRepositoryState.PendingRecoveryKit)
+                    {
+                        <MenuItem Icon="download.svg" Label="@R("Web_Backup_Kit_Download")" Disabled="@VM.IsReadOnlyDemo" OnClick="() => DownloadKitAsync(repo.Id)" />
+                    }
+                    @if (repo.State == BackupRepositoryState.Disabled)
+                    {
+                        <MenuItem Icon="check.svg" Label="@R("Web_Backup_Enable")" Disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" OnClick="() => VM.SetRepositoryEnabledAsync(repo.Id, true)" />
+                    }
+                    else
+                    {
+                        <MenuItem Icon="circle_x.svg" Label="@R("Web_Backup_Disable")" Disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" OnClick="() => VM.SetRepositoryEnabledAsync(repo.Id, false)" />
+                    }
+                    <MenuItem Separator />
+                    <MenuItem Icon="trash.svg" Label="@R("Web_Action_Delete")" Danger
+                              Disabled="@(VM.IsBusy || VM.IsReadOnlyDemo || view.JobCount > 0)"
+                              Tooltip="@(view.JobCount > 0 ? R("Web_Backup_Error_repository_in_use") : null)"
+                              OnClick="() => _confirmDelete = true" />
+                </MoreActions>
+            </DetailHeader>
+
+            @if (maintenance is not null || repo.State == BackupRepositoryState.PendingRecoveryKit || !string.IsNullOrEmpty(repo.LastErrorCode))
+            {
+                <div class="detail-alerts">
+                    @if (!string.IsNullOrEmpty(repo.LastErrorCode))
+                    {
+                        <div class="error-banner" role="alert"><strong>@R("Web_Backup_LastError"):</strong> @BackupViewModel.ErrorText(repo.LastErrorCode)</div>
+                    }
+                    @if (maintenance is not null)
+                    {
+                        <div class="backup-progress">
+                            <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@maintenance.Progress">
+                                <div class="job-progress-fill" style="width: @(maintenance.Progress)%"></div>
+                            </div>
+                            <span class="form-hint">
+                                @(maintenance.IsCancellationRequested ? R("Web_Jobs_Cancelling")
+                                    : maintenance.IsRunning ? string.Format(R("Web_Backup_Running"), maintenance.Progress) + (maintenance.Detail is null ? "" : " · " + maintenance.Detail)
+                                    : R("Web_Backup_Queued"))
+                            </span>
+                        </div>
+                    }
+                    @if (repo.State == BackupRepositoryState.PendingRecoveryKit)
+                    {
+                        <div class="backup-kit" role="status">
+                            <strong>@R("Web_Backup_Kit_Title")</strong>
+                            <p>@R("Web_Backup_Kit_Help")</p>
+                            <ol class="backup-kit-steps">
+                                <li>
+                                    <span>@R("Web_Backup_Kit_Step1")</span>
+                                    <button class="btn-secondary btn-secondary--sm" type="button" disabled="@VM.IsReadOnlyDemo" @onclick="() => DownloadKitAsync(repo.Id)">
+                                        @Assets.SVG("download.svg", new SvgOptions(Width: 12, Height: 12))
+                                        <span>@R("Web_Backup_Kit_Download")</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <span>@R("Web_Backup_Kit_Step2")</span>
+                                    <span class="backup-kit-confirm">
+                                        <input class="edit-input backup-kit-code" maxlength="12" autocomplete="off" spellcheck="false"
+                                               aria-label="@R("Web_Backup_Kit_Code")" placeholder="ABC234" @bind="_kitCode" @bind:event="oninput" />
+                                        <button class="btn-primary" type="button" disabled="@(VM.IsBusy || repo.KitDownloadedAtUtc is null && !_kitDownloaded || string.IsNullOrWhiteSpace(_kitCode))"
+                                                @onclick="() => ConfirmKitAsync(repo.Id)">@R("Web_Backup_Kit_Confirm")</button>
+                                    </span>
+                                </li>
+                            </ol>
+                        </div>
+                    }
                 </div>
-                <StatusBadge Tone="@BackupUi.RepositoryTone(repo)" Label="@BackupUi.RepositoryStateLabel(repo)" />
+            }
+
+            <div class="fact-tiles">
+                <FactTile Label="@R("Web_Backup_LastReachable")" Value="@DateFmt.FormatDateTime(repo.LastReachableAtUtc, R("Web_Backup_Never"))"
+                          Tone="@(!string.IsNullOrEmpty(repo.LastErrorCode) ? StatusTone.Negative : repo.LastReachableAtUtc is null ? StatusTone.Neutral : StatusTone.Positive)" />
+                <FactTile Label="@R("Web_Backup_Maintenance_LastCheck")"
+                          Value="@(repo.LastCheckAtUtc is null ? R("Web_Backup_Never") : repo.LastCheckOk == true ? R("Web_Backup_Maintenance_CheckOk") : R("Web_Backup_Maintenance_CheckFailed"))"
+                          Hint="@(repo.LastCheckAtUtc is { } checkedAt ? DateFmt.FormatDateTime(checkedAt) : null)"
+                          Tone="@(repo.LastCheckAtUtc is null ? StatusTone.Neutral : repo.LastCheckOk == true ? StatusTone.Positive : StatusTone.Negative)" />
+                <FactTile Label="@R("Web_Backup_Maintenance_Next")" Value="@DateFmt.FormatDateTime(VM.NextMaintenanceUtc(repo), R("Web_Backup_NoSchedule"))" />
+                <FactTile Label="@R("Web_Backup_Tab_Jobs")" Value="@view.JobCount.ToString()"
+                          OnLink="OnOpenJobs" LinkLabel="@R("Web_Backup_Repos_OpenJobs")" />
             </div>
 
-            @if (VM.ActiveMaintenance(repo.Id) is { } maintenance)
-            {
-                <div class="backup-progress">
-                    <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@maintenance.Progress">
-                        <div class="job-progress-fill" style="width: @(maintenance.Progress)%"></div>
-                    </div>
-                    <span class="form-hint">
-                        @(maintenance.IsCancellationRequested ? R("Web_Jobs_Cancelling")
-                            : maintenance.IsRunning ? string.Format(R("Web_Backup_Running"), maintenance.Progress) + (maintenance.Detail is null ? "" : " · " + maintenance.Detail)
-                            : R("Web_Backup_Queued"))
-                    </span>
-                </div>
-            }
-
-            @if (repo.State == BackupRepositoryState.PendingRecoveryKit)
-            {
-                <section class="workspace-section backup-kit">
-                    <h4>@R("Web_Backup_Kit_Title")</h4>
-                    <p>@R("Web_Backup_Kit_Help")</p>
-                    <ol class="backup-kit-steps">
-                        <li>
-                            <span>@R("Web_Backup_Kit_Step1")</span>
-                            <button class="btn-secondary btn-secondary--sm" type="button" disabled="@VM.IsReadOnlyDemo" @onclick="() => DownloadKitAsync(repo.Id)">
-                                @Assets.SVG("download.svg", new SvgOptions(Width: 12, Height: 12))
-                                <span>@R("Web_Backup_Kit_Download")</span>
-                            </button>
-                        </li>
-                        <li>
-                            <span>@R("Web_Backup_Kit_Step2")</span>
-                            <span class="backup-kit-confirm">
-                                <input class="edit-input backup-kit-code" maxlength="12" autocomplete="off" spellcheck="false"
-                                       aria-label="@R("Web_Backup_Kit_Code")" placeholder="ABC234" @bind="_kitCode" @bind:event="oninput" />
-                                <button class="btn-primary" type="button" disabled="@(VM.IsBusy || repo.KitDownloadedAtUtc is null && !_kitDownloaded || string.IsNullOrWhiteSpace(_kitCode))"
-                                        @onclick="() => ConfirmKitAsync(repo.Id)">@R("Web_Backup_Kit_Confirm")</button>
-                            </span>
-                        </li>
-                    </ol>
-                </section>
-            }
-
-            <dl class="workspace-dl">
-                <dt>@R("Web_Backup_Repos_Location")</dt><dd><code>@Location(repo)</code></dd>
-                <dt>@R("Web_Backup_Repos_RepositoryId")</dt><dd><code>@(repo.ResticRepositoryId ?? "–")</code></dd>
-                <dt>@R("Web_Backup_Repos_Departments")</dt><dd>@DepartmentNames(view)</dd>
-                <dt>@R("Web_Backup_Tab_Jobs")</dt><dd>@view.JobCount</dd>
-                <dt>@R("Web_Backup_LastReachable")</dt><dd>@DateFmt.FormatDateTime(repo.LastReachableAtUtc, R("Web_Backup_Never"))</dd>
-                @if (!string.IsNullOrEmpty(repo.LastErrorCode))
-                {
-                    <dt>@R("Web_Backup_LastError")</dt><dd>@BackupViewModel.ErrorText(repo.LastErrorCode)</dd>
-                }
-                <dt>@R("Web_Backup_Kit_Title")</dt>
-                <dd>@(repo.KitConfirmedAtUtc is { } confirmed
-                        ? string.Format(R("Web_Backup_Kit_ConfirmedAt"), DateFmt.FormatDateTime(confirmed))
-                        : R("Web_Backup_Kit_NotConfirmed"))</dd>
+            <DetailSection Title="@R("Web_Backup_Repos_Section_Connection")">
+                <PropertyRow Label="@R("Web_Backup_Repos_Location")" Value="@Location(repo)" Mono Copyable />
+                <PropertyRow Label="@R("Web_Backup_Repos_Departments")" Value="@DepartmentNames(view)" />
                 @if (repo.Backend == BackupBackend.Rest)
                 {
-                    <dt>@R("Web_Backup_Repos_AppendOnly")</dt><dd>@(repo.IsAppendOnly ? R("Web_Common_Yes") : R("Web_Common_No"))</dd>
+                    <PropertyRow Label="@R("Web_Backup_Repos_AppendOnly")" Value="@(repo.IsAppendOnly ? R("Web_Common_Yes") : R("Web_Common_No"))" />
                 }
-                <dt>@R("Web_Backup_Maintenance")</dt><dd>@BackupUi.ScheduleText(repo.MaintenanceSchedule)</dd>
-                <dt>@R("Web_Backup_Maintenance_Next")</dt><dd>@DateFmt.FormatDateTime(VM.NextMaintenanceUtc(repo), R("Web_Backup_NoSchedule"))</dd>
-                <dt>@R("Web_Backup_Maintenance_LastCheck")</dt>
-                <dd class="backup-inline-status">
-                    @if (repo.LastCheckAtUtc is { } checkedAt)
-                    {
-                        <StatusBadge Tone="@(repo.LastCheckOk == true ? StatusTone.Positive : StatusTone.Negative)"
-                                     Label="@(repo.LastCheckOk == true ? R("Web_Backup_Maintenance_CheckOk") : R("Web_Backup_Maintenance_CheckFailed"))" />
-                        <span class="form-hint">@DateFmt.FormatDateTime(checkedAt)</span>
-                    }
-                    else
-                    {
-                        @R("Web_Backup_Never")
-                    }
-                </dd>
-                <dt>@R("Web_Backup_Maintenance_Mirror")</dt>
-                <dd>@(repo.MirrorTargetId is { } mirrorId ? VM.RepositoryName(mirrorId) : R("Web_Backup_Maintenance_NoMirror"))</dd>
-            </dl>
+            </DetailSection>
 
-            <div class="detail-actions">
-                @if (repo.State == BackupRepositoryState.Active)
-                {
-                    if (VM.ActiveMaintenance(repo.Id) is { } running)
+            <DetailSection Title="@R("Web_Backup_Maintenance")">
+                <PropertyRow Label="@R("Web_Backup_Schedule")" Value="@BackupUi.ScheduleText(repo.MaintenanceSchedule)" />
+                <PropertyRow Label="@R("Web_Backup_Maintenance_Mirror")" Value="@(repo.MirrorTargetId is { } mirrorId ? VM.RepositoryName(mirrorId) : R("Web_Backup_Maintenance_NoMirror"))" />
+            </DetailSection>
+
+            <DetailSection Title="@R("Web_Backup_Repos_Section_Recovery")">
+                <PropertyRow Label="@R("Web_Backup_Kit_Title")">
+                    @if (repo.KitConfirmedAtUtc is { } confirmed)
                     {
-                        <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || running.IsCancellationRequested)" @onclick="() => VM.CancelRunAsync(running.RunId)">
-                            @R("Web_Jobs_Cancel")
-                        </button>
+                        @string.Format(R("Web_Backup_Kit_ConfirmedAt"), DateFmt.FormatDateTime(confirmed))
                     }
                     else
                     {
-                        <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => VM.RunMaintenanceAsync(repo.Id)">
-                            @R("Web_Backup_Maintenance_RunNow")
-                        </button>
+                        <StatusBadge Tone="StatusTone.Warning" Label="@R("Web_Backup_Kit_NotConfirmed")" />
                     }
-                }
-                <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => StartEdit(view)">@R("Web_Backup_Edit")</button>
-                @if (repo.State != BackupRepositoryState.PendingRecoveryKit)
-                {
-                    <button class="btn-secondary" type="button" disabled="@VM.IsReadOnlyDemo" @onclick="() => DownloadKitAsync(repo.Id)">@R("Web_Backup_Kit_Download")</button>
-                }
-                @if (repo.State == BackupRepositoryState.Disabled)
-                {
-                    <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => VM.SetRepositoryEnabledAsync(repo.Id, true)">@R("Web_Backup_Enable")</button>
-                }
-                else
-                {
-                    <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => VM.SetRepositoryEnabledAsync(repo.Id, false)">@R("Web_Backup_Disable")</button>
-                }
-                @if (_confirmDelete)
-                {
-                    <button class="btn-danger" type="button" disabled="@VM.IsBusy" @onclick="() => DeleteAsync(repo.Id)">@R("Web_Backup_ConfirmDelete")</button>
-                    <button class="btn-secondary" type="button" @onclick="() => _confirmDelete = false">@R("Web_Button_Cancel")</button>
-                }
-                else
-                {
-                    <button class="btn-danger-outline" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo || view.JobCount > 0)"
-                            title="@(view.JobCount > 0 ? R("Web_Backup_Error_repository_in_use") : null)" @onclick="() => _confirmDelete = true">@R("Web_Action_Delete")</button>
-                }
-            </div>
+                </PropertyRow>
+            </DetailSection>
+
+            <DetailSection Title="@R("Web_Backup_Repos_Section_Technical")" Collapsible InitiallyCollapsed>
+                <PropertyRow Label="@R("Web_Backup_Repos_RepositoryId")" Value="@repo.ResticRepositoryId" Mono Copyable />
+            </DetailSection>
+
             @if (_confirmDelete)
             {
-                <p class="form-hint">@R("Web_Backup_Repos_DeleteHint")</p>
+                <div class="modal-backdrop" @onclick="() => _confirmDelete = false">
+                    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-repo-delete-title" @onclick:stopPropagation="true">
+                        <h2 class="modal-title" id="backup-repo-delete-title">@string.Format(R("Web_Backup_Repos_DeleteTitle"), repo.Name)</h2>
+                        <p class="modal-text">@R("Web_Backup_Repos_DeleteHint")</p>
+                        <div class="modal-actions">
+                            <button type="button" class="btn-secondary" @onclick="() => _confirmDelete = false">@R("Web_Button_Cancel")</button>
+                            <button type="button" class="btn-danger" disabled="@VM.IsBusy" @onclick="() => DeleteAsync(repo.Id)">@R("Web_Backup_ConfirmDelete")</button>
+                        </div>
+                    </div>
+                </div>
             }
         }
         else
@@ -516,6 +540,9 @@
     public void Dispose() => VM.Changed -= Refresh;
 
     [Parameter] public Guid? SelectedRepositoryId { get; set; }
+
+    /// <summary>Opens the jobs tab; the jobs tile shows no link without it.</summary>
+    [Parameter] public EventCallback OnOpenJobs { get; set; }
 
     private Guid? _selectedId;
     private bool _editing;

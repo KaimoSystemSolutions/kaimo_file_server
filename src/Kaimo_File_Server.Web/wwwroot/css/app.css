@@ -5805,6 +5805,297 @@ input[type="radio"] {
         overflow-wrap: anywhere;
     }
 
+/* ══════════════════════════════════════════════════════════
+   Detail view skeleton (DESIGN_SPEC §9.2): DetailHeader → .detail-alerts →
+   .fact-tiles (FactTile) → DetailSection with PropertyRow children.
+   ══════════════════════════════════════════════════════════ */
+
+.detail-head {
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border);
+}
+
+.detail-head-top {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.detail-head-icon {
+    display: flex;
+    flex: 0 0 36px;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+.detail-head-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.detail-head-title {
+    margin: 0;
+    overflow: hidden;
+    color: var(--text-primary);
+    font-family: var(--font-heading);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -.015em;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detail-head-sub {
+    display: block;
+    margin-top: 1px;
+    color: var(--text-tertiary);
+    font-size: 12px;
+}
+
+.detail-head-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+}
+
+    .detail-head-actions > .btn-primary,
+    .detail-head-actions > .btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .detail-head-actions .detail-head-more {
+        margin-left: auto;
+    }
+
+.detail-head-menu {
+    min-width: 200px;
+}
+
+.context-menu-item:disabled {
+    cursor: not-allowed;
+    opacity: .5;
+}
+
+    .context-menu-item:disabled:hover {
+        background: none;
+    }
+
+.detail-alerts {
+    display: grid;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+    .detail-alerts > .error-banner,
+    .detail-alerts > .warning-banner,
+    .detail-alerts > .success-banner {
+        margin: 0;
+    }
+
+.fact-tiles {
+    display: grid;
+    /* 2×2 in the standard detail pane, one row of four in wide panes. */
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+}
+
+.fact-tile {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 3px;
+    min-width: 0;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+}
+
+.fact-tile-label {
+    padding-right: 26px;
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .045em;
+    text-transform: uppercase;
+}
+
+.fact-tile-value {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--text-primary);
+    font-size: 14.5px;
+    font-weight: 650;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.fact-tile-dot {
+    flex: 0 0 7px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.fact-tile--positive .fact-tile-value { color: var(--success); }
+.fact-tile--negative .fact-tile-value { color: var(--danger); }
+.fact-tile--warning .fact-tile-value { color: var(--warning); }
+.fact-tile--neutral .fact-tile-value { color: var(--text-secondary); }
+
+.fact-tile-hint {
+    color: var(--text-tertiary);
+    font-size: 11.5px;
+}
+
+.fact-tile .fact-tile-link {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 24px;
+    height: 24px;
+}
+
+.detail-section-group {
+    padding-top: var(--space-3);
+}
+
+.detail-section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-1);
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .045em;
+    text-transform: uppercase;
+}
+
+    .detail-section-title::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+    }
+
+.detail-section-group--collapsible > summary {
+    cursor: pointer;
+    list-style: none;
+    border-radius: var(--radius-control);
+}
+
+    .detail-section-group--collapsible > summary::-webkit-details-marker {
+        display: none;
+    }
+
+    /* Chevron: points right when closed, down when open. */
+    .detail-section-group--collapsible > summary::before {
+        content: "";
+        flex: 0 0 auto;
+        width: 5px;
+        height: 5px;
+        margin: 0 2px;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: rotate(-45deg);
+        transition: transform 120ms ease;
+    }
+
+    .detail-section-group--collapsible[open] > summary::before {
+        transform: rotate(45deg);
+    }
+
+    .detail-section-group--collapsible > summary:hover {
+        color: var(--text-secondary);
+    }
+
+.property-list {
+    margin: 0;
+}
+
+.property-row {
+    display: grid;
+    grid-template-columns: minmax(110px, 36%) minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: start;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+    .property-row:last-child {
+        border-bottom: 0;
+    }
+
+    .property-row dt {
+        color: var(--text-secondary);
+        font-size: 12px;
+        line-height: 22px;
+    }
+
+    .property-row dd {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+        min-width: 0;
+        min-height: 22px;
+        margin: 0;
+        color: var(--text-primary);
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+
+.property-value-text {
+    min-width: 0;
+}
+
+    /* Keep the copy button beside a long value (hash, path) instead of wrapping under it. */
+    .property-row dd:has(.property-copy) {
+        flex-wrap: nowrap;
+    }
+
+.property-value--mono .property-value-text {
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.property-empty {
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
+
+.property-row .property-copy {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+}
+
+@media (max-width: 760px) {
+    .property-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 2px;
+    }
+}
+
 @media (max-width: 1180px) {
     .workspace,
     .workspace--wide-detail {

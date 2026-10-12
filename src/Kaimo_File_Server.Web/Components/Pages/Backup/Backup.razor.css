@@ -165,7 +165,17 @@
     background: var(--warning-subtle);
 }
 
+    .backup-page ::deep .backup-kit > strong {
+        display: block;
+        margin-bottom: var(--space-1);
+        color: var(--text-primary);
+        font-size: 13px;
+    }
+
     .backup-page ::deep .backup-kit > p {
+        margin: 0 0 var(--space-3);
+        font-size: 12px;
+        line-height: 1.45;
         color: var(--text-primary);
     }
 
@@ -194,6 +204,12 @@
     width: 9em;
     letter-spacing: .12em;
     text-transform: uppercase;
+}
+
+/* Inside the detail alert band the band's gap does the spacing. */
+.backup-page ::deep .detail-alerts > .backup-kit,
+.backup-page ::deep .detail-alerts > .backup-progress {
+    margin-bottom: 0;
 }
 
 /* ── Activity ── */

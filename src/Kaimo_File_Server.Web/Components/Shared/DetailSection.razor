@@ -1,0 +1,35 @@
+@*
+    Titled group of properties in a detail pane (shared UI library, see DESIGN_SPEC §9.2).
+    Holds <PropertyRow> children (rendered as a <dl>).
+
+    Collapsible sections use native <details>/<summary>, so keyboard and screen-reader
+    support come for free; use them for secondary groups such as technical IDs.
+*@
+
+@if (Collapsible)
+{
+    <details class="detail-section-group detail-section-group--collapsible @Class" open="@(!InitiallyCollapsed)">
+        <summary class="detail-section-title">@Title</summary>
+        <dl class="property-list">@ChildContent</dl>
+    </details>
+}
+else
+{
+    <section class="detail-section-group @Class">
+        <h4 class="detail-section-title">@Title</h4>
+        <dl class="property-list">@ChildContent</dl>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    [Parameter] public bool Collapsible { get; set; }
+
+    /// <summary>Only with <see cref="Collapsible"/>: start closed.</summary>
+    [Parameter] public bool InitiallyCollapsed { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+}

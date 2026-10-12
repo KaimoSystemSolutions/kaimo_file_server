@@ -204,7 +204,12 @@ Semantic backgrounds are tinted (`*-subtle`); solid fills are reserved for badge
 
 - Information-rich areas use **lists** (header row + `file-row`-style rows) as the default.
 - **Admin pattern** (users, groups, roles, departments, shares, connections): `.admin-content` = list on the left, sticky `.admin-detail` panel (≈ 450–460 px) on the right. Selecting a row fills the panel; with no selection it shows `.detail-empty`.
-- Detail panels: `.detail-panel-header` (icon tile + name + subtitle), `<Tabs Variant panel>` for sections, read-only fields as `.detail-field-grid` / `.detail-field-value` (visually distinct from edit inputs), actions in `.detail-actions` separated by a top border.
+- **Detail view skeleton** (read view of a selected object; MUST be used for new and migrated detail panes), always in this order:
+  1. `<DetailHeader>`: icon tile, name, subtitle, `StatusBadge`; below it the primary and one or two frequent actions as buttons, every other action in the "⋯" overflow menu (`<MenuItem>`). Destructive actions are last in that menu, after a separator, and confirm in a `modal-dialog`. Important, frequent functions MUST stay visible buttons (§15).
+  2. `.detail-alerts`: one banner per problem or pending state (`.error-banner`, `.warning-banner`, progress), directly under the header; a banner MAY carry its own action.
+  3. `.fact-tiles` with 2–4 `<FactTile>`s for the facts that answer "is it OK?" at a glance; optional. A tile is not clickable; a link to a related place is a separate arrow button (`OnLink`).
+  4. `<DetailSection>`s with `<PropertyRow>`s: uppercase heading + divider, label left / value right (stacked ≤ 760 px). Secondary groups (technical IDs) MAY be `Collapsible`. Paths, IDs and URLs are `Mono` and `Copyable`. A missing value reads `–`.
+- Legacy detail panels (not yet migrated, see §18): `.detail-panel-header` (icon tile + name + subtitle), `<Tabs Variant panel>` for sections, read-only fields as `.detail-field-grid` / `.detail-field-value`, `.workspace-dl`, actions in `.detail-actions` separated by a top border. Tabs inside a detail pane remain valid for very large objects; the read-only content of each tab then follows step 4.
 - Hierarchical data (folders, departments, groups) SHOULD use a real tree view with indentation and expand/collapse state.
 - Multi-selection shows the `.selection-toolbar` (count + contextual `.toolbar-btn` actions) above the list.
 - Search, filters and sorting MUST show their active state.
@@ -240,6 +245,11 @@ Reuse these before writing anything new. New patterns that will be needed more t
 | `PrincipalPickerField` | Single/multi selection of users, groups, roles, departments, shares: modal with search, type tabs, scrollable list, selected chips. Always use it for principal selection. |
 | `StatusBadge` | Every entity status pill; `Tone` = Positive/Negative/Warning/Neutral. See §10.4. |
 | `InfoButton` | Inline "i" button that reveals an explanation (e.g. password rules) instead of static hint walls. |
+| `DetailHeader` | Header of a detail pane: icon, title, subtitle, `Status`, `Actions` and the "⋯" `MoreActions` menu (§9.2). |
+| `MenuItem` | Entry of a dropdown menu (icon, label, `Danger`, `Disabled` + `Tooltip` reason, `Separator`). |
+| `FactTile` | Key fact tile (label, value, optional hint, `Tone`, optional arrow link) inside `.fact-tiles`. |
+| `DetailSection` | Titled property group, optionally `Collapsible` (native `<details>`). |
+| `PropertyRow` | Read-only label/value row; `Mono`, `Copyable`, "–" for empty values. |
 
 ### 10.2 Global CSS primitives (`app.css`)
 
@@ -251,7 +261,7 @@ Reuse these before writing anything new. New patterns that will be needed more t
 | Forms | `.form-group` (label + control), `.edit-input` (inputs and `select.edit-input` with custom chevron), `.form-hint`, `.toggle-row` + `.toggle-switch`/`.toggle-slider` for booleans, styled file picker; checkboxes/radios use `accent-color: var(--accent)`; `.admin-compact` for dense admin forms |
 | Focus | Global `:focus-visible` = 2 px accent outline, 2 px offset; text fields add a 3 px `--accent-subtle` halo |
 | Lists | `.file-list-header` (micro-label row on `--bg-tertiary`), `.file-row` (10×16 px, bottom border, hover `--bg-hover`), `.file-row--selected` / `.admin-row-selected` |
-| Detail panel | `.admin-content`, `.admin-list`, `.admin-detail`, `.detail-empty`, `.detail-panel-header`, `.detail-panel-name`, `.detail-panel-subtitle`, `.detail-label`, `.detail-value(--mono)`, `.detail-field-grid`, `.detail-field-value`, `.detail-info` (dashed hint box), `.detail-actions` |
+| Detail panel | Skeleton: `.detail-head*`, `.detail-alerts`, `.fact-tiles` / `.fact-tile*`, `.detail-section-group`, `.property-list` / `.property-row` (rendered by the components in §10.1). Legacy: `.admin-content`, `.admin-list`, `.admin-detail`, `.detail-empty`, `.detail-panel-header`, `.detail-panel-name`, `.detail-panel-subtitle`, `.detail-label`, `.detail-value(--mono)`, `.detail-field-grid`, `.detail-field-value`, `.detail-info` (dashed hint box), `.detail-actions` |
 | Create forms | `.create-form-card`, `.create-form-fields`, `.create-form-toggles`, `.create-form-actions` |
 | Dialogs | `.modal-backdrop` (45 % black), `.modal-dialog` (`--bg-secondary`, border, `--radius-modal`, 24 px padding, `--shadow-lg`), `.modal-title`, `.modal-text`, `.modal-input`, `.modal-error`, `.modal-warning`, `.modal-actions` (right-aligned, cancel then primary) |
 | Menus | `.context-menu` (surface, border, `--shadow-lg`, 4 px padding, 13 px items, danger items tinted red), `.multi-select*` |
@@ -264,7 +274,7 @@ Reuse these before writing anything new. New patterns that will be needed more t
 - **Buttons:** at most one visually dominant primary action per local command group. Destructive actions are red, never accent. Every button defines default, hover, focus-visible and disabled; long-running actions show a spinner or progress.
 - **Lists:** header, row, hover and selection are distinct states. Row actions MUST NOT appear only on hover. Sorting is shown in the header.
 - **Tabs** look like navigation within an area and must not be confused with buttons. The legacy segmented `.admin-tabs` MUST NOT be used for new work — use `<Tabs>`.
-- **Read vs. edit:** read-only values render as `.detail-field-value`, never as disabled inputs, so view mode is never confused with edit mode.
+- **Read vs. edit:** read-only values render as `<PropertyRow>` (legacy: `.detail-field-value`), never as disabled inputs, so view mode is never confused with edit mode.
 - **Dialogs** have a clear title, structured content and a stable action zone. Long settings are split into tabs or sections instead of one huge form. Frequently consulted properties belong in the detail panel; rare, focused tasks may be dialogs.
 - **Toggles vs. checkboxes:** boolean settings that take effect as a setting use the toggle switch; checkboxes are for selection in lists and permission grids.
 - **System states:** loading, empty, error, disabled, permission denied, partial success, read-only demo mode (`demo-banner`) and background activity MUST be designed as their own states. Toasts must not replace persistent information; long uploads, downloads and syncs need visible progress that can be found again (running-jobs menu).
@@ -388,6 +398,7 @@ The implementation largely matches this spec. Undefined tokens, hard-coded fallb
 | 2 | `UserList.razor` (`.admin-tabs entity-tabs`) | Only remaining use of the old segmented tab control (Users/Groups/Roles switcher), restyled locally. | Optional: migrate to `<Tabs>` if it should look like the other tab strips. |
 | 3 | `LogViewer` `.log-exclude-chip`, `ClientDeviceSettings` `.pill`, `MainLayout` `.demo-banner`, `UserList` (2×) | Fully rounded pill shapes (`border-radius: 999px`), which §7.1 reserves for small round indicators. | Optional: `--radius-control`, if they should match the crisp look. |
 | 4 | `wwwroot/lib/bootstrap` | 8.4 MB of unused files. | May be deleted. |
+| 5 | Detail panes of Backup (Jobs, Activity, Restore), Notifications, Users/Groups/Roles, Departments, Shares, External Storage, Share links, Homes | Still on the legacy read-only patterns (`workspace-dl`, bare `<dl>` groups, boxed `detail-field-value`). Backup → Repositories is migrated (pilot, 2026-10-12). | Migrate to the detail view skeleton (§9.2) per `plans/detail-view-layout.md`; then remove `.workspace-dl`. |
 
 ## 19. Reusable master prompt
 

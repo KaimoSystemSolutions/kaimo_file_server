@@ -1,0 +1,106 @@
+@*
+    Header of a read-only detail pane (shared UI library, see DESIGN_SPEC §9.2).
+
+    Icon tile + name + subtitle + status on the first line, the actions below:
+    the primary and one or two frequent actions as buttons (`Actions`), every
+    other action in the overflow menu (`MoreActions`). Destructive actions go
+    last in that menu, after a separator, with Danger set.
+
+    Menu entries are <MenuItem> markup, so their handlers run in the owning page
+    and re-render it. The menu reuses the global .context-menu look and is placed with
+    infoPopover.place (position: fixed), so an overflow:hidden pane never clips it.
+*@
+@inherits AppComponentBase
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject IJSRuntime JS
+
+<header class="detail-head @Class">
+    <div class="detail-head-top">
+        @if (!string.IsNullOrEmpty(Icon))
+        {
+            <span class="detail-head-icon" aria-hidden="true">@Assets.SVG(Icon, new SvgOptions(Width: 18, Height: 18))</span>
+        }
+        <div class="detail-head-text">
+            <h3 class="detail-head-title" title="@Title">@Title</h3>
+            @if (!string.IsNullOrEmpty(Subtitle))
+            {
+                <span class="detail-head-sub">@Subtitle</span>
+            }
+        </div>
+        @Status
+    </div>
+
+    @if (Actions is not null || MoreActions is not null)
+    {
+        <div class="detail-head-actions">
+            @Actions
+            @if (MoreActions is not null)
+            {
+                <button type="button" class="btn-icon btn-icon--small detail-head-more" @ref="_triggerRef"
+                        aria-haspopup="menu" aria-expanded="@(_open ? "true" : "false")"
+                        aria-label="@MoreLabel" title="@MoreLabel" @onclick="Toggle">
+                    @Assets.SVG("more_horizontal.svg", new SvgOptions(Width: 16, Height: 16))
+                </button>
+            }
+        </div>
+    }
+</header>
+
+@if (_open && MoreActions is not null)
+{
+    <div class="context-menu-backdrop" @onclick="Close"></div>
+    @* A click on any entry bubbles up here and closes the menu; disabled entries fire no click. *@
+    <div class="context-menu detail-head-menu" role="menu" tabindex="-1" @ref="_menuRef" @onkeydown="OnKeyDown" @onclick="Close">
+        @MoreActions
+    </div>
+}
+
+@code {
+    /// <summary>Icon file in wwwroot/svg for the leading tile; omitted when empty.</summary>
+    [Parameter] public string? Icon { get; set; }
+
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    [Parameter] public string? Subtitle { get; set; }
+
+    /// <summary>Usually a <see cref="StatusBadge"/>, right-aligned on the title line.</summary>
+    [Parameter] public RenderFragment? Status { get; set; }
+
+    /// <summary>Visible action buttons (primary first).</summary>
+    [Parameter] public RenderFragment? Actions { get; set; }
+
+    /// <summary>Overflow menu entries (<see cref="MenuItem"/>); the menu button is hidden without them.</summary>
+    [Parameter] public RenderFragment? MoreActions { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+
+    private bool _open;
+    private bool _placed;
+    private ElementReference _triggerRef;
+    private ElementReference _menuRef;
+
+    private static string MoreLabel => Resources.ResourceManager.GetString("Web_Detail_MoreActions") ?? "More actions";
+
+    private void Toggle() { _open = !_open; _placed = false; }
+    private void Close() { _open = false; _placed = false; }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            Close();
+            await _triggerRef.FocusAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_open && !_placed)
+        {
+            _placed = true;
+            await JS.InvokeVoidAsync("infoPopover.place", _menuRef, _triggerRef);
+            await _menuRef.FocusAsync();
+        }
+    }
+}

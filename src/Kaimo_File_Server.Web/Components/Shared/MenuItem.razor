@@ -1,0 +1,41 @@
+@*
+    One entry of a dropdown menu such as the DetailHeader overflow menu (shared UI library).
+    `Separator` renders a divider instead of an entry. A disabled entry stays visible;
+    `Tooltip` should say why it is unavailable.
+*@
+@inherits AppComponentBase
+@using Kaimo_File_Server.Web.DynamicHelpers
+
+@if (Separator)
+{
+    <div class="context-menu-separator" role="separator"></div>
+}
+else
+{
+    <button type="button" role="menuitem" class="context-menu-item @(Danger ? "context-menu-item--danger" : null)"
+            disabled="@Disabled" title="@Tooltip" @onclick="OnClick">
+        @if (!string.IsNullOrEmpty(Icon))
+        {
+            @Assets.SVG(Icon, new SvgOptions(Width: 14, Height: 14))
+        }
+        @Label
+    </button>
+}
+
+@code {
+    [Parameter] public string? Label { get; set; }
+
+    /// <summary>Icon file in wwwroot/svg.</summary>
+    [Parameter] public string? Icon { get; set; }
+
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    /// <summary>Destructive action: danger-tinted, placed last after a separator.</summary>
+    [Parameter] public bool Danger { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public string? Tooltip { get; set; }
+
+    [Parameter] public bool Separator { get; set; }
+}

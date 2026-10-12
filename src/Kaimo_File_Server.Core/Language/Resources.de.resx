@@ -6985,4 +6985,34 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Backup_Error_rclone_type_blocked" xml:space="preserve">
     <value>Dieser rclone-Remote-Typ ist nicht erlaubt (local, alias, crypt, union, …).</value>
   </data>
+  <data name="Web_Detail_MoreActions" xml:space="preserve">
+    <value>Weitere Aktionen</value>
+  </data>
+  <data name="Web_Detail_Copy" xml:space="preserve">
+    <value>In die Zwischenablage kopieren</value>
+  </data>
+  <data name="Web_Detail_Copied" xml:space="preserve">
+    <value>In die Zwischenablage kopiert</value>
+  </data>
+  <data name="Web_Detail_CopyFailed" xml:space="preserve">
+    <value>Kopieren in die Zwischenablage fehlgeschlagen</value>
+  </data>
+  <data name="Web_Detail_Open" xml:space="preserve">
+    <value>Öffnen</value>
+  </data>
+  <data name="Web_Backup_Repos_OpenJobs" xml:space="preserve">
+    <value>Aufträge anzeigen</value>
+  </data>
+  <data name="Web_Backup_Repos_Section_Connection" xml:space="preserve">
+    <value>Verbindung</value>
+  </data>
+  <data name="Web_Backup_Repos_Section_Recovery" xml:space="preserve">
+    <value>Wiederherstellung</value>
+  </data>
+  <data name="Web_Backup_Repos_Section_Technical" xml:space="preserve">
+    <value>Technische Details</value>
+  </data>
+  <data name="Web_Backup_Repos_DeleteTitle" xml:space="preserve">
+    <value>Repository „{0}“ löschen?</value>
+  </data>
 </root>

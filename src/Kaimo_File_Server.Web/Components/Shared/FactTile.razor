@@ -1,0 +1,70 @@
+@*
+    One key fact at the top of a detail pane (shared UI library, see DESIGN_SPEC §9.2).
+    Place 2–4 tiles inside <div class="fact-tiles">.
+
+    The tile itself is not clickable. With `OnLink` set, a separate arrow button
+    in the corner leads to the related place (e.g. the jobs of a repository).
+*@
+@inherits AppComponentBase
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.DynamicHelpers
+
+<div class="fact-tile @ToneClass">
+    <span class="fact-tile-label">@Label</span>
+    <span class="fact-tile-value">
+        @if (Tone is not null)
+        {
+            <span class="fact-tile-dot" aria-hidden="true"></span>
+        }
+        @if (ChildContent is not null)
+        {
+            @ChildContent
+        }
+        else
+        {
+            @(string.IsNullOrEmpty(Value) ? "–" : Value)
+        }
+    </span>
+    @if (!string.IsNullOrEmpty(Hint))
+    {
+        <span class="fact-tile-hint">@Hint</span>
+    }
+    @if (OnLink.HasDelegate)
+    {
+        <button type="button" class="btn-icon btn-icon--small fact-tile-link"
+                aria-label="@(LinkLabel ?? OpenLabel)" title="@(LinkLabel ?? OpenLabel)" @onclick="OnLink">
+            @Assets.SVG("arrow_up_right.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2f))
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+
+    /// <summary>Plain value; empty shows "–". Ignored when <see cref="ChildContent"/> is set.</summary>
+    [Parameter] public string? Value { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Small secondary line under the value (e.g. a timestamp).</summary>
+    [Parameter] public string? Hint { get; set; }
+
+    /// <summary>Colours the value and adds a status dot; null keeps it neutral without a dot.</summary>
+    [Parameter] public StatusTone? Tone { get; set; }
+
+    [Parameter] public EventCallback OnLink { get; set; }
+
+    /// <summary>Accessible name of the link button, e.g. "Show jobs".</summary>
+    [Parameter] public string? LinkLabel { get; set; }
+
+    private static string OpenLabel => Resources.ResourceManager.GetString("Web_Detail_Open") ?? "Open";
+
+    private string? ToneClass => Tone switch
+    {
+        StatusTone.Positive => "fact-tile--positive",
+        StatusTone.Negative => "fact-tile--negative",
+        StatusTone.Warning => "fact-tile--warning",
+        StatusTone.Neutral => "fact-tile--neutral",
+        _ => null
+    };
+}
