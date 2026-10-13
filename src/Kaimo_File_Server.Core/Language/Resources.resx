@@ -4416,12 +4416,6 @@
   <data name="Web_ShareLink_PasswordPlaceholder" xml:space="preserve">
     <value>Leave empty for no password</value>
   </data>
-  <data name="Web_ShareLink_BaseAddress" xml:space="preserve">
-    <value>Address</value>
-  </data>
-  <data name="Web_ShareLink_DefaultAddress" xml:space="preserve">
-    <value>Default</value>
-  </data>
   <data name="Web_ShareLink_Start" xml:space="preserve">
     <value>Start</value>
   </data>
@@ -4504,16 +4498,7 @@
     <value>Exhausted</value>
   </data>
   <data name="Web_ShareLinkSettings_Hint" xml:space="preserve">
-    <value>Addresses the server is reachable under. A link URL is built from the default address (or the one the creator picks). DNS and TLS for these addresses are configured outside the app.</value>
-  </data>
-  <data name="Web_ShareLinkSettings_Default" xml:space="preserve">
-    <value>Default</value>
-  </data>
-  <data name="Web_ShareLinkSettings_Add" xml:space="preserve">
-    <value>Add address</value>
-  </data>
-  <data name="Web_ShareLinkSettings_AllowCustom" xml:space="preserve">
-    <value>Allow link creators to choose a non-default address</value>
+    <value>Link URLs are built from the default domain; without one, from the address the browser currently uses.</value>
   </data>
   <data name="Web_PublicShare_Unavailable_Title" xml:space="preserve">
     <value>Link unavailable</value>
@@ -5545,7 +5530,7 @@
     <value>Public address</value>
   </data>
   <data name="Web_Notifications_PublicUrl_Help" xml:space="preserve">
-    <value>Used for links in mails ({{ server.url }}). Empty uses the default share-link address.</value>
+    <value>Links in mails ({{ server.url }}) use the default domain from the Domains settings.</value>
   </data>
   <data name="Web_Notifications_HeaderHtml" xml:space="preserve">
     <value>Header (HTML)</value>
@@ -7179,5 +7164,116 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   </data>
   <data name="Web_Home_Links_Upload" xml:space="preserve">
     <value>upload</value>
+  </data>
+  <data name="Web_Notifications_PublicUrl_Missing" xml:space="preserve">
+    <value>No default domain is configured, so mails contain no link to the server.</value>
+  </data>
+  <data name="Web_Settings_Tab_Domains" xml:space="preserve">
+    <value>Domains</value>
+  </data>
+  <data name="Web_Settings_Tab_AccessRestrictions" xml:space="preserve">
+    <value>Access restrictions</value>
+  </data>
+  <data name="Web_DomainSettings_Hint" xml:space="preserve">
+    <value>Addresses (base URLs) the server is reachable under. The default address builds share-link URLs and the links in notification mails; access restriction rules can allow sign-ins per address. DNS and TLS for these addresses are configured outside the app.</value>
+  </data>
+  <data name="Web_DomainSettings_Default" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="Web_DomainSettings_Address" xml:space="preserve">
+    <value>Address</value>
+  </data>
+  <data name="Web_DomainSettings_Add" xml:space="preserve">
+    <value>Add address</value>
+  </data>
+  <data name="Web_DomainSettings_Empty" xml:space="preserve">
+    <value>No address configured. Share links then use the address the browser currently uses, and mails contain no link to the server.</value>
+  </data>
+  <data name="Web_DomainSettings_Invalid" xml:space="preserve">
+    <value>Not saved – only absolute http/https URLs are allowed: {0}</value>
+  </data>
+  <data name="Web_DomainSettings_Error_RuleWithoutSource" xml:space="preserve">
+    <value>Not saved – the following access restriction rules would be left without any domain or IP range and would block every user they cover: {0}. Add an IP range to them or delete them first.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Hint" xml:space="preserve">
+    <value>Users, groups or departments covered by an active rule may only sign in via one of its domains or from one of its IP ranges. Users without a rule are not restricted. Applies to the web interface, the client app (API) and WebDAV, not to SMB.</value>
+  </data>
+  <data name="Web_AccessRestrictions_ProxyHint" xml:space="preserve">
+    <value>A domain is the address the server was called under; the client controls it, so IP ranges are the hard boundary. Behind a reverse proxy, configure ForwardedHeaders:KnownProxies so client IPs are real, and let the proxy pass the Host header through. If you lock yourself out, start the web container with KAIMO_ACCESS_RESTRICTIONS_DISABLED=true.</value>
+  </data>
+  <data name="Web_AccessRestrictions_CurrentConnection" xml:space="preserve">
+    <value>Your current connection:</value>
+  </data>
+  <data name="Web_AccessRestrictions_New" xml:space="preserve">
+    <value>New rule</value>
+  </data>
+  <data name="Web_AccessRestrictions_EditTitle" xml:space="preserve">
+    <value>Edit rule</value>
+  </data>
+  <data name="Web_AccessRestrictions_Rules" xml:space="preserve">
+    <value>Rules</value>
+  </data>
+  <data name="Web_AccessRestrictions_Empty" xml:space="preserve">
+    <value>No rules. All users may sign in from any address.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Web_AccessRestrictions_Enabled" xml:space="preserve">
+    <value>Active</value>
+  </data>
+  <data name="Web_AccessRestrictions_Users" xml:space="preserve">
+    <value>Users</value>
+  </data>
+  <data name="Web_AccessRestrictions_Groups" xml:space="preserve">
+    <value>Groups</value>
+  </data>
+  <data name="Web_AccessRestrictions_Departments" xml:space="preserve">
+    <value>Departments</value>
+  </data>
+  <data name="Web_AccessRestrictions_DepartmentsHint" xml:space="preserve">
+    <value>Includes the members of sub-departments.</value>
+  </data>
+  <data name="Web_AccessRestrictions_None" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="Web_AccessRestrictions_Domains" xml:space="preserve">
+    <value>Allowed domains</value>
+  </data>
+  <data name="Web_AccessRestrictions_NoDomains" xml:space="preserve">
+    <value>No domains configured yet.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Networks" xml:space="preserve">
+    <value>Allowed IP ranges</value>
+  </data>
+  <data name="Web_AccessRestrictions_NetworksHint" xml:space="preserve">
+    <value>One per line: CIDR range (10.0.0.0/8) or single address (IPv4 or IPv6).</value>
+  </data>
+  <data name="Web_AccessRestrictions_Summary" xml:space="preserve">
+    <value>{0} principals · {1} domains · {2} IP ranges</value>
+  </data>
+  <data name="Web_AccessRestrictions_Error_Name" xml:space="preserve">
+    <value>Enter a name for the rule.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Error_Principals" xml:space="preserve">
+    <value>Select at least one user, group or department.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Error_Sources" xml:space="preserve">
+    <value>Allow at least one domain or IP range.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Error_Network" xml:space="preserve">
+    <value>Invalid IP range: {0}</value>
+  </data>
+  <data name="Web_AccessRestrictions_Error_SelfLockout" xml:space="preserve">
+    <value>Not saved: this change would block your own current connection ({0} · {1}).</value>
+  </data>
+  <data name="Web_AccessRestrictions_DeleteTitle" xml:space="preserve">
+    <value>Delete rule</value>
+  </data>
+  <data name="Web_AccessRestrictions_DeleteConfirm" xml:space="preserve">
+    <value>Delete the rule "{0}"?</value>
+  </data>
+  <data name="Web_Security_Outcome_AddressNotAllowed" xml:space="preserve">
+    <value>Address not allowed</value>
   </data>
 </root>

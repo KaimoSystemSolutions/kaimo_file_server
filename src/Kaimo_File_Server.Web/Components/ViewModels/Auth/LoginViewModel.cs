@@ -53,7 +53,7 @@ public class LoginViewModel
             // Credential verification, brute-force lockout, and enumeration
             // resistance all live in the login service — the view model only
             // maps the outcome to UI state.
-            var result = await _loginService.AuthenticateAsync(Username, Password, _client.RemoteAddress);
+            var result = await _loginService.AuthenticateAsync(Username, Password, _client.RemoteAddress, _client.Host);
 
             switch (result.Outcome)
             {
@@ -82,6 +82,15 @@ public class LoginViewModel
                 case LoginOutcome.AccountDisabled:
                     _logger.LogWarning("Login abgelehnt – Konto deaktiviert: {Username}", Username);
                     // Never disclose the real reason outward — see default below.
+                    ErrorMessage = Resources.Web_Login_InvalidCredentials;
+                    return false;
+
+                case LoginOutcome.AddressNotAllowed:
+                    _logger.LogWarning(
+                        "Login rejected – access restriction for {Username} from {Address} via {Host}",
+                        Username, _client.RemoteAddress, _client.Host);
+                    // Never disclose the real reason outward: it is only reached with the correct
+                    // password, so a distinct message would confirm the credentials.
                     ErrorMessage = Resources.Web_Login_InvalidCredentials;
                     return false;
 

@@ -5,46 +5,24 @@
 @inject ShareLinkService ShareLinks
 
 @*
-    Settings tab for public share links: the allowlist of base addresses (e.g. reverse-proxy
-    URLs) a link URL may be built from, which is the default, and whether a link creator may
-    pick a non-default one; plus the global switch and per-file size ceiling for upload links.
+    Settings tab for public share links: the global switch and per-file size ceiling for upload
+    links. The address link URLs are built from lives in the Domains tab.
 *@
 
 <div class="settings-section">
     <h2>@T("Web_Settings_Tab_ShareLinks", "Share Links")</h2>
     <p class="settings-hint">
-        @T("Web_ShareLinkSettings_Hint", "Addresses the server is reachable under. A link URL is built from the default address (or the one the creator picks). DNS and TLS for these addresses are configured outside the app.")
+        @T("Web_ShareLinkSettings_Hint", "Link URLs are built from the default domain (Settings → Domains); without one, from the address the browser currently uses.")
     </p>
+    <a class="btn-secondary btn-secondary--sm sharelink-domains-link" href="/settings?tab=Domains">
+        @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+        <span>@T("Web_Settings_Tab_Domains", "Domains")</span>
+    </a>
 
     @if (_saved)
     {
         <div class="success-banner">@Resources.Web_ChangesSaved</div>
     }
-
-    <div class="sharelink-address-list">
-        @for (int i = 0; i < _addresses.Count; i++)
-        {
-            var index = i;
-            <div class="sharelink-address-row">
-                <input type="radio" name="default-address" title="@T("Web_ShareLinkSettings_Default", "Default")"
-                       checked="@(_defaultIndex == index)" @onchange="() => _defaultIndex = index" />
-                <input type="url" class="edit-input" placeholder="https://files.example.com"
-                       value="@_addresses[index]" @onchange="e => _addresses[index] = e.Value?.ToString() ?? string.Empty" />
-                <button class="btn-icon" title="@T("Web_Button_Delete", "Delete")" @onclick="() => RemoveAt(index)">
-                    @Assets.SVG("trash.svg", new SvgOptions(Width: 14, Height: 14))
-                </button>
-            </div>
-        }
-    </div>
-
-    <button class="btn-secondary" disabled="@(_addresses.Count >= ShareLinkSettings.MaxAddresses)" @onclick="Add">
-        @T("Web_ShareLinkSettings_Add", "Add address")
-    </button>
-
-    <label class="sharelink-check">
-        <input type="checkbox" @bind="_allowUserChosen" />
-        <span>@T("Web_ShareLinkSettings_AllowCustom", "Allow link creators to choose a non-default address")</span>
-    </label>
 
     <h3>@T("Web_ShareLinkSettings_UploadTitle", "Upload links")</h3>
     <p class="settings-hint">
@@ -68,9 +46,7 @@
 </div>
 
 @code {
-    private List<string> _addresses = new();
-    private int _defaultIndex;
-    private bool _allowUserChosen = true;
+    private ShareLinkSettings _settings = ShareLinkSettings.Default();
     private bool _allowUploadLinks;
     private long _maxUploadMb = ShareLinkSettings.DefaultMaxUploadFileSizeBytes / Mb;
     private bool _saved;
@@ -80,48 +56,26 @@
     private static string T(string key, string fallback)
         => Resources.ResourceManager.GetString(key) ?? fallback;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() => Apply(await ShareLinks.GetSettingsAsync());
+
+    private void Apply(ShareLinkSettings settings)
     {
-        var settings = await ShareLinks.GetSettingsAsync();
-        _addresses = settings.BaseAddresses.ToList();
-        _defaultIndex = settings.DefaultIndex;
-        _allowUserChosen = settings.AllowUserChosenAddress;
+        _settings = settings;
         _allowUploadLinks = settings.AllowUploadLinks;
         _maxUploadMb = settings.MaxUploadFileSizeBytes / Mb;
     }
 
-    private void Add()
-    {
-        if (_addresses.Count < ShareLinkSettings.MaxAddresses)
-            _addresses.Add("");
-    }
-
-    private void RemoveAt(int index)
-    {
-        _addresses.RemoveAt(index);
-        if (_defaultIndex >= _addresses.Count)
-            _defaultIndex = Math.Max(0, _addresses.Count - 1);
-    }
-
     private async Task SaveAsync()
     {
-        var settings = new ShareLinkSettings
+        // Keep the legacy address fields as stored: they seed the Domains tab until it is saved.
+        await ShareLinks.SaveSettingsAsync(new ShareLinkSettings
         {
-            BaseAddresses = _addresses.ToList(),
-            DefaultIndex = _defaultIndex,
-            AllowUserChosenAddress = _allowUserChosen,
+            BaseAddresses = _settings.BaseAddresses.ToList(),
+            DefaultIndex = _settings.DefaultIndex,
             AllowUploadLinks = _allowUploadLinks,
             MaxUploadFileSizeBytes = _maxUploadMb * Mb,
-        };
-        await ShareLinks.SaveSettingsAsync(settings);
-
-        // Reflect the normalized result (invalid/duplicate entries dropped).
-        var reloaded = await ShareLinks.GetSettingsAsync();
-        _addresses = reloaded.BaseAddresses.ToList();
-        _defaultIndex = reloaded.DefaultIndex;
-        _allowUserChosen = reloaded.AllowUserChosenAddress;
-        _allowUploadLinks = reloaded.AllowUploadLinks;
-        _maxUploadMb = reloaded.MaxUploadFileSizeBytes / Mb;
+        });
+        Apply(await ShareLinks.GetSettingsAsync());
         _saved = true;
     }
 }

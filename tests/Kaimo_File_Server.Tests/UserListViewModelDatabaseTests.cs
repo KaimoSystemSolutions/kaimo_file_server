@@ -274,7 +274,7 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
     {
         var self = SeedUser("carol");
         var login = new Mock<ILoginService>();
-        login.Setup(l => l.AuthenticateAsync("carol", "current-password", "198.51.100.7"))
+        login.Setup(l => l.AuthenticateAsync("carol", "current-password", "198.51.100.7", It.IsAny<string?>()))
             .ReturnsAsync(LoginResult.LockedOut(TimeSpan.FromMinutes(7)));
         var sut = await StartSelfPasswordChangeAsync(self, login.Object);
 
@@ -283,7 +283,7 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
         Assert.Contains("7", sut.ErrorMessage);
         await using var db = NewContext();
         Assert.Equal("pw-hash", (await db.Users.FindAsync(self.Id))!.PasswordHash);
-        login.Verify(l => l.AuthenticateAsync("carol", "current-password", "198.51.100.7"), Times.Once);
+        login.Verify(l => l.AuthenticateAsync("carol", "current-password", "198.51.100.7", It.IsAny<string?>()), Times.Once);
     }
 
     [Fact]
@@ -297,7 +297,7 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
             await db.SaveChangesAsync();
         }
         var login = new Mock<ILoginService>();
-        login.Setup(l => l.AuthenticateAsync("carol", "current-password", It.IsAny<string?>()))
+        login.Setup(l => l.AuthenticateAsync("carol", "current-password", It.IsAny<string?>(), It.IsAny<string?>()))
             .ReturnsAsync(LoginResult.ForSuccess(ContextFor(self)));
         var sut = await StartSelfPasswordChangeAsync(self, login.Object);
 

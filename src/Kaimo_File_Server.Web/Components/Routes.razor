@@ -40,6 +40,11 @@
 
     /// <summary>Client address captured by App.razor; see <see cref="ClientConnectionInfo"/>.</summary>
     [Parameter] public string? ClientAddress { get; set; }
+    [Parameter] public string? ClientHost { get; set; }
 
-    protected override void OnInitialized() => ClientConnection.RemoteAddress = ClientAddress;
+    protected override void OnInitialized()
+    {
+        ClientConnection.RemoteAddress = ClientAddress;
+        ClientConnection.Host = ClientHost;
+    }
 }

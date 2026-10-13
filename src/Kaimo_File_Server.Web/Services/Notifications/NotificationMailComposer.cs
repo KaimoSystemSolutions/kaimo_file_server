@@ -25,13 +25,8 @@ public sealed class NotificationMailComposer(
         var layout = await config.GetFreshAsync(MailLayoutSettings.ConfigKey, MailLayoutSettings.Default());
         layout.Normalize();
 
-        var serverUrl = layout.PublicBaseUrl;
-        if (serverUrl.Length == 0)
-        {
-            var links = await config.GetAsync(ShareLinkSettings.ConfigKey, ShareLinkSettings.Default());
-            links.Normalize();
-            serverUrl = links.DefaultAddress ?? string.Empty;
-        }
+        // Links in mails use the central default domain (Settings → Domains).
+        var serverUrl = (await ServerDomainSettings.LoadAsync(config)).DefaultAddress ?? string.Empty;
 
         var smtpSettings = await smtp.GetAsync();
         var serverName = string.IsNullOrWhiteSpace(smtpSettings.FromName) ? "Kaimo Files" : smtpSettings.FromName;

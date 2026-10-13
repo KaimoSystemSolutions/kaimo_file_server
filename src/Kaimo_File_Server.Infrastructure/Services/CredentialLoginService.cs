@@ -30,23 +30,26 @@ public sealed class CredentialLoginService : ILoginService
     private readonly IUserContextFactory _contextFactory;
     private readonly ILoginThrottle _throttle;
     private readonly IConfigRepository _config;
+    private readonly AccessRestrictionService? _access;
 
     public CredentialLoginService(
         IUserRepository users,
         IPasswordService passwords,
         IUserContextFactory contextFactory,
         ILoginThrottle throttle,
-        IConfigRepository config)
+        IConfigRepository config,
+        AccessRestrictionService? access = null)
     {
         _users = users;
         _passwords = passwords;
         _contextFactory = contextFactory;
         _throttle = throttle;
         _config = config;
+        _access = access;
     }
 
     public async Task<LoginResult> AuthenticateAsync(
-        string username, string password, string? remoteAddress = null)
+        string username, string password, string? remoteAddress = null, string? host = null)
     {
         var trimmed = (username ?? string.Empty).Trim();
         var key = ThrottleKey(trimmed, remoteAddress);
@@ -103,11 +106,24 @@ public sealed class CredentialLoginService : ILoginService
             if (!user.IsEnabled)
                 return LoginResult.AccountDisabled;
 
-            // 4. Success — clear any accumulated failures for these keys.
+            var context = await _contextFactory.CreateAsync(user);
+
+            // 4. Valid credentials from an address an access restriction rule does not
+            //    allow. Must be indistinguishable from a wrong password, or the response
+            //    would confirm the password: counted as a failure (no throttle reset), and
+            //    every caller shows it exactly like InvalidCredentials. The distinct outcome
+            //    only reaches the admin-side security log.
+            if (_access is not null && !await _access.IsAllowedAsync(context, remoteAddress, host))
+            {
+                settled = true;
+                var failure = RegisterFailure(key, policy, accountKey, accountPolicy);
+                return failure.Outcome == LoginOutcome.LockedOut ? failure : LoginResult.AddressNotAllowed;
+            }
+
+            // 5. Success — clear any accumulated failures for these keys.
             settled = true;
             _throttle.Reset(key);
             _throttle.Reset(accountKey);
-            var context = await _contextFactory.CreateAsync(user);
             return LoginResult.ForSuccess(context);
         }
         finally

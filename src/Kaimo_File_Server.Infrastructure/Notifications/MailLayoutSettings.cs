@@ -26,7 +26,10 @@ public sealed partial record MailLayoutSettings
     public string HeaderHtml { get; set; } = string.Empty;
     public string FooterHtml { get; set; } = "{{ server.name }} · <a href=\"{{ server.url }}\">{{ server.url }}</a>";
 
-    /// <summary>Base URL used for links in mails; empty = the default share-link address.</summary>
+    /// <summary>
+    /// Legacy: links in mails now use the central default domain (<c>ServerDomainSettings</c>);
+    /// read only to derive that setting before its first save.
+    /// </summary>
     public string PublicBaseUrl { get; set; } = string.Empty;
 
     public void Normalize()

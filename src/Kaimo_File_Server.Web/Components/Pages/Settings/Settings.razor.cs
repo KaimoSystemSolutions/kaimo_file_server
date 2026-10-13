@@ -118,5 +118,7 @@ internal enum SettingsTab
     Certificate,
     Backup,
     ClientDevices,
-    MailServer
+    MailServer,
+    Domains,
+    AccessRestrictions
 }

@@ -46,6 +46,7 @@ Add these variables to `web`.
 | `GoogleOAuth__ClientSecret` | Image default | Overrides the Google OAuth client secret. |
 | `ForwardedHeaders__KnownProxies__0` | Empty | Address of a reverse proxy allowed to set `X-Forwarded-For`/`-Proto`. Add `__1`, `__2`, … for more. Needed for every proxy that is not on loopback — also one in the same Docker network or LAN; see [Behind a reverse proxy](DETAILS.md#-behind-a-reverse-proxy). |
 | `ForwardedHeaders__KnownNetworks__0` | Empty (= loopback only) | Trusted proxy range in CIDR notation, e.g. `172.18.0.0/16`. Setting this or `KnownProxies` replaces the loopback default. |
+| `KAIMO_ACCESS_RESTRICTIONS_DISABLED` | `false` | Set to `true` to ignore every access restriction rule (Settings → Access restrictions), e.g. after locking yourself out. Remove it again afterwards. |
 | `Security__EventRetentionDays` | `365` | Days that login attempts and per-client API/WebDAV activity (tables `login_attempts`, `client_activity`) are kept for the security overview. |
 
 ## SMB bridge only

@@ -1,0 +1,166 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Security
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AccessSettingsViewModel VM
+@inject AssetProvider Icons
+
+@*
+    Settings tab for access restriction rules: which users, groups or departments may only sign
+    in via certain domains (the address the server is reached under) or from certain IP ranges.
+    Shares its view model with the Domains tab, whose addresses are the selectable hosts.
+*@
+
+@if (VM.IsLoading)
+{
+    <p class="settings-description">@R("Web_Common_Loading")</p>
+}
+else if (!VM.CanManage)
+{
+    <div class="error-banner">@R("Web_Error_NoPermission")</div>
+}
+else
+{
+    @if (VM.SuccessMessage is not null) { <div class="success-banner">@VM.SuccessMessage</div> }
+    @if (VM.ErrorMessage is not null) { <div class="error-banner" role="alert">@VM.ErrorMessage</div> }
+
+    <div class="detail-section">
+        <span class="detail-label">@R("Web_Settings_Tab_AccessRestrictions")</span>
+        <p class="settings-description">
+            @R("Web_AccessRestrictions_Hint")
+            <InfoButton Text="@R("Web_AccessRestrictions_ProxyHint")" />
+        </p>
+        <p class="access-current">
+            @R("Web_AccessRestrictions_CurrentConnection")
+            <span class="detail-value--mono">@VM.ClientAddress</span>
+            <span>·</span>
+            <span class="detail-value--mono">@VM.ClientHost</span>
+        </p>
+
+        @if (VM.Editing is { } rule)
+        {
+            <div class="create-form-card admin-compact">
+                <h3>@(VM.IsNew ? R("Web_AccessRestrictions_New") : R("Web_AccessRestrictions_EditTitle"))</h3>
+                <div class="create-form-fields">
+                    <div class="form-group">
+                        <label for="access-rule-name">@R("Web_AccessRestrictions_Name")</label>
+                        <input id="access-rule-name" class="edit-input" maxlength="100" @bind="rule.Name" />
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label-text">@R("Web_AccessRestrictions_Enabled")</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" @bind="rule.Enabled" aria-label="@R("Web_AccessRestrictions_Enabled")" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>@R("Web_AccessRestrictions_Users")</label>
+                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.UserItems" SelectedIds="rule.UserIds"
+                                              SelectedIdsChanged="ids => rule.UserIds = ids.ToList()"
+                                              Title="@R("Web_AccessRestrictions_Users")" Placeholder="@R("Web_AccessRestrictions_None")" />
+                    </div>
+                    <div class="form-group">
+                        <label>@R("Web_AccessRestrictions_Groups")</label>
+                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.GroupItems" SelectedIds="rule.GroupIds"
+                                              SelectedIdsChanged="ids => rule.GroupIds = ids.ToList()"
+                                              Title="@R("Web_AccessRestrictions_Groups")" Placeholder="@R("Web_AccessRestrictions_None")" />
+                    </div>
+                    <div class="form-group">
+                        <label>@R("Web_AccessRestrictions_Departments")</label>
+                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.DepartmentItems" SelectedIds="rule.DepartmentIds"
+                                              SelectedIdsChanged="ids => rule.DepartmentIds = ids.ToList()"
+                                              Title="@R("Web_AccessRestrictions_Departments")" Placeholder="@R("Web_AccessRestrictions_None")" />
+                        <span class="form-hint">@R("Web_AccessRestrictions_DepartmentsHint")</span>
+                    </div>
+                    <div class="form-group">
+                        <label>@R("Web_AccessRestrictions_Domains")</label>
+                        @if (VM.EditHosts.Count == 0)
+                        {
+                            <span class="form-hint">@R("Web_AccessRestrictions_NoDomains")</span>
+                            <a class="btn-secondary btn-secondary--sm" href="/settings?tab=Domains">
+                                @Icons.SVG("arrow_right.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                                <span>@R("Web_Settings_Tab_Domains")</span>
+                            </a>
+                        }
+                        else
+                        {
+                            <MultiSelect T="string" Items="VM.EditHosts" Label="h => h"
+                                         PlaceholderText="@R("Web_AccessRestrictions_None")" />
+                        }
+                    </div>
+                    <div class="form-group">
+                        <label for="access-rule-networks">@R("Web_AccessRestrictions_Networks")</label>
+                        <textarea id="access-rule-networks" class="edit-input access-networks" rows="4" spellcheck="false"
+                                  placeholder="10.0.0.0/8&#10;192.168.1.20" @bind="VM.EditNetworks"></textarea>
+                        <span class="form-hint">@R("Web_AccessRestrictions_NetworksHint")</span>
+                    </div>
+                </div>
+                <div class="create-form-actions">
+                    <button type="button" class="btn-secondary" @onclick="VM.CancelEdit">@R("Web_Button_Cancel")</button>
+                    <button type="button" class="btn-primary" disabled="@VM.IsSaving" @onclick="VM.SaveRuleAsync">@Resources.Web_Settings_Button_Save</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="access-toolbar">
+                <button type="button" class="btn-primary" @onclick="VM.NewRule">@R("Web_AccessRestrictions_New")</button>
+            </div>
+        }
+
+        @if (VM.Rules.Count == 0)
+        {
+            <p class="settings-empty">@R("Web_AccessRestrictions_Empty")</p>
+        }
+        else
+        {
+            <div class="access-rules">
+                <div class="file-list-header">@R("Web_AccessRestrictions_Rules")</div>
+                @foreach (var item in VM.Rules)
+                {
+                    var current = item;
+                    <div class="file-row access-rule @(VM.Editing?.Id == current.Id ? "admin-row-selected" : "")">
+                        <div class="access-rule__text">
+                            <span class="access-rule__name">@current.Name</span>
+                            <span class="access-rule__summary">@AccessSettingsViewModel.Summary(current)</span>
+                        </div>
+                        <StatusBadge Tone="@(current.Enabled ? StatusTone.Positive : StatusTone.Neutral)"
+                                     Label="@(current.Enabled ? Resources.Web_Common_Active : Resources.Web_Common_Disabled)" />
+                        <button type="button" class="btn-icon" title="@R("Web_AccessRestrictions_EditTitle")"
+                                aria-label="@R("Web_AccessRestrictions_EditTitle")" @onclick="() => VM.EditRule(current)">
+                            @Icons.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
+                        </button>
+                        <button type="button" class="btn-icon btn-icon--danger" title="@R("Web_Button_Delete")"
+                                aria-label="@R("Web_Button_Delete")" @onclick="() => VM.PendingDelete = current">
+                            @Icons.SVG("trash.svg", new SvgOptions(Width: 14, Height: 14))
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @if (VM.PendingDelete is { } pending)
+    {
+        <div class="modal-backdrop" @onclick="() => VM.PendingDelete = null">
+            <div class="modal-dialog" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
+                <h3 class="modal-title">@R("Web_AccessRestrictions_DeleteTitle")</h3>
+                <p class="modal-text">@string.Format(R("Web_AccessRestrictions_DeleteConfirm"), pending.Name)</p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" @onclick="() => VM.PendingDelete = null">@R("Web_Button_Cancel")</button>
+                    <button type="button" class="btn-danger" disabled="@VM.IsSaving" @onclick="VM.DeleteRuleAsync">@R("Web_Button_Delete")</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        VM.ClearMessages();
+        await VM.LoadAsync();
+    }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+}

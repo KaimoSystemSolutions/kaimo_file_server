@@ -56,6 +56,13 @@ public sealed class ShareLinkListViewModel(
     public string? ErrorMessage { get; private set; }
     public List<ShareLinkRow> Links { get; private set; } = new();
     public ShareLinkSettings Settings { get; private set; } = ShareLinkSettings.Default();
+    public ServerDomainSettings Domains { get; private set; } = ServerDomainSettings.Default();
+
+    /// <summary>
+    /// The address the browser currently uses (set by the page before loading); link URLs fall
+    /// back to it when no default server domain is configured.
+    /// </summary>
+    public string? CurrentBaseUri { get; set; }
 
     public event Action? OnStateChanged;
     private void Notify() => OnStateChanged?.Invoke();
@@ -75,6 +82,7 @@ public sealed class ShareLinkListViewModel(
             if (!CanAccessPage) return;
 
             Settings = await shareLinks.GetSettingsAsync();
+            Domains = await shareLinks.GetDomainsAsync();
 
             var links = new List<ShareLink>();
             if (CanManageDownloadLinks)
@@ -129,7 +137,7 @@ public sealed class ShareLinkListViewModel(
         }
     }
 
-    public string BuildUrl(ShareLink link) => shareLinks.BuildUrl(link, Settings);
+    public string BuildUrl(ShareLink link) => shareLinks.BuildUrl(link, Domains, CurrentBaseUri);
 
     private async Task<List<ShareLink>> ListInScopeAsync(UserContext actor, ManagementPermission permission)
     {
@@ -176,7 +184,7 @@ public sealed class ShareLinkListViewModel(
                 l,
                 shareNames.GetValueOrDefault(l.ShareId, ""),
                 creatorNames.GetValueOrDefault(l.CreatedByUserId, ""),
-                shareLinks.BuildUrl(l, Settings)))
+                shareLinks.BuildUrl(l, Domains, CurrentBaseUri)))
             .ToList();
     }
 

@@ -224,7 +224,9 @@ in a network you fully trust, or remove the `8081` mapping from
 
 **Behind a reverse proxy** that forwards to `8081`, the proxy must be trusted
 (see above) and send `X-Forwarded-Proto: https` — otherwise every page request
-is redirected again (redirect loop). If the proxy rewrites the `Host` header,
+is redirected again (redirect loop). Access restriction rules that allow a
+domain (Settings → Access restrictions) need the original `Host` header, so let
+the proxy pass it through (nginx: `proxy_set_header Host $host;`). If the proxy rewrites the `Host` header,
 also list the public URL so the browser connection is accepted:
 `Web__AllowedOrigins: https://files.example.com`.
 

@@ -401,6 +401,7 @@ builder.Services.AddScoped<ExternalStorageSyncViewModel>();
 builder.Services.AddScoped<HomeDashboardViewModel>();
 builder.Services.AddScoped<ClientDeviceAdminViewModel>();
 builder.Services.AddScoped<MailServerSettingsViewModel>();
+builder.Services.AddScoped<AccessSettingsViewModel>();
 builder.Services.AddScoped<NotificationsViewModel>();
 builder.Services.AddScoped<CloudAccessViewModel>();
 builder.Services.AddScoped<CloudAccessShareBrowserViewModel>();
@@ -644,6 +645,10 @@ app.UseWhen(
 // controllers see the JWT-derived principal and the Blazor hub sees the session user.
 app.UseAuthentication();
 app.UseAuthorization();
+
+// After authorization, where the principal is resolved for every scheme (incl. WebDAV Basic):
+// rejects users an access restriction rule does not allow from this address / host.
+app.UseMiddleware<AccessRestrictionMiddleware>();
 
 // After authentication, so rate-limit partitions see the JWT subject.
 app.UseRateLimiter();

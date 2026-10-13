@@ -112,6 +112,7 @@ namespace Kaimo_File_Server.Infrastructure
             //    credential authentication with enumeration resistance --
             services.TryAddSingleton(TimeProvider.System);
             services.AddSingleton<ILoginThrottle, LoginThrottle>();
+            services.AddScoped<AccessRestrictionService>();
             services.AddScoped<ILoginService, CredentialLoginService>();
 
             // -- Search engine config flag (cross-process, read by the search router) --

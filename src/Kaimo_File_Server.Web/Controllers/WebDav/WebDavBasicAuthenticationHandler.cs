@@ -84,8 +84,9 @@ public sealed class WebDavBasicAuthenticationHandler : AuthenticationHandler<Aut
             && generation == cached.Generation)
             return Success(cached.UserId, username);
 
+        // Cache hits skip this check; AccessRestrictionMiddleware covers them per request.
         var result = await _loginService.AuthenticateAsync(
-            username, password, Context.Connection.RemoteIpAddress?.ToString());
+            username, password, Context.Connection.RemoteIpAddress?.ToString(), Request.Host.Host);
         if (result.Outcome != LoginOutcome.Success || result.UserContext is null)
             return AuthenticateResult.Fail("Invalid credentials.");
 

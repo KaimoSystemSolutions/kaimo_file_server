@@ -58,6 +58,10 @@ public abstract class ApiControllerBase : ControllerBase
     protected IActionResult ApiForbidden(string message = "Access denied.")
         => StatusCode(StatusCodes.Status403Forbidden, new ApiError("forbidden", message));
 
+    /// <summary>403 for a user an access restriction rule does not allow from this address.</summary>
+    protected IActionResult AddressNotAllowed()
+        => StatusCode(StatusCodes.Status403Forbidden, AccessRestrictionMiddleware.Error);
+
     /// <summary>404 with a machine code.</summary>
     protected IActionResult ApiNotFound(string message = "Resource not found.")
         => NotFound(new ApiError("not_found", message));

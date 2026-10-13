@@ -75,8 +75,9 @@ public sealed class ShareLink
     public string? PasswordHash { get; set; }
 
     /// <summary>
-    /// Chosen base address the link URL is built from (one of the admin-configured allowlist
-    /// entries). Null falls back to the configured default at display time.
+    /// Legacy, ignored: link creators could once choose a base address. The URL is now always
+    /// built from the central default domain (or the current browser address). Kept so existing
+    /// rows and the schema stay unchanged.
     /// </summary>
     public string? BaseAddress { get; set; }
 

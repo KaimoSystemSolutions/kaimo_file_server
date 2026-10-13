@@ -1,0 +1,76 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Services
+@inject AccessSettingsViewModel VM
+@inject AssetProvider Icons
+
+@*
+    Settings tab for the central list of server addresses (domains). The default address builds
+    share-link URLs and the links in notification mails; the access restriction rules offer
+    these addresses as allowed hosts. Shares its view model with the access restrictions tab.
+*@
+
+@if (VM.IsLoading)
+{
+    <p class="settings-description">@R("Web_Common_Loading")</p>
+}
+else if (!VM.CanManage)
+{
+    <div class="error-banner">@R("Web_Error_NoPermission")</div>
+}
+else
+{
+    @if (VM.SuccessMessage is not null) { <div class="success-banner">@VM.SuccessMessage</div> }
+    @if (VM.ErrorMessage is not null) { <div class="error-banner" role="alert">@VM.ErrorMessage</div> }
+
+    <div class="detail-section">
+        <span class="detail-label">@R("Web_Settings_Tab_Domains")</span>
+        <p class="settings-description">@R("Web_DomainSettings_Hint")</p>
+
+        @if (VM.Addresses.Count == 0)
+        {
+            <p class="settings-empty">@R("Web_DomainSettings_Empty")</p>
+        }
+        else
+        {
+            <div class="domain-list">
+                <span class="domain-list__head">@R("Web_DomainSettings_Default")</span>
+                <span class="domain-list__head">@R("Web_DomainSettings_Address")</span>
+                <span></span>
+                @for (int i = 0; i < VM.Addresses.Count; i++)
+                {
+                    var index = i;
+                    <input type="radio" name="default-domain" class="domain-list__radio"
+                           aria-label="@R("Web_DomainSettings_Default")"
+                           checked="@(VM.DefaultIndex == index)" @onchange="() => VM.DefaultIndex = index" />
+                    <input type="url" class="edit-input" placeholder="https://files.example.com"
+                           aria-label="@R("Web_DomainSettings_Address")"
+                           value="@VM.Addresses[index]" @onchange="e => VM.Addresses[index] = e.Value?.ToString() ?? string.Empty" />
+                    <button type="button" class="btn-icon btn-icon--danger" title="@R("Web_Button_Delete")"
+                            aria-label="@R("Web_Button_Delete")" @onclick="() => VM.RemoveAddress(index)">
+                        @Icons.SVG("trash.svg", new SvgOptions(Width: 14, Height: 14))
+                    </button>
+                }
+            </div>
+        }
+
+        <button type="button" class="btn-secondary" disabled="@(VM.Addresses.Count >= ServerDomainSettings.MaxAddresses)" @onclick="VM.AddAddress">
+            @R("Web_DomainSettings_Add")
+        </button>
+
+        <div class="settings-actions">
+            <button type="button" class="btn-primary" disabled="@VM.IsSaving" @onclick="VM.SaveDomainsAsync">@Resources.Web_Settings_Button_Save</button>
+        </div>
+    </div>
+}
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        VM.ClearMessages();
+        await VM.LoadAsync();
+    }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+}

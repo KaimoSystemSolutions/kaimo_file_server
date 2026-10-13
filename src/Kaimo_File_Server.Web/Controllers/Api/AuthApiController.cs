@@ -90,7 +90,7 @@ public sealed class AuthApiController : ApiControllerBase
             return ApiBadRequest("credentials_required", "Username and password are required.");
 
         var result = await _loginService.AuthenticateAsync(
-            request.Username, request.Password, HttpContext.Connection.RemoteIpAddress?.ToString());
+            request.Username, request.Password, HttpContext.Connection.RemoteIpAddress?.ToString(), Request.Host.Host);
         switch (result.Outcome)
         {
             case LoginOutcome.Success:
@@ -112,6 +112,11 @@ public sealed class AuthApiController : ApiControllerBase
                 _logger.LogWarning("Login rejected – account disabled: {Username}", request.Username);
                 return ApiUnauthorized("Invalid username or password.");
 
+            case LoginOutcome.AddressNotAllowed:
+                // Same answer as a wrong password: a distinct one would confirm the credentials.
+                _logger.LogWarning("Login rejected – access restriction: {Username}", request.Username);
+                return ApiUnauthorized("Invalid username or password.");
+
             default:
                 return ApiUnauthorized("Invalid username or password.");
         }
@@ -123,7 +128,8 @@ public sealed class AuthApiController : ApiControllerBase
     {
         NoStore();
 
-        var result = await _tokens.RefreshAsync(request?.RefreshToken ?? "");
+        var result = await _tokens.RefreshAsync(
+            request?.RefreshToken ?? "", HttpContext.Connection.RemoteIpAddress?.ToString(), Request.Host.Host);
         return result.Outcome switch
         {
             RefreshOutcome.Success => Ok(new TokenResponse(
@@ -132,6 +138,7 @@ public sealed class AuthApiController : ApiControllerBase
                 result.Tokens.ExpiresInSeconds,
                 DeviceId: Guid.Empty)),
             RefreshOutcome.Reuse => ApiUnauthorized("Refresh token was already used; sign in again."),
+            RefreshOutcome.AddressNotAllowed => AddressNotAllowed(),
             _ => ApiUnauthorized("Refresh token is invalid or expired."),
         };
     }

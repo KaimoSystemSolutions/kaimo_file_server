@@ -18,7 +18,6 @@ public sealed record CreateShareLinkRequest(
     bool IsDirectory,
     string DisplayName,
     string? Password,
-    string? BaseAddress,
     DateTime? StartsAtUtc,
     DateTime? ExpiresAtUtc,
     int? MaxAccessCount,
@@ -69,9 +68,15 @@ public sealed class ShareLinkService(
     public string GenerateToken()
         => Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
 
-    /// <summary>Builds the shareable URL for a link, honouring the configured base addresses.</summary>
-    public string BuildUrl(ShareLink link, ShareLinkSettings settings)
-        => BuildUrl(RevealToken(link) ?? string.Empty, link.BaseAddress, settings);
+    /// <summary>The configured server domains (central setting), normalized.</summary>
+    public Task<ServerDomainSettings> GetDomainsAsync() => ServerDomainSettings.LoadAsync(config);
+
+    /// <summary>
+    /// Builds the shareable URL for a link from the default server domain, or from
+    /// <paramref name="fallbackBase"/> (the address the browser currently uses) when none is set.
+    /// </summary>
+    public string BuildUrl(ShareLink link, ServerDomainSettings domains, string? fallbackBase)
+        => BuildUrl(RevealToken(link) ?? string.Empty, domains, fallbackBase);
 
     /// <summary>
     /// The plain token of a link (tokens are stored only hashed + encrypted); null when it
@@ -80,10 +85,10 @@ public sealed class ShareLinkService(
     public string? RevealToken(ShareLink link)
         => tokenProtector?.Reveal(link) ?? (string.IsNullOrEmpty(link.Token) ? link.LegacyToken : link.Token);
 
-    /// <summary>Builds a shareable URL from a token + chosen base address (for a live preview).</summary>
-    public string BuildUrl(string token, string? chosenBase, ShareLinkSettings settings)
+    /// <summary>Builds a shareable URL from a token (also used for the live preview).</summary>
+    public static string BuildUrl(string token, ServerDomainSettings domains, string? fallbackBase)
     {
-        var baseAddress = settings.ResolveBaseFor(chosenBase);
+        var baseAddress = domains.DefaultAddress ?? fallbackBase?.Trim().TrimEnd('/');
         return string.IsNullOrEmpty(baseAddress)
             ? $"/shared/{token}"
             : $"{baseAddress}/shared/{token}";
@@ -133,7 +138,6 @@ public sealed class ShareLinkService(
             PasswordHash = string.IsNullOrEmpty(request.Password)
                 ? null
                 : passwords.HashPassword(request.Password),
-            BaseAddress = request.BaseAddress,
             StartsAtUtc = request.StartsAtUtc,
             ExpiresAtUtc = request.ExpiresAtUtc,
             MaxAccessCount = request.MaxAccessCount is > 0 ? request.MaxAccessCount : null,

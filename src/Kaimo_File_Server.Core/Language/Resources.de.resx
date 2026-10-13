@@ -4350,12 +4350,6 @@
   <data name="Web_ShareLink_PasswordPlaceholder" xml:space="preserve">
     <value>Leer lassen für kein Passwort</value>
   </data>
-  <data name="Web_ShareLink_BaseAddress" xml:space="preserve">
-    <value>Adresse</value>
-  </data>
-  <data name="Web_ShareLink_DefaultAddress" xml:space="preserve">
-    <value>Standard</value>
-  </data>
   <data name="Web_ShareLink_Start" xml:space="preserve">
     <value>Beginn</value>
   </data>
@@ -4438,16 +4432,7 @@
     <value>Aufgebraucht</value>
   </data>
   <data name="Web_ShareLinkSettings_Hint" xml:space="preserve">
-    <value>Adressen, unter denen der Server erreichbar ist. Die Link-URL wird aus der Standardadresse gebildet (oder der vom Ersteller gewählten). DNS und TLS für diese Adressen werden außerhalb der App konfiguriert.</value>
-  </data>
-  <data name="Web_ShareLinkSettings_Default" xml:space="preserve">
-    <value>Standard</value>
-  </data>
-  <data name="Web_ShareLinkSettings_Add" xml:space="preserve">
-    <value>Adresse hinzufügen</value>
-  </data>
-  <data name="Web_ShareLinkSettings_AllowCustom" xml:space="preserve">
-    <value>Erstellern erlauben, eine andere als die Standardadresse zu wählen</value>
+    <value>Link-URLs werden aus der Standard-Domain gebildet; ist keine hinterlegt, aus der Adresse, die der Browser gerade verwendet.</value>
   </data>
   <data name="Web_PublicShare_Unavailable_Title" xml:space="preserve">
     <value>Link nicht verfügbar</value>
@@ -5479,7 +5464,7 @@
     <value>Öffentliche Adresse</value>
   </data>
   <data name="Web_Notifications_PublicUrl_Help" xml:space="preserve">
-    <value>Wird für Links in E-Mails verwendet ({{ server.url }}). Leer übernimmt die Standardadresse der Freigabe-Links.</value>
+    <value>Links in E-Mails ({{ server.url }}) verwenden die Standard-Domain aus den Domain-Einstellungen.</value>
   </data>
   <data name="Web_Notifications_HeaderHtml" xml:space="preserve">
     <value>Kopfbereich (HTML)</value>
@@ -7179,5 +7164,116 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   </data>
   <data name="Web_Home_Links_Upload" xml:space="preserve">
     <value>Upload</value>
+  </data>
+  <data name="Web_Notifications_PublicUrl_Missing" xml:space="preserve">
+    <value>Es ist keine Standard-Domain hinterlegt, daher enthalten E-Mails keinen Link zum Server.</value>
+  </data>
+  <data name="Web_Settings_Tab_Domains" xml:space="preserve">
+    <value>Domains</value>
+  </data>
+  <data name="Web_Settings_Tab_AccessRestrictions" xml:space="preserve">
+    <value>Zugriffsbeschränkungen</value>
+  </data>
+  <data name="Web_DomainSettings_Hint" xml:space="preserve">
+    <value>Adressen (Basis-URLs), unter denen der Server erreichbar ist. Aus der Standardadresse werden Freigabelink-URLs und die Links in Benachrichtigungs-E-Mails gebildet; Zugriffsbeschränkungen können Anmeldungen pro Adresse erlauben. DNS und TLS für diese Adressen werden außerhalb der App konfiguriert.</value>
+  </data>
+  <data name="Web_DomainSettings_Default" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <data name="Web_DomainSettings_Address" xml:space="preserve">
+    <value>Adresse</value>
+  </data>
+  <data name="Web_DomainSettings_Add" xml:space="preserve">
+    <value>Adresse hinzufügen</value>
+  </data>
+  <data name="Web_DomainSettings_Empty" xml:space="preserve">
+    <value>Keine Adresse hinterlegt. Freigabelinks verwenden dann die Adresse, die der Browser gerade nutzt, und E-Mails enthalten keinen Link zum Server.</value>
+  </data>
+  <data name="Web_DomainSettings_Invalid" xml:space="preserve">
+    <value>Nicht gespeichert – nur absolute http/https-URLs sind erlaubt: {0}</value>
+  </data>
+  <data name="Web_DomainSettings_Error_RuleWithoutSource" xml:space="preserve">
+    <value>Nicht gespeichert – folgende Zugriffsbeschränkungen hätten danach weder eine Domäne noch einen IP-Bereich und würden alle betroffenen Benutzer sperren: {0}. Ergänzen Sie zuerst einen IP-Bereich oder löschen Sie die Regeln.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Hint" xml:space="preserve">
+    <value>Benutzer, Gruppen oder Abteilungen, die von einer aktiven Regel erfasst sind, dürfen sich nur über eine ihrer Domains oder aus einem ihrer IP-Bereiche anmelden. Benutzer ohne Regel sind nicht eingeschränkt. Gilt für die Weboberfläche, die Client-App (API) und WebDAV, nicht für SMB.</value>
+  </data>
+  <data name="Web_AccessRestrictions_ProxyHint" xml:space="preserve">
+    <value>Eine Domain ist die Adresse, unter der der Server aufgerufen wurde; sie stammt vom Client, daher sind IP-Bereiche die harte Grenze. Hinter einem Reverse Proxy ForwardedHeaders:KnownProxies setzen, damit echte Client-IPs ankommen, und den Host-Header vom Proxy durchreichen lassen. Bei einer Aussperrung den Web-Container mit KAIMO_ACCESS_RESTRICTIONS_DISABLED=true starten.</value>
+  </data>
+  <data name="Web_AccessRestrictions_CurrentConnection" xml:space="preserve">
+    <value>Ihre aktuelle Verbindung:</value>
+  </data>
+  <data name="Web_AccessRestrictions_New" xml:space="preserve">
+    <value>Neue Regel</value>
+  </data>
+  <data name="Web_AccessRestrictions_EditTitle" xml:space="preserve">
+    <value>Regel bearbeiten</value>
+  </data>
+  <data name="Web_AccessRestrictions_Rules" xml:space="preserve">
+    <value>Regeln</value>
+  </data>
+  <data name="Web_AccessRestrictions_Empty" xml:space="preserve">
+    <value>Keine Regeln. Alle Benutzer dürfen sich von jeder Adresse anmelden.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Web_AccessRestrictions_Enabled" xml:space="preserve">
+    <value>Aktiv</value>
+  </data>
+  <data name="Web_AccessRestrictions_Users" xml:space="preserve">
+    <value>Benutzer</value>
+  </data>
+  <data name="Web_AccessRestrictions_Groups" xml:space="preserve">
+    <value>Gruppen</value>
+  </data>
+  <data name="Web_AccessRestrictions_Departments" xml:space="preserve">
+    <value>Abteilungen</value>
+  </data>
+  <data name="Web_AccessRestrictions_DepartmentsHint" xml:space="preserve">
+    <value>Schließt die Mitglieder von Unterabteilungen ein.</value>
+  </data>
+  <data name="Web_AccessRestrictions_None" xml:space="preserve">
+    <value>Keine</value>
+  </data>
+  <data name="Web_AccessRestrictions_Domains" xml:space="preserve">
+    <value>Erlaubte Domains</value>
+  </data>
+  <data name="Web_AccessRestrictions_NoDomains" xml:space="preserve">
+    <value>Noch keine Domains hinterlegt.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Networks" xml:space="preserve">
+    <value>Erlaubte IP-Bereiche</value>
+  </data>
+  <data name="Web_AccessRestrictions_NetworksHint" xml:space="preserve">
+    <value>Einer pro Zeile: CIDR-Bereich (10.0.0.0/8) oder einzelne Adresse (IPv4 oder IPv6).</value>
+  </data>
+  <data name="Web_AccessRestrictions_Summary" xml:space="preserve">
+    <value>{0} Prinzipale · {1} Domains · {2} IP-Bereiche</value>
+  </data>
+  <data name="Web_AccessRestrictions_Error_Name" xml:space="preserve">
+    <value>Bitte einen Namen für die Regel eingeben.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Error_Principals" xml:space="preserve">
+    <value>Mindestens einen Benutzer, eine Gruppe oder eine Abteilung auswählen.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Error_Sources" xml:space="preserve">
+    <value>Mindestens eine Domain oder einen IP-Bereich erlauben.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Error_Network" xml:space="preserve">
+    <value>Ungültiger IP-Bereich: {0}</value>
+  </data>
+  <data name="Web_AccessRestrictions_Error_SelfLockout" xml:space="preserve">
+    <value>Nicht gespeichert: Diese Änderung würde Ihre eigene aktuelle Verbindung sperren ({0} · {1}).</value>
+  </data>
+  <data name="Web_AccessRestrictions_DeleteTitle" xml:space="preserve">
+    <value>Regel löschen</value>
+  </data>
+  <data name="Web_AccessRestrictions_DeleteConfirm" xml:space="preserve">
+    <value>Die Regel „{0}“ löschen?</value>
+  </data>
+  <data name="Web_Security_Outcome_AddressNotAllowed" xml:space="preserve">
+    <value>Adresse nicht erlaubt</value>
   </data>
 </root>

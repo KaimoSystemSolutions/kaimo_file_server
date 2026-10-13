@@ -85,7 +85,8 @@ public sealed class SecurityEventRepository(IDbContextFactory<ApplicationDbConte
                 Username = g.Key,
                 Successes = g.Count(a => a.Outcome == LoginOutcome.Success),
                 Failures = g.Count(a => a.Outcome == LoginOutcome.InvalidCredentials
-                                        || a.Outcome == LoginOutcome.AccountDisabled),
+                                        || a.Outcome == LoginOutcome.AccountDisabled
+                                        || a.Outcome == LoginOutcome.AddressNotAllowed),
                 Lockouts = g.Count(a => a.Outcome == LoginOutcome.LockedOut),
                 Addresses = g.Select(a => a.Address).Distinct().Count(),
                 LastAttemptUtc = g.Max(a => a.AtUtc),

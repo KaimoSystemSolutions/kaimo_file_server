@@ -34,7 +34,8 @@
         </div>
     </div>
     <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)"
-            ClientAddress="@HttpContext?.Connection.RemoteIpAddress?.ToString()" />
+            ClientAddress="@HttpContext?.Connection.RemoteIpAddress?.ToString()"
+            ClientHost="@HttpContext?.Request.Host.Host" />
     <script src="js/session.js"></script>
     <script src="js/noAutofill.js"></script>
     <script src="js/globalSearch.js"></script>

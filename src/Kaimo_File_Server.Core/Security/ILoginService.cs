@@ -9,6 +9,14 @@ public enum LoginOutcome
     InvalidCredentials,
     AccountDisabled,
     LockedOut,
+
+    /// <summary>
+    /// Valid credentials, but an access restriction rule does not allow this user from the
+    /// client address / host used (see <see cref="AccessRestrictionSettings"/>). Counted as a
+    /// failed attempt and shown to the client exactly like <see cref="InvalidCredentials"/>,
+    /// so it never confirms the password; only the admin-side security log tells them apart.
+    /// </summary>
+    AddressNotAllowed,
 }
 
 /// <summary>
@@ -32,6 +40,9 @@ public sealed record LoginResult(
     public static readonly LoginResult AccountDisabled =
         new(LoginOutcome.AccountDisabled);
 
+    public static readonly LoginResult AddressNotAllowed =
+        new(LoginOutcome.AddressNotAllowed);
+
     public static LoginResult LockedOut(TimeSpan retryAfter) =>
         new(LoginOutcome.LockedOut, RetryAfter: retryAfter);
 }
@@ -50,5 +61,9 @@ public interface ILoginService
     /// (username, address), so failed attempts from one client cannot lock the
     /// account out for everyone else.
     /// </param>
-    Task<LoginResult> AuthenticateAsync(string username, string password, string? remoteAddress = null);
+    /// <param name="host">
+    /// Host name the server was reached under (request <c>Host</c>), checked against the
+    /// access restriction rules together with <paramref name="remoteAddress"/>.
+    /// </param>
+    Task<LoginResult> AuthenticateAsync(string username, string password, string? remoteAddress = null, string? host = null);
 }

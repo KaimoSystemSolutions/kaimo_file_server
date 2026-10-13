@@ -248,9 +248,9 @@ public sealed class MonitoredLoginService(
     // throttle is the real flood guard for the mails themselves.
     private static readonly ConcurrentDictionary<string, DateTime> LockNotifiedUntil = new(StringComparer.OrdinalIgnoreCase);
 
-    public async Task<LoginResult> AuthenticateAsync(string username, string password, string? remoteAddress = null)
+    public async Task<LoginResult> AuthenticateAsync(string username, string password, string? remoteAddress = null, string? host = null)
     {
-        var result = await inner.AuthenticateAsync(username, password, remoteAddress);
+        var result = await inner.AuthenticateAsync(username, password, remoteAddress, host);
         monitor.RecordLogin(SecurityMonitorMiddleware.ChannelOf(http.HttpContext?.Request.Path), username, remoteAddress, result);
         if (result.Outcome == LoginOutcome.LockedOut && notifications is not null)
         {

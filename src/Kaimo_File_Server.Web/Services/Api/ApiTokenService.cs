@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Infrastructure.Services;
 using System.Security.Cryptography;
 using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Domain.Identity;
@@ -19,6 +20,11 @@ public enum RefreshOutcome
     Invalid,
     /// <summary>An already-rotated token was replayed — the whole device chain is revoked.</summary>
     Reuse,
+    /// <summary>
+    /// Valid token, but an access restriction rule does not allow the user from this address;
+    /// the token is not rotated, so it works again from an allowed address.
+    /// </summary>
+    AddressNotAllowed,
 }
 
 /// <summary>Result of <see cref="ApiTokenService.RefreshAsync"/>.</summary>
@@ -41,6 +47,7 @@ public sealed class ApiTokenService
     private readonly int _accessTokenSeconds;
     private readonly int _refreshTokenDays;
     private readonly TimeSpan _refreshReuseGrace;
+    private readonly AccessRestrictionService? _access;
 
     public ApiTokenService(
         JwtTokenService jwt,
@@ -49,8 +56,10 @@ public sealed class ApiTokenService
         IUserContextFactory userContextFactory,
         TimeProvider clock,
         IConfiguration config,
-        ILogger<ApiTokenService> logger)
+        ILogger<ApiTokenService> logger,
+        AccessRestrictionService? access = null)
     {
+        _access = access;
         _jwt = jwt;
         _refreshTokens = refreshTokens;
         _devices = devices;
@@ -99,7 +108,8 @@ public sealed class ApiTokenService
     /// Validates a presented refresh token, rotates it, and mints a new access
     /// token. Re-resolves the account each time so a disabled user cannot refresh.
     /// </summary>
-    public async Task<RefreshResult> RefreshAsync(string presentedRefreshToken)
+    public async Task<RefreshResult> RefreshAsync(
+        string presentedRefreshToken, string? remoteAddress = null, string? host = null)
     {
         if (string.IsNullOrWhiteSpace(presentedRefreshToken))
             return new RefreshResult(RefreshOutcome.Invalid);
@@ -158,6 +168,9 @@ public sealed class ApiTokenService
         var user = await _userContextFactory.CreateByUserIdAsync(existing.UserId);
         if (user is null || !user.User.IsEnabled)
             return new RefreshResult(RefreshOutcome.Invalid);
+
+        if (_access is not null && !await _access.IsAllowedAsync(user, remoteAddress, host))
+            return new RefreshResult(RefreshOutcome.AddressNotAllowed);
 
         // Rotate: mint the replacement, then atomically revoke the old + insert new.
         (string secret, string newHash) = GenerateOpaqueToken();

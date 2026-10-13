@@ -700,6 +700,18 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 12px;
 }
 
+/* An anchor styled as a button (navigates to another page or settings tab, usually with a
+   leading arrow_right icon): icon and label in one row, never the browser link underline. */
+a.btn-secondary,
+a.btn-tinted {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    white-space: nowrap;
+    text-decoration: none;
+}
+
 /* -- Banners -- */
 
 .error-banner {

@@ -7,11 +7,12 @@
 @inherits AppComponentBase
 @inject IJSRuntime JS
 @inject ShareLinkService ShareLinks
+@inject NavigationManager Nav
 
 @*
     "Share as public link" / "Create upload link" dialog. Opened from the file-browser context
     menu for a single file or folder (upload: folders only) when the user may manage links of that
-    kind. Collects the link policy (optional password, base address, start/end, max accesses or
+    kind. Collects the link policy (optional password, start/end, max accesses or
     files, max rate; for uploads also max file size, total quota and allowed types), creates the
     link, then shows the resulting URL with a copy button.
 *@
@@ -58,22 +59,6 @@
                             @Assets.SVG(_showPassword ? "eye-off.svg" : "eye.svg", new SvgOptions(Width: 16, Height: 16))
                         </button>
                     </div>
-
-                    @if (_settings.BaseAddresses.Count > 0)
-                    {
-                        <label class="hash-field-label">@T("Web_ShareLink_BaseAddress", "Address")</label>
-                        <select class="edit-input" value="@_baseAddress" @onchange="OnBaseChanged"
-                                disabled="@(!_settings.AllowUserChosenAddress)">
-                            <option value="">@($"{T("Web_ShareLink_DefaultAddress", "Default")}: {_settings.DefaultAddress}")</option>
-                            @if (_settings.AllowUserChosenAddress)
-                            {
-                                @foreach (var address in _settings.BaseAddresses)
-                                {
-                                    <option value="@address">@address</option>
-                                }
-                            }
-                        </select>
-                    }
 
                     <div class="sharelink-row">
                         <div class="sharelink-col">
@@ -197,6 +182,7 @@
     private FileMetadata? _target;
     private ShareLinkKind _kind = ShareLinkKind.Download;
     private ShareLinkSettings _settings = ShareLinkSettings.Default();
+    private ServerDomainSettings _domains = ServerDomainSettings.Default();
 
     private bool IsUpload => _kind == ShareLinkKind.Upload;
 
@@ -206,7 +192,6 @@
     private string _name = "";
     private string? _password;
     private bool _showPassword;
-    private string _baseAddress = "";
     private DateTime? _startsAt;
     private DateTime? _endsAt;
     private int? _maxAccess;
@@ -238,7 +223,6 @@
         _name = "";
         _password = null;
         _showPassword = false;
-        _baseAddress = "";
         _startsAt = null;
         _endsAt = null;
         _maxAccess = null;
@@ -249,14 +233,16 @@
         _busy = false;
         _error = null;
         _settings = await ShareLinks.GetSettingsAsync();
+        _domains = await ShareLinks.GetDomainsAsync();
         _token = ShareLinks.GenerateToken();
         _show = true;
         StateHasChanged();
     }
 
-    // Live URL preview, so the link is known before the link is created.
+    // Live URL preview, so the link is known before the link is created. Without a configured
+    // default domain the address the browser currently uses is taken.
     private string PreviewUrl()
-        => ShareLinks.BuildUrl(_token, string.IsNullOrEmpty(_baseAddress) ? null : _baseAddress, _settings);
+        => ShareLinkService.BuildUrl(_token, _domains, Nav.BaseUri);
 
     public void Close()
     {
@@ -264,8 +250,6 @@
         _target = null;
         StateHasChanged();
     }
-
-    private void OnBaseChanged(ChangeEventArgs e) => _baseAddress = e.Value?.ToString() ?? "";
 
     private async Task CreateAsync()
     {
@@ -284,7 +268,6 @@
             IsDirectory: _target.IsDirectory,
             DisplayName: _name.Trim(),
             Password: string.IsNullOrWhiteSpace(_password) ? null : _password,
-            BaseAddress: string.IsNullOrEmpty(_baseAddress) ? null : _baseAddress,
             StartsAtUtc: _startsAt?.ToUniversalTime(),
             ExpiresAtUtc: _endsAt?.ToUniversalTime(),
             MaxAccessCount: _maxAccess is > 0 ? _maxAccess : null,
@@ -303,7 +286,7 @@
                     ? T("Web_ShareLink_UploadNotPossible", "The upload link could not be created. Upload links may be disabled, or you lack write access to this folder.")
                     : T("Web_ShareLink_NoPermission", "You are not allowed to create a link for this item.");
             else
-                _createdUrl = ShareLinks.BuildUrl(link, _settings);
+                _createdUrl = ShareLinks.BuildUrl(link, _domains, Nav.BaseUri);
         }
         catch
         {

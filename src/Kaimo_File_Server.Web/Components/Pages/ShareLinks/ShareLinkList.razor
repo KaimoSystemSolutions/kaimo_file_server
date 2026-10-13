@@ -354,6 +354,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         VM.OnStateChanged += OnStateChanged;
+        VM.CurrentBaseUri = Nav.BaseUri;
         await VM.LoadAsync();
 
         // Open the first tab the actor may use.

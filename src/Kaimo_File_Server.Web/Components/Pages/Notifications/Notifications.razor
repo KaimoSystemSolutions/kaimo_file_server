@@ -400,11 +400,23 @@ else
                                        @bind="VM.Layout.AccentColor" @bind:after="VM.RefreshLayoutPreviewAsync" />
                             </div>
                         </div>
-                        <label>
+                        @* Links in mails use the central default domain (Settings → Domains). *@
+                        <div class="workspace-field">
                             <span>@R("Web_Notifications_PublicUrl")</span>
-                            <input type="url" class="edit-input" placeholder="https://files.example.com" @bind="VM.Layout.PublicBaseUrl" />
+                            @if (string.IsNullOrEmpty(VM.ServerUrl))
+                            {
+                                <div class="warning-banner">@R("Web_Notifications_PublicUrl_Missing")</div>
+                            }
+                            else
+                            {
+                                <span class="detail-value--mono">@VM.ServerUrl</span>
+                            }
                             <small>@R("Web_Notifications_PublicUrl_Help")</small>
-                        </label>
+                            <a class="btn-secondary btn-secondary--sm" href="/settings?tab=Domains">
+                                @Icons.SVG("arrow_right.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                                <span>@R("Web_Settings_Tab_Domains")</span>
+                            </a>
+                        </div>
                         <label>
                             <span>@R("Web_Notifications_HeaderHtml")</span>
                             <textarea class="edit-input notif-code" rows="4" spellcheck="false"

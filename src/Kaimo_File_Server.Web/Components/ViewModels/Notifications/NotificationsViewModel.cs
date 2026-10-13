@@ -463,6 +463,9 @@ public sealed class NotificationsViewModel(
 
     /// <summary>The edited layout (also used by the template preview, so edits show up there).</summary>
     public MailLayoutSettings Layout { get; private set; } = MailLayoutSettings.Default();
+
+    /// <summary>The address links in mails point to (the central default domain); empty when none is set.</summary>
+    public string ServerUrl => _environment?.ServerUrl ?? string.Empty;
     public string LayoutPreviewHtml { get; private set; } = string.Empty;
     public string? LayoutError { get; private set; }
 

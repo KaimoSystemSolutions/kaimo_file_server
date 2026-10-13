@@ -56,7 +56,16 @@ links; both share one entity, repository and policy code.
 | `MaxAccessCount` / `AccessCount` | Downloads | Uploaded files |
 | `MaxBytesPerSecond` | Download rate | Upload rate |
 | `MaxFileSizeBytes`, `MaxTotalBytes`, `UploadedBytes`, `AllowedExtensions` | – | Per-file limit, byte quota, allowed types |
-| `BaseAddress` | Host used to build the public URL | Same |
+| `BaseAddress` | Legacy, ignored (see [Link URL](#link-url)) | Same |
+
+### Link URL
+
+The public URL is `{base}/shared/{token}`. `ShareLinkService.BuildUrl` takes `{base}` from the
+default address of the central domain list (`ServerDomainSettings`, config key `server.domains`,
+Settings → Domains); without one it uses the address the browser currently uses
+(`NavigationManager.BaseUri`). Link creators cannot choose an address. The same default address is
+`{{ server.url }}` in notification mails. Until the domain list is first saved it is derived from
+the legacy share-link addresses and the mail layout's public URL.
 
 ### Tokens
 

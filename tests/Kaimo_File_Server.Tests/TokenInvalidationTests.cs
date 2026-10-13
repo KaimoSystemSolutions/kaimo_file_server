@@ -207,13 +207,13 @@ public sealed class TokenInvalidationTests : DatabaseTestBase
         var user = NewUser();
         var cache = new MemoryCache(new MemoryCacheOptions());
         var login = new Mock<ILoginService>();
-        login.Setup(l => l.AuthenticateAsync("alice", "old-password", It.IsAny<string?>()))
+        login.Setup(l => l.AuthenticateAsync("alice", "old-password", It.IsAny<string?>(), It.IsAny<string?>()))
             .ReturnsAsync(LoginResult.ForSuccess(ContextFor(user)));
 
         Assert.True((await AuthenticateWebDavAsync(cache, login.Object, "alice", "old-password")).Succeeded);
 
         // Password changed: the login service now rejects the old password.
-        login.Setup(l => l.AuthenticateAsync("alice", "old-password", It.IsAny<string?>()))
+        login.Setup(l => l.AuthenticateAsync("alice", "old-password", It.IsAny<string?>(), It.IsAny<string?>()))
             .ReturnsAsync(LoginResult.InvalidCredentials);
 
         // Without invalidation the cached login would still be accepted for up to 60 s.
@@ -229,13 +229,13 @@ public sealed class TokenInvalidationTests : DatabaseTestBase
         var user = NewUser();
         var cache = new MemoryCache(new MemoryCacheOptions());
         var login = new Mock<ILoginService>();
-        login.Setup(l => l.AuthenticateAsync("alice", "old-password", It.IsAny<string?>()))
+        login.Setup(l => l.AuthenticateAsync("alice", "old-password", It.IsAny<string?>(), It.IsAny<string?>()))
             .ReturnsAsync(LoginResult.ForSuccess(ContextFor(user)));
         await AuthenticateWebDavAsync(cache, login.Object, "alice", "old-password");
 
-        login.Setup(l => l.AuthenticateAsync("alice", "old-password", It.IsAny<string?>()))
+        login.Setup(l => l.AuthenticateAsync("alice", "old-password", It.IsAny<string?>(), It.IsAny<string?>()))
             .ReturnsAsync(LoginResult.InvalidCredentials);
-        login.Setup(l => l.AuthenticateAsync("alice", "new-password", It.IsAny<string?>()))
+        login.Setup(l => l.AuthenticateAsync("alice", "new-password", It.IsAny<string?>(), It.IsAny<string?>()))
             .ReturnsAsync(LoginResult.ForSuccess(ContextFor(user)));
         WebDavBasicAuthenticationHandler.Invalidate(cache, user.Id);
 

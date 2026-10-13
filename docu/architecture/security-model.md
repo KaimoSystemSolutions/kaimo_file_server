@@ -62,6 +62,7 @@ Common rules:
   is the counterpart for the web token: not device-scoped, unexpired, `jti` not revoked, account
   enabled, security stamp current. It runs when the Blazor connection is established and periodically
   for the circuit's lifetime (`app.session.revalidationSeconds`, default 30 s).
+- **Access restrictions.** See [Access restrictions](#access-restrictions).
 - **Security monitor.** `SecurityMonitor` records every credential check (web, API, WebDAV) and counts
   API/WebDAV requests per client into `login_attempts` and `client_activity`.
 - There is no directory-service (LDAP/Active Directory/Kerberos) integration; all accounts are local.
@@ -96,6 +97,31 @@ attribute and non-HTTPS writes). Its expiry equals the token's `exp` (`Jwt:Expir
 The client API and WebDAV are unaffected: their credentials (Authorization header) are never sent by
 a browser on its own, the API has no CORS policy and accepts JSON bodies only, and `/dav` rejects
 cross-site browser requests (see [WebDAV](../external-access/webdav.md#response-hardening)).
+
+### Access restrictions
+
+Administrators can limit where users, groups or departments may sign in from (Settings → Access
+restrictions; rules in `AccessRestrictionSettings`, config key `security.access.restrictions`,
+evaluated by `AccessRestrictionService`).
+
+- A user covered by no enabled rule is unrestricted. A covered user (directly, through a group, or
+  through a department including its sub-departments) is allowed when at least one covering rule
+  matches: the request host (the address the server was reached under, from the central domain
+  list) or the client IP (CIDR ranges). An unknown client address fails closed.
+- The host comes from the client, so only the IP ranges are a hard boundary. Behind a reverse proxy,
+  client IPs are only real when the proxy is trusted (`ForwardedHeaders`), and host rules require the
+  proxy to pass the `Host` header through.
+- Enforcement: the login service after a successful password check (`LoginOutcome.AddressNotAllowed`;
+  web, REST, WebDAV Basic). To the client it is indistinguishable from a wrong password (same message /
+  401, counted towards lockout, no throttle reset), so it never confirms valid credentials; only the
+  security log names the reason. Further: the token refresh, `AccessRestrictionMiddleware`
+  after authorization on every authenticated request (API and WebDAV incl. its credential cache:
+  403 `address_not_allowed`; Blazor hub connect: the session cookie is ignored, so the circuit starts
+  anonymous on the login page), and the periodic circuit revalidation.
+- Not covered: SMB, anonymous share links, and download tickets issued inside an already checked circuit.
+- Saving rules that would block the saving administrator's own connection is refused. For recovery,
+  `KAIMO_ACCESS_RESTRICTIONS_DISABLED=true` on the web container ignores every rule.
+- Rules and each user's resolved groups/departments are cached for 30 seconds.
 
 ## File authorization (ACL)
 

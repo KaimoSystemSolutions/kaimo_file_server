@@ -95,7 +95,7 @@ public class UserListViewModel
                 ? null
                 : Resources.Web_User_CurrentPasswordWrong;
 
-        var result = await _loginService.AuthenticateAsync(user.Username, CurrentPassword, _client?.RemoteAddress);
+        var result = await _loginService.AuthenticateAsync(user.Username, CurrentPassword, _client?.RemoteAddress, _client?.Host);
         return result.Outcome switch
         {
             LoginOutcome.Success when result.UserContext?.User.Id == user.Id => null,

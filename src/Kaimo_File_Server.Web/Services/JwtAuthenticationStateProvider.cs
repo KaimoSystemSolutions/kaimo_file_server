@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Infrastructure.Configuration;
+using Kaimo_File_Server.Infrastructure.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -35,6 +36,7 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider,
     private readonly WebSessionTicketStore _tickets;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<JwtAuthenticationStateProvider> _logger;
+    private readonly ClientConnectionInfo? _client;
 
     private static readonly AuthenticationState _anonymous =
         new(new ClaimsPrincipal(new ClaimsIdentity()));
@@ -55,8 +57,10 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider,
         JwtTokenService jwtService,
         WebSessionTicketStore tickets,
         IServiceScopeFactory scopeFactory,
-        ILogger<JwtAuthenticationStateProvider> logger)
+        ILogger<JwtAuthenticationStateProvider> logger,
+        ClientConnectionInfo? client = null)
     {
+        _client = client;
         _js = js;
         _jwtService = jwtService;
         _tickets = tickets;
@@ -181,6 +185,14 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider,
                 principal,
                 scope.ServiceProvider.GetRequiredService<IUserRepository>(),
                 scope.ServiceProvider.GetRequiredService<IRevokedWebTokenRepository>());
+
+            // Access restriction rules may have changed since the hub connection was checked.
+            if (failure is null
+                && _client is not null
+                && Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
+                && scope.ServiceProvider.GetService<AccessRestrictionService>() is { } access
+                && !await access.IsAllowedAsync(userId, _client.RemoteAddress, _client.Host))
+                failure = "Access from this address is no longer allowed.";
         }
         catch (Exception ex)
         {

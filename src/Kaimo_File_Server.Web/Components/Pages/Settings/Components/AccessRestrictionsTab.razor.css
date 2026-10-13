@@ -1,0 +1,55 @@
+.access-current {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-2);
+    margin: 0 0 var(--space-4);
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.access-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--space-3);
+}
+
+.access-networks {
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    resize: vertical;
+}
+
+.access-rules {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+
+    .access-rules .access-rule:last-child {
+        border-bottom: none;
+    }
+
+.access-rule {
+    gap: var(--space-3);
+}
+
+.access-rule__text {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.access-rule__name {
+    color: var(--text-primary);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.access-rule__summary {
+    color: var(--text-tertiary);
+    font-size: 12px;
+}
