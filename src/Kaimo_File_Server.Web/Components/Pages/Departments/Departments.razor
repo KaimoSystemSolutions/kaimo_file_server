@@ -301,7 +301,7 @@ else
                     <DetailSection Title="@Resources.Web_Admin_EditTab_General">
                         <PropertyRow Label="@Resources.Web_Admin_Label_Description" Value="@dept.Description" />
                         <PropertyRow Label="@Resources.Web_Dept_Label_InheritsFromView"
-                                     Value="@(dept.ParentDepartmentId.HasValue ? VM.GetParentName(dept.ParentDepartmentId) : Resources.Web_Dept_NoParentTopLevel)" />
+                                     Value="@(dept.ParentDepartmentId.HasValue ? VM.GetParentName(dept.ParentDepartmentId) : Resources.Web_Dept_NoParentTopLevel)" Entity="@dept.ParentDepartmentId.HasValue" />
                     </DetailSection>
 
                     <DetailSection Title="@Resources.Web_Admin_Label_Permissions">
@@ -325,7 +325,7 @@ else
                         </PropertyRow>
                         @if (VM.PermInfo is { HasNoDefault: false, IsOwn: false, InheritedFromName: { } inheritedFrom })
                         {
-                            <PropertyRow Label="@Resources.Web_Dept_Label_InheritsFromView" Value="@inheritedFrom" />
+                            <PropertyRow Label="@Resources.Web_Dept_Label_InheritsFromView" Value="@inheritedFrom" Entity />
                         }
                     </DetailSection>
 

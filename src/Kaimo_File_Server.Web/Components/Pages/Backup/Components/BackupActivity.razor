@@ -190,7 +190,7 @@
                         @if (maintenance.MirrorName is { } mirror)
                         {
                             <PropertyRow Label="@R("Web_Backup_Maintenance_Mirror")"
-                                         Value="@(mirror + (maintenance.SnapshotsCopied is { } copied ? " · " + string.Format(R("Web_Backup_Activity_CopiedValue"), copied) : ""))" />
+                                         Value="@(mirror + (maintenance.SnapshotsCopied is { } copied ? " · " + string.Format(R("Web_Backup_Activity_CopiedValue"), copied) : ""))" Entity />
                         }
                     </ChildContent>
                     <Body>

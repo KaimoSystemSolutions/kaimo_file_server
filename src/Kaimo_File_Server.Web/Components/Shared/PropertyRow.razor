@@ -3,6 +3,7 @@
 
     Label left, value right (stacked on narrow screens). A missing value always reads "–".
     Mono is for paths, IDs, URLs and hashes; Copyable adds a copy button for them.
+    Entity sets the value in semibold when it names a real object (department, share …).
 *@
 @inherits AppComponentBase
 @using Kaimo_File_Server.Core.Language
@@ -12,7 +13,7 @@
 
 <div class="property-row">
     <dt>@Label</dt>
-    <dd class="@(Mono ? "property-value--mono" : null)">
+    <dd class="@(Mono ? "property-value--mono" : null) @(Entity ? "property-value--entity" : null)">
         @if (ChildContent is not null)
         {
             @ChildContent
@@ -45,6 +46,12 @@
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
     [Parameter] public bool Mono { get; set; }
+
+    /// <summary>
+    /// The value names a real object (department, share, connection, repository …) and is set
+    /// in semibold; plain values such as descriptions, dates or counts stay regular.
+    /// </summary>
+    [Parameter] public bool Entity { get; set; }
 
     /// <summary>Adds a copy-to-clipboard button for <see cref="Value"/>.</summary>
     [Parameter] public bool Copyable { get; set; }

@@ -279,14 +279,14 @@
             <DetailSection Title="@R("Web_Backup_Jobs_Section_Sources")">
                 @if (view.Shares.Count > 0)
                 {
-                    <PropertyRow Label="@R("Web_Backup_Jobs_Sources")" Value="@string.Join(", ", view.Shares.Select(s => s.Name))" />
+                    <PropertyRow Label="@R("Web_Backup_Jobs_Sources")" Value="@string.Join(", ", view.Shares.Select(s => s.Name))" Entity />
                 }
                 @if (hasPools)
                 {
                     <PropertyRow Label="@R("Web_Backup_Jobs_Pools")"
-                                 Value="@string.Join(", ", job.Sources.Where(s => s.Kind == BackupSourceKind.Pool && s.PoolPath is not null).Select(s => BackupUi.PoolName(s.PoolPath!)))" />
+                                 Value="@string.Join(", ", job.Sources.Where(s => s.Kind == BackupSourceKind.Pool && s.PoolPath is not null).Select(s => BackupUi.PoolName(s.PoolPath!)))" Entity />
                     <PropertyRow Label="@R("Web_Backup_Jobs_PoolShares")"
-                                 Value="@string.Join(", ", job.Sources.Where(s => s.Kind == BackupSourceKind.Pool && s.PoolPath is not null).SelectMany(s => VM.SharesInPool(s.PoolPath!)).Distinct())" />
+                                 Value="@string.Join(", ", job.Sources.Where(s => s.Kind == BackupSourceKind.Pool && s.PoolPath is not null).SelectMany(s => VM.SharesInPool(s.PoolPath!)).Distinct())" Entity />
                 }
                 <PropertyRow Label="@R("Web_Backup_Jobs_Content")" Value="@BackupUi.LevelLabel(job.ContentLevel)" />
                 @if (hasPools)

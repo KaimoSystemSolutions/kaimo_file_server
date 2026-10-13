@@ -65,7 +65,7 @@
                             </DetailHeader>
 
                             <DetailSection Title="@Resources.Web_Admin_EditTab_General">
-                                <PropertyRow Label="@Resources.Web_Admin_Label_Department" Value="@VM.GetDepartmentName(group.DepartmentId)" />
+                                <PropertyRow Label="@Resources.Web_Admin_Label_Department" Value="@VM.GetDepartmentName(group.DepartmentId)" Entity />
                             </DetailSection>
 
                             <DetailSection Title="@($"{Resources.Web_Admin_DirectMembers} ({VM.GroupMembers.Count})")">

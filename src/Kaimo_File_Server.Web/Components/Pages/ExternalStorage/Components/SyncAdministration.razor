@@ -308,8 +308,8 @@ else
             </div>
 
             <DetailSection Title="@R("Web_ExternalStorage_Section_Locations")">
-                <PropertyRow Label="@R("Web_ExternalStorage_Connection")" Value="@selected.ConnectionName" />
-                <PropertyRow Label="@R("Web_ExternalStorage_LocalShare")" Value="@selected.ShareName" />
+                <PropertyRow Label="@R("Web_ExternalStorage_Connection")" Value="@selected.ConnectionName" Entity />
+                <PropertyRow Label="@R("Web_ExternalStorage_LocalShare")" Value="@selected.ShareName" Entity />
                 <PropertyRow Label="@R("Web_ExternalStorage_LocalPath")" Value="@DisplayPath(selected.Definition.LocalPath)" Mono Copyable />
                 <PropertyRow Label="@R("Web_ExternalStorage_RemotePath")" Value="@selected.Definition.RemotePath" Mono Copyable />
             </DetailSection>

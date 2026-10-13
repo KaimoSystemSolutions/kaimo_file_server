@@ -587,7 +587,12 @@ app.UseWhen(
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseStaticFiles();
+    // Revalidate on every request (cheap 304 via ETag): without a Cache-Control header the
+    // browser reuses a stale css/app.css?v=2 heuristically, so style edits seem to have no effect.
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache"
+    });
 }
 else
 {
