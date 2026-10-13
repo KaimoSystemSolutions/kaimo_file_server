@@ -398,6 +398,7 @@ builder.Services.AddScoped<Kaimo_File_Server.Web.Components.ProfileNavigator>();
 builder.Services.AddScoped<AclEditorViewModel>();
 builder.Services.AddScoped<DepartmentViewModel>();
 builder.Services.AddScoped<ExternalStorageSyncViewModel>();
+builder.Services.AddScoped<HomeDashboardViewModel>();
 builder.Services.AddScoped<ClientDeviceAdminViewModel>();
 builder.Services.AddScoped<MailServerSettingsViewModel>();
 builder.Services.AddScoped<NotificationsViewModel>();

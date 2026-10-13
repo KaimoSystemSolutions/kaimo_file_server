@@ -27,81 +27,87 @@
         <div class="sidebar-backdrop" @onclick="CloseNav"></div>
     }
     <nav id="app-sidebar" class="sidebar @(_navOpen ? "sidebar--open" : "")">
-        <div class="sidebar-brand">
+        @* The brand leads back to the start page. *@
+        <a class="sidebar-brand" href="/" title="@Text("Web_Nav_Home", "Overview")">
             @* Don't replace this with an Assets.SVG call, cuz this a lil too complicated for it *@
-            @* <svg width="28" height="28" viewBox="0 0 48 48" fill="none">
-                <rect width="48" height="48" rx="10" fill="var(--accent)" />
-                <path d="M14 20h20v2H14zM14 26h20v2H14zM14 32h14v2H14z" fill="#fff" />
-            </svg> *@
             @Assets.RawSVG("icon_kaimo.svg", 40, 40)
             <span class="brand-text">Kaimo File Server</span>
-        </div>
+        </a>
 
         <div class="sidebar-nav">
             <NavLink class="nav-item" href="/" Match="NavLinkMatch.All">
-                @Assets.SVG("folder.svg", new SvgOptions())
-                <span class="nav-label">@Resources.Web_Nav_Shares</span>
-            </NavLink>
-            @if (_canManageUsers)
-            {
-                <NavLink class="nav-item" href="/users" Match="NavLinkMatch.All">
-                    @Assets.SVG("users.svg", new SvgOptions())
-                    <span class="nav-label">@Resources.Web_Nav_Users</span>
-                </NavLink>
-            }
-            @if (_canViewDepartments)
-            {
-                <NavLink class="nav-item" href="/departments" Match="NavLinkMatch.All">
-                    @Assets.SVG("building.svg", new SvgOptions())
-                    <span class="nav-label">@Resources.Web_Nav_Departments</span>
-                </NavLink>
-            }
-            @* Keep the File Browser selected while navigating within a share. *@
-            <NavLink class="nav-item" href="/files" Match="NavLinkMatch.Prefix">
-                @Assets.SVG("compass.svg", new SvgOptions())
-                <span class="nav-label">@Resources.Web_Nav_BrowseFiles</span>
+                @Assets.SVG("home.svg", new SvgOptions())
+                <span class="nav-label">@Text("Web_Nav_Home", "Overview")</span>
             </NavLink>
 
-            @if (canManageSyncs() || _canManageCloudAccess)
-            {
-                <NavLink class="nav-item" href="/external-storage" Match="NavLinkMatch.Prefix">
-                    @Assets.SVG("cloud-download.svg", new SvgOptions())
-                    <span class="nav-label">@Text("Web_ExternalStorage_Title", "External Storage")</span>
+            <div class="nav-group" role="group" aria-labelledby="nav-group-storage">
+                <span id="nav-group-storage" class="ui-label nav-group-label">@Text("Web_Nav_Group_Storage", "Storage")</span>
+                <NavLink class="nav-item" href="/shares" Match="NavLinkMatch.Prefix">
+                    @Assets.SVG("folder.svg", new SvgOptions())
+                    <span class="nav-label">@Resources.Web_Nav_Shares</span>
                 </NavLink>
-            }
-
-            @if (_canManageShareLinks)
-            {
-                <NavLink class="nav-item" href="/share-links" Match="NavLinkMatch.Prefix">
-                    @Assets.SVG("share.svg", new SvgOptions())
-                    <span class="nav-label">@Text("Web_Nav_ShareLinks", "Share Links")</span>
+                @* Keep the File Browser selected while navigating within a share. *@
+                <NavLink class="nav-item" href="/files" Match="NavLinkMatch.Prefix">
+                    @Assets.SVG("compass.svg", new SvgOptions())
+                    <span class="nav-label">@Resources.Web_Nav_BrowseFiles</span>
                 </NavLink>
-            }
+                @if (canManageSyncs() || _canManageCloudAccess)
+                {
+                    <NavLink class="nav-item" href="/external-storage" Match="NavLinkMatch.Prefix">
+                        @Assets.SVG("cloud-download.svg", new SvgOptions())
+                        <span class="nav-label">@Text("Web_ExternalStorage_Title", "External Storage")</span>
+                    </NavLink>
+                }
+                @if (_canManageShareLinks)
+                {
+                    <NavLink class="nav-item" href="/share-links" Match="NavLinkMatch.Prefix">
+                        @Assets.SVG("share.svg", new SvgOptions())
+                        <span class="nav-label">@Text("Web_Nav_ShareLinks", "Share Links")</span>
+                    </NavLink>
+                }
+                @if (_canManageFileBackup)
+                {
+                    <NavLink class="nav-item" href="/backup" Match="NavLinkMatch.Prefix">
+                        @Assets.SVG("archive.svg", new SvgOptions())
+                        <span class="nav-label">@Text("Web_Nav_Backup", "Backup")</span>
+                    </NavLink>
+                }
+            </div>
 
-            @if (_canManageFileBackup)
+            @if (_canManageUsers || _canViewDepartments || _canViewSecurity || _canManageNotifications)
             {
-                <NavLink class="nav-item" href="/backup" Match="NavLinkMatch.Prefix">
-                    @Assets.SVG("archive.svg", new SvgOptions())
-                    <span class="nav-label">@Text("Web_Nav_Backup", "Backup")</span>
-                </NavLink>
+                <div class="nav-group" role="group" aria-labelledby="nav-group-users">
+                    <span id="nav-group-users" class="ui-label nav-group-label">@Text("Web_Nav_Group_Users", "Users & access")</span>
+                    @if (_canManageUsers)
+                    {
+                        <NavLink class="nav-item" href="/users" Match="NavLinkMatch.All">
+                            @Assets.SVG("users.svg", new SvgOptions())
+                            <span class="nav-label">@Resources.Web_Nav_Users</span>
+                        </NavLink>
+                    }
+                    @if (_canViewDepartments)
+                    {
+                        <NavLink class="nav-item" href="/departments" Match="NavLinkMatch.All">
+                            @Assets.SVG("building.svg", new SvgOptions())
+                            <span class="nav-label">@Resources.Web_Nav_Departments</span>
+                        </NavLink>
+                    }
+                    @if (_canViewSecurity)
+                    {
+                        <NavLink class="nav-item" href="/security" Match="NavLinkMatch.Prefix">
+                            @Assets.SVG("shield.svg", new SvgOptions())
+                            <span class="nav-label">@Text("Web_Nav_Security", "Security")</span>
+                        </NavLink>
+                    }
+                    @if (_canManageNotifications)
+                    {
+                        <NavLink class="nav-item" href="/notifications" Match="NavLinkMatch.Prefix">
+                            @Assets.SVG("mail.svg", new SvgOptions())
+                            <span class="nav-label">@Text("Web_Nav_Notifications", "Notifications")</span>
+                        </NavLink>
+                    }
+                </div>
             }
-
-            @if (_canViewSecurity)
-            {
-                <NavLink class="nav-item" href="/security" Match="NavLinkMatch.Prefix">
-                    @Assets.SVG("shield.svg", new SvgOptions())
-                    <span class="nav-label">@Text("Web_Nav_Security", "Security")</span>
-                </NavLink>
-            }
-
-            @if (_canManageNotifications)
-            {
-                <NavLink class="nav-item" href="/notifications" Match="NavLinkMatch.Prefix">
-                    @Assets.SVG("mail.svg", new SvgOptions())
-                    <span class="nav-label">@Text("Web_Nav_Notifications", "Notifications")</span>
-                </NavLink>
-            }
-
         </div>
 
 

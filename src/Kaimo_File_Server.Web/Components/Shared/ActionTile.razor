@@ -1,0 +1,39 @@
+@*
+    Quick-access tile (shared UI library, see DESIGN_SPEC §10.1): a large link with a
+    coloured icon, a title and one short description, used on overview pages.
+
+    It only navigates; counts and states belong in a <FactTile>. At most one tile per row
+    is `Primary` (accent surface) — the most likely next step, e.g. the own home folder.
+*@
+@inherits AppComponentBase
+@using Kaimo_File_Server.Web.DynamicHelpers
+
+<a class="action-tile @(Primary ? "action-tile--primary" : null)" href="@Href">
+    <span class="tile-icon @(Primary ? "action-tile-icon--primary" : $"tile-icon--{IconColor.ToString().ToLowerInvariant()}")" aria-hidden="true">
+        @Assets.SVG(Icon, new SvgOptions(Width: 20, Height: 20))
+    </span>
+    <span class="action-tile-title">@Title</span>
+    @if (!string.IsNullOrEmpty(Description))
+    {
+        <span class="action-tile-description">@Description</span>
+    }
+    <span class="action-tile-arrow" aria-hidden="true">
+        @Assets.SVG("arrow_up_right.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2f))
+    </span>
+</a>
+
+@code {
+    [Parameter, EditorRequired] public string Href { get; set; } = "/";
+
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    [Parameter] public string? Description { get; set; }
+
+    /// <summary>Icon file from wwwroot/svg, e.g. "folder.svg".</summary>
+    [Parameter, EditorRequired] public string Icon { get; set; } = string.Empty;
+
+    [Parameter] public TileColor IconColor { get; set; } = TileColor.Neutral;
+
+    /// <summary>Accent surface for the single most important shortcut.</summary>
+    [Parameter] public bool Primary { get; set; }
+}

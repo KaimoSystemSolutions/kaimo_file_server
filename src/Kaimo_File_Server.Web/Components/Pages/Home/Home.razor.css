@@ -1,0 +1,132 @@
+/* Quick access row (ActionTile). */
+.home-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+}
+
+.home-group {
+    margin-bottom: var(--space-6);
+}
+
+.home-group-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-2);
+}
+
+/* Overview tiles: wider than in a detail pane and with a larger count. */
+.home-group .fact-tiles {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+.home-group ::deep .fact-tile {
+    padding: var(--space-3);
+}
+
+.home-group ::deep .fact-tile-value {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+/* ── Rows inside a DetailSection body (devices, attention items) ── */
+
+.home-list {
+    list-style: none;
+    margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-3));
+    padding: 0;
+}
+
+.home-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 48px;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+}
+
+.home-row:last-child {
+    border-bottom: none;
+}
+
+.home-row:hover {
+    background: var(--bg-hover);
+}
+
+.home-row.home-row--attention {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.home-row-icon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.home-row-main {
+    display: grid;
+    min-width: 0;
+}
+
+.home-row-main strong {
+    overflow: hidden;
+    color: var(--text-primary);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-row-main small {
+    overflow: hidden;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-row-cell {
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    white-space: nowrap;
+}
+
+.home-empty {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.home-empty--ok {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+@media (max-width: 760px) {
+    .home-row {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    /* Secondary cells (folder count, last seen) wrap under the name. */
+    .home-row-cell {
+        grid-column: 2 / -1;
+        white-space: normal;
+    }
+
+    .home-row ::deep .home-row-status {
+        grid-row: 1;
+        grid-column: 3;
+    }
+}

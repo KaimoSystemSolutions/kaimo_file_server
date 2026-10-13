@@ -7081,4 +7081,103 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Homes_Disable" xml:space="preserve">
     <value>Home-Ordner deaktivieren</value>
   </data>
+  <data name="Web_Nav_Home" xml:space="preserve">
+    <value>Übersicht</value>
+  </data>
+  <data name="Web_Nav_Group_Storage" xml:space="preserve">
+    <value>Speicher</value>
+  </data>
+  <data name="Web_Nav_Group_Users" xml:space="preserve">
+    <value>Benutzer &amp; Zugriff</value>
+  </data>
+  <data name="Web_Home_OpenHome" xml:space="preserve">
+    <value>Mein Ordner</value>
+  </data>
+  <data name="Web_Home_Group_Workspace" xml:space="preserve">
+    <value>Mein Arbeitsbereich</value>
+  </data>
+  <data name="Web_Home_Group_Admin" xml:space="preserve">
+    <value>Administration</value>
+  </data>
+  <data name="Web_Home_Tile_Devices" xml:space="preserve">
+    <value>Angemeldete Geräte</value>
+  </data>
+  <data name="Web_Home_Tile_DeviceSyncs" xml:space="preserve">
+    <value>Geräte-Sync-Ordner</value>
+  </data>
+  <data name="Web_Home_Devices_Title" xml:space="preserve">
+    <value>Meine Geräte</value>
+  </data>
+  <data name="Web_Home_Devices_None" xml:space="preserve">
+    <value>Mit Ihrem Konto ist kein Gerät angemeldet. Melden Sie sich mit der Kaimo-App an, um Ordner auf Ihr Smartphone oder Ihren Computer zu synchronisieren.</value>
+  </data>
+  <data name="Web_Home_Devices_Folders" xml:space="preserve">
+    <value>{0} Sync-Ordner</value>
+  </data>
+  <data name="Web_Home_Tile_ShareLinks" xml:space="preserve">
+    <value>Aktive Freigabelinks</value>
+  </data>
+  <data name="Web_Home_Tile_Backups" xml:space="preserve">
+    <value>Sicherungsaufträge</value>
+  </data>
+  <data name="Web_Home_Users_Hint" xml:space="preserve">
+    <value>{0} deaktiviert</value>
+  </data>
+  <data name="Web_Home_Tile_FailedLogins" xml:space="preserve">
+    <value>Fehlgeschlagene Anmeldungen (24 h)</value>
+  </data>
+  <data name="Web_Home_Security_Hint" xml:space="preserve">
+    <value>{0} aktive Sperren</value>
+  </data>
+  <data name="Web_Home_AllHealthy" xml:space="preserve">
+    <value>Alle fehlerfrei</value>
+  </data>
+  <data name="Web_Home_Attention_Title" xml:space="preserve">
+    <value>Handlungsbedarf</value>
+  </data>
+  <data name="Web_Home_Attention_None" xml:space="preserve">
+    <value>Alle Synchronisierungen, Verbindungen und Sicherungsaufträge laufen normal.</value>
+  </data>
+  <data name="Web_Home_Kind_Sync" xml:space="preserve">
+    <value>Synchronisierung</value>
+  </data>
+  <data name="Web_Home_Kind_Connection" xml:space="preserve">
+    <value>Verbindung</value>
+  </data>
+  <data name="Web_Home_Kind_Backup" xml:space="preserve">
+    <value>Sicherungsauftrag</value>
+  </data>
+  <data name="Web_Home_Backup_Overdue" xml:space="preserve">
+    <value>Überfällig</value>
+  </data>
+  <data name="Web_Home_Action_Home" xml:space="preserve">
+    <value>Ihr persönlicher Speicher</value>
+  </data>
+  <data name="Web_Home_Action_Browse" xml:space="preserve">
+    <value>Alle Shares und Ordner</value>
+  </data>
+  <data name="Web_Home_Action_External" xml:space="preserve">
+    <value>Synchronisierungen und Verbindungen</value>
+  </data>
+  <data name="Web_Home_Action_ShareLinks" xml:space="preserve">
+    <value>Öffentliche Download- und Upload-Links</value>
+  </data>
+  <data name="Web_Home_Health_Ok" xml:space="preserve">
+    <value>fehlerfrei</value>
+  </data>
+  <data name="Web_Home_Health_Warning" xml:space="preserve">
+    <value>mit Warnungen</value>
+  </data>
+  <data name="Web_Home_Health_Failed" xml:space="preserve">
+    <value>fehlgeschlagen</value>
+  </data>
+  <data name="Web_Home_Health_Inactive" xml:space="preserve">
+    <value>inaktiv</value>
+  </data>
+  <data name="Web_Home_Links_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="Web_Home_Links_Upload" xml:space="preserve">
+    <value>Upload</value>
+  </data>
 </root>

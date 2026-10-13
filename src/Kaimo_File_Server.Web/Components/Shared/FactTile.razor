@@ -12,7 +12,13 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 
-<div class="fact-tile @ToneClass @(Compact ? "fact-tile--compact" : null)" title="@Tooltip">
+<div class="fact-tile @ToneClass @(Compact ? "fact-tile--compact" : null) @(Icon is null ? null : "fact-tile--with-icon")" title="@Tooltip">
+    @if (Icon is not null)
+    {
+        <span class="tile-icon tile-icon--@IconColor.ToString().ToLowerInvariant()" aria-hidden="true">@Assets.SVG(Icon, new SvgOptions(Width: 18, Height: 18))</span>
+    }
+    @* display: contents without an icon, so the label/value/hint keep the plain tile layout. *@
+    <div class="fact-tile-body">
     <span class="fact-tile-label">@Label</span>
     <span class="fact-tile-value">
         @if (Tone is not null)
@@ -31,6 +37,20 @@
     @if (!string.IsNullOrEmpty(Hint))
     {
         <span class="fact-tile-hint">@Hint</span>
+    }
+    </div>
+    @if (Segments is { Count: > 0 })
+    {
+        @* The bar is decorative; the legend below carries the same numbers as text. *@
+        <div class="fact-tile-bar" aria-hidden="true">
+            @foreach (var segment in Segments.Where(s => s.Count > 0))
+            {
+                <span class="tile-segment--@segment.Color.ToString().ToLowerInvariant()" style="flex-grow:@segment.Count"></span>
+            }
+        </div>
+        <span class="fact-tile-legend">
+            @string.Join(" · ", Segments.Where(s => s.Count > 0).Select(s => $"{s.Count} {s.Label}"))
+        </span>
     }
     @if (OnLink.HasDelegate)
     {
@@ -54,6 +74,18 @@
 
     /// <summary>Colours the value and adds a status dot; null keeps it neutral without a dot.</summary>
     [Parameter] public StatusTone? Tone { get; set; }
+
+    /// <summary>Optional icon file from wwwroot/svg (e.g. "folder.svg"), shown in a neutral tile on the left.</summary>
+    [Parameter] public string? Icon { get; set; }
+
+    /// <summary>Colour of the icon tile; category colours for overview pages, neutral by default.</summary>
+    [Parameter] public TileColor IconColor { get; set; } = TileColor.Neutral;
+
+    /// <summary>
+    /// Optional distribution bar under the value (e.g. healthy / warning / failed), with a text
+    /// legend of the non-zero parts. Meant for overview pages.
+    /// </summary>
+    [Parameter] public IReadOnlyList<FactTileSegment>? Segments { get; set; }
 
     /// <summary>Smaller value text for longer values such as timestamps.</summary>
     [Parameter] public bool Compact { get; set; }

@@ -1,4 +1,4 @@
-@page "/"
+@page "/shares"
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.Acl
 @using Kaimo_File_Server.Web.Components.Pages.CloudAccess
@@ -29,7 +29,6 @@ else
 <div class="page-header share-page-header">
     <div>
         <h1>@Resources.Web_Nav_Shares</h1>
-        <p class="subtitle">@string.Format(Resources.Web_ShareList_Welcome, VM.CurrentUserName)</p>
     </div>
     <div class="page-header-actions">
         @if (VM.Shares.Any() && VM.IsAdmin)

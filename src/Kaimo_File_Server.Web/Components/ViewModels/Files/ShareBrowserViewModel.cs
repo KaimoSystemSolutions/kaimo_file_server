@@ -113,7 +113,11 @@ public partial class ShareBrowserViewModel
 
     // -- Commands --
 
-    public async Task LoadAsync()
+    /// <param name="loadSizes">
+    /// Start the background size calculation per share; off for callers that only need the
+    /// list (the start page), since it walks every share's directory tree.
+    /// </param>
+    public async Task LoadAsync(bool loadSizes = true)
     {
         try
         {
@@ -201,7 +205,8 @@ public partial class ShareBrowserViewModel
             }
 
             Shares = visible;
-            _ = LoadShareSizesInBackgroundAsync(visible, actor);
+            if (loadSizes)
+                _ = LoadShareSizesInBackgroundAsync(visible, actor);
         }
         catch (Exception ex)
         {

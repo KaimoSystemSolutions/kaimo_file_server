@@ -5970,6 +5970,78 @@ input[type="radio"] {
     font-size: 11.5px;
 }
 
+.fact-tile-body {
+    display: contents;
+}
+
+/* Icon variant (`Icon`): neutral icon tile on the left, label/value/hint stacked beside it. */
+.fact-tile--with-icon {
+    grid-template-columns: 36px minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-3);
+}
+
+    .fact-tile--with-icon .fact-tile-body {
+        display: grid;
+        gap: 3px;
+        min-width: 0;
+    }
+
+/* Distribution bar (`Segments`): spans the whole tile, the legend repeats it as text. */
+.fact-tile-bar {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 2px;
+    height: 6px;
+    margin-top: var(--space-1);
+    overflow: hidden;
+    border-radius: var(--radius-control);
+    background: var(--bg-tertiary);
+}
+
+.fact-tile-legend {
+    grid-column: 1 / -1;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+/* ── Tile icon + colour palette (TileColor), shared by FactTile and ActionTile ── */
+
+.tile-icon {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+}
+
+.tile-icon--neutral { border-color: var(--border); background: var(--bg-tertiary); color: var(--text-secondary); }
+.tile-icon--folder { background: var(--folder-fill); color: var(--folder-stroke); }
+.tile-icon--user { background: var(--entity-user-soft); color: var(--entity-user); }
+.tile-icon--group { background: var(--entity-group-soft); color: var(--entity-group); }
+.tile-icon--role { background: var(--entity-role-soft); color: var(--entity-role); }
+.tile-icon--department { background: var(--entity-department-soft); color: var(--entity-department); }
+.tile-icon--info { background: color-mix(in srgb, var(--info) 16%, transparent); color: var(--info); }
+.tile-icon--accent { background: var(--accent-subtle); color: var(--accent-strong); }
+.tile-icon--success { background: var(--success-subtle); color: var(--success); }
+.tile-icon--warning { background: var(--warning-subtle); color: var(--warning); }
+.tile-icon--danger { background: var(--danger-subtle); color: var(--danger); }
+
+.tile-segment--neutral { background: var(--border-strong); }
+.tile-segment--folder { background: var(--folder-stroke); }
+.tile-segment--user { background: var(--entity-user); }
+.tile-segment--group { background: var(--entity-group); }
+.tile-segment--role { background: var(--entity-role); }
+.tile-segment--department { background: var(--entity-department); }
+.tile-segment--info { background: var(--info); }
+.tile-segment--accent { background: var(--accent); }
+.tile-segment--success { background: var(--success); }
+.tile-segment--warning { background: var(--warning); }
+.tile-segment--danger { background: var(--danger); }
+
 .fact-tile .fact-tile-link {
     position: absolute;
     top: 5px;

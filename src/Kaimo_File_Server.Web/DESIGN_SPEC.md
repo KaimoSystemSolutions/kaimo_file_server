@@ -196,7 +196,7 @@ Semantic backgrounds are tinted (`*-subtle`); solid fills are reserved for badge
 
 ### 9.1 Application shell (`MainLayout`)
 
-- **Sidebar** (248 px, `--bg-tertiary`, right border): brand at the top, vertical `nav-item` list, footer on `--bg-secondary` with user avatar/name (links to own profile), logout, theme toggle and accent picker.
+- **Sidebar** (248 px, `--bg-tertiary`, right border): brand at the top (links to the start page `/`), vertical `nav-item` list — "Overview" first, then categories (`.nav-group`: Storage, Users & access) under uppercase `ui-label` headings; in the 72 px icon rail a 1 px divider replaces the heading — footer on `--bg-secondary` with user avatar/name (links to own profile), logout, theme toggle and accent picker.
 - **Active nav item:** `--accent-subtle` background, `--accent-border` border, a 3 px accent bar on the left edge and heavier text. Hover: `--bg-hover` + border. Never a solid accent block.
 - **Main area** (`.main`): scrolls independently, padding `0 32px 24px`. The first child is the sticky global search bar on `--bg-tertiary` (controls share `--topbar-control-h: 40px`, including the scope select and the running-jobs menu).
 - **Page header** (`.page-header`): title (`h1`) + `.subtitle` on the left, page actions on the right, 24 px bottom margin.
@@ -250,7 +250,9 @@ Reuse these before writing anything new. New patterns that will be needed more t
 | `InfoButton` | Inline "i" button that reveals an explanation (e.g. password rules) instead of static hint walls. |
 | `DetailHeader` | Header of a detail pane: icon, title, subtitle, `Status`, `Actions` and the "⋯" `MoreActions` menu (§9.2). |
 | `MenuItem` | Entry of a dropdown menu (icon, label, `Danger`, `Disabled` + `Tooltip` reason, `Separator`). |
-| `FactTile` | Key fact tile (label, value, optional hint, `Tone`, `Compact` for dates, `Tooltip`, optional arrow link) inside `.fact-tiles`. |
+| `FactTile` | Key fact tile (label, value, optional hint, `Tone`, `Compact` for dates, `Tooltip`, optional arrow link) inside `.fact-tiles`. Overview pages only (not detail panes): `Icon` + `IconColor` (category colour) and `Segments` (distribution bar, e.g. healthy / warning / failed / inactive, with a text legend so colour is never the only carrier). |
+| `ActionTile` | Large quick-access link on overview pages: coloured icon, title, one-line description, arrow. Navigates only; at most one `Primary` (accent surface) per row. |
+| `TileColor` | Colour vocabulary for tile icons and segments: categories `Folder` (storage), `User` (people/devices), `Group`, `Role`, `Department`, `Info` (cloud/sync), `Accent`, `Neutral`, plus `Success`/`Warning`/`Danger` for health segments. Maps to existing tokens via `.tile-icon--*` / `.tile-segment--*`. |
 | `DetailSection` | Titled property group, collapsible via its title band (native `<details>`), `InitiallyCollapsed` for secondary groups; `Body` for free content below the rows. |
 | `PropertyRow` | Read-only label/value row; `Mono`, `Copyable`, `Entity` (semibold for object names), "–" for empty values. |
 

@@ -1,0 +1,58 @@
+.action-tile {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: var(--space-2);
+    min-width: 0;
+    padding: var(--space-4);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: background 120ms ease, border-color 120ms ease;
+}
+
+.action-tile:hover {
+    border-color: var(--border-strong);
+    background: var(--bg-hover);
+}
+
+.action-tile--primary {
+    border-color: var(--accent-border);
+    background: var(--accent-subtle);
+}
+
+.action-tile--primary:hover {
+    border-color: var(--accent);
+    background: var(--accent-subtle);
+}
+
+.action-tile-icon--primary {
+    background: var(--accent);
+    color: var(--text-on-accent);
+}
+
+.action-tile-title {
+    padding-right: var(--space-5);
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.action-tile-description {
+    color: var(--text-secondary);
+    font-size: 12.5px;
+}
+
+.action-tile-arrow {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    display: flex;
+    color: var(--text-tertiary);
+    transition: color 120ms ease;
+}
+
+.action-tile:hover .action-tile-arrow {
+    color: var(--text-primary);
+}

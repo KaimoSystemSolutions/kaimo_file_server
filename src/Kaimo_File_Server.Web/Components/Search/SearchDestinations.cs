@@ -38,7 +38,7 @@ public sealed record SearchDestination(
         _ when Url.StartsWith("/settings", StringComparison.Ordinal) => Loc("Web_Nav_Settings", "Settings"),
         _ when Url.StartsWith("/external-storage", StringComparison.Ordinal)
             => Loc("Web_ExternalStorage_Title", "External Storage"),
-        _ when Url.StartsWith("/?view=virtual", StringComparison.Ordinal) => Loc("Web_Nav_Shares", "Shares"),
+        _ when Url.StartsWith("/shares?view=virtual", StringComparison.Ordinal) => Loc("Web_Nav_Shares", "Shares"),
         _ => Loc("Web_Search_Cat_Page", "Page"),
     };
 
@@ -77,9 +77,12 @@ public static class SearchDestinations
     public static readonly IReadOnlyList<SearchDestination> All = new List<SearchDestination>
     {
         // ── Top-level tabs ──
+        new("Web_Nav_Home",
+            ["home", "start", "startseite", "overview", "übersicht", "dashboard"],
+            "/", "home.svg", null),
         new("Web_Nav_Shares",
             ["shares", "share", "freigaben", "freigabe", "dateifreigabe"],
-            "/", "folder.svg", null),
+            "/shares", "folder.svg", null),
         new("Web_Nav_BrowseFiles",
             ["files", "dateien", "browse", "durchsuchen", "explorer", "dateibrowser"],
             "/files", "compass.svg", null),
@@ -99,7 +102,7 @@ public static class SearchDestinations
             "/external-storage?tab=connections", "cloud-download.svg", ConnectionsGate),
         new("Web_Shares_VirtualShares",
             ["cloud access", "virtual shares", "virtuelle shares", "virtueller share", "remote shares"],
-            "/?view=virtual", "cloud-download.svg", ConnectionsGate),
+            "/shares?view=virtual", "cloud-download.svg", ConnectionsGate),
 
         // ── Settings sections (deep-linked via ?tab=) ──
         new("Web_Settings_Tab_Region",

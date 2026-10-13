@@ -1,0 +1,253 @@
+@page "/"
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Infrastructure.Backup.Restic
+@using Kaimo_File_Server.Web.Components.ViewModels.Backup
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+@inject HomeDashboardViewModel VM
+@inject DateFormatService DateFmt
+@inject NavigationManager Nav
+
+<PageTitle>@R("Web_Nav_Home", "Overview") - Kaimo Files</PageTitle>
+
+<div class="page-header home-header">
+    <div>
+        <h1>@R("Web_Nav_Home", "Overview")</h1>
+        @if (!string.IsNullOrEmpty(VM.DisplayName))
+        {
+            <p class="subtitle">@string.Format(Resources.Web_ShareList_Welcome, VM.DisplayName)</p>
+        }
+    </div>
+</div>
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state">
+        <div class="spinner"></div>
+        <p>@R("Web_Common_Loading", "Loading…")</p>
+    </div>
+}
+else
+{
+    <div class="home-actions">
+        @if (VM.HasHome)
+        {
+            <ActionTile Href="/files/user" Icon="home.svg" Primary="true"
+                        Title="@R("Web_Home_OpenHome", "My folder")"
+                        Description="@R("Web_Home_Action_Home", "Your personal storage")" />
+        }
+        <ActionTile Href="/files" Icon="compass.svg" IconColor="TileColor.Folder"
+                    Title="@Resources.Web_Nav_BrowseFiles"
+                    Description="@R("Web_Home_Action_Browse", "All shares and folders")" />
+        @if (VM.CanSeeSyncs || VM.CanSeeConnections)
+        {
+            <ActionTile Href="/external-storage" Icon="cloud-download.svg" IconColor="TileColor.Info"
+                        Title="@R("Web_ExternalStorage_Title", "External Storage")"
+                        Description="@R("Web_Home_Action_External", "Syncs and connections")" />
+        }
+        @if (VM.CanSeeShareLinks)
+        {
+            <ActionTile Href="/share-links" Icon="share.svg" IconColor="TileColor.Role"
+                        Title="@R("Web_Nav_ShareLinks", "Share Links")"
+                        Description="@R("Web_Home_Action_ShareLinks", "Public download and upload links")" />
+        }
+    </div>
+
+    <section class="home-group" aria-labelledby="home-workspace">
+        <h2 id="home-workspace" class="ui-label home-group-title">@R("Web_Home_Group_Workspace", "My workspace")</h2>
+        <div class="fact-tiles">
+            <FactTile Icon="folder.svg" IconColor="TileColor.Folder" Label="@Resources.Web_Nav_Shares" Value="@Count(VM.ShareCount)"
+                      OnLink="@(() => Nav.NavigateTo("/shares"))" LinkLabel="@Resources.Web_Nav_Shares" />
+            @if (VM.VirtualShareCount > 0)
+            {
+                <FactTile Icon="cloud-download.svg" IconColor="TileColor.Info" Label="@R("Web_Shares_VirtualShares", "Virtual Shares")"
+                          Value="@Count(VM.VirtualShareCount)"
+                          OnLink="@(() => Nav.NavigateTo("/shares?view=virtual"))"
+                          LinkLabel="@R("Web_Shares_VirtualShares", "Virtual Shares")" />
+            }
+            <FactTile Icon="devices.svg" IconColor="TileColor.User" Label="@R("Web_Home_Tile_Devices", "Signed-in devices")"
+                      Value="@Count(VM.Devices.Count)" />
+            <FactTile Icon="sync-twoway.svg" IconColor="TileColor.Info" Label="@R("Web_Home_Tile_DeviceSyncs", "Device sync folders")"
+                      Value="@Count(VM.Devices.Sum(d => d.SyncFolderCount))" />
+        </div>
+
+        <DetailSection Title="@R("Web_Home_Devices_Title", "My devices")">
+            <Body>
+                @if (VM.Devices.Count == 0)
+                {
+                    <p class="home-empty">@R("Web_Home_Devices_None", "No device is signed in to your account.")</p>
+                }
+                else
+                {
+                    <ul class="home-list">
+                        @foreach (var item in VM.Devices)
+                        {
+                            <li class="home-row">
+                                <span class="home-row-icon">@Assets.SVG("devices.svg", new SvgOptions(Width: 18, Height: 18))</span>
+                                <span class="home-row-main">
+                                    <strong>@item.Device.DisplayName</strong>
+                                    <small>@(string.IsNullOrWhiteSpace(item.Device.Platform) ? "–" : item.Device.Platform)</small>
+                                </span>
+                                <span class="home-row-cell">
+                                    @string.Format(R("Web_Home_Devices_Folders", "{0} sync folders"), item.SyncFolderCount)
+                                </span>
+                                <span class="home-row-cell">
+                                    @Resources.Web_Devices_LastSeen: @DateFmt.FormatDateTime(item.Device.LastSeenUtc)
+                                </span>
+                                <StatusBadge Tone="StatusTone.Positive" Label="@R("Web_Devices_Active", "Active")" Class="home-row-status" />
+                            </li>
+                        }
+                    </ul>
+                }
+            </Body>
+        </DetailSection>
+    </section>
+
+    @if (VM.HasAdminSections)
+    {
+        <section class="home-group" aria-labelledby="home-admin">
+            <h2 id="home-admin" class="ui-label home-group-title">@R("Web_Home_Group_Admin", "Administration")</h2>
+            <div class="fact-tiles">
+                @if (VM.CanSeeSyncs)
+                {
+                    <FactTile Icon="refresh.svg" IconColor="TileColor.Info" Label="@R("Web_ExternalStorage_Tab_Syncs", "Syncs")"
+                              Value="@Count(VM.Syncs.Count)" Segments="@HealthSegments(VM.SyncHealth)"
+                              OnLink="@(() => Nav.NavigateTo("/external-storage?tab=syncs"))"
+                              LinkLabel="@R("Web_ExternalStorage_Tab_Syncs", "Syncs")" />
+                }
+                @if (VM.CanSeeConnections)
+                {
+                    <FactTile Icon="cloud-download.svg" IconColor="TileColor.Info" Label="@R("Web_ExternalStorage_Tab_Connections", "Connections")"
+                              Value="@Count(VM.Connections.Count)" Segments="@HealthSegments(VM.ConnectionHealth)"
+                              OnLink="@(() => Nav.NavigateTo("/external-storage?tab=connections"))"
+                              LinkLabel="@R("Web_ExternalStorage_Tab_Connections", "Connections")" />
+                }
+                @if (VM.CanSeeBackups)
+                {
+                    <FactTile Icon="archive.svg" IconColor="TileColor.Group" Label="@R("Web_Home_Tile_Backups", "Backup jobs")"
+                              Value="@Count(VM.BackupJobs.Count)" Segments="@HealthSegments(VM.BackupHealth)"
+                              OnLink="@(() => Nav.NavigateTo("/backup"))"
+                              LinkLabel="@R("Web_Nav_Backup", "Backup")" />
+                }
+                @if (VM.CanSeeShareLinks)
+                {
+                    <FactTile Icon="share.svg" IconColor="TileColor.Role" Label="@R("Web_Home_Tile_ShareLinks", "Active share links")"
+                              Value="@Count(VM.ActiveDownloadLinks + VM.ActiveUploadLinks)" Segments="@LinkSegments()"
+                              OnLink="@(() => Nav.NavigateTo("/share-links"))"
+                              LinkLabel="@R("Web_Nav_ShareLinks", "Share Links")" />
+                }
+                @if (VM.CanSeeUsers)
+                {
+                    <FactTile Icon="users.svg" IconColor="TileColor.User" Label="@Resources.Web_Nav_Users" Value="@Count(VM.UserCount)"
+                              Hint="@(VM.DisabledUserCount > 0 ? string.Format(R("Web_Home_Users_Hint", "{0} disabled"), VM.DisabledUserCount) : null)"
+                              OnLink="@(() => Nav.NavigateTo("/users"))" LinkLabel="@Resources.Web_Nav_Users" />
+                }
+                @if (VM.CanSeeSecurity && VM.SecurityLast24h is { } security)
+                {
+                    <FactTile Icon="shield.svg" IconColor="TileColor.Department" Label="@R("Web_Home_Tile_FailedLogins", "Failed sign-ins (24 h)")"
+                              Value="@Count(security.Failures)"
+                              Tone="@(security.ActiveLockouts > 0 ? StatusTone.Warning : null)"
+                              Hint="@(security.ActiveLockouts > 0 ? string.Format(R("Web_Home_Security_Hint", "{0} active lockouts"), security.ActiveLockouts) : null)"
+                              OnLink="@(() => Nav.NavigateTo("/security"))"
+                              LinkLabel="@R("Web_Nav_Security", "Security")" />
+                }
+            </div>
+
+            @if (VM.CanSeeSyncs || VM.CanSeeConnections || VM.CanSeeBackups)
+            {
+                var attention = AttentionItems();
+                <DetailSection Title="@R("Web_Home_Attention_Title", "Needs attention")">
+                    <Body>
+                        @if (attention.Count == 0)
+                        {
+                            <p class="home-empty home-empty--ok">
+                                <StatusBadge Tone="StatusTone.Positive" Label="@R("Web_Home_AllHealthy", "All healthy")" />
+                                <span>@R("Web_Home_Attention_None", "All syncs, connections and backup jobs are running normally.")</span>
+                            </p>
+                        }
+                        else
+                        {
+                            <ul class="home-list">
+                                @foreach (var item in attention)
+                                {
+                                    <li class="home-row home-row--attention">
+                                        <span class="home-row-icon">@Assets.SVG(item.Icon, new SvgOptions(Width: 18, Height: 18))</span>
+                                        <span class="home-row-main">
+                                            <strong>@item.Name</strong>
+                                            <small>@item.Context</small>
+                                        </span>
+                                        <StatusBadge Tone="item.Tone" Label="@item.State" Class="home-row-status" />
+                                        <button type="button" class="btn-icon btn-icon--small"
+                                                title="@R("Web_Detail_Open", "Open")" aria-label="@($"{R("Web_Detail_Open", "Open")}: {item.Name}")"
+                                                @onclick="() => Nav.NavigateTo(item.Url)">
+                                            @Assets.SVG("arrow_up_right.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2f))
+                                        </button>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </Body>
+                </DetailSection>
+            }
+        </section>
+    }
+}
+
+@code {
+    private sealed record AttentionItem(string Icon, string Name, string Context, StatusTone Tone, string State, string Url);
+
+    protected override async Task OnInitializedAsync() => await VM.LoadAsync();
+
+    private List<AttentionItem> AttentionItems()
+    {
+        var items = new List<AttentionItem>();
+        var syncKind = R("Web_Home_Kind_Sync", "Sync");
+        foreach (var sync in VM.SyncIssues)
+            items.Add(new AttentionItem("cloud-download.svg",
+                string.IsNullOrWhiteSpace(sync.Definition.DisplayName) ? sync.ShareName : sync.Definition.DisplayName,
+                $"{syncKind} · {sync.ShareName} ↔ {sync.ConnectionName}",
+                StatusTone.Warning,
+                string.IsNullOrWhiteSpace(sync.Runtime?.LastErrorCode)
+                    ? R("Web_ExternalStorage_CompletedWithErrors", "Completed with errors")
+                    : R("Web_ExternalStorage_AttentionRequired", "Attention required"),
+                "/external-storage?tab=syncs"));
+
+        var connectionKind = R("Web_Home_Kind_Connection", "Connection");
+        foreach (var connection in VM.ConnectionIssues)
+            items.Add(new AttentionItem("cloud-download.svg", connection.Name, connectionKind,
+                StatusTone.Warning, R("Web_ExternalStorage_AttentionRequired", "Attention required"),
+                "/external-storage?tab=connections"));
+
+        var backupKind = R("Web_Home_Kind_Backup", "Backup job");
+        var now = DateTime.UtcNow;
+        foreach (var backup in VM.BackupIssues)
+        {
+            var stale = BackupSchedulerService.IsStale(backup.Job, now);
+            items.Add(new AttentionItem("archive.svg", backup.Job.Name, $"{backupKind} · {backup.RepositoryName}",
+                stale ? StatusTone.Warning : BackupUi.JobTone(backup.Job),
+                stale ? R("Web_Home_Backup_Overdue", "Overdue") : BackupUi.JobStatusLabel(backup.Job),
+                "/backup"));
+        }
+
+        return items;
+    }
+
+    private static IReadOnlyList<FactTileSegment> HealthSegments(HealthCounts health) =>
+    [
+        new(health.Ok, R("Web_Home_Health_Ok", "healthy"), TileColor.Success),
+        new(health.Warning, R("Web_Home_Health_Warning", "with warnings"), TileColor.Warning),
+        new(health.Failed, R("Web_Home_Health_Failed", "failed"), TileColor.Danger),
+        new(health.Inactive, R("Web_Home_Health_Inactive", "inactive"), TileColor.Neutral),
+    ];
+
+    private IReadOnlyList<FactTileSegment> LinkSegments() =>
+    [
+        new(VM.ActiveDownloadLinks, R("Web_Home_Links_Download", "download"), TileColor.Info),
+        new(VM.ActiveUploadLinks, R("Web_Home_Links_Upload", "upload"), TileColor.Role),
+    ];
+
+    private static string Count(int value) => value.ToString(System.Globalization.CultureInfo.CurrentCulture);
+
+    private static string R(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
+}
