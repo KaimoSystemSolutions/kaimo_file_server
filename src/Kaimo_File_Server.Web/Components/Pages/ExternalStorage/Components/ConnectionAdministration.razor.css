@@ -180,8 +180,7 @@
     min-height: 32px;
 }
 
-.ssh-ready-line,
-.connection-test-success {
+.ssh-ready-line {
     display: inline-flex;
     width: fit-content;
     align-items: center;
@@ -222,14 +221,6 @@
     display: grid;
     gap: 12px;
     padding: 14px;
-}
-
-.connection-test-success { margin: 0; }
-
-.connection-test-failed {
-    color: var(--danger);
-    font-size: 11.5px;
-    font-weight: 650;
 }
 
 .connection-form .storage-check {
@@ -432,186 +423,6 @@
     background: var(--bg-tertiary);
 }
 
-.connection-detail-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 13px;
-}
-
-.connection-detail-header > div { min-width: 0; }
-
-.connection-detail-title { display: grid; gap: 3px; }
-
-.connection-title-row {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    min-width: 0;
-}
-
-.connection-detail-icon {
-    display: flex;
-    flex: 0 0 34px;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: var(--radius-surface);
-    background: color-mix(in srgb, currentColor 10%, var(--bg-secondary));
-}
-
-.connection-rename-trigger {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: var(--radius-control);
-    background: transparent;
-    color: var(--text-tertiary);
-    cursor: pointer;
-    transition: background 110ms ease, color 110ms ease, border-color 110ms ease;
-}
-
-.connection-rename-trigger:hover {
-    border-color: var(--border);
-    background: var(--bg-hover);
-    color: var(--text-primary);
-}
-
-.connection-rename-trigger:disabled {
-    opacity: .4;
-    pointer-events: none;
-}
-
-.connection-rename-card {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px 14px;
-    border: 1px solid var(--accent-border);
-    border-radius: var(--radius-surface);
-    background: var(--bg-secondary);
-    box-shadow: 0 1px 3px rgb(0 0 0 / .06);
-}
-
-.connection-rename-label {
-    color: var(--text-secondary);
-    font-size: 11.5px;
-    font-weight: 600;
-}
-
-.connection-rename-row {
-    display: flex;
-    gap: 7px;
-}
-
-.connection-rename-input {
-    flex: 1 1 0;
-    min-height: 34px;
-}
-
-.connection-rename-actions {
-    display: flex;
-    gap: 7px;
-    justify-content: flex-end;
-}
-
-.connection-rename-actions > button {
-    flex: 0 0 auto;
-    width: auto;
-    min-height: 30px;
-    padding-inline: 12px;
-    font-size: 12px;
-}
-
-.connection-detail-header h3 {
-    overflow: hidden;
-    margin: 0;
-    color: var(--text-primary);
-    font-family: var(--font-heading);
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -.015em;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.connection-detail-header .detail-subtitle {
-    display: block;
-    margin-top: 1px;
-    color: var(--text-tertiary);
-    font-size: 12px;
-}
-
-.connection-detail-grid {
-    display: flex;
-    flex-direction: column;
-    border-top: 1px solid var(--border);
-}
-
-.connection-detail-group {
-    padding: 15px 0;
-    border-bottom: 1px solid var(--border);
-}
-
-.connection-detail-group h4 {
-    margin: 0 0 10px;
-    color: var(--text-tertiary);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: .045em;
-    text-transform: uppercase;
-}
-
-.connection-detail dl {
-    display: grid;
-    grid-template-columns: minmax(110px, .42fr) minmax(0, 1fr);
-    gap: 8px 14px;
-    margin: 0;
-}
-
-.connection-detail dt {
-    color: var(--text-tertiary);
-    font-size: 11.5px;
-}
-
-.connection-detail dd {
-    min-width: 0;
-    margin: 0;
-    color: var(--text-primary);
-    font-size: 12.5px;
-    line-height: 1.4;
-    overflow-wrap: anywhere;
-}
-
-.connection-detail-actions-top { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-bottom: 13px; }
-.connection-detail-actions-top > button { min-height: 32px; flex: 0 0 auto; width: auto; }
-
-.connection-actions {
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-    gap: 7px;
-    margin-top: 16px;
-    border-top: 0;
-    padding-top: 0;
-}
-
-.connection-actions > button {
-    min-height: 32px;
-    flex: 0 0 auto;
-    width: auto;
-}
-
-.connection-detail .error-banner { margin-top: 14px; }
-
 .connection-detail .detail-empty {
     display: flex;
     flex-direction: column;
@@ -660,11 +471,6 @@
     .connection-row ::deep .connection-state { grid-row: 2; }
     .connection-usage { display: none; }
     .connection-detail { padding-inline: 14px; }
-    .connection-detail-header { flex-direction: column; }
-    .connection-detail-icon { width: 28px; height: 28px; flex-basis: 28px; }
-    .connection-rename-card { padding: 10px 12px; }
-    .connection-detail dl { grid-template-columns: 1fr; gap: 3px; }
-    .connection-detail dd { margin-bottom: 7px; }
 }
 
 .connection-form .connection-field-error {

@@ -123,13 +123,6 @@
     margin-top: var(--space-3);
 }
 
-.backup-page ::deep .backup-inline-status {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2);
-}
-
 .backup-page ::deep .backup-progress {
     display: grid;
     gap: var(--space-1);
@@ -214,20 +207,26 @@
 
 /* ── Activity ── */
 
-.backup-page ::deep .backup-source-list {
-    display: grid;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
+/* Outcome of one source: a status dot in the tone colour before the text. */
+.backup-page ::deep .backup-source-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
 }
 
-    .backup-page ::deep .backup-source-list > li {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: var(--space-2);
+    .backup-page ::deep .backup-source-state::before {
+        content: "";
+        flex: 0 0 7px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--source-tone);
     }
+
+.backup-page ::deep .backup-source-state--positive { --source-tone: var(--success); }
+.backup-page ::deep .backup-source-state--warning { --source-tone: var(--warning); }
+.backup-page ::deep .backup-source-state--negative { --source-tone: var(--danger); }
 
 .backup-page ::deep .backup-details {
     flex-basis: 100%;

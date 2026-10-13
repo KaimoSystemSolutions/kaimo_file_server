@@ -15,6 +15,7 @@
 @inject IRsyncSshSetupService RsyncSshSetup
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject ToastService Toasts
 @inherits AppComponentBase
 
 @if (VM.IsLoading)
@@ -118,75 +119,105 @@ else
                 else
                 {
                     var usage = Usage(_selected.Id);
-                    <div class="detail-header connection-detail-header">
-                        <div class="connection-detail-title">
-                            <div class="connection-title-row">
-                                <span class="connection-detail-icon" style="color: @ProviderColor(_selected.ProviderId)">@Assets.SVG(ProviderIcon(_selected.ProviderId), new SvgOptions(Width: 22, Height: 22))</span>
-                                <h3>@_selected.Name</h3>
+                    var hasError = !string.IsNullOrWhiteSpace(_selected.LastErrorCode);
+                    // Authorizing is the next step until the connection is ready; afterwards re-authorizing is rare.
+                    var authorizeFirst = SupportsAuthorization(_selected) && _selected.State != StorageConnectionState.Ready;
+                    <DetailHeader Title="@_selected.Name" Subtitle="@ProviderName(_selected.ProviderId)">
+                        <Leading>
+                            <span class="detail-head-icon" aria-hidden="true" style="color: @ProviderColor(_selected.ProviderId)">
+                                @Assets.SVG(ProviderIcon(_selected.ProviderId), new SvgOptions(Width: 20, Height: 20))
+                            </span>
+                        </Leading>
+                        <Status>
+                            <StatusBadge Tone="@StateTone(_selected.State)" Label="@StateName(_selected.State)" />
+                        </Status>
+                        <Actions>
+                            @if (VM.CanManageConnections)
+                            {
+                                <button class="btn-tinted" type="button" disabled="@_busy" @onclick="StartEditAsync">
+                                    @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
+                                    <span>@R("Web_CloudAccess_Edit")</span>
+                                </button>
+                                @if (authorizeFirst)
+                                {
+                                    <button class="btn-tinted" type="button" disabled="@_busy" @onclick="AuthorizeAsync">
+                                        @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14))
+                                        <span>@R("Web_CloudAccess_Authorize")</span>
+                                    </button>
+                                }
+                                <button class="btn-tinted btn-tinted--info" type="button" disabled="@_busy" @onclick="TestAsync">
+                                    @Assets.SVG("refresh.svg", new SvgOptions(Width: 14, Height: 14))
+                                    <span>@R("Web_ExternalStorage_Test")</span>
+                                </button>
+                            }
+                        </Actions>
+                        <MoreActions>
+                            @if (VM.CanManageConnections)
+                            {
+                                @if (SupportsAuthorization(_selected) && !authorizeFirst)
+                                {
+                                    <MenuItem Icon="shield.svg" Label="@R("Web_CloudAccess_Reauthorize")" Disabled="@_busy" OnClick="AuthorizeAsync" />
+                                    <MenuItem Separator />
+                                }
+                                <MenuItem Icon="trash.svg" Label="@R("Web_Action_Delete")" Danger
+                                          Disabled="@(_busy || usage.TotalCount > 0)"
+                                          Tooltip="@(usage.TotalCount > 0 ? R("Web_StorageConnection_DeleteInUse") : null)"
+                                          OnClick="() => _confirmDelete = true" />
+                            }
+                        </MoreActions>
+                    </DetailHeader>
+
+                    @if (hasError || _testFailed)
+                    {
+                        <div class="detail-alerts">
+                            <div class="error-banner" role="alert">
+                                @if (_testFailed)
+                                {
+                                    <strong>@R("Web_ExternalStorage_TestFailed")@(hasError ? ":" : "")</strong>
+                                    @(hasError ? ErrorMessage(_selected.LastErrorCode!) : "")
+                                }
+                                else
+                                {
+                                    @ErrorMessage(_selected.LastErrorCode!)
+                                }
                             </div>
-                            <span class="detail-subtitle">@ProviderName(_selected.ProviderId)</span>
-                        </div>
-                        
-                    </div>
-
-                    @if (VM.CanManageConnections)
-                    {
-                        <div class="connection-detail-actions-top">
-                            <button class="btn-secondary" type="button" disabled="@_busy" @onclick="TestAsync">@R("Web_ExternalStorage_Test")</button>
-                            @if (_testSucceeded)
-                            {
-                                <span class="connection-test-success"><span class="connection-health"></span>@R("Web_ExternalStorage_TestSuccessful")</span>
-                            }
-                            else if (_testFailed)
-                            {
-                                <span class="connection-test-failed">@R("Web_ExternalStorage_TestFailed")</span>
-                            }
                         </div>
                     }
 
-                    <div class="connection-detail-grid">
-                        <section class="connection-detail-group">
-                            <h4>@R("Web_ExternalStorage_Identity")</h4>
-                            <dl>
-                                <dt>@R("Web_ExternalStorage_AuthorizationMode")</dt><dd>@AuthorizationName(_selected.AuthorizationMode)</dd>
-                                <dt>@R("Web_CloudAccess_Account")</dt><dd>@(_selected.AccountEmail ?? _selected.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</dd>
-                                <dt>@R("Web_ExternalStorage_Tenant")</dt><dd>@(_selected.ProviderTenantId ?? "—")</dd>
-                                <dt>@R("Web_ExternalStorage_Scopes")</dt><dd>@(_selected.EffectiveScopes ?? "—")</dd>
-                            </dl>
-                        </section>
-                        <section class="connection-detail-group">
-                            <h4>@R("Web_ExternalStorage_Health")</h4>
-                            <dl>
-                                <dt>@R("Web_ExternalStorage_State")</dt>
-                                <dd><StatusBadge Tone="@StateTone(_selected.State)" Class="connection-state" Label="@StateName(_selected.State)" /></dd>
-                                <dt>@R("Web_ExternalStorage_LastVerified")</dt><dd>@DateFmt.FormatDateTime(_selected.LastVerifiedAtUtc, nullText: R("Web_CloudSync_Never"))</dd>
-                                <dt>@R("Web_ExternalStorage_ProfileHealth")</dt><dd>@(_selected.ProviderProfileId is null ? R("Web_ExternalStorage_ProfileLegacy") : R("Web_ExternalStorage_ProfileConfigured"))</dd>
-                                <dt>@R("Web_ExternalStorage_SecretHealth")</dt><dd>@SecretHealth(_selected)</dd>
-                            </dl>
-                        </section>
-                        <section class="connection-detail-group connection-detail-group--wide">
-                            <h4>@R("Web_ExternalStorage_CapabilitiesAndUsage")</h4>
-                            <dl>
-                                <dt>@R("Web_ExternalStorage_Usage")</dt><dd>@string.Format(R("Web_ExternalStorage_UsageFormat"), usage.SyncCount, usage.VirtualShareCount)</dd>
-                                <dt>@R("Web_ExternalStorage_Capabilities")</dt><dd>@CapabilityNames(_selected)</dd>
-                            </dl>
-                        </section>
+                    <div class="fact-tiles">
+                        <FactTile Label="@R("Web_ExternalStorage_LastVerified")" Value="@DateFmt.FormatDateTime(_selected.LastVerifiedAtUtc, nullText: R("Web_CloudSync_Never"))" Compact
+                                  Tone="@(_selected.LastVerifiedAtUtc is null ? StatusTone.Neutral : StateTone(_selected.State))" />
+                        <FactTile Label="@R("Web_ExternalStorage_Tab_Syncs")" Value="@usage.SyncCount.ToString()"
+                                  OnLink="OnOpenSyncs" LinkLabel="@R("Web_ExternalStorage_OpenSyncs")" />
+                        <FactTile Label="@R("Web_Shares_VirtualShares")" Value="@usage.VirtualShareCount.ToString()" />
                     </div>
-                    @if (!string.IsNullOrWhiteSpace(_selected.LastErrorCode))
+
+                    <DetailSection Title="@R("Web_ExternalStorage_Identity")">
+                        <PropertyRow Label="@R("Web_ExternalStorage_AuthorizationMode")" Value="@AuthorizationName(_selected.AuthorizationMode)" />
+                        <PropertyRow Label="@R("Web_CloudAccess_Account")" Value="@(_selected.AccountEmail ?? _selected.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))" />
+                        <PropertyRow Label="@R("Web_ExternalStorage_Tenant")" Value="@_selected.ProviderTenantId" Mono Copyable />
+                        <PropertyRow Label="@R("Web_ExternalStorage_Scopes")" Value="@_selected.EffectiveScopes" Mono />
+                    </DetailSection>
+
+                    <DetailSection Title="@R("Web_ExternalStorage_Health")">
+                        <PropertyRow Label="@R("Web_ExternalStorage_ProfileHealth")" Value="@(_selected.ProviderProfileId is null ? R("Web_ExternalStorage_ProfileLegacy") : R("Web_ExternalStorage_ProfileConfigured"))" />
+                        <PropertyRow Label="@R("Web_ExternalStorage_SecretHealth")" Value="@SecretHealth(_selected)" />
+                        <PropertyRow Label="@R("Web_ExternalStorage_Capabilities")" Value="@CapabilityNames(_selected)" />
+                    </DetailSection>
+
+                    @if (_confirmDelete)
                     {
-                        <div class="error-banner">@ErrorMessage(_selected.LastErrorCode)</div>
+                        <div class="modal-backdrop" @onclick="() => _confirmDelete = false">
+                            <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="connection-delete-title" @onclick:stopPropagation="true">
+                                <h2 class="modal-title" id="connection-delete-title">@string.Format(R("Web_ExternalStorage_DeleteConnectionTitle"), _selected.Name)</h2>
+                                <p class="modal-text">@R("Web_ExternalStorage_DeleteConnectionHint")</p>
+                                <div class="modal-actions">
+                                    <button type="button" class="btn-secondary" @onclick="() => _confirmDelete = false">@R("Web_Button_Cancel")</button>
+                                    <button type="button" class="btn-danger" disabled="@_busy" @onclick="DeleteAsync">@R("Web_Action_Delete")</button>
+                                </div>
+                            </div>
+                        </div>
                     }
-                    <div class="detail-actions connection-actions">
-                        @if (VM.CanManageConnections)
-                        {
-                            @if (SupportsAuthorization(_selected))
-                            {
-                                <button class="btn-secondary" type="button" disabled="@_busy" @onclick="AuthorizeAsync">@(_selected.State == StorageConnectionState.Ready ? R("Web_CloudAccess_Reauthorize") : R("Web_CloudAccess_Authorize"))</button>
-                            }
-                            <button class="btn-secondary connection-edit-action" type="button" disabled="@_busy" @onclick="StartEditAsync">@R("Web_CloudAccess_Edit")</button>
-                            <button class="btn-danger-outline" type="button" disabled="@(_busy || usage.TotalCount > 0)" @onclick="DeleteAsync">@R("Web_Action_Delete")</button>
-                        }
-                    </div>
                 }
             </aside>
         </div>
@@ -194,6 +225,9 @@ else
 }
 
 @code {
+    /// <summary>Opens the syncs tab; the syncs tile shows no link without it.</summary>
+    [Parameter] public EventCallback OnOpenSyncs { get; set; }
+
     private StorageConnection? _selected;
     private bool _creating;
     private bool _busy;
@@ -221,8 +255,8 @@ else
     private string _selectedHostFingerprint = string.Empty;
     private bool _hostKeyConfirmed;
     private string? _managedKnownHostsPath;
-    private bool _testSucceeded;
     private bool _testFailed;
+    private bool _confirmDelete;
     private string? _error;
     private bool _editing;
     private bool _editEnabled = true;
@@ -330,16 +364,18 @@ else
             authorization.Ticket);
     private async Task TestAsync()
     {
-        _testSucceeded = _testFailed = false;
+        _testFailed = false;
         Guid selectedId = _selected!.Id;
         _busy = true; _error = null;
         try
         {
             await VM.TestConnectionAsync(selectedId);
             _selected = VM.Connections.FirstOrDefault(connection => connection.Id == selectedId);
-            _testSucceeded = _selected?.State == StorageConnectionState.Ready
-                             && string.IsNullOrWhiteSpace(_selected.LastErrorCode);
-            _testFailed = !_testSucceeded;
+            // Success is transient (toast); a failure stays as a banner until the next test.
+            _testFailed = !(_selected?.State == StorageConnectionState.Ready
+                            && string.IsNullOrWhiteSpace(_selected.LastErrorCode));
+            if (!_testFailed)
+                Toasts.Show(R("Web_ExternalStorage_TestSuccessful"), ToastType.Success);
         }
         catch (Exception exception)
         {
@@ -350,7 +386,11 @@ else
         }
         finally { _busy = false; }
     }
-    private async Task DeleteAsync() => await ActAsync(() => VM.DeleteConnectionAsync(_selected!.Id));
+    private async Task DeleteAsync()
+    {
+        _confirmDelete = false;
+        await ActAsync(() => VM.DeleteConnectionAsync(_selected!.Id));
+    }
     private async Task ProviderChanged()
     {
         if (!UsesPinnedSshSetup)
@@ -738,7 +778,8 @@ else
     private void SelectConnection(StorageConnection connection)
     {
         _selected = connection;
-        _testSucceeded = _testFailed = false;
+        _testFailed = false;
+        _confirmDelete = false;
         _editing = false;
     }
 
@@ -766,7 +807,7 @@ else
             return;
         _creating = false;
         _error = null;
-        _testSucceeded = _testFailed = false;
+        _testFailed = false;
         _activeConnectionTab = ConnectionTab.General;
         _editEnabled = _selected.State != StorageConnectionState.Disabled;
         _provider = _selected.ProviderId;

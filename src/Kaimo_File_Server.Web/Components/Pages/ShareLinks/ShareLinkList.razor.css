@@ -112,37 +112,6 @@
 .storage-form-checkbox input { flex: 0 0 auto; }
 .storage-wide { grid-column: 1 / -1; }
 
-.sharelink-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
-.sharelink-detail-title { min-width: 0; }
-.sharelink-title-row { display: flex; align-items: center; gap: 9px; min-width: 0; }
-.sharelink-detail-icon {
-    display: flex;
-    flex: 0 0 34px;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: var(--radius-surface);
-    background: var(--bg-secondary);
-    color: var(--text-secondary);
-}
-.sharelink-detail-title h3 { overflow: hidden; margin: 0; color: var(--text-primary); font-family: var(--font-heading); font-size: 18px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.sharelink-detail-header ::deep .sharelink-state { flex: 0 0 auto; }
-
-.sharelink-detail-grid { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
-.sharelink-detail-group { padding: 15px 0; border-bottom: 1px solid var(--border); }
-.sharelink-detail-group h4 { margin: 0 0 10px; color: var(--text-tertiary); font-size: 11px; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; }
-.sharelink-detail-group dl { display: grid; grid-template-columns: minmax(110px, .42fr) minmax(0, 1fr); gap: 8px 14px; margin: 0; }
-.sharelink-detail-group dt { color: var(--text-tertiary); font-size: 11.5px; }
-.sharelink-detail-group dd { min-width: 0; margin: 0; color: var(--text-primary); font-size: 12.5px; line-height: 1.4; overflow-wrap: anywhere; }
-
-.sharelink-url-row { display: flex; gap: 8px; }
-.sharelink-url { flex: 1; min-width: 0; }
-.sharelink-note { margin: 8px 0 0; color: var(--text-tertiary); font-size: 11.5px; }
-
-.sharelink-summary-actions { display: flex; gap: 7px; margin-top: 16px; }
-.sharelink-summary-actions > button { flex: 0 0 auto; width: auto; }
-
 /* Password field with an inline show/hide toggle. */
 .sharelink-password { display: flex; gap: 8px; }
 .sharelink-password input { flex: 1; min-width: 0; }
@@ -171,7 +140,6 @@
     .sharelink-row { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 13px 16px; }
     .sharelink-row ::deep .sharelink-state { grid-row: 2; }
     .sharelink-meta { grid-row: 3; }
-    .sharelink-detail-group dl { grid-template-columns: 1fr; gap: 3px; }
 }
 
 .sharelink-icon--folder { background: var(--folder-fill); }

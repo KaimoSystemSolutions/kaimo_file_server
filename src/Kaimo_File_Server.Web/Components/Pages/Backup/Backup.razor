@@ -57,7 +57,8 @@ else
         @switch (_tab)
         {
             case BackupTab.Jobs:
-                <BackupJobs SelectedJobId="_selectedId" />
+                <BackupJobs SelectedJobId="_selectedId"
+                            OnOpenRepository="@(VM.Access.CanManageRepositories ? EventCallback.Factory.Create<Guid>(this, id => SwitchTab(BackupTab.Repositories, id)) : default)" />
                 break;
             case BackupTab.Restore:
                 <BackupRestore />
@@ -67,7 +68,8 @@ else
                                     OnOpenJobs="@(VM.Access.CanManageJobs ? EventCallback.Factory.Create(this, () => SwitchTab(BackupTab.Jobs)) : default)" />
                 break;
             case BackupTab.Activity:
-                <BackupActivity />
+                <BackupActivity OnOpenJob="@(VM.Access.CanManageJobs ? EventCallback.Factory.Create<Guid>(this, id => SwitchTab(BackupTab.Jobs, id)) : default)"
+                                OnOpenRepository="@(VM.Access.CanManageRepositories ? EventCallback.Factory.Create<Guid>(this, id => SwitchTab(BackupTab.Repositories, id)) : default)" />
                 break;
             default:
                 <BackupOverview OnOpenJob="id => SwitchTab(BackupTab.Jobs, id)"

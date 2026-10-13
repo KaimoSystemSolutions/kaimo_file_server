@@ -15,6 +15,7 @@
 @inject ICloudSyncJobRunner SyncJobRunner
 @inject IJSRuntime JS
 @inject DateFormatService DateFmt
+@inject ToastService Toasts
 @inherits AppComponentBase
 
 @if (VM.IsLoading)
@@ -244,74 +245,97 @@ else
         }
         else if (SelectedItem is { } selected)
         {
-            <div class="detail-header sync-detail-header">
-                <div class="sync-detail-title">
-                    <div class="sync-title-row">
-                        <span class="sync-detail-icon" style="color: @ProviderColor(ProviderIdFor(selected))">@Assets.SVG(ProviderIcon(ProviderIdFor(selected)), new SvgOptions(Width: 22, Height: 22))</span>
-                        <h3>@DisplayName(selected)</h3>
-                    </div>
-                    <span class="detail-subtitle">@selected.ConnectionName · @ProviderFor(selected)</span>
-                </div>
-            </div>
-            <div class="sync-detail-actions-top">
-                <button class="btn-secondary" type="button" disabled="@(_busy || !selected.Definition.Enabled)" @onclick="() => RunAsync(selected)">@R("Web_ExternalStorage_RunNow")</button>
-                @if (_runSucceeded)
-                {
-                    <span class="sync-run-success"><span class="sync-run-health"></span>@R("Web_ExternalStorage_SyncStarted")</span>
-                }
-            </div>
-            <div class="sync-detail-grid">
-                <section class="sync-detail-group">
-                    <h4>@R("Web_ExternalStorage_Tab_Syncs")</h4>
-                    <dl>
-                        <dt>@R("Web_ExternalStorage_Connection")</dt><dd>@selected.ConnectionName</dd>
-                        <dt>@R("Web_ExternalStorage_LocalShare")</dt><dd>@selected.ShareName</dd>
-                        <dt>@R("Web_ExternalStorage_LocalPath")</dt><dd>@DisplayPath(selected.Definition.LocalPath)</dd>
-                        <dt>@R("Web_ExternalStorage_RemotePath")</dt><dd>@selected.Definition.RemotePath</dd>
-                        <dt>@R("Web_ExternalStorage_Mode")</dt><dd>@ModeName(selected.Definition.Mode)</dd>
-                    </dl>
-                </section>
-                <section class="sync-detail-group">
-                    <h4>@R("Web_ExternalStorage_Health")</h4>
-                    <dl>
-                        <dt>@R("Web_ExternalStorage_State")</dt><dd><StatusBadge Tone="@SyncStateTone(selected)" Label="@SyncState(selected)" /></dd>
-                        <dt>@R("Web_CloudSync_Schedule")</dt><dd>@(selected.Definition.Schedule.IsEnabled ? R("Web_ExternalStorage_ScheduleEnabled") : R("Web_ExternalStorage_Disabled"))</dd>
-                        <dt>@R("Web_ExternalStorage_LastRun")</dt><dd>@DateFmt.FormatDateTime(selected.Runtime?.LastRunAtUtc, nullText: R("Web_CloudSync_Never"))</dd>
-                    </dl>
-                </section>
-                @if (!string.IsNullOrWhiteSpace(selected.Definition.Description))
-                {
-                    <section class="sync-detail-group sync-detail-group--wide">
-                        <h4>@R("Web_ExternalStorage_Description")</h4>
-                        <p class="sync-detail-description">@selected.Definition.Description</p>
-                    </section>
-                }
-            </div>
-            @if (!string.IsNullOrWhiteSpace(selected.Runtime?.LastErrorCode))
+            var hasError = !string.IsNullOrWhiteSpace(selected.Runtime?.LastErrorCode);
+            var hasFailures = selected.Runtime?.LastRunFailureCount > 0;
+            <DetailHeader Title="@DisplayName(selected)" Subtitle="@($"{selected.ConnectionName} · {ProviderFor(selected)}")">
+                <Leading>
+                    <span class="detail-head-icon" aria-hidden="true" style="color: @ProviderColor(ProviderIdFor(selected))">
+                        @Assets.SVG(ProviderIcon(ProviderIdFor(selected)), new SvgOptions(Width: 20, Height: 20))
+                    </span>
+                </Leading>
+                <Status>
+                    <StatusBadge Tone="@SyncStateTone(selected)" Label="@SyncState(selected)" />
+                </Status>
+                <Actions>
+                    <button class="btn-tinted" type="button" disabled="@_busy" @onclick="() => StartEdit(selected)">
+                        @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
+                        <span>@R("Web_CloudAccess_Edit")</span>
+                    </button>
+                    <button class="btn-tinted btn-tinted--info" type="button" disabled="@(_busy || !selected.Definition.Enabled)"
+                            title="@(selected.Definition.Enabled ? null : R("Web_ExternalStorage_Disabled"))" @onclick="() => RunAsync(selected)">
+                        @Assets.SVG("play.svg", new SvgOptions(Width: 14, Height: 14))
+                        <span>@R("Web_ExternalStorage_RunNow")</span>
+                    </button>
+                </Actions>
+                <MoreActions>
+                    <MenuItem Icon="trash.svg" Label="@R("Web_Action_Delete")" Danger Disabled="@_busy" OnClick="() => _confirmDelete = true" />
+                </MoreActions>
+            </DetailHeader>
+
+            @if (hasError || hasFailures)
             {
-                <div class="error-banner">@ErrorMessage(selected.Runtime!.LastErrorCode)</div>
-            }
-            @if (selected.Runtime?.LastRunFailureCount > 0)
-            {
-                var failed = FailedItems(selected);
-                <details class="sync-failures">
-                    <summary>@string.Format(R("Web_CloudSync_FailedItemsHeader"), selected.Runtime!.LastRunFailureCount)</summary>
-                    <ul>
-                        @foreach (var failure in failed)
-                        {
-                            <li><code>@failure.Path</code> — @failure.Reason</li>
-                        }
-                    </ul>
-                    @if (selected.Runtime!.LastRunFailureCount > failed.Count)
+                <div class="detail-alerts">
+                    @if (hasError)
                     {
-                        <p class="sync-failures-more">@string.Format(R("Web_CloudSync_FailedItemsMore"), selected.Runtime!.LastRunFailureCount!.Value - failed.Count)</p>
+                        <div class="error-banner" role="alert">@ErrorMessage(selected.Runtime!.LastErrorCode!)</div>
                     }
-                </details>
+                    @if (hasFailures)
+                    {
+                        var failed = FailedItems(selected);
+                        <details class="warning-banner sync-failures">
+                            <summary>@string.Format(R("Web_CloudSync_FailedItemsHeader"), selected.Runtime!.LastRunFailureCount)</summary>
+                            <ul>
+                                @foreach (var failure in failed)
+                                {
+                                    <li><code>@failure.Path</code> — @failure.Reason</li>
+                                }
+                            </ul>
+                            @if (selected.Runtime!.LastRunFailureCount > failed.Count)
+                            {
+                                <p class="sync-failures-more">@string.Format(R("Web_CloudSync_FailedItemsMore"), selected.Runtime!.LastRunFailureCount!.Value - failed.Count)</p>
+                            }
+                        </details>
+                    }
+                </div>
             }
-            <div class="detail-actions sync-summary-actions">
-                <button class="btn-secondary sync-edit-action" type="button" disabled="@_busy" @onclick="() => StartEdit(selected)">@R("Web_CloudAccess_Edit")</button>
-                <button class="btn-danger-outline" type="button" disabled="@_busy" @onclick="() => DeleteAsync(selected)">@R("Web_Action_Delete")</button>
+
+            <div class="fact-tiles">
+                <FactTile Label="@R("Web_ExternalStorage_LastRun")" Value="@DateFmt.FormatDateTime(selected.Runtime?.LastRunAtUtc, nullText: R("Web_CloudSync_Never"))" Compact
+                          Tone="@(selected.Runtime?.LastRunAtUtc is null ? StatusTone.Neutral : SyncStateTone(selected))"
+                          Tooltip="@(selected.Runtime?.LastRunAtUtc is null ? null : SyncState(selected))" />
+                <FactTile Label="@R("Web_CloudSync_Schedule")" Value="@(selected.Definition.Schedule.IsEnabled ? R("Web_ExternalStorage_ScheduleEnabled") : R("Web_ExternalStorage_Disabled"))" Compact />
+                <FactTile Label="@R("Web_ExternalStorage_Mode")" Value="@ModeName(selected.Definition.Mode)" Compact />
             </div>
+
+            <DetailSection Title="@R("Web_ExternalStorage_Section_Locations")">
+                <PropertyRow Label="@R("Web_ExternalStorage_Connection")" Value="@selected.ConnectionName" />
+                <PropertyRow Label="@R("Web_ExternalStorage_LocalShare")" Value="@selected.ShareName" />
+                <PropertyRow Label="@R("Web_ExternalStorage_LocalPath")" Value="@DisplayPath(selected.Definition.LocalPath)" Mono Copyable />
+                <PropertyRow Label="@R("Web_ExternalStorage_RemotePath")" Value="@selected.Definition.RemotePath" Mono Copyable />
+            </DetailSection>
+
+            @if (!string.IsNullOrWhiteSpace(selected.Definition.Description))
+            {
+                <DetailSection Title="@R("Web_ExternalStorage_Description")">
+                    <Body>
+                        <p class="sync-detail-description">@selected.Definition.Description</p>
+                    </Body>
+                </DetailSection>
+            }
+
+            @if (_confirmDelete)
+            {
+                <div class="modal-backdrop" @onclick="() => _confirmDelete = false">
+                    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="sync-delete-title" @onclick:stopPropagation="true">
+                        <h2 class="modal-title" id="sync-delete-title">@string.Format(R("Web_ExternalStorage_DeleteSyncTitle"), DisplayName(selected))</h2>
+                        <p class="modal-text">@R("Web_ExternalStorage_DeleteSyncHint")</p>
+                        <div class="modal-actions">
+                            <button type="button" class="btn-secondary" @onclick="() => _confirmDelete = false">@R("Web_Button_Cancel")</button>
+                            <button type="button" class="btn-danger" disabled="@_busy" @onclick="() => DeleteAsync(selected)">@R("Web_Action_Delete")</button>
+                        </div>
+                    </div>
+                </div>
+            }
         }
         else
         {
@@ -343,7 +367,7 @@ else
     [Parameter] public Guid? InitialSyncId { get; set; }
     private bool _editing;
     private bool _busy;
-    private bool _runSucceeded;
+    private bool _confirmDelete;
     private Guid? _editingId;
     private Guid? _selectedId;
     private string? _error;
@@ -428,7 +452,7 @@ else
         _editing = false;
         _editingId = null;
         _error = null;
-        _runSucceeded = false;
+        _confirmDelete = false;
     }
 
     // A local folder belongs to its share; start again at the share root.
@@ -483,6 +507,7 @@ else
     });
     private async Task DeleteAsync(ExternalStorageSyncListItem item)
     {
+        _confirmDelete = false;
         await ActAsync(() => VM.DeleteAsync(item.Definition.Id));
         if (VM.Syncs.All(sync => sync.Definition.Id != item.Definition.Id))
         {
@@ -492,9 +517,9 @@ else
     }
     private async Task RunAsync(ExternalStorageSyncListItem item)
     {
-        _runSucceeded = false;
         await ActAsync(() => VM.RunAsync(item.Definition.Id));
-        _runSucceeded = _error is null;
+        if (_error is null)
+            Toasts.Show(R("Web_ExternalStorage_SyncStarted"), ToastType.Success);
     }
     private async Task ActAsync(Func<Task> action)
     {

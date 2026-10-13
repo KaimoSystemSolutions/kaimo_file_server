@@ -43,49 +43,68 @@
                         }
                         else
                         {
-                            <div class="detail-header">
-                                <h3>@VM.SelectedGroup.Name</h3>
-<span class="detail-subtitle">@Resources.Web_Admin_Label_Group</span>
-                            </div>
-                            <div class="detail-field-grid">
-                                <div class="detail-field">
-<span class="detail-field-label">@Resources.Web_Admin_Label_Department</span>
-                                    <span class="detail-field-value">@VM.GetDepartmentName(VM.SelectedGroup.DepartmentId)</span>
-                                </div>
-                                <div class="detail-field">
-<span class="detail-field-label">@Resources.Web_Admin_DirectMembers (@VM.GroupMembers.Count)</span>
-                                    <span class="detail-field-value">
-
-@(VM.GroupMembers.Any() ? Format(VM.GroupMembers.Select(u => u.Name), 5) : Resources.Web_Common_NoMembers)
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="detail-actions">
-                                @if (VM.CanManageGroups && VM.SelectedGroupIsEditable)
-                                {
-<button class="btn-secondary" @onclick="EditGroup">@Resources.Web_Common_Edit</button>
-                                }
-                                @if (VM.CanDeleteGroups)
-                                {
-                                    @if (VM.IsConfirmingDelete)
+                            var group = VM.SelectedGroup;
+                            var canEdit = VM.CanManageGroups && VM.SelectedGroupIsEditable;
+                            <DetailHeader Icon="users.svg" Title="@group.Name" Subtitle="@Resources.Web_Admin_Label_Group">
+                                <Actions>
+                                    @if (canEdit)
                                     {
-                                        <div class="confirm-delete">
-<p>@Resources.Web_Admin_ConfirmDeleteGroup</p>
-                                            <div style="display: flex; gap: 8px;">
-                                                <button class="btn-danger-outline" @onclick="ConfirmDeleteGroup" disabled="@VM.IsSaving">
-                                                    @(VM.IsSaving ? Resources.Web_Common_Deleting : Resources.Web_Admin_DeleteGroup)
-                                                </button>
-<button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">@Resources.Web_Common_Cancel</button>
-                                            </div>
+                                        <button class="btn-tinted" type="button" @onclick="EditGroup">
+                                            @Icons.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
+                                            <span>@Resources.Web_Common_Edit</span>
+                                        </button>
+                                    }
+                                </Actions>
+                                <MoreActions>
+                                    @if (VM.CanDeleteGroups)
+                                    {
+                                        <MenuItem Icon="trash.svg" Label="@Resources.Web_Admin_DeleteGroup" Danger Disabled="@VM.IsSaving"
+                                                  OnClick="() => VM.RequestDeleteGroup()" />
+                                    }
+                                </MoreActions>
+                            </DetailHeader>
+
+                            <DetailSection Title="@Resources.Web_Admin_EditTab_General">
+                                <PropertyRow Label="@Resources.Web_Admin_Label_Department" Value="@VM.GetDepartmentName(group.DepartmentId)" />
+                            </DetailSection>
+
+                            <DetailSection Title="@($"{Resources.Web_Admin_DirectMembers} ({VM.GroupMembers.Count})")">
+                                <Body>
+                                    <div class="user-chip-list">
+                                        @if (VM.GroupMembers.Any())
+                                        {
+                                            @foreach (var member in VM.GroupMembers.Take(MemberPreview))
+                                            {
+                                                <span class="user-chip">@member.Name</span>
+                                            }
+                                            @if (VM.GroupMembers.Count > MemberPreview)
+                                            {
+                                                <span class="user-chip user-chip--more">+@(VM.GroupMembers.Count - MemberPreview)</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="user-membership-empty">@Resources.Web_Common_NoMembers</span>
+                                        }
+                                    </div>
+                                </Body>
+                            </DetailSection>
+
+                            @if (VM.IsConfirmingDelete && VM.CanDeleteGroups)
+                            {
+                                <div class="modal-backdrop" @onclick="() => VM.IsConfirmingDelete = false">
+                                    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="group-delete-title" @onclick:stopPropagation="true">
+                                        <h2 class="modal-title" id="group-delete-title">@Resources.Web_Admin_ConfirmDeleteGroup</h2>
+                                        <p class="modal-text"><strong>@group.Name</strong></p>
+                                        <div class="modal-actions">
+                                            <button type="button" class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">@Resources.Web_Common_Cancel</button>
+                                            <button type="button" class="btn-danger" disabled="@VM.IsSaving" @onclick="ConfirmDeleteGroup">
+                                                @(VM.IsSaving ? Resources.Web_Common_Deleting : Resources.Web_Admin_DeleteGroup)
+                                            </button>
                                         </div>
-
-                                    }
-                                    else
-                                    {
-<button class="btn-danger-outline" @onclick="() => VM.RequestDeleteGroup()">@Resources.Web_Admin_DeleteGroup</button>
-                                    }
-                                }
-                            </div>
+                                    </div>
+                                </div>
+                            }
                         }
                     }
 @code {
@@ -95,5 +114,5 @@
     private async Task SaveGroup() { await VM.SaveGroupAsync(); await OnChanged.InvokeAsync(); }
     private void CancelEdit() { VM.CancelEdit(); StateHasChanged(); }
     private async Task ConfirmDeleteGroup() { await VM.ConfirmDeleteGroupAsync(); await OnChanged.InvokeAsync(); }
-    private static string Format(IEnumerable<string> items, int max) { var list = items.ToList(); if (list.Count == 0) return ""; var visible = string.Join(", ", list.Take(max)); if (list.Count > max) visible += " " + string.Format(Resources.Web_Common_MoreItems, list.Count - max); return visible; }
+    private const int MemberPreview = 12;
 }

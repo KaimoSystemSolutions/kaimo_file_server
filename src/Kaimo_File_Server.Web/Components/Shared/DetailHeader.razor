@@ -17,7 +17,11 @@
 
 <header class="detail-head @Class">
     <div class="detail-head-top">
-        @if (!string.IsNullOrEmpty(Icon))
+        @if (Leading is not null)
+        {
+            @Leading
+        }
+        else if (!string.IsNullOrEmpty(Icon))
         {
             <span class="detail-head-icon" aria-hidden="true">@Assets.SVG(Icon, new SvgOptions(Width: 18, Height: 18))</span>
         }
@@ -59,6 +63,12 @@
 @code {
     /// <summary>Icon file in wwwroot/svg for the leading tile; omitted when empty.</summary>
     [Parameter] public string? Icon { get; set; }
+
+    /// <summary>
+    /// Replaces the icon tile, e.g. with an avatar or a tinted icon. Use a
+    /// `detail-head-icon` element (optionally with `detail-head-icon--round`) so it keeps the tile size.
+    /// </summary>
+    [Parameter] public RenderFragment? Leading { get; set; }
 
     [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
 

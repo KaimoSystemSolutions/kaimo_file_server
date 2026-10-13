@@ -247,27 +247,26 @@
     }
     else
     {
+        var user = VM.SelectedUser;
         var delegatedAssignments = VM.UserScopedAssignments
             .Where(assignment => assignment.ScopeType != ScopeType.Global)
             .ToList();
 
-        <div class="user-detail-shell user-detail-shell--viewing">
-            <div class="user-profile-header">
-                <span class="user-profile-avatar" aria-hidden="true">
-                    @if (UserAvatar.DataUri(VM.SelectedUser) is { } avatarUri)
+        <DetailHeader Title="@DisplayName(user.Name, user.Username)" Subtitle="@("@" + user.Username)">
+            <Leading>
+                <span class="detail-head-icon detail-head-icon--round" aria-hidden="true">
+                    @if (UserAvatar.DataUri(user) is { } avatarUri)
                     {
                         <img src="@avatarUri" alt="" />
                     }
                     else
                     {
-                        @UserAvatar.Initials(VM.SelectedUser)
+                        @UserAvatar.Initials(user)
                     }
                 </span>
-                <span class="user-profile-identity">
-                    <strong>@DisplayName(VM.SelectedUser.Name, VM.SelectedUser.Username)</strong>
-                    <small>@@@VM.SelectedUser.Username</small>
-                </span>
-                @if (VM.SelectedUser.IsEnabled)
+            </Leading>
+            <Status>
+                @if (user.IsEnabled)
                 {
                     <StatusBadge Tone="StatusTone.Positive" Label="@Resources.Web_Common_Active" />
                 }
@@ -275,205 +274,154 @@
                 {
                     <StatusBadge Tone="StatusTone.Negative" Label="@Resources.Web_Common_Disabled" />
                 }
-            </div>
-
-            <div class="user-overview-list">
-                @if (!string.IsNullOrWhiteSpace(VM.SelectedUser.FirstName) || !string.IsNullOrWhiteSpace(VM.SelectedUser.LastName))
+            </Status>
+            <Actions>
+                @if (VM.CanEditSelectedProfile)
                 {
-                    <div class="user-overview-row">
-                        <span class="user-overview-label">@Resources.Web_Admin_Label_FirstName</span>
-                        <span class="user-overview-value @(string.IsNullOrWhiteSpace(VM.SelectedUser.FirstName) ? "user-overview-value--empty" : "")">
-                            @(string.IsNullOrWhiteSpace(VM.SelectedUser.FirstName) ? Resources.Web_Admin_NotSpecified : VM.SelectedUser.FirstName)
-                        </span>
-                    </div>
-                    <div class="user-overview-row">
-                        <span class="user-overview-label">@Resources.Web_Admin_Label_LastName</span>
-                        <span class="user-overview-value @(string.IsNullOrWhiteSpace(VM.SelectedUser.LastName) ? "user-overview-value--empty" : "")">
-                            @(string.IsNullOrWhiteSpace(VM.SelectedUser.LastName) ? Resources.Web_Admin_NotSpecified : VM.SelectedUser.LastName)
-                        </span>
-                    </div>
+                    <button class="btn-tinted" type="button" @onclick="EditUser">
+                        @Icons.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
+                        <span>@Resources.Web_Common_Edit</span>
+                    </button>
                 }
-                <div class="user-overview-row">
-                    <span class="user-overview-label">@Resources.Web_Admin_Label_Email</span>
-                    <span class="user-overview-value @(string.IsNullOrWhiteSpace(VM.SelectedUser.Email) ? "user-overview-value--empty" : "")">
-                        @(string.IsNullOrWhiteSpace(VM.SelectedUser.Email) ? Resources.Web_Admin_NotSpecified : VM.SelectedUser.Email)
-                    </span>
-                </div>
-                <div class="user-overview-row user-overview-row--multiline">
-                    <span class="user-overview-label">@Resources.Web_Admin_Label_Description</span>
-                    <span class="user-overview-value @(string.IsNullOrWhiteSpace(VM.SelectedUser.Description) ? "user-overview-value--empty" : "")">
-                        @(string.IsNullOrWhiteSpace(VM.SelectedUser.Description) ? Resources.Web_Admin_NoDescription : VM.SelectedUser.Description)
-                    </span>
-                </div>
-                <div class="user-overview-row">
-                    <span class="user-overview-label">@Resources.Web_Admin_Label_PasswordChange</span>
-                    <span class="user-overview-value">
-                        @(VM.SelectedUser.CanChangePassword ? Resources.Web_Admin_PasswordChange_Allowed : Resources.Web_Admin_PasswordChange_Locked)
-                    </span>
-                </div>
-            </div>
+            </Actions>
+            <MoreActions>
+                @if (VM.CanDeleteSelectedUser)
+                {
+                    <MenuItem Icon="trash.svg" Label="@Resources.Web_Admin_DeleteUser" Danger Disabled="@VM.IsSaving"
+                              OnClick="() => VM.RequestDeleteUser()" />
+                }
+            </MoreActions>
+        </DetailHeader>
 
-            <div class="user-role-access">
-                <div class="user-role-access-heading">
-                    <span>@Resources.Web_Admin_Label_Roles</span>
-                    <InfoButton Text="@Resources.Web_Admin_RoleScopes_Info"
-                                AriaLabel="@Resources.Web_Admin_RoleScopes_InfoLabel" />
-                </div>
+        <DetailSection Title="@Resources.Web_Admin_EditTab_General">
+            @if (!string.IsNullOrWhiteSpace(user.FirstName) || !string.IsNullOrWhiteSpace(user.LastName))
+            {
+                <PropertyRow Label="@Resources.Web_Admin_Label_FirstName" Value="@user.FirstName" />
+                <PropertyRow Label="@Resources.Web_Admin_Label_LastName" Value="@user.LastName" />
+            }
+            <PropertyRow Label="@Resources.Web_Admin_Label_Email" Value="@user.Email" Copyable />
+            <PropertyRow Label="@Resources.Web_Admin_Label_Description" Value="@user.Description" />
+            <PropertyRow Label="@Resources.Web_Admin_Label_PasswordChange"
+                         Value="@(user.CanChangePassword ? Resources.Web_Admin_PasswordChange_Allowed : Resources.Web_Admin_PasswordChange_Locked)" />
+        </DetailSection>
 
-                <section class="user-role-scope-card user-role-scope-card--global">
-                    <div class="user-role-scope-header">
-                        <span class="user-role-scope-icon" aria-hidden="true">
-                            @Icons.SVG("globe.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2f))
-                        </span>
-                        <span class="user-role-scope-copy">
-                            <strong>@Resources.Web_Admin_GlobalRoles</strong>
-                            <small>@Resources.Web_Admin_GlobalRoles_Hint</small>
-                        </span>
-                        <span class="user-role-scope-badge user-role-scope-badge--global">
-                            @Resources.Web_Admin_ScopeType_Global
-                        </span>
-                    </div>
-                    <div class="user-chip-list user-role-chip-list">
-                        @if (VM.UserRoles.Any())
-                        {
+        <DetailSection Title="@Resources.Web_Admin_Label_Roles">
+            <ChildContent>
+                <PropertyRow Label="@Resources.Web_Admin_GlobalRoles">
+                    @if (VM.UserRoles.Any())
+                    {
+                        <span class="user-chip-list">
                             @foreach (var role in VM.UserRoles)
                             {
                                 <span class="user-chip user-chip--global-role">@role.Name</span>
                             }
-                        }
-                        else
-                        {
-                            <span class="user-membership-empty">@Resources.Web_Common_NoRolesAssigned</span>
-                        }
-                    </div>
-                </section>
-
-                <section class="user-role-scope-card user-role-scope-card--delegated">
-                    <div class="user-role-scope-header">
-                        <span class="user-role-scope-icon" aria-hidden="true">
-                            @Icons.SVG("shield_transparent.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2f))
                         </span>
-                        <span class="user-role-scope-copy">
-                            <strong>@Resources.Web_Admin_ScopedAssignments</strong>
-                            <small>@Resources.Web_Admin_DelegatedRoles_Hint</small>
-                        </span>
-                        <span class="user-role-scope-badge user-role-scope-badge--delegated">
-                            @Resources.Web_Admin_Delegated
-                        </span>
-                    </div>
-
-                    @if (delegatedAssignments.Any())
-                    {
-                        <div class="user-delegated-role-list">
-                            @foreach (var assignment in delegatedAssignments)
-                            {
-                                <div class="user-delegated-role-row">
-                                    <span class="user-delegated-role-name">@assignment.RoleName</span>
-                                    <span class="user-delegated-role-scope">
-                                        <span class="user-delegated-scope-type">@FormatScopeType(assignment.ScopeType)</span>
-                                        <span class="user-delegated-scope-name">@assignment.ScopeName</span>
-                                    </span>
-                                    @if (VM.CanManageRoles)
-                                    {
-                                        <button class="btn-icon btn-icon--small user-delegated-role-remove"
-                                                title="@Resources.Web_Admin_RemoveAssignment"
-                                                @onclick="() => DeleteAssignment(assignment.AssignmentId)">
-                                            @Icons.SVG("cross.svg", new SvgOptions(
-                                                Width: 14,
-                                                Height: 14,
-                                                Color: "var(--danger)",
-                                                StrokeWidth: 2f))
-                                        </button>
-                                    }
-                                </div>
-                            }
-                        </div>
                     }
                     else
                     {
-                        <span class="user-membership-empty user-role-scope-empty">
-                            @Resources.Web_Admin_NoDelegatedRoles
-                        </span>
+                        <span class="property-empty">@Resources.Web_Common_NoRolesAssigned</span>
                     }
-                </section>
-            </div>
+                </PropertyRow>
+            </ChildContent>
+            <Body>
+                <p class="user-role-hint">
+                    <span>@Resources.Web_Admin_GlobalRoles_Hint</span>
+                    <InfoButton Text="@Resources.Web_Admin_RoleScopes_Info" AriaLabel="@Resources.Web_Admin_RoleScopes_InfoLabel" />
+                </p>
+            </Body>
+        </DetailSection>
 
-            <div class="user-memberships">
-                <div class="user-membership-section">
-                    <span class="user-membership-label">@Resources.Web_Admin_Label_Departments</span>
-                    <div class="user-chip-list">
-                        @if (VM.UserDepartments.Any())
-                        {
-                            @foreach (var department in VM.UserDepartments.Take(4))
-                            {
-                                <span class="user-chip">@department.Name</span>
-                            }
-                            @if (VM.UserDepartments.Count > 4)
-                            {
-                                <span class="user-chip user-chip--more">+@(VM.UserDepartments.Count - 4)</span>
-                            }
-                        }
-                        else
-                        {
-                            <span class="user-membership-empty">@Resources.Web_Common_NoDepartments</span>
-                        }
-                    </div>
-                </div>
-                <div class="user-membership-section">
-                    <span class="user-membership-label">@Resources.Web_Admin_Label_Groups</span>
-                    <div class="user-chip-list">
-                        @if (VM.UserGroups.Any())
-                        {
-                            @foreach (var group in VM.UserGroups.Take(4))
-                            {
-                                <span class="user-chip">@group.Name</span>
-                            }
-                            @if (VM.UserGroups.Count > 4)
-                            {
-                                <span class="user-chip user-chip--more">+@(VM.UserGroups.Count - 4)</span>
-                            }
-                        }
-                        else
-                        {
-                            <span class="user-membership-empty">@Resources.Web_Common_NoGroupsAssigned</span>
-                        }
-                    </div>
-                </div>
-            </div>
-
-            <div class="detail-actions user-view-actions">
-                @if (VM.CanEditSelectedProfile)
+        @* Delegated roles keep their inline removal (decision in plans/detail-view-layout.md §9). *@
+        <DetailSection Title="@Resources.Web_Admin_ScopedAssignments">
+            <Body>
+                <p class="user-role-hint">@Resources.Web_Admin_DelegatedRoles_Hint</p>
+                @if (delegatedAssignments.Any())
                 {
-                    <button class="btn-primary user-edit-button" @onclick="EditUser">
-                        @Icons.SVG("edit.svg", new SvgOptions(Width: 15, Height: 15, StrokeWidth: 2f))
-                        <span>@Resources.Web_Common_Edit</span>
-                    </button>
-                }
-                @if (VM.CanDeleteSelectedUser)
-                {
-                    @if (VM.IsConfirmingDelete)
-                    {
-                        <div class="confirm-delete">
-                            <p>@Resources.Web_Admin_ConfirmDeleteUser</p>
-                            <div class="user-delete-confirm-actions">
-                                <button class="btn-danger-outline" @onclick="ConfirmDeleteUser" disabled="@VM.IsSaving">
-                                    @(VM.IsSaving ? Resources.Web_Common_Deleting : Resources.Web_Admin_DeleteUser)
-                                </button>
-                                <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">
-                                    @Resources.Web_Common_Cancel
-                                </button>
+                    <div class="user-delegated-role-list">
+                        @foreach (var assignment in delegatedAssignments)
+                        {
+                            <div class="user-delegated-role-row">
+                                <span class="user-delegated-role-name">@assignment.RoleName</span>
+                                <span class="user-delegated-role-scope">
+                                    <span class="user-delegated-scope-type">@FormatScopeType(assignment.ScopeType)</span>
+                                    <span class="user-delegated-scope-name">@assignment.ScopeName</span>
+                                </span>
+                                @if (VM.CanManageRoles)
+                                {
+                                    <button class="btn-icon btn-icon--small user-delegated-role-remove"
+                                            title="@Resources.Web_Admin_RemoveAssignment"
+                                            aria-label="@Resources.Web_Admin_RemoveAssignment"
+                                            @onclick="() => DeleteAssignment(assignment.AssignmentId)">
+                                        @Icons.SVG("cross.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--danger)", StrokeWidth: 2f))
+                                    </button>
+                                }
                             </div>
-                        </div>
-                    }
-                    else
-                    {
-                        <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteUser()">
-                            @Resources.Web_Admin_DeleteUser
-                        </button>
-                    }
+                        }
+                    </div>
                 }
+                else
+                {
+                    <span class="property-empty">@Resources.Web_Admin_NoDelegatedRoles</span>
+                }
+            </Body>
+        </DetailSection>
+
+        <DetailSection Title="@R("Web_Admin_Section_Memberships")">
+            <PropertyRow Label="@Resources.Web_Admin_Label_Departments">
+                @if (VM.UserDepartments.Any())
+                {
+                    <span class="user-chip-list">
+                        @foreach (var department in VM.UserDepartments.Take(ChipPreview))
+                        {
+                            <span class="user-chip">@department.Name</span>
+                        }
+                        @if (VM.UserDepartments.Count > ChipPreview)
+                        {
+                            <span class="user-chip user-chip--more">+@(VM.UserDepartments.Count - ChipPreview)</span>
+                        }
+                    </span>
+                }
+                else
+                {
+                    <span class="property-empty">@Resources.Web_Common_NoDepartments</span>
+                }
+            </PropertyRow>
+            <PropertyRow Label="@Resources.Web_Admin_Label_Groups">
+                @if (VM.UserGroups.Any())
+                {
+                    <span class="user-chip-list">
+                        @foreach (var group in VM.UserGroups.Take(ChipPreview))
+                        {
+                            <span class="user-chip">@group.Name</span>
+                        }
+                        @if (VM.UserGroups.Count > ChipPreview)
+                        {
+                            <span class="user-chip user-chip--more">+@(VM.UserGroups.Count - ChipPreview)</span>
+                        }
+                    </span>
+                }
+                else
+                {
+                    <span class="property-empty">@Resources.Web_Common_NoGroupsAssigned</span>
+                }
+            </PropertyRow>
+        </DetailSection>
+
+        @if (VM.IsConfirmingDelete && VM.CanDeleteSelectedUser)
+        {
+            <div class="modal-backdrop" @onclick="() => VM.IsConfirmingDelete = false">
+                <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="user-delete-title" @onclick:stopPropagation="true">
+                    <h2 class="modal-title" id="user-delete-title">@Resources.Web_Admin_ConfirmDeleteUser</h2>
+                    <p class="modal-text"><strong>@DisplayName(user.Name, user.Username)</strong> (@@@user.Username)</p>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">@Resources.Web_Common_Cancel</button>
+                        <button type="button" class="btn-danger" disabled="@VM.IsSaving" @onclick="ConfirmDeleteUser">
+                            @(VM.IsSaving ? Resources.Web_Common_Deleting : Resources.Web_Admin_DeleteUser)
+                        </button>
+                    </div>
+                </div>
             </div>
-        </div>
+        }
     }
 }
 
@@ -502,6 +450,9 @@
     [Parameter] public EventCallback OnChanged { get; set; }
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
+    // Departments and groups show this many chips, then a "+n" chip.
+    private const int ChipPreview = 4;
 
     // Active password-complexity rules, shown in the InfoButton next to new-password fields.
     private RenderFragment PasswordPolicyList => @<ul>

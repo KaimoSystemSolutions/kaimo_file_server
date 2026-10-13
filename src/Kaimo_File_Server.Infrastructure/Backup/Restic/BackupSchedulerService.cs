@@ -176,7 +176,7 @@ public sealed class BackupSchedulerService(
     /// counted from its last success or its last configuration change (creation, re-enabling,
     /// new schedule), whichever is later. Manual-only jobs never go stale.
     /// </summary>
-    internal static bool IsStale(BackupJob job, DateTime nowUtc)
+    public static bool IsStale(BackupJob job, DateTime nowUtc)
     {
         if (!job.Enabled || job.AlertAfterDays <= 0 || job.Schedule.IsEmpty)
             return false;
@@ -188,6 +188,6 @@ public sealed class BackupSchedulerService(
     /// The configured threshold, but never less than the longest gap between two scheduled
     /// days plus one: a weekly job is not overdue before it missed its weekly run.
     /// </summary>
-    internal static int EffectiveAlertDays(BackupJob job)
+    public static int EffectiveAlertDays(BackupJob job)
         => Math.Max(job.AlertAfterDays, BackupScheduleCalculator.LongestGapDays(job.Schedule) + 1);
 }

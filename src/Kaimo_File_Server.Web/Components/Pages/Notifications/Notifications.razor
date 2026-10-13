@@ -463,44 +463,45 @@ else
                 <aside class="workspace-detail notif-log-detail" aria-label="@R("Web_Notifications_Tab_Log")">
                     @if (VM.ViewedDelivery is { } viewed)
                     {
-                        <div class="workspace-heading">
-                            <div>
-                                <h3>@EventName(viewed.EventType)</h3>
-                                <span class="workspace-heading-sub">@viewed.Subject</span>
-                            </div>
-                            <StatusBadge Tone="@ToneOf(viewed.Status)" Label="@R("Web_Notifications_Status_" + viewed.Status)" />
-                        </div>
-                        <dl class="workspace-dl">
-                            <dt>@R("Web_Notifications_Col_Recipient")</dt>
-                            <dd>@viewed.ToAddress</dd>
-                            <dt>@R("Web_Notifications_Col_Time")</dt>
-                            <dd>@DateFmt.FormatDateTimeLocal(viewed.CreatedAtUtc.ToLocalTime())</dd>
-                            @if (viewed.SentAtUtc is { } sentAt)
-                            {
-                                <dt>@R("Web_Notifications_SentAt")</dt>
-                                <dd>@DateFmt.FormatDateTimeLocal(sentAt.ToLocalTime())</dd>
-                            }
-                            @if (viewed.AttemptCount > 0)
-                            {
-                                <dt>@R("Web_Notifications_Col_Attempts")</dt>
-                                <dd>@viewed.AttemptCount</dd>
-                            }
-                            @if (!string.IsNullOrEmpty(viewed.LastError))
-                            {
-                                <dt>@R("Web_Notifications_Col_Error")</dt>
-                                <dd class="notif-error-text">@viewed.LastError</dd>
-                            }
-                        </dl>
-                        @if (viewed.Status is MailDeliveryStatus.Dead or MailDeliveryStatus.Failed)
+                        <DetailHeader Icon="mail.svg" Title="@EventName(viewed.EventType)" Subtitle="@viewed.Subject">
+                            <Status>
+                                <StatusBadge Tone="@ToneOf(viewed.Status)" Label="@R("Web_Notifications_Status_" + viewed.Status)" />
+                            </Status>
+                            <Actions>
+                                @if (viewed.Status is MailDeliveryStatus.Dead or MailDeliveryStatus.Failed)
+                                {
+                                    <button type="button" class="btn-tinted btn-tinted--info" @onclick="() => VM.RetryDeliveryAsync(viewed.Id)">
+                                        @Icons.SVG("refresh.svg", new SvgOptions(Width: 14, Height: 14))
+                                        <span>@R("Web_Notifications_Retry")</span>
+                                    </button>
+                                }
+                            </Actions>
+                        </DetailHeader>
+
+                        @if (!string.IsNullOrEmpty(viewed.LastError))
                         {
-                            <div class="detail-actions">
-                                <button type="button" class="btn-secondary" @onclick="() => VM.RetryDeliveryAsync(viewed.Id)">@R("Web_Notifications_Retry")</button>
+                            <div class="detail-alerts">
+                                <div class="error-banner" role="alert"><strong>@R("Web_Notifications_Col_Error"):</strong> @viewed.LastError</div>
                             </div>
                         }
-                        <section class="workspace-section notif-preview">
-                            <h4>@R("Web_Notifications_Preview")</h4>
-                            <iframe class="notif-preview__frame" sandbox="" title="@viewed.Subject" srcdoc="@ViewHtml(viewed)"></iframe>
-                        </section>
+
+                        <div class="fact-tiles">
+                            <FactTile Label="@R("Web_Notifications_Col_Time")" Value="@DateFmt.FormatDateTimeLocal(viewed.CreatedAtUtc.ToLocalTime())" Compact />
+                            <FactTile Label="@R("Web_Notifications_SentAt")" Compact
+                                      Value="@(viewed.SentAtUtc is { } sentAt ? DateFmt.FormatDateTimeLocal(sentAt.ToLocalTime()) : null)"
+                                      Tone="@(viewed.SentAtUtc is null ? StatusTone.Neutral : StatusTone.Positive)" />
+                            <FactTile Label="@R("Web_Notifications_Col_Attempts")" Value="@viewed.AttemptCount.ToString()" />
+                        </div>
+
+                        <DetailSection Title="@R("Web_Notifications_Section_Delivery")">
+                            <PropertyRow Label="@R("Web_Notifications_Col_Recipient")" Value="@viewed.ToAddress" Copyable />
+                        </DetailSection>
+
+                        <DetailSection Title="@R("Web_Notifications_Preview")">
+                            <Body>
+                                <iframe class="notif-preview__frame" sandbox="" title="@viewed.Subject" srcdoc="@ViewHtml(viewed)"></iframe>
+                            </Body>
+                        </DetailSection>
                     }
                     else
                     {

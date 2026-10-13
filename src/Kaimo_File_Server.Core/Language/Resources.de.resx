@@ -7015,4 +7015,70 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Backup_Repos_DeleteTitle" xml:space="preserve">
     <value>Repository „{0}“ löschen?</value>
   </data>
+  <data name="Web_Backup_Jobs_SuccessOverdue" xml:space="preserve">
+    <value>Seit mehr als {0} Tagen keine erfolgreiche Sicherung</value>
+  </data>
+  <data name="Web_Backup_Jobs_OpenRepository" xml:space="preserve">
+    <value>Repository anzeigen</value>
+  </data>
+  <data name="Web_Backup_Jobs_Section_Sources" xml:space="preserve">
+    <value>Quellen</value>
+  </data>
+  <data name="Web_Backup_Jobs_Section_Schedule" xml:space="preserve">
+    <value>Zeitplan &amp; Aufbewahrung</value>
+  </data>
+  <data name="Web_Backup_Jobs_DeleteTitle" xml:space="preserve">
+    <value>Auftrag „{0}“ löschen?</value>
+  </data>
+  <data name="Web_Backup_Activity_Duration" xml:space="preserve">
+    <value>Dauer</value>
+  </data>
+  <data name="Web_Backup_Activity_Job" xml:space="preserve">
+    <value>Auftrag</value>
+  </data>
+  <data name="Web_Backup_Activity_OpenJob" xml:space="preserve">
+    <value>Auftrag anzeigen</value>
+  </data>
+  <data name="Web_Backup_Activity_Section_Run" xml:space="preserve">
+    <value>Lauf</value>
+  </data>
+  <data name="Web_Backup_Activity_Section_Result" xml:space="preserve">
+    <value>Ergebnis</value>
+  </data>
+  <data name="Web_ExternalStorage_OpenSyncs" xml:space="preserve">
+    <value>Synchronisierungen anzeigen</value>
+  </data>
+  <data name="Web_ExternalStorage_DeleteConnectionTitle" xml:space="preserve">
+    <value>Verbindung „{0}“ löschen?</value>
+  </data>
+  <data name="Web_ExternalStorage_DeleteConnectionHint" xml:space="preserve">
+    <value>Die gespeicherten Zugangsdaten werden von diesem Server entfernt. Dateien im entfernten Speicher bleiben unverändert.</value>
+  </data>
+  <data name="Web_ExternalStorage_Section_Locations" xml:space="preserve">
+    <value>Speicherorte</value>
+  </data>
+  <data name="Web_ExternalStorage_DeleteSyncTitle" xml:space="preserve">
+    <value>Synchronisierung „{0}“ löschen?</value>
+  </data>
+  <data name="Web_ExternalStorage_DeleteSyncHint" xml:space="preserve">
+    <value>Bereits synchronisierte Dateien bleiben auf beiden Seiten erhalten.</value>
+  </data>
+  <data name="Web_Admin_Section_Memberships" xml:space="preserve">
+    <value>Mitgliedschaften</value>
+  </data>
+  <data name="Web_ShareLinks_DeleteTitle" xml:space="preserve">
+    <value>Link „{0}“ löschen?</value>
+  </data>
+  <data name="Web_ShareLinks_DeleteHint" xml:space="preserve">
+    <value>Der öffentliche Link funktioniert ab sofort nicht mehr. Die freigegebenen Dateien werden nicht gelöscht.</value>
+  </data>
+  <data name="Web_Notifications_Section_Delivery" xml:space="preserve">
+    <value>Zustellung</value>
+  </data>
+  <data name="Web_Homes_Enable" xml:space="preserve">
+    <value>Home-Ordner aktivieren</value>
+  </data>
+  <data name="Web_Homes_Disable" xml:space="preserve">
+    <value>Home-Ordner deaktivieren</value>
+  </data>
 </root>

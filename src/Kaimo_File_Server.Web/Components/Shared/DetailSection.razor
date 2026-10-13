@@ -2,6 +2,9 @@
     Titled group of properties in a detail pane (shared UI library, see DESIGN_SPEC §9.2).
     Holds <PropertyRow> children (rendered as a <dl>).
 
+    `Body` takes free content that is no label/value pair (a list with its own actions,
+    a log excerpt, collapsible error lists); it renders below the property rows.
+
     Every section can be collapsed via its title band. It uses native <details>/<summary>,
     so keyboard and screen-reader support come for free. The open/closed state lives only
     in the DOM: a reload or reopened page starts from the default again (open, or closed
@@ -10,7 +13,14 @@
 
 <details class="detail-section-group @Class" open="@(!InitiallyCollapsed)">
     <summary class="detail-section-title"><h4 class="detail-section-heading">@Title</h4></summary>
-    <dl class="property-list">@ChildContent</dl>
+    @if (ChildContent is not null)
+    {
+        <dl class="property-list">@ChildContent</dl>
+    }
+    @if (Body is not null)
+    {
+        <div class="detail-section-body">@Body</div>
+    }
 </details>
 
 @code {
@@ -19,7 +29,11 @@
     /// <summary>Start closed; for secondary groups such as technical IDs.</summary>
     [Parameter] public bool InitiallyCollapsed { get; set; }
 
+    /// <summary><see cref="PropertyRow"/> children.</summary>
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Free content below the property rows.</summary>
+    [Parameter] public RenderFragment? Body { get; set; }
 
     [Parameter] public string? Class { get; set; }
 }

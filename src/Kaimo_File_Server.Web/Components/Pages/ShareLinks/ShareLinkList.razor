@@ -13,6 +13,7 @@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject DateFormatService DateFmt
+@inject ToastService Toasts
 @implements IDisposable
 
 @*
@@ -192,67 +193,91 @@ else
                 }
                 else
                 {
-                    <div class="detail-header sharelink-detail-header">
-                        <div class="sharelink-detail-title">
-                            <div class="sharelink-title-row">
-                                <span class="sharelink-detail-icon @IconTone(link)">
-                                    @ItemIcon(link, 22)
-                                </span>
-                                <h3>@link.DisplayName</h3>
-                            </div>
-                            <span class="detail-subtitle">@sel.ShareName · @sel.CreatedBy</span>
+                    var isUpload = link.Kind == ShareLinkKind.Upload;
+                    var unlimited = T("Web_ShareLink_Unlimited", "Unlimited");
+                    <DetailHeader Title="@link.DisplayName" Subtitle="@($"{sel.ShareName} · {sel.CreatedBy}")">
+                        <Leading>
+                            <span class="detail-head-icon" aria-hidden="true">@ItemIcon(link, 20)</span>
+                        </Leading>
+                        <Status>
+                            <StatusBadge Tone="StatusToneFor(sel.StatusKey)" Label="@StatusLabel(sel.StatusKey)" />
+                        </Status>
+                        <Actions>
+                            <button class="btn-tinted" type="button" @onclick="StartEdit">
+                                @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
+                                <span>@T("Web_ShareLinks_Edit", "Edit")</span>
+                            </button>
+                            <button class="btn-tinted btn-tinted--info" type="button" @onclick="() => CopyAsync(sel.Url)">
+                                @Assets.SVG("copy.svg", new SvgOptions(Width: 14, Height: 14))
+                                <span>@T("Web_ShareLink_Copy", "Copy")</span>
+                            </button>
+                        </Actions>
+                        <MoreActions>
+                            <MenuItem Icon="folder.svg" Label="@T("Web_ShareLinks_OpenInBrowser", "Open in file browser")"
+                                      OnClick="() => Nav.NavigateTo(BrowserHref(sel))" />
+                            <MenuItem Separator />
+                            <MenuItem Icon="trash.svg" Label="@Resources.Web_Action_Delete" Danger OnClick="() => _confirmDelete = true" />
+                        </MoreActions>
+                    </DetailHeader>
+
+                    @if (isUpload && !VM.Settings.AllowUploadLinks)
+                    {
+                        <div class="detail-alerts">
+                            <div class="warning-banner" role="status">@T("Web_ShareLinks_UploadsDisabled", "Upload links are disabled in the settings; this link currently accepts no files.")</div>
                         </div>
-                        <StatusBadge Tone="StatusToneFor(sel.StatusKey)" Class="sharelink-state" Label="@StatusLabel(sel.StatusKey)" />
+                    }
+
+                    <div class="fact-tiles">
+                        <FactTile Label="@AccessLabel" Value="@(link.MaxAccessCount is { } max ? $"{link.AccessCount} / {max}" : link.AccessCount.ToString())"
+                                  Tone="@(sel.StatusKey == "exhausted" ? StatusTone.Negative : (StatusTone?)null)" />
+                        <FactTile Label="@T("Web_ShareLink_End", "End")" Value="@DateFmt.FormatDateTime(link.ExpiresAtUtc, nullText: unlimited)" Compact
+                                  Tone="@(sel.StatusKey == "expired" ? StatusTone.Negative : (StatusTone?)null)" />
+                        @if (isUpload)
+                        {
+                            <FactTile Label="@T("Web_ShareLinks_UsedQuota", "Uploaded")" Compact
+                                      Value="@(FormatHelper.FormatFileSize(link.UploadedBytes) + (link.MaxTotalBytes is { } quota ? $" / {FormatHelper.FormatFileSize(quota)}" : ""))" />
+                        }
                     </div>
 
-                    <div class="sharelink-detail-grid">
-                        <section class="sharelink-detail-group">
-                            <h4>@T("Web_ShareLinks_Group_Target", "Target")</h4>
-                            <dl>
-                                <dt>@T("Web_ShareLinks_Col_Share", "Share")</dt><dd>@sel.ShareName</dd>
-                                <dt>@T("Web_ShareLinks_Path", "Path")</dt><dd>@DisplayPath(link.RootRelativePath)</dd>
-                            </dl>
-                        </section>
-                        <section class="sharelink-detail-group">
-                            <h4>@T("Web_ShareLinks_Group_Limits", "Limits")</h4>
-                            <dl>
-                                <dt>@T("Web_ShareLink_Start", "Start")</dt><dd>@DateFmt.FormatDateTime(link.StartsAtUtc, nullText: "—")</dd>
-                                <dt>@T("Web_ShareLink_End", "End")</dt><dd>@DateFmt.FormatDateTime(link.ExpiresAtUtc, nullText: "—")</dd>
-                                <dt>@AccessLabel</dt>
-                                <dd>@link.AccessCount@(link.MaxAccessCount is { } m ? $" / {m}" : $" / {T("Web_ShareLink_Unlimited", "Unlimited")}")</dd>
-                                <dt>@(link.Kind == ShareLinkKind.Upload ? T("Web_ShareLink_MaxUploadRate", "Max upload rate") : T("Web_ShareLink_MaxRate", "Max rate"))</dt><dd>@RateText(link)</dd>
-                                @if (link.Kind == ShareLinkKind.Upload)
-                                {
-                                    <dt>@T("Web_ShareLink_MaxFileSize", "Max file size")</dt>
-                                    <dd>@FormatHelper.FormatFileSize(VM.Settings.EffectiveMaxFileSize(link))</dd>
-                                    <dt>@T("Web_ShareLinks_UsedQuota", "Uploaded")</dt>
-                                    <dd>@FormatHelper.FormatFileSize(link.UploadedBytes)@(link.MaxTotalBytes is { } q ? $" / {FormatHelper.FormatFileSize(q)}" : $" / {T("Web_ShareLink_Unlimited", "Unlimited")}")</dd>
-                                    <dt>@T("Web_ShareLink_AllowedTypes", "Allowed file types")</dt>
-                                    <dd>@(link.AllowedExtensionList.Count > 0 ? string.Join(", ", link.AllowedExtensionList) : T("Web_ShareLinks_AnyType", "Any"))</dd>
-                                }
-                            </dl>
-                        </section>
-                        <section class="sharelink-detail-group sharelink-detail-group--wide">
-                            <h4>@T("Web_ShareLink_Url", "Public link")</h4>
-                            <div class="sharelink-url-row">
-                                <input class="edit-input sharelink-url" readonly value="@sel.Url" />
-                                <button class="btn-secondary" @onclick="() => CopyAsync(sel.Url)">@T("Web_ShareLink_Copy", "Copy")</button>
+                    <DetailSection Title="@T("Web_ShareLinks_Group_Target", "Target")">
+                        <PropertyRow Label="@T("Web_ShareLinks_Col_Share", "Share")" Value="@sel.ShareName" />
+                        <PropertyRow Label="@T("Web_ShareLinks_Path", "Path")" Value="@DisplayPath(link.RootRelativePath)" Mono Copyable />
+                    </DetailSection>
+
+                    <DetailSection Title="@T("Web_ShareLink_Url", "Public link")">
+                        <PropertyRow Label="@T("Web_ShareLink_Url", "Public link")" Value="@sel.Url" Mono Copyable />
+                        <PropertyRow Label="@T("Web_ShareLinks_PasswordProtected", "Password-protected")"
+                                     Value="@(link.PasswordHash is not null ? Resources.Web_Common_Yes : Resources.Web_Common_No)" />
+                    </DetailSection>
+
+                    <DetailSection Title="@T("Web_ShareLinks_Group_Limits", "Limits")">
+                        <PropertyRow Label="@T("Web_ShareLink_Start", "Start")" Value="@DateFmt.FormatDateTime(link.StartsAtUtc, nullText: "")" />
+                        <PropertyRow Label="@T("Web_ShareLink_End", "End")" Value="@DateFmt.FormatDateTime(link.ExpiresAtUtc, nullText: unlimited)" />
+                        <PropertyRow Label="@AccessLabel" Value="@($"{link.AccessCount} / {(link.MaxAccessCount is { } m ? m.ToString() : unlimited)}")" />
+                        <PropertyRow Label="@(isUpload ? T("Web_ShareLink_MaxUploadRate", "Max upload rate") : T("Web_ShareLink_MaxRate", "Max rate"))" Value="@RateText(link)" />
+                        @if (isUpload)
+                        {
+                            <PropertyRow Label="@T("Web_ShareLink_MaxFileSize", "Max file size")" Value="@FormatHelper.FormatFileSize(VM.Settings.EffectiveMaxFileSize(link))" />
+                            <PropertyRow Label="@T("Web_ShareLinks_UsedQuota", "Uploaded")"
+                                         Value="@($"{FormatHelper.FormatFileSize(link.UploadedBytes)} / {(link.MaxTotalBytes is { } q ? FormatHelper.FormatFileSize(q) : unlimited)}")" />
+                            <PropertyRow Label="@T("Web_ShareLink_AllowedTypes", "Allowed file types")"
+                                         Value="@(link.AllowedExtensionList.Count > 0 ? string.Join(", ", link.AllowedExtensionList) : T("Web_ShareLinks_AnyType", "Any"))" />
+                        }
+                    </DetailSection>
+
+                    @if (_confirmDelete)
+                    {
+                        <div class="modal-backdrop" @onclick="() => _confirmDelete = false">
+                            <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="sharelink-delete-title" @onclick:stopPropagation="true">
+                                <h2 class="modal-title" id="sharelink-delete-title">@string.Format(T("Web_ShareLinks_DeleteTitle", "Delete link “{0}”?"), link.DisplayName)</h2>
+                                <p class="modal-text">@T("Web_ShareLinks_DeleteHint", "The public link stops working immediately. The shared files are not deleted.")</p>
+                                <div class="modal-actions">
+                                    <button type="button" class="btn-secondary" @onclick="() => _confirmDelete = false">@Resources.Web_Button_Cancel</button>
+                                    <button type="button" class="btn-danger" @onclick="() => DeleteAsync(link.Id)">@Resources.Web_Action_Delete</button>
+                                </div>
                             </div>
-                            @if (link.PasswordHash is not null)
-                            {
-                                <p class="sharelink-note">@T("Web_ShareLinks_PasswordProtected", "Password-protected")</p>
-                            }
-                            @if (link.Kind == ShareLinkKind.Upload && !VM.Settings.AllowUploadLinks)
-                            {
-                                <p class="sharelink-note">@T("Web_ShareLinks_UploadsDisabled", "Upload links are disabled in the settings; this link currently accepts no files.")</p>
-                            }
-                        </section>
-                    </div>
-
-                    <div class="detail-actions sharelink-summary-actions">
-                        <button class="btn-secondary" @onclick="StartEdit">@T("Web_ShareLinks_Edit", "Edit")</button>
-                        <button class="btn-danger-outline" @onclick="() => DeleteAsync(link.Id)">@Resources.Web_Action_Delete</button>
-                    </div>
+                        </div>
+                    }
                 }
             }
             else
@@ -272,6 +297,7 @@ else
 
     private Guid? _selectedId;
     private bool _editing;
+    private bool _confirmDelete;
     private ShareLinkKind _tab = ShareLinkKind.Download;
 
     private string _editName = "";
@@ -309,6 +335,7 @@ else
         _tab = kind;
         _selectedId = null;
         _editing = false;
+        _confirmDelete = false;
         _editError = null;
     }
 
@@ -361,6 +388,7 @@ else
     {
         _selectedId = id;
         _editing = false;
+        _confirmDelete = false;
         _editError = null;
     }
 
@@ -416,11 +444,24 @@ else
 
     private async Task DeleteAsync(Guid id)
     {
+        _confirmDelete = false;
         await VM.DeleteAsync(id);
         if (_selectedId == id) { _selectedId = null; _editing = false; }
     }
 
-    private async Task CopyAsync(string url) => await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
+    private async Task CopyAsync(string url)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
+            Toasts.Show(T("Web_Detail_Copied", "Copied to clipboard"), ToastType.Success);
+        }
+        catch (JSException)
+        {
+            // Clipboard access needs a secure context and permission.
+            Toasts.Show(T("Web_Detail_CopyFailed", "Could not copy to the clipboard"), ToastType.Error);
+        }
+    }
 
     private string RateText(ShareLink link)
         => link.MaxBytesPerSecond is { } bps

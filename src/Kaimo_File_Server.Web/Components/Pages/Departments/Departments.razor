@@ -264,124 +264,55 @@ else
                 else
                 {
                     @* -------- VIEW MODE -------- *@
-                    <div class="detail-header">
-                        <h3>@VM.Selected.Name</h3>
-                        <span class="detail-subtitle">
-@(VM.IsGlobalDepartment(VM.Selected) ? Resources.Web_Dept_GlobalDepartment : Resources.Web_Admin_Label_Department)
-                        </span>
-                    </div>
-
-                    <Tabs aria-label="@Resources.Web_Admin_Label_Department">
-                        <Tab Active="@(_activeTab == DepartmentDetailTab.General)" Icon="settings.svg" Label="@Resources.Web_Admin_EditTab_General"
-                             OnClick="() => SwitchTab(DepartmentDetailTab.General)" />
-                        <Tab Active="@(_activeTab == DepartmentDetailTab.Permissions)" Icon="shield.svg" Label="@Resources.Web_Admin_Label_Permissions"
-                             OnClick="() => SwitchTab(DepartmentDetailTab.Permissions)" />
-                        <Tab Active="@(_activeTab == DepartmentDetailTab.Assignments)" Icon="users.svg" Label="@Resources.Web_Admin_EditTab_Assignment"
-                             OnClick="() => SwitchTab(DepartmentDetailTab.Assignments)" />
-                    </Tabs>
-
-                    @* -------- GENERAL -------- *@
-                    @if (_activeTab == DepartmentDetailTab.General)
-                    {
-                    <div class="dept-overview-list">
-                        <div class="dept-overview-row dept-overview-row--multiline">
-                            <span class="dept-overview-label">@Resources.Web_Admin_Label_Description</span>
-                            <span class="dept-overview-value @(string.IsNullOrWhiteSpace(VM.Selected.Description) ? "dept-overview-value--empty" : "")">
-                                @(string.IsNullOrWhiteSpace(VM.Selected.Description) ? Resources.Web_Admin_NoDescription : VM.Selected.Description)
+                    var dept = VM.Selected;
+                    var isGlobal = VM.IsGlobalDepartment(dept);
+                    var (deptColor, deptSoft) = DepartmentPalette.For(dept.Id, dept.Color);
+                    <DetailHeader Title="@dept.Name" Subtitle="@(isGlobal ? Resources.Web_Dept_GlobalDepartment : Resources.Web_Admin_Label_Department)">
+                        <Leading>
+                            <span class="detail-head-icon" aria-hidden="true">
+                                @if (isGlobal)
+                                {
+                                    @Assets.SVG("compass.svg", new SvgOptions(Width: 18, Height: 18, Color: deptColor, StrokeWidth: 1.8f))
+                                }
+                                else
+                                {
+                                    @Assets.SVG("building.svg", new SvgOptions(Width: 20, Height: 20, Color: deptColor, Fill: deptSoft, StrokeWidth: 1.4f))
+                                }
                             </span>
-                        </div>
-                        <div class="dept-overview-row">
-                            <span class="dept-overview-label">@Resources.Web_Dept_Label_InheritsFromView</span>
-                            @if (VM.Selected.ParentDepartmentId.HasValue)
+                        </Leading>
+                        <Actions>
+                            @if (VM.CanEdit && !isGlobal)
                             {
-                                <span class="dept-overview-value">@VM.GetParentName(VM.Selected.ParentDepartmentId)</span>
+                                <button class="btn-tinted" type="button" @onclick="Edit">
+                                    @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
+                                    <span>@Resources.Web_Common_Edit</span>
+                                </button>
+                            }
+                        </Actions>
+                        <MoreActions>
+                            @if (VM.CanDelete && !isGlobal)
+                            {
+                                <MenuItem Icon="trash.svg" Label="@Resources.Web_Dept_DeleteDepartment" Danger Disabled="@VM.IsSaving"
+                                          OnClick="() => VM.RequestDelete()" />
+                            }
+                        </MoreActions>
+                    </DetailHeader>
+
+                    <DetailSection Title="@Resources.Web_Admin_EditTab_General">
+                        <PropertyRow Label="@Resources.Web_Admin_Label_Description" Value="@dept.Description" />
+                        <PropertyRow Label="@Resources.Web_Dept_Label_InheritsFromView"
+                                     Value="@(dept.ParentDepartmentId.HasValue ? VM.GetParentName(dept.ParentDepartmentId) : Resources.Web_Dept_NoParentTopLevel)" />
+                    </DetailSection>
+
+                    <DetailSection Title="@Resources.Web_Admin_Label_Permissions">
+                        <PropertyRow Label="@Resources.Web_Dept_DefaultFilePerm">
+                            @if (VM.PermInfo is null || VM.PermInfo.HasNoDefault)
+                            {
+                                <span class="property-empty">@Resources.Web_Dept_NoDefaultPerm</span>
                             }
                             else
                             {
-                                <span class="dept-overview-value dept-overview-value--empty">@Resources.Web_Dept_NoParentTopLevel</span>
-                            }
-                        </div>
-                    </div>
-                    }
-
-                    @* -------- ASSIGNMENTS -------- *@
-                    @if (_activeTab == DepartmentDetailTab.Assignments)
-                    {
-                    <div class="dept-assign-groups">
-                        <section class="dept-assign-section">
-                            <div class="dept-assign-heading">
-                                <span class="dept-assign-label">@Resources.Web_Dept_Label_Members</span>
-                                <span class="dept-assign-count">@VM.Members.Count</span>
-                            </div>
-                            <div class="dept-chip-list">
-                                @if (VM.Members.Any())
-                                {
-                                    @foreach (var member in VM.Members)
-                                    {
-                                        <span class="dept-chip">@member.Name</span>
-                                    }
-                                }
-                                else
-                                {
-                                    <span class="dept-chip-empty">@Resources.Web_Common_NoMembers</span>
-                                }
-                            </div>
-                        </section>
-                        <section class="dept-assign-section">
-                            <div class="dept-assign-heading">
-                                <span class="dept-assign-label">@Resources.Web_Dept_Label_AssignedGroups</span>
-                                <span class="dept-assign-count">@VM.Groups.Count</span>
-                            </div>
-                            <div class="dept-chip-list">
-                                @if (VM.Groups.Any())
-                                {
-                                    @foreach (var group in VM.Groups)
-                                    {
-                                        <span class="dept-chip">@group.Name</span>
-                                    }
-                                }
-                                else
-                                {
-                                    <span class="dept-chip-empty">@Resources.Web_Dept_NoGroupsAssigned</span>
-                                }
-                            </div>
-                        </section>
-                        <section class="dept-assign-section">
-                            <div class="dept-assign-heading">
-                                <span class="dept-assign-label">@Resources.Web_Dept_Label_AssignedShares</span>
-                                <span class="dept-assign-count">@VM.Shares.Count</span>
-                            </div>
-                            <div class="dept-chip-list">
-                                @if (VM.Shares.Any())
-                                {
-                                    @foreach (var share in VM.Shares)
-                                    {
-                                        <span class="dept-chip">@share.Name</span>
-                                    }
-                                }
-                                else
-                                {
-                                    <span class="dept-chip-empty">@Resources.Web_Dept_NoSharesAssigned</span>
-                                }
-                            </div>
-                        </section>
-                    </div>
-                    }
-
-                    @* -------- PERMISSIONS -------- *@
-                    @if (_activeTab == DepartmentDetailTab.Permissions)
-                    {
-                    <section class="dept-perm-card">
-                        <div class="dept-perm-card-label">@Resources.Web_Dept_DefaultFilePerm</div>
-                        @if (VM.PermInfo is not null)
-                        {
-                            @if (VM.PermInfo.HasNoDefault)
-                            {
-                                <span class="dept-chip-empty">@Resources.Web_Dept_NoDefaultPerm</span>
-                            }
-                            else
-                            {
-                                <div class="permission-tags">
+                                <span class="permission-tags">
                                     @foreach (var flag in DepartmentViewModel.PermFlags)
                                     {
                                         if ((VM.PermInfo.Permission & flag.Flag) == flag.Flag)
@@ -389,47 +320,78 @@ else
                                             <span class="permission-tag">@flag.Label</span>
                                         }
                                     }
-                                </div>
-                                @if (!VM.PermInfo.IsOwn && VM.PermInfo.InheritedFromName is not null)
-                                {
-                                    <span class="inherited-hint">
-                                        @Assets.SVG("chevron_right.svg", new SvgOptions(
-                                            Width: 12, Height: 12,
-                                            Color: "var(--text-tertiary)", StrokeWidth: 1.5f,
-                                            Style: "vertical-align: -1px; margin-right: 2px;"))
-                                        @string.Format(Resources.Web_Dept_InheritedFrom, VM.PermInfo.InheritedFromName)
-                                    </span>
-                                }
+                                </span>
                             }
+                        </PropertyRow>
+                        @if (VM.PermInfo is { HasNoDefault: false, IsOwn: false, InheritedFromName: { } inheritedFrom })
+                        {
+                            <PropertyRow Label="@Resources.Web_Dept_Label_InheritsFromView" Value="@inheritedFrom" />
                         }
-                    </section>
-                    }
+                    </DetailSection>
 
-                    <div class="detail-actions">
-                        @if (VM.CanEdit && !VM.IsGlobalDepartment(VM.Selected))
-                        {
-<button class="btn-secondary" @onclick="Edit">@Resources.Web_Common_Edit</button>
-                        }
-                        @if (VM.CanDelete && !VM.IsGlobalDepartment(VM.Selected))
-                        {
-                            @if (VM.IsConfirmingDelete)
+                    <DetailSection Title="@Resources.Web_Admin_EditTab_Assignment">
+                        <PropertyRow Label="@($"{Resources.Web_Dept_Label_Members} ({VM.Members.Count})")">
+                            @if (VM.Members.Any())
                             {
-                                <div class="confirm-delete">
-<p>@Resources.Web_Dept_ConfirmDelete</p>
-                                    <div style="display: flex; gap: 8px;">
-                                        <button class="btn-danger-outline" @onclick="ConfirmDelete" disabled="@VM.IsSaving">
-                                            @(VM.IsSaving ? Resources.Web_Common_Deleting : Resources.Web_Common_YesDelete)
-                                        </button>
-<button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">@Resources.Web_Common_Cancel</button>
-                                    </div>
-                                </div>
+                                <span class="dept-chip-list">
+                                    @foreach (var member in VM.Members)
+                                    {
+                                        <span class="dept-chip">@member.Name</span>
+                                    }
+                                </span>
                             }
                             else
                             {
-<button class="btn-danger-outline" @onclick="() => VM.RequestDelete()">@Resources.Web_Dept_DeleteDepartment</button>
+                                <span class="property-empty">@Resources.Web_Common_NoMembers</span>
                             }
-                        }
-                    </div>
+                        </PropertyRow>
+                        <PropertyRow Label="@($"{Resources.Web_Dept_Label_AssignedGroups} ({VM.Groups.Count})")">
+                            @if (VM.Groups.Any())
+                            {
+                                <span class="dept-chip-list">
+                                    @foreach (var group in VM.Groups)
+                                    {
+                                        <span class="dept-chip">@group.Name</span>
+                                    }
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="property-empty">@Resources.Web_Dept_NoGroupsAssigned</span>
+                            }
+                        </PropertyRow>
+                        <PropertyRow Label="@($"{Resources.Web_Dept_Label_AssignedShares} ({VM.Shares.Count})")">
+                            @if (VM.Shares.Any())
+                            {
+                                <span class="dept-chip-list">
+                                    @foreach (var share in VM.Shares)
+                                    {
+                                        <span class="dept-chip">@share.Name</span>
+                                    }
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="property-empty">@Resources.Web_Dept_NoSharesAssigned</span>
+                            }
+                        </PropertyRow>
+                    </DetailSection>
+
+                    @if (VM.IsConfirmingDelete && VM.CanDelete && !isGlobal)
+                    {
+                        <div class="modal-backdrop" @onclick="() => VM.IsConfirmingDelete = false">
+                            <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="dept-delete-title" @onclick:stopPropagation="true">
+                                <h2 class="modal-title" id="dept-delete-title">@Resources.Web_Dept_DeleteDepartment: @dept.Name</h2>
+                                <p class="modal-text">@Resources.Web_Dept_ConfirmDelete</p>
+                                <div class="modal-actions">
+                                    <button type="button" class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">@Resources.Web_Common_Cancel</button>
+                                    <button type="button" class="btn-danger" disabled="@VM.IsSaving" @onclick="ConfirmDelete">
+                                        @(VM.IsSaving ? Resources.Web_Common_Deleting : Resources.Web_Common_YesDelete)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
                 }
             </aside>
         }

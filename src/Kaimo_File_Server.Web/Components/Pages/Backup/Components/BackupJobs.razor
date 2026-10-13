@@ -215,79 +215,105 @@
         {
             var job = view.Job;
             var active = VM.ActiveRuns.FirstOrDefault(r => r.JobId == job.Id);
-            <div class="workspace-heading">
-                <div>
-                    <h3>@job.Name</h3>
-                    <span class="workspace-heading-sub">@view.RepositoryName</span>
-                </div>
-                <StatusBadge Tone="@BackupUi.JobTone(job)" Label="@BackupUi.JobStatusLabel(job)" />
-            </div>
+            var hasPools = job.Sources.Any(s => s.Kind == BackupSourceKind.Pool);
+            <DetailHeader Icon="history.svg" Title="@job.Name" Subtitle="@view.RepositoryName">
+                <Status>
+                    <StatusBadge Tone="@BackupUi.JobTone(job)" Label="@BackupUi.JobStatusLabel(job)" />
+                </Status>
+                <Actions>
+                    <button class="btn-tinted" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => StartEdit(view)">
+                        @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
+                        <span>@R("Web_Backup_Edit")</span>
+                    </button>
+                    @if (active is not null)
+                    {
+                        <button class="btn-tinted btn-tinted--danger" type="button" disabled="@(VM.IsBusy || active.IsCancellationRequested)" @onclick="() => VM.CancelRunAsync(active.RunId)">
+                            @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14))
+                            <span>@R("Web_Jobs_Cancel")</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn-tinted btn-tinted--info" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo || !job.Enabled)"
+                                title="@(job.Enabled ? null : R("Web_Backup_Disabled"))" @onclick="() => VM.RunNowAsync(job.Id)">
+                            @Assets.SVG("play.svg", new SvgOptions(Width: 14, Height: 14))
+                            <span>@R("Web_Backup_Jobs_RunNow")</span>
+                        </button>
+                    }
+                </Actions>
+                <MoreActions>
+                    <MenuItem Icon="trash.svg" Label="@R("Web_Action_Delete")" Danger
+                              Disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" OnClick="() => _confirmDelete = true" />
+                </MoreActions>
+            </DetailHeader>
 
             @if (active is not null)
             {
-                <div class="backup-progress">
-                    <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@active.Progress">
-                        <div class="job-progress-fill" style="width: @(active.Progress)%"></div>
+                <div class="detail-alerts">
+                    <div class="backup-progress">
+                        <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@active.Progress">
+                            <div class="job-progress-fill" style="width: @(active.Progress)%"></div>
+                        </div>
+                        <span class="form-hint">
+                            @(active.IsCancellationRequested ? R("Web_Jobs_Cancelling")
+                                : active.IsRunning ? string.Format(R("Web_Backup_Running"), active.Progress) + (active.Detail is null ? "" : " · " + active.Detail)
+                                : R("Web_Backup_Queued"))
+                        </span>
                     </div>
-                    <span class="form-hint">
-                        @(active.IsCancellationRequested ? R("Web_Jobs_Cancelling")
-                            : active.IsRunning ? string.Format(R("Web_Backup_Running"), active.Progress) + (active.Detail is null ? "" : " · " + active.Detail)
-                            : R("Web_Backup_Queued"))
-                    </span>
                 </div>
             }
 
-            <dl class="workspace-dl">
+            <div class="fact-tiles">
+                <FactTile Label="@R("Web_Backup_LastRun")" Value="@DateFmt.FormatDateTime(job.LastRunAtUtc, R("Web_Backup_Never"))" Compact
+                          Tone="@(job.LastStatus is { } lastStatus ? BackupUi.RunTone(lastStatus) : StatusTone.Neutral)"
+                          Tooltip="@(job.LastStatus is { } status ? BackupUi.RunStatusLabel(status) : null)" />
+                <FactTile Label="@R("Web_Backup_LastSuccess")" Value="@DateFmt.FormatDateTime(job.LastSuccessAtUtc, R("Web_Backup_Never"))" Compact
+                          Tone="@SuccessTone(job)"
+                          Tooltip="@(SuccessTone(job) == StatusTone.Warning ? string.Format(R("Web_Backup_Jobs_SuccessOverdue"), BackupSchedulerService.EffectiveAlertDays(job)) : null)" />
+                <FactTile Label="@R("Web_Backup_NextRun")" Value="@DateFmt.FormatDateTime(VM.NextRunUtc(job), R("Web_Backup_NoSchedule"))" Compact />
+                <FactTile Label="@R("Web_Backup_Repository")" Value="@view.RepositoryName" Compact
+                          OnLink="@(OnOpenRepository.HasDelegate ? EventCallback.Factory.Create(this, () => OnOpenRepository.InvokeAsync(job.RepositoryId)) : default)"
+                          LinkLabel="@R("Web_Backup_Jobs_OpenRepository")" />
+            </div>
+
+            <DetailSection Title="@R("Web_Backup_Jobs_Section_Sources")">
                 @if (view.Shares.Count > 0)
                 {
-                    <dt>@R("Web_Backup_Jobs_Sources")</dt><dd>@string.Join(", ", view.Shares.Select(s => s.Name))</dd>
+                    <PropertyRow Label="@R("Web_Backup_Jobs_Sources")" Value="@string.Join(", ", view.Shares.Select(s => s.Name))" />
                 }
-                @if (job.Sources.Any(s => s.Kind == BackupSourceKind.Pool))
+                @if (hasPools)
                 {
-                    <dt>@R("Web_Backup_Jobs_Pools")</dt>
-                    <dd>@string.Join(", ", job.Sources.Where(s => s.Kind == BackupSourceKind.Pool && s.PoolPath is not null).Select(s => BackupUi.PoolName(s.PoolPath!)))</dd>
-                    <dt>@R("Web_Backup_Jobs_PoolShares")</dt>
-                    <dd>@string.Join(", ", job.Sources.Where(s => s.Kind == BackupSourceKind.Pool && s.PoolPath is not null).SelectMany(s => VM.SharesInPool(s.PoolPath!)).Distinct())</dd>
-                    <dt>@R("Web_Backup_Jobs_IncludeVersions")</dt><dd>@(BackupJobExecutor.IncludesVersions(job) ? R("Web_Common_Yes") : R("Web_Common_No"))</dd>
+                    <PropertyRow Label="@R("Web_Backup_Jobs_Pools")"
+                                 Value="@string.Join(", ", job.Sources.Where(s => s.Kind == BackupSourceKind.Pool && s.PoolPath is not null).Select(s => BackupUi.PoolName(s.PoolPath!)))" />
+                    <PropertyRow Label="@R("Web_Backup_Jobs_PoolShares")"
+                                 Value="@string.Join(", ", job.Sources.Where(s => s.Kind == BackupSourceKind.Pool && s.PoolPath is not null).SelectMany(s => VM.SharesInPool(s.PoolPath!)).Distinct())" />
                 }
-                <dt>@R("Web_Backup_Jobs_Content")</dt><dd>@BackupUi.LevelLabel(job.ContentLevel)</dd>
-                <dt>@R("Web_Backup_Repository")</dt><dd>@view.RepositoryName</dd>
-                <dt>@R("Web_Backup_Schedule")</dt><dd>@BackupUi.ScheduleText(job.Schedule, DateFmt.FormatTime)</dd>
-                <dt>@R("Web_Backup_Retention")</dt><dd>@BackupUi.RetentionText(job.Retention)</dd>
-                <dt>@R("Web_Backup_AlertAfterDays")</dt><dd>@(job.AlertAfterDays > 0 ? string.Format(R("Web_Backup_AlertAfterDaysValue"), job.AlertAfterDays) : R("Web_Backup_AlertOff"))</dd>
-                <dt>@R("Web_Backup_Jobs_IncludeRecycleBin")</dt><dd>@(job.IncludeRecycleBin ? R("Web_Common_Yes") : R("Web_Common_No"))</dd>
-                <dt>@R("Web_Backup_LastRun")</dt><dd>@DateFmt.FormatDateTime(job.LastRunAtUtc, R("Web_Backup_Never"))</dd>
-                <dt>@R("Web_Backup_LastSuccess")</dt><dd>@DateFmt.FormatDateTime(job.LastSuccessAtUtc, R("Web_Backup_Never"))</dd>
-                <dt>@R("Web_Backup_NextRun")</dt><dd>@DateFmt.FormatDateTime(VM.NextRunUtc(job), R("Web_Backup_NoSchedule"))</dd>
-            </dl>
+                <PropertyRow Label="@R("Web_Backup_Jobs_Content")" Value="@BackupUi.LevelLabel(job.ContentLevel)" />
+                @if (hasPools)
+                {
+                    <PropertyRow Label="@R("Web_Backup_Jobs_IncludeVersions")" Value="@(BackupJobExecutor.IncludesVersions(job) ? R("Web_Common_Yes") : R("Web_Common_No"))" />
+                }
+                <PropertyRow Label="@R("Web_Backup_Jobs_IncludeRecycleBin")" Value="@(job.IncludeRecycleBin ? R("Web_Common_Yes") : R("Web_Common_No"))" />
+            </DetailSection>
 
-            <div class="detail-actions">
-                @if (active is null)
-                {
-                    <button class="btn-primary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo || !job.Enabled)" @onclick="() => VM.RunNowAsync(job.Id)">
-                        @R("Web_Backup_Jobs_RunNow")
-                    </button>
-                }
-                else
-                {
-                    <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || active.IsCancellationRequested)" @onclick="() => VM.CancelRunAsync(active.RunId)">
-                        @R("Web_Jobs_Cancel")
-                    </button>
-                }
-                <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => StartEdit(view)">@R("Web_Backup_Edit")</button>
-                @if (_confirmDelete)
-                {
-                    <button class="btn-danger" type="button" disabled="@VM.IsBusy" @onclick="() => DeleteAsync(job.Id)">@R("Web_Backup_ConfirmDelete")</button>
-                    <button class="btn-secondary" type="button" @onclick="() => _confirmDelete = false">@R("Web_Button_Cancel")</button>
-                }
-                else
-                {
-                    <button class="btn-danger-outline" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => _confirmDelete = true">@R("Web_Action_Delete")</button>
-                }
-            </div>
+            <DetailSection Title="@R("Web_Backup_Jobs_Section_Schedule")">
+                <PropertyRow Label="@R("Web_Backup_Schedule")" Value="@BackupUi.ScheduleText(job.Schedule, DateFmt.FormatTime)" />
+                <PropertyRow Label="@R("Web_Backup_Retention")" Value="@BackupUi.RetentionText(job.Retention)" />
+                <PropertyRow Label="@R("Web_Backup_AlertAfterDays")" Value="@(job.AlertAfterDays > 0 ? string.Format(R("Web_Backup_AlertAfterDaysValue"), job.AlertAfterDays) : R("Web_Backup_AlertOff"))" />
+            </DetailSection>
+
             @if (_confirmDelete)
             {
-                <p class="form-hint">@R("Web_Backup_Jobs_DeleteHint")</p>
+                <div class="modal-backdrop" @onclick="() => _confirmDelete = false">
+                    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-job-delete-title" @onclick:stopPropagation="true">
+                        <h2 class="modal-title" id="backup-job-delete-title">@string.Format(R("Web_Backup_Jobs_DeleteTitle"), job.Name)</h2>
+                        <p class="modal-text">@R("Web_Backup_Jobs_DeleteHint")</p>
+                        <div class="modal-actions">
+                            <button type="button" class="btn-secondary" @onclick="() => _confirmDelete = false">@R("Web_Button_Cancel")</button>
+                            <button type="button" class="btn-danger" disabled="@VM.IsBusy" @onclick="() => DeleteAsync(job.Id)">@R("Web_Backup_ConfirmDelete")</button>
+                        </div>
+                    </div>
+                </div>
             }
         }
         else
@@ -305,6 +331,9 @@
     public void Dispose() => VM.Changed -= Refresh;
 
     [Parameter] public Guid? SelectedJobId { get; set; }
+
+    /// <summary>Opens a repository on its tab; the repository tile shows no link without it.</summary>
+    [Parameter] public EventCallback<Guid> OnOpenRepository { get; set; }
 
     private Guid? _selectedId;
     private bool _editing;
@@ -360,6 +389,14 @@
             _selectedId = null;
         _confirmDelete = false;
     }
+
+    // Warning when the scheduler counts the job as overdue; negative when runs never
+    // succeeded, neutral before the first run.
+    private static StatusTone SuccessTone(BackupJob job)
+        => BackupSchedulerService.IsStale(job, DateTime.UtcNow) ? StatusTone.Warning
+            : job.LastSuccessAtUtc is not null ? StatusTone.Positive
+            : job.LastRunAtUtc is null ? StatusTone.Neutral
+            : StatusTone.Negative;
 
     private static string R(string key) => BackupViewModel.R(key);
 }

@@ -355,14 +355,6 @@
     min-height: 52px;
 }
 
-.notif-log-detail .detail-actions {
-    margin-top: var(--space-3);
-}
-
-.notif-log-detail .workspace-section {
-    margin-top: var(--space-4);
-}
-
 /* ── Responsive ─────────────────────────────────────── */
 
 /* Layout tab: narrow form, wide preview (only while the panes sit side by side). */

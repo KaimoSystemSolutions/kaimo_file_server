@@ -38,187 +38,198 @@
     <aside class="workspace-detail" aria-label="@R("Web_Backup_Activity_Detail")">
         @if (Selected is { } current)
         {
-            <div class="workspace-heading">
-                <div>
-                    <h3>@BackupUi.RunTypeLabel(current.Type)</h3>
-                    <span class="workspace-heading-sub">@RunSubject(current)</span>
+            var failed = !string.IsNullOrEmpty(current.ErrorCode);
+            <DetailHeader Icon="@RunIcon(current.Type)" Title="@BackupUi.RunTypeLabel(current.Type)" Subtitle="@RunSubject(current)">
+                <Status>
+                    <StatusBadge Tone="@BackupUi.RunTone(current.Status)" Label="@BackupUi.RunStatusLabel(current.Status)" />
+                </Status>
+            </DetailHeader>
+
+            @if (failed || current.WarningCount > 0)
+            {
+                <div class="detail-alerts">
+                    @if (failed)
+                    {
+                        <div class="error-banner" role="alert"><strong>@R("Web_Backup_LastError"):</strong> @BackupViewModel.ErrorText(current.ErrorCode)</div>
+                    }
+                    @if (current.WarningCount > 0)
+                    {
+                        <div class="warning-banner" role="status">@string.Format(R("Web_Backup_Activity_SourceWarnings"), current.WarningCount)</div>
+                    }
                 </div>
-                <StatusBadge Tone="@BackupUi.RunTone(current.Status)" Label="@BackupUi.RunStatusLabel(current.Status)" />
+            }
+
+            <div class="fact-tiles">
+                <FactTile Label="@R("Web_Backup_Activity_Started")" Value="@DateFmt.FormatDateTime(current.StartedAtUtc ?? current.QueuedAtUtc)" Compact />
+                <FactTile Label="@R("Web_Backup_Activity_Duration")" Value="@Duration(current)" Compact />
+                @if (current.JobId is { } jobId)
+                {
+                    <FactTile Label="@R("Web_Backup_Activity_Job")" Value="@VM.JobName(jobId)" Compact
+                              OnLink="@(OnOpenJob.HasDelegate ? EventCallback.Factory.Create(this, () => OnOpenJob.InvokeAsync(jobId)) : default)"
+                              LinkLabel="@R("Web_Backup_Activity_OpenJob")" />
+                }
+                <FactTile Label="@R("Web_Backup_Repository")" Value="@VM.RepositoryName(current.RepositoryId)" Compact
+                          OnLink="@(OnOpenRepository.HasDelegate ? EventCallback.Factory.Create(this, () => OnOpenRepository.InvokeAsync(current.RepositoryId)) : default)"
+                          LinkLabel="@R("Web_Backup_Jobs_OpenRepository")" />
             </div>
-            <dl class="workspace-dl">
-                <dt>@R("Web_Backup_Repository")</dt><dd>@VM.RepositoryName(current.RepositoryId)</dd>
-                <dt>@R("Web_Backup_Activity_Trigger")</dt><dd>@BackupUi.TriggerLabel(current.Trigger)</dd>
-                <dt>@R("Web_Backup_Activity_Started")</dt><dd>@DateFmt.FormatDateTime(current.StartedAtUtc)</dd>
-                <dt>@R("Web_Backup_Activity_Finished")</dt><dd>@DateFmt.FormatDateTime(current.FinishedAtUtc)</dd>
+
+            <DetailSection Title="@R("Web_Backup_Activity_Section_Run")">
+                <PropertyRow Label="@R("Web_Backup_Activity_Trigger")" Value="@BackupUi.TriggerLabel(current.Trigger)" />
+                <PropertyRow Label="@R("Web_Backup_Activity_Finished")" Value="@DateFmt.FormatDateTime(current.FinishedAtUtc)" />
                 @if (current.Type == BackupRunType.Backup)
                 {
-                    <dt>@R("Web_Backup_Activity_Files")</dt>
-                    <dd>@string.Format(R("Web_Backup_Activity_FilesValue"), current.FilesNew, current.FilesChanged, current.FilesUnmodified)</dd>
-                    <dt>@R("Web_Backup_Activity_Data")</dt>
-                    <dd>@string.Format(R("Web_Backup_Activity_DataValue"), NotificationEvents.FormatSize(current.BytesAdded), NotificationEvents.FormatSize(current.BytesProcessed))</dd>
+                    <PropertyRow Label="@R("Web_Backup_Activity_Files")" Value="@string.Format(R("Web_Backup_Activity_FilesValue"), current.FilesNew, current.FilesChanged, current.FilesUnmodified)" />
+                    <PropertyRow Label="@R("Web_Backup_Activity_Data")" Value="@string.Format(R("Web_Backup_Activity_DataValue"), NotificationEvents.FormatSize(current.BytesAdded), NotificationEvents.FormatSize(current.BytesProcessed))" />
                 }
-                @if (current.WarningCount > 0)
-                {
-                    <dt>@R("Web_Backup_Activity_Warnings")</dt><dd>@current.WarningCount</dd>
-                }
-                @if (!string.IsNullOrEmpty(current.ErrorCode))
-                {
-                    <dt>@R("Web_Backup_LastError")</dt><dd>@BackupViewModel.ErrorText(current.ErrorCode)</dd>
-                }
-            </dl>
+            </DetailSection>
 
             @if (Sources(current) is { Count: > 0 } sources)
             {
-                <section class="workspace-section">
-                    <h4>@R("Web_Backup_Activity_Sources")</h4>
-                    <ul class="backup-source-list">
-                        @foreach (var source in sources)
-                        {
-                            <li>
-                                <StatusBadge Tone="@(source.ErrorCode is not null ? StatusTone.Negative : source.WarningCount > 0 ? StatusTone.Warning : StatusTone.Positive)"
-                                             Label="@BackupUi.SourceName(source.Name)" />
-                                <span class="form-hint">
-                                    @(source.ErrorCode is not null ? BackupViewModel.ErrorText(source.ErrorCode)
-                                        : source.WarningCount > 0 ? string.Format(R("Web_Backup_Activity_SourceWarnings"), source.WarningCount)
-                                        : string.Format(R("Web_Backup_Activity_Snapshot"), source.SnapshotId?[..Math.Min(8, source.SnapshotId.Length)]))
-                                </span>
-                                @if (source.Warnings.Count > 0)
-                                {
-                                    <details class="backup-details">
-                                        <summary>@R("Web_Backup_Activity_ShowWarnings")</summary>
-                                        <ul>
-                                            @foreach (var warning in source.Warnings)
-                                            {
-                                                <li><code>@warning</code></li>
-                                            }
-                                        </ul>
-                                    </details>
-                                }
-                            </li>
-                        }
-                    </ul>
-                </section>
+                <DetailSection Title="@R("Web_Backup_Activity_Sources")">
+                    @foreach (var source in sources)
+                    {
+                        var tone = source.ErrorCode is not null ? "negative" : source.WarningCount > 0 ? "warning" : "positive";
+                        <PropertyRow Label="@BackupUi.SourceName(source.Name)">
+                            <span class="backup-source-state backup-source-state--@tone">
+                                @(source.ErrorCode is not null ? BackupViewModel.ErrorText(source.ErrorCode)
+                                    : source.WarningCount > 0 ? string.Format(R("Web_Backup_Activity_SourceWarnings"), source.WarningCount)
+                                    : string.Format(R("Web_Backup_Activity_Snapshot"), source.SnapshotId?[..Math.Min(8, source.SnapshotId.Length)]))
+                            </span>
+                            @if (source.Warnings.Count > 0)
+                            {
+                                <details class="backup-details">
+                                    <summary>@R("Web_Backup_Activity_ShowWarnings")</summary>
+                                    <ul>
+                                        @foreach (var warning in source.Warnings)
+                                        {
+                                            <li><code>@warning</code></li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+                        </PropertyRow>
+                    }
+                </DetailSection>
             }
 
             @if (current.Type == BackupRunType.Restore && BackupRestoreDetails.TryParse(current.DetailsJson) is { } restore)
             {
                 var request = restore.Request;
                 var result = restore.Result;
-                <section class="workspace-section">
-                    <h4>@R("Web_Backup_Activity_Restore")</h4>
-                    <dl class="workspace-dl">
-                        <dt>@R("Web_Backup_Restore_Mode")</dt>
-                        <dd>@R("Web_Backup_Restore_Mode_" + request.Mode)@(request.Mode == BackupRestoreMode.InPlace ? " · " + R("Web_Backup_Restore_Conflict_" + request.Conflict) : "")</dd>
-                        <dt>@R("Web_Backup_Activity_RestoreSource")</dt>
-                        <dd>@SharePath(result?.SourceShareName, request.FolderPath)@(request.Items.Count == 0 ? "" : " · " + string.Join(", ", request.Items))</dd>
+                <DetailSection Title="@R("Web_Backup_Activity_Restore")">
+                    <ChildContent>
+                        <PropertyRow Label="@R("Web_Backup_Restore_Mode")"
+                                     Value="@(R("Web_Backup_Restore_Mode_" + request.Mode) + (request.Mode == BackupRestoreMode.InPlace ? " · " + R("Web_Backup_Restore_Conflict_" + request.Conflict) : ""))" />
+                        <PropertyRow Label="@R("Web_Backup_Activity_RestoreSource")"
+                                     Value="@(SharePath(result?.SourceShareName, request.FolderPath) + (request.Items.Count == 0 ? "" : " · " + string.Join(", ", request.Items)))" Mono />
                         @if (result is not null && request.Mode != BackupRestoreMode.Download)
                         {
-                            <dt>@R("Web_Backup_Activity_RestoreTarget")</dt>
-                            <dd>@SharePath(result.DestinationShareName, result.DestinationPath)</dd>
-                            <dt>@R("Web_Backup_Activity_Files")</dt>
-                            <dd>@string.Format(R("Web_Backup_Activity_RestoreFilesValue"), result.FilesRestored, NotificationEvents.FormatSize(result.BytesRestored))</dd>
+                            <PropertyRow Label="@R("Web_Backup_Activity_RestoreTarget")" Value="@SharePath(result.DestinationShareName, result.DestinationPath)" Mono />
+                            <PropertyRow Label="@R("Web_Backup_Activity_Files")" Value="@string.Format(R("Web_Backup_Activity_RestoreFilesValue"), result.FilesRestored, NotificationEvents.FormatSize(result.BytesRestored))" />
                             @if (request.Mode == BackupRestoreMode.InPlace)
                             {
-                                <dt>@R("Web_Backup_Activity_RestoreConflicts")</dt>
-                                <dd>@string.Format(R("Web_Backup_Activity_RestoreConflictsValue"), result.Overwritten, result.VersionsCreated, result.Unchanged, result.Skipped, result.Renamed)</dd>
+                                <PropertyRow Label="@R("Web_Backup_Activity_RestoreConflicts")"
+                                             Value="@string.Format(R("Web_Backup_Activity_RestoreConflictsValue"), result.Overwritten, result.VersionsCreated, result.Unchanged, result.Skipped, result.Renamed)" />
                             }
-                            <dt>@R("Web_Backup_Restore_Permissions")</dt>
-                            <dd>@(request.RestorePermissions ? string.Format(R("Web_Backup_Activity_RestoreAclValue"), result.AclEntriesApplied) : R("Web_Common_No"))</dd>
+                            <PropertyRow Label="@R("Web_Backup_Restore_Permissions")"
+                                         Value="@(request.RestorePermissions ? string.Format(R("Web_Backup_Activity_RestoreAclValue"), result.AclEntriesApplied) : R("Web_Common_No"))" />
                         }
-                    </dl>
-                    @if (result is { SkippedPrincipals.Count: > 0 })
-                    {
-                        <details class="backup-details">
-                            <summary>@string.Format(R("Web_Backup_Activity_SkippedPrincipals"), result.SkippedPrincipals.Count)</summary>
-                            <ul>
-                                @foreach (var principal in result.SkippedPrincipals)
-                                {
-                                    <li>@(principal.Name ?? "?") <code>@principal.Id</code></li>
-                                }
-                            </ul>
-                        </details>
-                    }
-                    @if (result is { SkippedItems.Count: > 0 })
-                    {
-                        <details class="backup-details">
-                            <summary>@string.Format(R("Web_Backup_Activity_SkippedItems"), result.SkippedItems.Count)</summary>
-                            <ul>
-                                @foreach (var item in result.SkippedItems)
-                                {
-                                    <li><code>@item</code></li>
-                                }
-                            </ul>
-                        </details>
-                    }
-                </section>
+                    </ChildContent>
+                    <Body>
+                        @if (result is { SkippedPrincipals.Count: > 0 })
+                        {
+                            <details class="backup-details">
+                                <summary>@string.Format(R("Web_Backup_Activity_SkippedPrincipals"), result.SkippedPrincipals.Count)</summary>
+                                <ul>
+                                    @foreach (var principal in result.SkippedPrincipals)
+                                    {
+                                        <li>@(principal.Name ?? "?") <code>@principal.Id</code></li>
+                                    }
+                                </ul>
+                            </details>
+                        }
+                        @if (result is { SkippedItems.Count: > 0 })
+                        {
+                            <details class="backup-details">
+                                <summary>@string.Format(R("Web_Backup_Activity_SkippedItems"), result.SkippedItems.Count)</summary>
+                                <ul>
+                                    @foreach (var item in result.SkippedItems)
+                                    {
+                                        <li><code>@item</code></li>
+                                    }
+                                </ul>
+                            </details>
+                        }
+                    </Body>
+                </DetailSection>
             }
 
             @* Prune records no details; it shows only the common fields above. *@
             @if (current.Type is BackupRunType.Forget or BackupRunType.Check or BackupRunType.TestRestore or BackupRunType.Copy
                  && BackupMaintenanceDetails.TryParse(current.DetailsJson) is { } maintenance)
             {
-                <section class="workspace-section">
-                    <h4>@R("Web_Backup_Activity_Detail")</h4>
-                    <dl class="workspace-dl">
+                <DetailSection Title="@R("Web_Backup_Activity_Section_Result")">
+                    <ChildContent>
                         @if (maintenance.SnapshotsRemoved is { } removed)
                         {
-                            <dt>@R("Web_Backup_Activity_Forgotten")</dt>
-                            <dd>@string.Format(R("Web_Backup_Activity_ForgottenValue"), removed, maintenance.JobsApplied ?? 0)</dd>
+                            <PropertyRow Label="@R("Web_Backup_Activity_Forgotten")" Value="@string.Format(R("Web_Backup_Activity_ForgottenValue"), removed, maintenance.JobsApplied ?? 0)" />
                         }
                         @if (current.Type == BackupRunType.Check)
                         {
-                            <dt>@R("Web_Backup_Activity_ReadData")</dt>
-                            <dd>@(maintenance.ReadDataSubset ?? R("Web_Common_No"))</dd>
+                            <PropertyRow Label="@R("Web_Backup_Activity_ReadData")" Value="@(maintenance.ReadDataSubset ?? R("Web_Common_No"))" />
                         }
                         @if (maintenance.FilesVerified is { } verified)
                         {
-                            <dt>@R("Web_Backup_Activity_TestRestore")</dt>
-                            <dd>@string.Format(R("Web_Backup_Activity_TestRestoreValue"), verified, maintenance.FilesChanged ?? 0, maintenance.Mismatches?.Count ?? 0)</dd>
+                            <PropertyRow Label="@R("Web_Backup_Activity_TestRestore")"
+                                         Value="@string.Format(R("Web_Backup_Activity_TestRestoreValue"), verified, maintenance.FilesChanged ?? 0, maintenance.Mismatches?.Count ?? 0)" />
                         }
                         @if (maintenance.DatabaseDumpOk is { } dumpOk)
                         {
-                            <dt>@R("Web_Backup_Activity_DumpCheck")</dt>
-                            <dd>@(dumpOk ? R("Web_Backup_Activity_DumpOk") : R("Web_Backup_Activity_DumpBroken"))</dd>
+                            <PropertyRow Label="@R("Web_Backup_Activity_DumpCheck")" Value="@(dumpOk ? R("Web_Backup_Activity_DumpOk") : R("Web_Backup_Activity_DumpBroken"))" />
                         }
                         @if (maintenance.MirrorName is { } mirror)
                         {
-                            <dt>@R("Web_Backup_Maintenance_Mirror")</dt>
-                            <dd>@mirror@(maintenance.SnapshotsCopied is { } copied ? " · " + string.Format(R("Web_Backup_Activity_CopiedValue"), copied) : "")</dd>
+                            <PropertyRow Label="@R("Web_Backup_Maintenance_Mirror")"
+                                         Value="@(mirror + (maintenance.SnapshotsCopied is { } copied ? " · " + string.Format(R("Web_Backup_Activity_CopiedValue"), copied) : ""))" />
                         }
-                    </dl>
-                    @if (maintenance.CheckErrors is { Count: > 0 } errors)
-                    {
-                        <details class="backup-details">
-                            <summary>@string.Format(R("Web_Backup_Activity_CheckErrors"), errors.Count)</summary>
-                            <ul>
-                                @foreach (var error in errors)
-                                {
-                                    <li><code>@error</code></li>
-                                }
-                            </ul>
-                        </details>
-                    }
-                    @if (maintenance.Mismatches is { Count: > 0 } mismatches)
-                    {
-                        <details class="backup-details" open>
-                            <summary>@string.Format(R("Web_Backup_Activity_Mismatches"), mismatches.Count)</summary>
-                            <ul>
-                                @foreach (var file in mismatches)
-                                {
-                                    <li><code>@file</code></li>
-                                }
-                            </ul>
-                        </details>
-                    }
-                </section>
+                    </ChildContent>
+                    <Body>
+                        @if (maintenance.CheckErrors is { Count: > 0 } errors)
+                        {
+                            <details class="backup-details">
+                                <summary>@string.Format(R("Web_Backup_Activity_CheckErrors"), errors.Count)</summary>
+                                <ul>
+                                    @foreach (var error in errors)
+                                    {
+                                        <li><code>@error</code></li>
+                                    }
+                                </ul>
+                            </details>
+                        }
+                        @if (maintenance.Mismatches is { Count: > 0 } mismatches)
+                        {
+                            <details class="backup-details" open>
+                                <summary>@string.Format(R("Web_Backup_Activity_Mismatches"), mismatches.Count)</summary>
+                                <ul>
+                                    @foreach (var file in mismatches)
+                                    {
+                                        <li><code>@file</code></li>
+                                    }
+                                </ul>
+                            </details>
+                        }
+                    </Body>
+                </DetailSection>
             }
 
             @if (!string.IsNullOrWhiteSpace(current.LogExcerpt))
             {
-                <section class="workspace-section">
-                    <h4>@R("Web_Backup_Activity_Log")</h4>
-                    <pre class="backup-log">@current.LogExcerpt</pre>
-                </section>
+                @* Mostly needed to diagnose a failure; otherwise it starts closed. *@
+                <DetailSection Title="@R("Web_Backup_Activity_Log")" InitiallyCollapsed="@(!failed)">
+                    <Body>
+                        <pre class="backup-log">@current.LogExcerpt</pre>
+                    </Body>
+                </DetailSection>
             }
         }
         else
@@ -234,6 +245,12 @@
     protected override void OnInitialized() => VM.Changed += Refresh;
     private void Refresh() => _ = InvokeAsync(StateHasChanged);
     public void Dispose() => VM.Changed -= Refresh;
+
+    /// <summary>Opens a job on its tab; the job tile shows no link without it.</summary>
+    [Parameter] public EventCallback<Guid> OnOpenJob { get; set; }
+
+    /// <summary>Opens a repository on its tab; the repository tile shows no link without it.</summary>
+    [Parameter] public EventCallback<Guid> OnOpenRepository { get; set; }
 
     private Guid? _selectedId;
 
@@ -264,6 +281,27 @@
     // The share name is only recorded once the run started; a queued restore shows its folder.
     private static string SharePath(string? share, string? path)
         => string.Join("/", new[] { share, path }.Where(p => !string.IsNullOrEmpty(p))) is { Length: > 0 } text ? text : "–";
+
+    private static string RunIcon(BackupRunType type) => type switch
+    {
+        BackupRunType.Backup => "upload.svg",
+        BackupRunType.Restore => "cloud-download.svg",
+        BackupRunType.Check or BackupRunType.TestRestore => "shield.svg",
+        BackupRunType.Copy => "copy.svg",
+        BackupRunType.Forget or BackupRunType.Prune => "trash.svg",
+        _ => "archive.svg",
+    };
+
+    // Queued or still running runs have no duration yet.
+    private static string? Duration(BackupRun run)
+    {
+        if (run.StartedAtUtc is not { } started || run.FinishedAtUtc is not { } finished)
+            return null;
+        var span = finished - started;
+        return span.TotalHours >= 1 ? $"{(int)span.TotalHours} h {span.Minutes} min"
+            : span.TotalMinutes >= 1 ? $"{span.Minutes} min {span.Seconds} s"
+            : $"{Math.Max(0, span.Seconds)} s";
+    }
 
     private static string R(string key) => BackupViewModel.R(key);
 }

@@ -7015,4 +7015,70 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Backup_Repos_DeleteTitle" xml:space="preserve">
     <value>Delete repository “{0}”?</value>
   </data>
+  <data name="Web_Backup_Jobs_SuccessOverdue" xml:space="preserve">
+    <value>No successful backup for more than {0} days</value>
+  </data>
+  <data name="Web_Backup_Jobs_OpenRepository" xml:space="preserve">
+    <value>Show repository</value>
+  </data>
+  <data name="Web_Backup_Jobs_Section_Sources" xml:space="preserve">
+    <value>Sources</value>
+  </data>
+  <data name="Web_Backup_Jobs_Section_Schedule" xml:space="preserve">
+    <value>Schedule &amp; retention</value>
+  </data>
+  <data name="Web_Backup_Jobs_DeleteTitle" xml:space="preserve">
+    <value>Delete job “{0}”?</value>
+  </data>
+  <data name="Web_Backup_Activity_Duration" xml:space="preserve">
+    <value>Duration</value>
+  </data>
+  <data name="Web_Backup_Activity_Job" xml:space="preserve">
+    <value>Job</value>
+  </data>
+  <data name="Web_Backup_Activity_OpenJob" xml:space="preserve">
+    <value>Show job</value>
+  </data>
+  <data name="Web_Backup_Activity_Section_Run" xml:space="preserve">
+    <value>Run</value>
+  </data>
+  <data name="Web_Backup_Activity_Section_Result" xml:space="preserve">
+    <value>Result</value>
+  </data>
+  <data name="Web_ExternalStorage_OpenSyncs" xml:space="preserve">
+    <value>Show syncs</value>
+  </data>
+  <data name="Web_ExternalStorage_DeleteConnectionTitle" xml:space="preserve">
+    <value>Delete connection “{0}”?</value>
+  </data>
+  <data name="Web_ExternalStorage_DeleteConnectionHint" xml:space="preserve">
+    <value>The stored access data is removed from this server. Files on the remote storage are not changed.</value>
+  </data>
+  <data name="Web_ExternalStorage_Section_Locations" xml:space="preserve">
+    <value>Locations</value>
+  </data>
+  <data name="Web_ExternalStorage_DeleteSyncTitle" xml:space="preserve">
+    <value>Delete sync “{0}”?</value>
+  </data>
+  <data name="Web_ExternalStorage_DeleteSyncHint" xml:space="preserve">
+    <value>Files that were already synchronized stay on both sides.</value>
+  </data>
+  <data name="Web_Admin_Section_Memberships" xml:space="preserve">
+    <value>Memberships</value>
+  </data>
+  <data name="Web_ShareLinks_DeleteTitle" xml:space="preserve">
+    <value>Delete link “{0}”?</value>
+  </data>
+  <data name="Web_ShareLinks_DeleteHint" xml:space="preserve">
+    <value>The public link stops working immediately. The shared files are not deleted.</value>
+  </data>
+  <data name="Web_Notifications_Section_Delivery" xml:space="preserve">
+    <value>Delivery</value>
+  </data>
+  <data name="Web_Homes_Enable" xml:space="preserve">
+    <value>Enable home folder</value>
+  </data>
+  <data name="Web_Homes_Disable" xml:space="preserve">
+    <value>Disable home folder</value>
+  </data>
 </root>
