@@ -2,31 +2,21 @@
     Titled group of properties in a detail pane (shared UI library, see DESIGN_SPEC §9.2).
     Holds <PropertyRow> children (rendered as a <dl>).
 
-    Collapsible sections use native <details>/<summary>, so keyboard and screen-reader
-    support come for free; use them for secondary groups such as technical IDs.
+    Every section can be collapsed via its title band. It uses native <details>/<summary>,
+    so keyboard and screen-reader support come for free. The open/closed state lives only
+    in the DOM: a reload or reopened page starts from the default again (open, or closed
+    with InitiallyCollapsed for secondary groups such as technical IDs).
 *@
 
-@if (Collapsible)
-{
-    <details class="detail-section-group detail-section-group--collapsible @Class" open="@(!InitiallyCollapsed)">
-        <summary class="detail-section-title">@Title</summary>
-        <dl class="property-list">@ChildContent</dl>
-    </details>
-}
-else
-{
-    <section class="detail-section-group @Class">
-        <h4 class="detail-section-title">@Title</h4>
-        <dl class="property-list">@ChildContent</dl>
-    </section>
-}
+<details class="detail-section-group @Class" open="@(!InitiallyCollapsed)">
+    <summary class="detail-section-title"><h4 class="detail-section-heading">@Title</h4></summary>
+    <dl class="property-list">@ChildContent</dl>
+</details>
 
 @code {
     [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
 
-    [Parameter] public bool Collapsible { get; set; }
-
-    /// <summary>Only with <see cref="Collapsible"/>: start closed.</summary>
+    /// <summary>Start closed; for secondary groups such as technical IDs.</summary>
     [Parameter] public bool InitiallyCollapsed { get; set; }
 
     [Parameter] public RenderFragment? ChildContent { get; set; }

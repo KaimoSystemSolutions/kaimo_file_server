@@ -55,6 +55,17 @@ public class DateFormatService
         _loaded = true;
     }
 
+    /// <summary>
+    /// Switches this circuit to newly saved formats, so the change shows without a reload.
+    /// Other open sessions pick it up on their next page load.
+    /// </summary>
+    public void Apply(string format, string timeFormat)
+    {
+        _format = Normalize(format);
+        _timeFormat = NormalizeTime(timeFormat);
+        _loaded = true;
+    }
+
     /// <summary>Formats a UTC timestamp as local date + time, or <paramref name="nullText"/> when null.</summary>
     public string FormatDateTime(DateTime? utc, string nullText = "–")
         => utc.HasValue
@@ -70,6 +81,10 @@ public class DateFormatService
     /// <summary>Formats an already-local value as date + time, without re-converting the time zone.</summary>
     public string FormatDateTimeLocal(DateTime local)
         => local.ToString(DateTimePattern, CultureInfo.InvariantCulture);
+
+    /// <summary>Formats a wall-clock time (e.g. a schedule slot) in the active time format.</summary>
+    public string FormatTime(TimeOnly time)
+        => time.ToString(TimePattern, CultureInfo.InvariantCulture);
 
     private static string Normalize(string? value)
     {

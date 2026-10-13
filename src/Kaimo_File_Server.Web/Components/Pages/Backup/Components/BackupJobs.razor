@@ -252,7 +252,7 @@
                 }
                 <dt>@R("Web_Backup_Jobs_Content")</dt><dd>@BackupUi.LevelLabel(job.ContentLevel)</dd>
                 <dt>@R("Web_Backup_Repository")</dt><dd>@view.RepositoryName</dd>
-                <dt>@R("Web_Backup_Schedule")</dt><dd>@BackupUi.ScheduleText(job.Schedule)</dd>
+                <dt>@R("Web_Backup_Schedule")</dt><dd>@BackupUi.ScheduleText(job.Schedule, DateFmt.FormatTime)</dd>
                 <dt>@R("Web_Backup_Retention")</dt><dd>@BackupUi.RetentionText(job.Retention)</dd>
                 <dt>@R("Web_Backup_AlertAfterDays")</dt><dd>@(job.AlertAfterDays > 0 ? string.Format(R("Web_Backup_AlertAfterDaysValue"), job.AlertAfterDays) : R("Web_Backup_AlertOff"))</dd>
                 <dt>@R("Web_Backup_Jobs_IncludeRecycleBin")</dt><dd>@(job.IncludeRecycleBin ? R("Web_Common_Yes") : R("Web_Common_No"))</dd>

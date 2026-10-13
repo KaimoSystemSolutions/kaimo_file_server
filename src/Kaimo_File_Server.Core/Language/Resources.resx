@@ -6670,11 +6670,11 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Backup_Maintenance_LastCheck" xml:space="preserve">
     <value>Last check</value>
   </data>
-  <data name="Web_Backup_Maintenance_CheckOk" xml:space="preserve">
-    <value>No errors</value>
+  <data name="Web_Backup_Maintenance_CheckOkAt" xml:space="preserve">
+    <value>Last run on {0} was successful</value>
   </data>
-  <data name="Web_Backup_Maintenance_CheckFailed" xml:space="preserve">
-    <value>Errors found</value>
+  <data name="Web_Backup_Maintenance_CheckFailedAt" xml:space="preserve">
+    <value>Last run on {0} found errors</value>
   </data>
   <data name="Web_Backup_Maintenance_RunNow" xml:space="preserve">
     <value>Run maintenance now</value>

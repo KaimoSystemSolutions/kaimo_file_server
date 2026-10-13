@@ -6604,11 +6604,11 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Backup_Maintenance_LastCheck" xml:space="preserve">
     <value>Letzte Prüfung</value>
   </data>
-  <data name="Web_Backup_Maintenance_CheckOk" xml:space="preserve">
-    <value>Fehlerfrei</value>
+  <data name="Web_Backup_Maintenance_CheckOkAt" xml:space="preserve">
+    <value>Letzter Lauf am {0} war erfolgreich</value>
   </data>
-  <data name="Web_Backup_Maintenance_CheckFailed" xml:space="preserve">
-    <value>Fehler gefunden</value>
+  <data name="Web_Backup_Maintenance_CheckFailedAt" xml:space="preserve">
+    <value>Letzter Lauf am {0} war fehlerhaft</value>
   </data>
   <data name="Web_Backup_Maintenance_RunNow" xml:space="preserve">
     <value>Wartung jetzt starten</value>

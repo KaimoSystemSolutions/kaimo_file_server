@@ -648,6 +648,49 @@ h1, h2, h3, h4, h5, h6 {
         cursor: not-allowed;
     }
 
+/* Quiet coloured action (e.g. DetailHeader buttons): tinted surface, toned text.
+   Accent by default; --info / --danger switch the tone. */
+.btn-tinted {
+    --btn-tone: var(--accent);
+    --btn-tone-text: var(--accent-strong, var(--accent));
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: color-mix(in srgb, var(--btn-tone) 10%, var(--bg-secondary));
+    color: var(--btn-tone-text);
+    border: 1px solid color-mix(in srgb, var(--btn-tone) 32%, var(--border));
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+    .btn-tinted:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--btn-tone) 18%, var(--bg-secondary));
+        border-color: color-mix(in srgb, var(--btn-tone) 50%, var(--border));
+    }
+
+    .btn-tinted:active:not(:disabled) {
+        background: color-mix(in srgb, var(--btn-tone) 26%, var(--bg-secondary));
+    }
+
+    .btn-tinted:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+.btn-tinted--info {
+    --btn-tone: var(--info);
+    --btn-tone-text: var(--info);
+}
+
+.btn-tinted--danger {
+    --btn-tone: var(--danger);
+    --btn-tone-text: var(--danger);
+}
+
 .btn-secondary--sm {
     padding: 4px 10px;
     font-size: 12px;
@@ -5958,6 +6001,11 @@ input[type="radio"] {
 .fact-tile--warning .fact-tile-value { color: var(--warning); }
 .fact-tile--neutral .fact-tile-value { color: var(--text-secondary); }
 
+.fact-tile--compact .fact-tile-value {
+    font-size: 13px;
+    font-weight: 600;
+}
+
 .fact-tile-hint {
     color: var(--text-tertiary);
     font-size: 11.5px;
@@ -5972,40 +6020,42 @@ input[type="radio"] {
 }
 
 .detail-section-group {
-    padding-top: var(--space-3);
+    padding-top: var(--space-4);
 }
 
+/* Category band: a slightly sunken full-width bar that separates the property groups. */
 .detail-section-title {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    margin: 0 0 var(--space-1);
-    color: var(--text-tertiary);
+    min-height: 30px;
+    margin: 0;
+    padding: 6px var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: color-mix(in srgb, var(--bg-sunken) 55%, var(--bg-tertiary));
+    color: var(--text-secondary);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: .045em;
     text-transform: uppercase;
-}
-
-    .detail-section-title::after {
-        content: "";
-        flex: 1;
-        height: 1px;
-        background: var(--border);
-    }
-
-.detail-section-group--collapsible > summary {
     cursor: pointer;
     list-style: none;
-    border-radius: var(--radius-control);
 }
 
-    .detail-section-group--collapsible > summary::-webkit-details-marker {
+    .detail-section-title::-webkit-details-marker {
         display: none;
     }
 
+    /* The heading keeps the band's look; it is only there for heading navigation. */
+    .detail-section-heading {
+        margin: 0;
+        font: inherit;
+        letter-spacing: inherit;
+    }
+
     /* Chevron: points right when closed, down when open. */
-    .detail-section-group--collapsible > summary::before {
+    .detail-section-title::before {
         content: "";
         flex: 0 0 auto;
         width: 5px;
@@ -6017,16 +6067,19 @@ input[type="radio"] {
         transition: transform 120ms ease;
     }
 
-    .detail-section-group--collapsible[open] > summary::before {
+    .detail-section-group[open] > .detail-section-title::before {
         transform: rotate(45deg);
     }
 
-    .detail-section-group--collapsible > summary:hover {
-        color: var(--text-secondary);
+    .detail-section-title:hover {
+        background: color-mix(in srgb, var(--bg-sunken) 80%, var(--bg-tertiary));
+        color: var(--text-primary);
     }
 
 .property-list {
     margin: 0;
+    /* Rows line up with the label inside the category band above them. */
+    padding: 0 var(--space-3);
 }
 
 .property-row {
@@ -6037,6 +6090,10 @@ input[type="radio"] {
     padding: 6px 0;
     border-bottom: 1px solid var(--border-light);
 }
+
+    .property-row:first-child {
+        padding-top: 3px;
+    }
 
     .property-row:last-child {
         border-bottom: 0;

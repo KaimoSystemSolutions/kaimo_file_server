@@ -205,10 +205,10 @@ Semantic backgrounds are tinted (`*-subtle`); solid fills are reserved for badge
 - Information-rich areas use **lists** (header row + `file-row`-style rows) as the default.
 - **Admin pattern** (users, groups, roles, departments, shares, connections): `.admin-content` = list on the left, sticky `.admin-detail` panel (≈ 450–460 px) on the right. Selecting a row fills the panel; with no selection it shows `.detail-empty`.
 - **Detail view skeleton** (read view of a selected object; MUST be used for new and migrated detail panes), always in this order:
-  1. `<DetailHeader>`: icon tile, name, subtitle, `StatusBadge`; below it the primary and one or two frequent actions as buttons, every other action in the "⋯" overflow menu (`<MenuItem>`). Destructive actions are last in that menu, after a separator, and confirm in a `modal-dialog`. Important, frequent functions MUST stay visible buttons (§15).
+  1. `<DetailHeader>`: icon tile, name, subtitle, `StatusBadge`; below it the primary and one or two frequent actions as `.btn-tinted` buttons (accent for the primary, `--info` for run/test actions, `--danger` for cancel), every other action in the "⋯" overflow menu (`<MenuItem>`). Destructive actions are last in that menu, after a separator, and confirm in a `modal-dialog`. Important, frequent functions MUST stay visible buttons (§15).
   2. `.detail-alerts`: one banner per problem or pending state (`.error-banner`, `.warning-banner`, progress), directly under the header; a banner MAY carry its own action.
-  3. `.fact-tiles` with 2–4 `<FactTile>`s for the facts that answer "is it OK?" at a glance; optional. A tile is not clickable; a link to a related place is a separate arrow button (`OnLink`).
-  4. `<DetailSection>`s with `<PropertyRow>`s: uppercase heading + divider, label left / value right (stacked ≤ 760 px). Secondary groups (technical IDs) MAY be `Collapsible`. Paths, IDs and URLs are `Mono` and `Copyable`. A missing value reads `–`.
+  3. `.fact-tiles` with 2–4 `<FactTile>`s for the facts that answer "is it OK?" at a glance; optional. One short value per tile: dates use `Compact`; a result (e.g. "last check passed") is shown as the coloured date via `Tone` and spelled out in `Tooltip`, not as value + `Hint`. A tile is not clickable; a link to a related place is a separate arrow button (`OnLink`).
+  4. `<DetailSection>`s with `<PropertyRow>`s: each category starts with a slightly sunken, full-width title band (uppercase label, `--bg-sunken` mixed into the pane), label left / value right (stacked ≤ 760 px). Every section collapses via its band (native `<details>`; state is not persisted, a reload restores the default); secondary groups (technical IDs) start closed with `InitiallyCollapsed`. Paths, IDs and URLs are `Mono` and `Copyable`. A missing value reads `–`.
 - Legacy detail panels (not yet migrated, see §18): `.detail-panel-header` (icon tile + name + subtitle), `<Tabs Variant panel>` for sections, read-only fields as `.detail-field-grid` / `.detail-field-value`, `.workspace-dl`, actions in `.detail-actions` separated by a top border. Tabs inside a detail pane remain valid for very large objects; the read-only content of each tab then follows step 4.
 - Hierarchical data (folders, departments, groups) SHOULD use a real tree view with indentation and expand/collapse state.
 - Multi-selection shows the `.selection-toolbar` (count + contextual `.toolbar-btn` actions) above the list.
@@ -247,15 +247,15 @@ Reuse these before writing anything new. New patterns that will be needed more t
 | `InfoButton` | Inline "i" button that reveals an explanation (e.g. password rules) instead of static hint walls. |
 | `DetailHeader` | Header of a detail pane: icon, title, subtitle, `Status`, `Actions` and the "⋯" `MoreActions` menu (§9.2). |
 | `MenuItem` | Entry of a dropdown menu (icon, label, `Danger`, `Disabled` + `Tooltip` reason, `Separator`). |
-| `FactTile` | Key fact tile (label, value, optional hint, `Tone`, optional arrow link) inside `.fact-tiles`. |
-| `DetailSection` | Titled property group, optionally `Collapsible` (native `<details>`). |
+| `FactTile` | Key fact tile (label, value, optional hint, `Tone`, `Compact` for dates, `Tooltip`, optional arrow link) inside `.fact-tiles`. |
+| `DetailSection` | Titled property group, collapsible via its title band (native `<details>`), `InitiallyCollapsed` for secondary groups. |
 | `PropertyRow` | Read-only label/value row; `Mono`, `Copyable`, "–" for empty values. |
 
 ### 10.2 Global CSS primitives (`app.css`)
 
 | Area | Classes |
 |---|---|
-| Buttons | `.btn-primary` (accent fill, one per command group), `.btn-secondary` (neutral, bordered), `.btn-danger`, `.btn-danger-outline` (tinted, fills on hover), `.btn-secondary--sm`; all 8×16 px, 13 px; disabled = 50 % opacity + `not-allowed` |
+| Buttons | `.btn-primary` (accent fill, one per command group), `.btn-secondary` (neutral, bordered), `.btn-danger`, `.btn-danger-outline` (tinted, fills on hover), `.btn-tinted` (quiet coloured action: tinted surface + toned text; accent by default, `--info`, `--danger`), `.btn-secondary--sm`; all 8×16 px, 13 px; disabled = 50 % opacity + `not-allowed` |
 | Icon buttons | `.btn-icon` (34 px, accent hover), `.btn-icon--small` (30 px, neutral hover), `.btn-icon--danger` |
 | Toolbars | `.selection-toolbar`, `.toolbar-left`, `.toolbar-count`, `.toolbar-actions`, `.toolbar-btn`, `.toolbar-btn--danger` |
 | Forms | `.form-group` (label + control), `.edit-input` (inputs and `select.edit-input` with custom chevron), `.form-hint`, `.toggle-row` + `.toggle-switch`/`.toggle-slider` for booleans, styled file picker; checkboxes/radios use `accent-color: var(--accent)`; `.admin-compact` for dense admin forms |

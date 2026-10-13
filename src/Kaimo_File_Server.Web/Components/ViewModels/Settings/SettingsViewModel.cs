@@ -34,6 +34,7 @@ public partial class SettingsViewModel
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authState;
     private readonly HomeDirectoryService? _homes;
+    private readonly DateFormatService? _dateFormat;
     private readonly ISystemInfoService _sysInfo;
     private readonly ISearchAdminService _searchAdmin;
     private readonly IShareRepository _shareRepo;
@@ -62,7 +63,8 @@ public partial class SettingsViewModel
         IDatabaseBackupService backupService,
         BackupDownloadTokenService backupDownloadTokens,
         ILogger<SettingsViewModel> logger,
-        HomeDirectoryService? homes = null)
+        HomeDirectoryService? homes = null,
+        DateFormatService? dateFormat = null)
     {
         _config = config;
         _mgmtAuth = mgmtAuth;
@@ -80,6 +82,7 @@ public partial class SettingsViewModel
         _backupDownloadTokens = backupDownloadTokens;
         _logger = logger;
         _homes = homes;
+        _dateFormat = dateFormat;
     }
 
     // ── State ──

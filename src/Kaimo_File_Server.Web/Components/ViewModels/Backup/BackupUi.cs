@@ -81,14 +81,15 @@ public static class BackupUi
     public static string DayName(DayOfWeek day)
         => CultureInfo.CurrentUICulture.DateTimeFormat.GetAbbreviatedDayName(day);
 
-    public static string ScheduleText(BackupSchedule schedule)
+    /// <param name="formatTime">Formats a slot in the configured time format (DateFormatService.FormatTime).</param>
+    public static string ScheduleText(BackupSchedule schedule, Func<TimeOnly, string> formatTime)
     {
         if (schedule.IsEmpty)
             return R("Web_Backup_Schedule_ManualOnly");
         var days = schedule.Days.Count == 7
             ? R("Web_Backup_Schedule_Daily")
             : string.Join(", ", WeekDays.Where(schedule.Days.Contains).Select(DayName));
-        return days + " · " + string.Join(", ", schedule.Times.Select(t => t.ToString("HH:mm", CultureInfo.InvariantCulture)));
+        return days + " · " + string.Join(", ", schedule.Times.Select(formatTime));
     }
 
     /// <summary>"7 daily · 4 weekly · 12 monthly", or "keep all".</summary>

@@ -377,7 +377,7 @@
                     <StatusBadge Tone="@BackupUi.RepositoryTone(repo)" Label="@BackupUi.RepositoryStateLabel(repo)" />
                 </Status>
                 <Actions>
-                    <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => StartEdit(view)">
+                    <button class="btn-tinted" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => StartEdit(view)">
                         @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
                         <span>@R("Web_Backup_Edit")</span>
                     </button>
@@ -385,14 +385,14 @@
                     {
                         if (maintenance is not null)
                         {
-                            <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || maintenance.IsCancellationRequested)" @onclick="() => VM.CancelRunAsync(maintenance.RunId)">
+                            <button class="btn-tinted btn-tinted--danger" type="button" disabled="@(VM.IsBusy || maintenance.IsCancellationRequested)" @onclick="() => VM.CancelRunAsync(maintenance.RunId)">
                                 @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14))
                                 <span>@R("Web_Jobs_Cancel")</span>
                             </button>
                         }
                         else
                         {
-                            <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => VM.RunMaintenanceAsync(repo.Id)">
+                            <button class="btn-tinted btn-tinted--info" type="button" disabled="@(VM.IsBusy || VM.IsReadOnlyDemo)" @onclick="() => VM.RunMaintenanceAsync(repo.Id)">
                                 @Assets.SVG("refresh.svg", new SvgOptions(Width: 14, Height: 14))
                                 <span>@R("Web_Backup_Maintenance_RunNow")</span>
                             </button>
@@ -469,13 +469,14 @@
             }
 
             <div class="fact-tiles">
-                <FactTile Label="@R("Web_Backup_LastReachable")" Value="@DateFmt.FormatDateTime(repo.LastReachableAtUtc, R("Web_Backup_Never"))"
+                <FactTile Label="@R("Web_Backup_LastReachable")" Value="@DateFmt.FormatDateTime(repo.LastReachableAtUtc, R("Web_Backup_Never"))" Compact
                           Tone="@(!string.IsNullOrEmpty(repo.LastErrorCode) ? StatusTone.Negative : repo.LastReachableAtUtc is null ? StatusTone.Neutral : StatusTone.Positive)" />
-                <FactTile Label="@R("Web_Backup_Maintenance_LastCheck")"
-                          Value="@(repo.LastCheckAtUtc is null ? R("Web_Backup_Never") : repo.LastCheckOk == true ? R("Web_Backup_Maintenance_CheckOk") : R("Web_Backup_Maintenance_CheckFailed"))"
-                          Hint="@(repo.LastCheckAtUtc is { } checkedAt ? DateFmt.FormatDateTime(checkedAt) : null)"
-                          Tone="@(repo.LastCheckAtUtc is null ? StatusTone.Neutral : repo.LastCheckOk == true ? StatusTone.Positive : StatusTone.Negative)" />
-                <FactTile Label="@R("Web_Backup_Maintenance_Next")" Value="@DateFmt.FormatDateTime(VM.NextMaintenanceUtc(repo), R("Web_Backup_NoSchedule"))" />
+                <FactTile Label="@R("Web_Backup_Maintenance_LastCheck")" Value="@DateFmt.FormatDateTime(repo.LastCheckAtUtc, R("Web_Backup_Never"))" Compact
+                          Tone="@(repo.LastCheckAtUtc is null ? StatusTone.Neutral : repo.LastCheckOk == true ? StatusTone.Positive : StatusTone.Negative)"
+                          Tooltip="@(repo.LastCheckAtUtc is { } checkedAt
+                                        ? string.Format(R(repo.LastCheckOk == true ? "Web_Backup_Maintenance_CheckOkAt" : "Web_Backup_Maintenance_CheckFailedAt"), DateFmt.FormatDateTime(checkedAt))
+                                        : null)" />
+                <FactTile Label="@R("Web_Backup_Maintenance_Next")" Value="@DateFmt.FormatDateTime(VM.NextMaintenanceUtc(repo), R("Web_Backup_NoSchedule"))" Compact />
                 <FactTile Label="@R("Web_Backup_Tab_Jobs")" Value="@view.JobCount.ToString()"
                           OnLink="OnOpenJobs" LinkLabel="@R("Web_Backup_Repos_OpenJobs")" />
             </div>
@@ -490,7 +491,7 @@
             </DetailSection>
 
             <DetailSection Title="@R("Web_Backup_Maintenance")">
-                <PropertyRow Label="@R("Web_Backup_Schedule")" Value="@BackupUi.ScheduleText(repo.MaintenanceSchedule)" />
+                <PropertyRow Label="@R("Web_Backup_Schedule")" Value="@BackupUi.ScheduleText(repo.MaintenanceSchedule, DateFmt.FormatTime)" />
                 <PropertyRow Label="@R("Web_Backup_Maintenance_Mirror")" Value="@(repo.MirrorTargetId is { } mirrorId ? VM.RepositoryName(mirrorId) : R("Web_Backup_Maintenance_NoMirror"))" />
             </DetailSection>
 
@@ -507,7 +508,7 @@
                 </PropertyRow>
             </DetailSection>
 
-            <DetailSection Title="@R("Web_Backup_Repos_Section_Technical")" Collapsible InitiallyCollapsed>
+            <DetailSection Title="@R("Web_Backup_Repos_Section_Technical")" InitiallyCollapsed>
                 <PropertyRow Label="@R("Web_Backup_Repos_RepositoryId")" Value="@repo.ResticRepositoryId" Mono Copyable />
             </DetailSection>
 

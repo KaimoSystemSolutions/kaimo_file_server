@@ -87,6 +87,7 @@ public partial class SettingsViewModel
         {
             await _config.SetAsync(DateFormatService.ConfigKey, SelectedDateFormat);
             await _config.SetAsync(DateFormatService.TimeConfigKey, SelectedTimeFormat);
+            _dateFormat?.Apply(SelectedDateFormat, SelectedTimeFormat);
 
             _logger.LogInformation(
                 "Date/time display format changed to '{Format}' / '{TimeFormat}'",

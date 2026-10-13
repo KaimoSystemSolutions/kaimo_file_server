@@ -4,12 +4,15 @@
 
     The tile itself is not clickable. With `OnLink` set, a separate arrow button
     in the corner leads to the related place (e.g. the jobs of a repository).
+
+    Prefer a single short value (a date, a count) over value + `Hint`; a status
+    such as "check passed" is carried by `Tone` and explained in `Tooltip`.
 *@
 @inherits AppComponentBase
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 
-<div class="fact-tile @ToneClass">
+<div class="fact-tile @ToneClass @(Compact ? "fact-tile--compact" : null)" title="@Tooltip">
     <span class="fact-tile-label">@Label</span>
     <span class="fact-tile-value">
         @if (Tone is not null)
@@ -51,6 +54,12 @@
 
     /// <summary>Colours the value and adds a status dot; null keeps it neutral without a dot.</summary>
     [Parameter] public StatusTone? Tone { get; set; }
+
+    /// <summary>Smaller value text for longer values such as timestamps.</summary>
+    [Parameter] public bool Compact { get; set; }
+
+    /// <summary>Hover text for the tile, e.g. what the tone means ("Last run on … was successful").</summary>
+    [Parameter] public string? Tooltip { get; set; }
 
     [Parameter] public EventCallback OnLink { get; set; }
 
