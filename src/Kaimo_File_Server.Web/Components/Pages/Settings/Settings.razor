@@ -24,44 +24,74 @@ else
 {
     <div class="admin-content settings-workspace">
         <div class="admin-detail settings-page">
+            @* Tabs are grouped by topic; a group heading only renders when at least one of its tabs is permitted. *@
             <Tabs Orientation="TabOrientation.Vertical">
+                @if (VM.CanManageSettings || VM.CanManageMailServer)
+                {
+                    <span class="ui-label settings-tab-group" aria-hidden="true">@R("Web_Settings_Group_General")</span>
+                }
                 @if (VM.CanManageSettings)
                 {
                     <Tab Active="@(_activeTab == SettingsTab.Language)" Icon="globe.svg" Label="@Resources.Web_Settings_Tab_Region" OnClick="() => SwitchTab(SettingsTab.Language)" />
                     <Tab Active="@(_activeTab == SettingsTab.ContextMenu)" Icon="edit.svg" Label="@Resources.Web_Settings_Tab_ContextMenu" OnClick="() => SwitchTab(SettingsTab.ContextMenu)" />
+                }
+                @if (VM.CanManageMailServer)
+                {
+                    <Tab Active="@(_activeTab == SettingsTab.MailServer)" Icon="mail.svg" Label="@R("Web_Settings_Tab_MailServer")" OnClick="() => SwitchTab(SettingsTab.MailServer)" />
+                }
+
+                @if (VM.CanManageSettings || VM.CanManageCertificates)
+                {
+                    <span class="ui-label settings-tab-group" aria-hidden="true">@R("Web_Settings_Group_Security")</span>
+                }
+                @if (VM.CanManageSettings)
+                {
                     <Tab Active="@(_activeTab == SettingsTab.PasswordPolicy)" Icon="shield.svg" Label="@Resources.Web_Settings_Tab_Password" OnClick="() => SwitchTab(SettingsTab.PasswordPolicy)" />
-                    <Tab Active="@(_activeTab == SettingsTab.Network)" Icon="compass.svg" Label="@Resources.Web_Settings_Tab_IP_Address" OnClick="() => SwitchTab(SettingsTab.Network)" />
-                    <Tab Active="@(_activeTab == SettingsTab.Storage)" Icon="folder.svg" Label="@Resources.Web_Settings_Tab_Storage" OnClick="() => SwitchTab(SettingsTab.Storage)" />
-                    <Tab Active="@(_activeTab == SettingsTab.Memory)" Icon="gear.svg" Label="@Resources.Web_Settings_Tab_Ram" OnClick="() => SwitchTab(SettingsTab.Memory)" />
-                    <Tab Active="@(_activeTab == SettingsTab.Search)" Icon="search.svg" Label="@Resources.Web_Settings_Tab_Search" OnClick="() => SwitchTab(SettingsTab.Search)" />
-                    <Tab Active="@(_activeTab == SettingsTab.CloudAccess)" Icon="cloud-download.svg" Label="@R("Web_Settings_Tab_CloudAccess")" OnClick="() => SwitchTab(SettingsTab.CloudAccess)" />
-                    <Tab Active="@(_activeTab == SettingsTab.ShareLinks)" Icon="share.svg" Label="@R("Web_Settings_Tab_ShareLinks")" OnClick="() => SwitchTab(SettingsTab.ShareLinks)" />
-                    <Tab Active="@(_activeTab == SettingsTab.Domains)" Icon="globe.svg" Label="@R("Web_Settings_Tab_Domains")" OnClick="() => SwitchTab(SettingsTab.Domains)" />
                     <Tab Active="@(_activeTab == SettingsTab.AccessRestrictions)" Icon="shield.svg" Label="@R("Web_Settings_Tab_AccessRestrictions")" OnClick="() => SwitchTab(SettingsTab.AccessRestrictions)" />
-                }
-                @if (VM.CanManageSettings || VM.CanViewLogs)
-                {
-                    <Tab Active="@(_activeTab == SettingsTab.Logging)" Icon="gear.svg" Label="@Resources.Web_Settings_Tab_Logging" OnClick="() => SwitchTab(SettingsTab.Logging)" />
-                }
-                @if (VM.CanManageDataServices)
-                {
-                    <Tab Active="@(_activeTab == SettingsTab.DataServices)" Icon="archive.svg" Label="@Resources.Web_Settings_Tab_Fileservices" OnClick="() => SwitchTab(SettingsTab.DataServices)" />
+                    <Tab Active="@(_activeTab == SettingsTab.Domains)" Icon="globe.svg" Label="@R("Web_Settings_Tab_Domains")" OnClick="() => SwitchTab(SettingsTab.Domains)" />
                 }
                 @if (VM.CanManageCertificates)
                 {
                     <Tab Active="@(_activeTab == SettingsTab.Certificate)" Icon="shield.svg" Label="@Resources.Web_Settings_Tab_Certificate" OnClick="() => SwitchTab(SettingsTab.Certificate)" />
                 }
-                @if (VM.CanManageBackups)
+
+                @if (VM.CanManageSettings)
                 {
-                    <Tab Active="@(_activeTab == SettingsTab.Backup)" Icon="archive.svg" Label="@R("Web_Settings_Tab_Backup")" OnClick="() => SwitchTab(SettingsTab.Backup)" />
+                    <span class="ui-label settings-tab-group" aria-hidden="true">@R("Web_Settings_Group_StorageFiles")</span>
+                    <Tab Active="@(_activeTab == SettingsTab.Storage)" Icon="folder.svg" Label="@Resources.Web_Settings_Tab_Storage" OnClick="() => SwitchTab(SettingsTab.Storage)" />
+                    <Tab Active="@(_activeTab == SettingsTab.Search)" Icon="search.svg" Label="@Resources.Web_Settings_Tab_Search" OnClick="() => SwitchTab(SettingsTab.Search)" />
+                    <Tab Active="@(_activeTab == SettingsTab.CloudAccess)" Icon="cloud-download.svg" Label="@R("Web_Settings_Tab_CloudAccess")" OnClick="() => SwitchTab(SettingsTab.CloudAccess)" />
+                    <Tab Active="@(_activeTab == SettingsTab.ShareLinks)" Icon="share.svg" Label="@R("Web_Settings_Tab_ShareLinks")" OnClick="() => SwitchTab(SettingsTab.ShareLinks)" />
+                }
+
+                @if (VM.CanManageDataServices || VM.CanManageClientDevices)
+                {
+                    <span class="ui-label settings-tab-group" aria-hidden="true">@R("Web_Settings_Group_ServicesClients")</span>
+                }
+                @if (VM.CanManageDataServices)
+                {
+                    <Tab Active="@(_activeTab == SettingsTab.DataServices)" Icon="archive.svg" Label="@Resources.Web_Settings_Tab_Fileservices" OnClick="() => SwitchTab(SettingsTab.DataServices)" />
                 }
                 @if (VM.CanManageClientDevices)
                 {
                     <Tab Active="@(_activeTab == SettingsTab.ClientDevices)" Icon="refresh.svg" Label="@R("Web_Nav_DeviceAdmin")" OnClick="() => SwitchTab(SettingsTab.ClientDevices)" />
                 }
-                @if (VM.CanManageMailServer)
+
+                @if (VM.CanManageBackups || VM.CanManageSettings || VM.CanViewLogs)
                 {
-                    <Tab Active="@(_activeTab == SettingsTab.MailServer)" Icon="mail.svg" Label="@R("Web_Settings_Tab_MailServer")" OnClick="() => SwitchTab(SettingsTab.MailServer)" />
+                    <span class="ui-label settings-tab-group" aria-hidden="true">@R("Web_Settings_Group_Maintenance")</span>
+                }
+                @if (VM.CanManageBackups)
+                {
+                    <Tab Active="@(_activeTab == SettingsTab.Backup)" Icon="archive.svg" Label="@R("Web_Settings_Tab_Backup")" OnClick="() => SwitchTab(SettingsTab.Backup)" />
+                }
+                @if (VM.CanManageSettings || VM.CanViewLogs)
+                {
+                    <Tab Active="@(_activeTab == SettingsTab.Logging)" Icon="gear.svg" Label="@Resources.Web_Settings_Tab_Logging" OnClick="() => SwitchTab(SettingsTab.Logging)" />
+                }
+                @if (VM.CanManageSettings)
+                {
+                    <Tab Active="@(_activeTab == SettingsTab.SystemStatus)" Icon="compass.svg" Label="@R("Web_Settings_Tab_SystemStatus")" OnClick="() => SwitchTab(SettingsTab.SystemStatus)" />
                 }
             </Tabs>
 
@@ -74,9 +104,8 @@ else
                     case SettingsTab.Language when VM.CanManageSettings: <RegionSettings VM="VM" /> break;
                     case SettingsTab.ContextMenu when VM.CanManageSettings: <ContextMenuSettings VM="VM" /> break;
                     case SettingsTab.PasswordPolicy when VM.CanManageSettings: <PasswordPolicySettings VM="VM" /> break;
-                    case SettingsTab.Network when VM.CanManageSettings: <NetworkSettings VM="VM" /> break;
                     case SettingsTab.Storage when VM.CanManageSettings: <StorageSettings VM="VM" /> break;
-                    case SettingsTab.Memory when VM.CanManageSettings: <MemorySettings VM="VM" /> break;
+                    case SettingsTab.SystemStatus when VM.CanManageSettings: <NetworkSettings VM="VM" /><MemorySettings VM="VM" /> break;
                     case SettingsTab.Search when VM.CanManageSettings: <SearchSettings VM="VM" /> break;
                     case SettingsTab.CloudAccess when VM.CanManageSettings: <CloudAccessSettings VM="VM" /> break;
                     case SettingsTab.ShareLinks when VM.CanManageSettings: <ShareLinkSettingsTab /> break;

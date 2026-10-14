@@ -1483,7 +1483,7 @@
     <value>Datenbank-Backups verwalten</value>
   </data>
   <data name="Web_Settings_Tab_Backup" xml:space="preserve">
-    <value>Datensicherung</value>
+    <value>Datenbank-Sicherung</value>
   </data>
   <data name="Web_Settings_Backup_ScheduleTitle" xml:space="preserve">
     <value>Geplante Backups</value>
@@ -1603,7 +1603,7 @@
     <value>Sprache</value>
   </data>
   <data name="Web_Settings_Tab_Password" xml:space="preserve">
-    <value>Passwort</value>
+    <value>Passwort &amp; Sitzung</value>
   </data>
   <data name="Web_Settings_Tab_Storage" xml:space="preserve">
     <value>Speicher</value>
@@ -3391,7 +3391,7 @@
     <value>{0} von {1} Elementen übertragen. Die übrigen konnten nicht übertragen werden.</value>
   </data>
   <data name="Web_Settings_Tab_CloudAccess" xml:space="preserve">
-    <value>Cloud-Zugriff</value>
+    <value>Verzeichnis-Cache</value>
   </data>
   <data name="Web_Settings_CloudAccess_CacheTitle" xml:space="preserve">
     <value>Verzeichnis-Metadaten-Cache</value>
@@ -7275,5 +7275,23 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   </data>
   <data name="Web_Security_Outcome_AddressNotAllowed" xml:space="preserve">
     <value>Adresse nicht erlaubt</value>
+  </data>
+  <data name="Web_Settings_Group_General" xml:space="preserve">
+    <value>Allgemein</value>
+  </data>
+  <data name="Web_Settings_Group_Security" xml:space="preserve">
+    <value>Sicherheit</value>
+  </data>
+  <data name="Web_Settings_Group_StorageFiles" xml:space="preserve">
+    <value>Speicher &amp; Dateien</value>
+  </data>
+  <data name="Web_Settings_Group_ServicesClients" xml:space="preserve">
+    <value>Dienste &amp; Clients</value>
+  </data>
+  <data name="Web_Settings_Group_Maintenance" xml:space="preserve">
+    <value>Wartung</value>
+  </data>
+  <data name="Web_Settings_Tab_SystemStatus" xml:space="preserve">
+    <value>Systemstatus</value>
   </data>
 </root>

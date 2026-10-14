@@ -1483,7 +1483,7 @@
     <value>Manage database backups</value>
   </data>
   <data name="Web_Settings_Tab_Backup" xml:space="preserve">
-    <value>Backup</value>
+    <value>Database backup</value>
   </data>
   <data name="Web_Settings_Backup_ScheduleTitle" xml:space="preserve">
     <value>Scheduled backups</value>
@@ -1603,7 +1603,7 @@
     <value>Language</value>
   </data>
   <data name="Web_Settings_Tab_Password" xml:space="preserve">
-    <value>Password</value>
+    <value>Password &amp; session</value>
   </data>
   <data name="Web_Settings_Tab_Storage" xml:space="preserve">
     <value>Storage</value>
@@ -3457,7 +3457,7 @@
     <value>Unavailable</value>
   </data>
   <data name="Web_Settings_Tab_CloudAccess" xml:space="preserve">
-    <value>Cloud Access</value>
+    <value>Directory cache</value>
   </data>
   <data name="Web_Settings_CloudAccess_CacheTitle" xml:space="preserve">
     <value>Directory metadata cache</value>
@@ -7275,5 +7275,23 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   </data>
   <data name="Web_Security_Outcome_AddressNotAllowed" xml:space="preserve">
     <value>Address not allowed</value>
+  </data>
+  <data name="Web_Settings_Group_General" xml:space="preserve">
+    <value>General</value>
+  </data>
+  <data name="Web_Settings_Group_Security" xml:space="preserve">
+    <value>Security</value>
+  </data>
+  <data name="Web_Settings_Group_StorageFiles" xml:space="preserve">
+    <value>Storage &amp; files</value>
+  </data>
+  <data name="Web_Settings_Group_ServicesClients" xml:space="preserve">
+    <value>Services &amp; clients</value>
+  </data>
+  <data name="Web_Settings_Group_Maintenance" xml:space="preserve">
+    <value>Maintenance</value>
+  </data>
+  <data name="Web_Settings_Tab_SystemStatus" xml:space="preserve">
+    <value>System status</value>
   </data>
 </root>

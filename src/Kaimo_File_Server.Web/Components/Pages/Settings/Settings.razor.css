@@ -243,6 +243,15 @@
     overscroll-behavior: contain;
 }
 
+/* Topic group headings between the tabs (same micro-label as the main nav groups). */
+.settings-tab-group {
+    padding: var(--space-4) 10px var(--space-1);
+}
+
+    .settings-tab-group:first-child {
+        padding-top: var(--space-1);
+    }
+
 /* The vertical settings sidebar is now the shared <Tabs> vertical variant.
    Its styling lives in Components/Shared/Tabs.razor.css (.detail-tabs--vertical). */
 
@@ -419,6 +428,11 @@
 
     .settings-page ::deep .detail-tabs--vertical {
         overflow-y: visible;
+    }
+
+    /* The strip becomes a horizontal scroller here; headings would only break the row. */
+    .settings-tab-group {
+        display: none;
     }
 
     .settings-content {

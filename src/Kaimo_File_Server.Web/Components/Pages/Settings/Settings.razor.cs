@@ -28,18 +28,19 @@ public partial class Settings
 
         if (!VM.CanManageSettings)
         {
-            if (VM.CanViewLogs)
-                _activeTab = SettingsTab.Logging;
-            else if (VM.CanManageDataServices)
-                _activeTab = SettingsTab.DataServices;
+            // First permitted tab in the visual (grouped) order of Settings.razor.
+            if (VM.CanManageMailServer)
+                _activeTab = SettingsTab.MailServer;
             else if (VM.CanManageCertificates)
                 _activeTab = SettingsTab.Certificate;
-            else if (VM.CanManageBackups)
-                _activeTab = SettingsTab.Backup;
+            else if (VM.CanManageDataServices)
+                _activeTab = SettingsTab.DataServices;
             else if (VM.CanManageClientDevices)
                 _activeTab = SettingsTab.ClientDevices;
-            else if (VM.CanManageMailServer)
-                _activeTab = SettingsTab.MailServer;
+            else if (VM.CanManageBackups)
+                _activeTab = SettingsTab.Backup;
+            else if (VM.CanViewLogs)
+                _activeTab = SettingsTab.Logging;
         }
 
         _initialLoadComplete = true;
@@ -65,8 +66,18 @@ public partial class Settings
     private static bool TryParseTab(string? value, out SettingsTab tab)
     {
         tab = default;
-        return !string.IsNullOrWhiteSpace(value)
-               && Enum.TryParse(value, ignoreCase: true, out tab)
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        // The former "network" and "memory" tabs were merged into "systemstatus"; keep old links working.
+        if (value.Equals("network", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("memory", StringComparison.OrdinalIgnoreCase))
+        {
+            tab = SettingsTab.SystemStatus;
+            return true;
+        }
+
+        return Enum.TryParse(value, ignoreCase: true, out tab)
                && Enum.IsDefined(tab);
     }
 
@@ -87,7 +98,7 @@ public partial class Settings
         _activeTab = tab;
         VM.ClearMessages();
 
-        // The Network tab resolves the public IP only on demand, once the user reveals it
+        // The system status tab resolves the public IP only on demand, once the user reveals it
         // (see NetworkSettings), so it never lands in the page before that.
         if (tab == SettingsTab.Search)
         {
@@ -107,9 +118,8 @@ internal enum SettingsTab
     Language,
     ContextMenu,
     PasswordPolicy,
-    Network,
+    SystemStatus,
     Storage,
-    Memory,
     DataServices,
     Search,
     CloudAccess,
