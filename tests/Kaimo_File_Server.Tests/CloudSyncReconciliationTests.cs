@@ -261,6 +261,22 @@ public sealed class CloudSyncReconciliationTests
     }
 
     [Fact]
+    public async Task Push_RecordsUploadedItemsInManifest()
+    {
+        // The file browser compares against it to flag local-only items as pending upload.
+        var remote = new InMemoryRemote();
+        var local = new InMemoryFileService();
+        local.PutFile("a.txt", "aaa", Time(10));
+
+        var manifest = await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.Push,
+            new CloudSyncTransferOptions(new CloudSyncAdvancedSettings()), previousManifest: null);
+
+        Assert.NotNull(manifest);
+        Assert.Contains("/a.txt", manifest!.Paths);
+    }
+
+    [Fact]
     public async Task Pull_NewRemoteFolder_GetsTheRemoteTimeAfterItsContent()
     {
         var remote = new InMemoryRemote();

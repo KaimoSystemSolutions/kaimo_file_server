@@ -236,9 +236,9 @@ public sealed class CloudSyncExecutionService(
             await syncDefinitions.MarkCompletedAsync(
                 definition.Id, completedAtUtc, failures, cancellationToken);
 
-            // Persist the converged tree after any run that built one (two-way, for a
-            // ready delete-propagation baseline; pull, for the browser's local-only
-            // detection). newManifest is non-null exactly for those modes (see SyncAsync).
+            // Persist the converged tree after every run (two-way, for a ready
+            // delete-propagation baseline; every mode, for the browser's local-only
+            // detection). A connection that returns none keeps the previous one.
             if (newManifest is not null)
                 await syncDefinitions.SaveManifestAsync(
                     definition.Id, newManifest.Serialize(), cancellationToken);

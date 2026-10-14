@@ -1126,11 +1126,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
                     ? (entry.Definition.LocalPath.Length == 0 ? CurrentShare?.Name ?? "" : entry.Definition.LocalPath)
                     : entry.Definition.DisplayName,
                 entry.Runtime?.LastSuccessfulRunAtUtc,
-                // Only pull consults the converged manifest (which paths the remote
-                // actually backs); other modes never look at it, so skip the parse.
-                RemotePaths: entry.Definition.Mode == SyncMode.Pull
-                    ? RemoteBackedPaths(entry.Runtime?.LastSyncManifest)
-                    : null,
+                // The converged manifest says which paths the remote actually backs.
+                RemotePaths: RemoteBackedPaths(entry.Runtime?.LastSyncManifest),
                 entry.Definition.Id))
             .OrderByDescending(sync => sync.LocalPath.Length)
             .ToList();

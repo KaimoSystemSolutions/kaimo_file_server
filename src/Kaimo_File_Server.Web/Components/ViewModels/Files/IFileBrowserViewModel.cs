@@ -41,9 +41,13 @@ public static class SyncItemStateEvaluator
     /// no manifest exists yet (a pull that has not run under manifest tracking); the timestamp
     /// heuristic below then stands in until the first run records one.
     ///
-    /// ponytail: push/two-way keep the mtime heuristic. A successful run really does upload the
-    /// item, so "last write at/before the last success" == synced holds; anything newer (or
-    /// before any success) is still pending upload. Both times must be UTC.
+    /// Push/two-way: an explicit manifest miss (<paramref name="isRemoteBacked"/> == <c>false</c>)
+    /// means the item has never reached the remote, so it is pending upload whatever its mtime —
+    /// items written by other paths (client app sync, SMB copy, restore) keep their original,
+    /// possibly older, write time and would otherwise pass as synced. A manifest hit still
+    /// applies the mtime check (a later local edit is pending again); without a manifest the
+    /// mtime heuristic alone decides: "last write at/before the last success" == synced,
+    /// anything newer (or before any success) is pending upload. Both times must be UTC.
     ///
     /// While a run is active (<paramref name="isRunning"/>), items pulled by that run carry
     /// a remote mtime newer than the last success (or no success exists yet) and are not in
@@ -67,6 +71,9 @@ public static class SyncItemStateEvaluator
         // entry. Only an explicit manifest miss (isRemoteBacked == false) blocks.
         if (mode == SyncMode.Pull)
             return isRemoteBacked == false ? SyncItemState.PullBlocked : SyncItemState.Synced;
+
+        if (isRemoteBacked == false)
+            return SyncItemState.PendingUpload;
 
         if (lastSuccessfulRunAtUtc is not null && modifiedAtUtc <= lastSuccessfulRunAtUtc)
             return SyncItemState.Synced;

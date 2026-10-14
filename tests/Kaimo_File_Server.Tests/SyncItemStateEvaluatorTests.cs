@@ -28,6 +28,38 @@ public sealed class SyncItemStateEvaluatorTests
         Assert.Equal(SyncItemState.PendingUpload, state);
     }
 
+    [Theory]
+    [InlineData(SyncMode.Push)]
+    [InlineData(SyncMode.TwoWay)]
+    public void ManifestMiss_UnderPushOrTwoWay_IsPendingUpload_EvenWithOldWriteTime(SyncMode mode)
+    {
+        // E.g. a file written by the client app sync keeps its original (older) mtime,
+        // but it never reached the remote — it must not read as synced.
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddDays(-30), LastRun, mode, isRemoteBacked: false);
+        Assert.Equal(SyncItemState.PendingUpload, state);
+    }
+
+    [Theory]
+    [InlineData(SyncMode.Push)]
+    [InlineData(SyncMode.TwoWay)]
+    public void ManifestHit_ChangedAfterLastRun_UnderPushOrTwoWay_IsPendingUpload(SyncMode mode)
+    {
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(5), LastRun, mode, isRemoteBacked: true);
+        Assert.Equal(SyncItemState.PendingUpload, state);
+    }
+
+    [Theory]
+    [InlineData(SyncMode.Push)]
+    [InlineData(SyncMode.TwoWay)]
+    public void ManifestHit_WrittenBeforeLastRun_UnderPushOrTwoWay_IsSynced(SyncMode mode)
+    {
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(-5), LastRun, mode, isRemoteBacked: true);
+        Assert.Equal(SyncItemState.Synced, state);
+    }
+
     [Fact]
     public void NoSuccessfulRunYet_UnderPush_TreatsItemAsPending()
     {

@@ -95,8 +95,9 @@ public interface ICloudConnection
     /// Pass <c>null</c> when delete propagation is off or no baseline exists yet.
     /// </param>
     /// <returns>
-    /// The manifest of paths present after this run when delete propagation is
-    /// active (persist it for the next run), otherwise <c>null</c>.
+    /// The manifest of paths present on both endpoints after this run. Persist it:
+    /// two-way uses it as the delete-propagation baseline, the file browser to tell
+    /// remote-backed items from local-only ones.
     /// </returns>
     /// <param name="failures">
     /// Optional sink for per-item failures. When supplied, a single file that
@@ -158,12 +159,12 @@ public interface ICloudConnection
         // has a baseline immediately instead of wasting the first run establishing
         // one. The previous manifest is only *consulted* (to delete) when the
         // option is on; otherwise deletions are ignored and items are copied.
-        // Pull also builds a manifest — not for delete propagation, but so the file
+        // Pull and push also build one — not for delete propagation, but so the file
         // browser can tell a remote-backed item (present here) from a local-only one
-        // (absent) and flag the latter as "won't be uploaded".
-        bool buildManifest = mode == SyncMode.TwoWay || mode == SyncMode.Pull;
+        // (absent) and flag the latter as "won't be uploaded" / "pending upload"
+        // instead of trusting its (possibly preserved, older) write time.
         bool applyDeletions = options.SyncDeletions && mode == SyncMode.TwoWay;
-        var newManifest = buildManifest ? new SyncManifest() : null;
+        var newManifest = new SyncManifest();
 
         await SyncDirectory(
             fileService,
