@@ -1,0 +1,42 @@
+.recycle-limits {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    max-width: 520px;
+}
+
+.recycle-limits__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+/* Mode select, size and unit on one line; wraps on narrow panes. The number inputs sit in
+   a row so their flex basis sizes the width, never the height. */
+.recycle-limits__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
+}
+
+.recycle-limits__mode {
+    flex: 1 1 200px;
+    width: auto;
+    min-width: 0;
+}
+
+.recycle-limits__number {
+    flex: 0 1 140px;
+    width: 140px;
+}
+
+.recycle-limits__unit {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+.recycle-limits__actions {
+    display: flex;
+    justify-content: flex-start;
+}

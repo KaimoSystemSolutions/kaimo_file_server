@@ -1,0 +1,149 @@
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Language
+
+@* Settings → Home folders: setup, path, pool (move) and global switch, plus the recycle
+   limits of the per-user home bins. /files/users stays the metadata overview of the
+   individual homes. *@
+
+<div class="detail-section">
+    <span class="detail-label">@T("Web_Settings_Homes_Label", "User home folders")</span>
+    <p class="settings-description">@T("Web_Settings_Homes_Description", "Every user gets a private folder users/<user id> that only they can access. Users see it as \"user\" in the web UI and app; administrators only see its size, status and links.")</p>
+    @* Inline feedback: this child re-renders on its own, the page-level banners would stay stale. *@
+    @if (_error is not null) { <div class="error-banner">@_error</div> }
+    @if (_success is not null) { <div class="success-banner">@_success</div> }
+    @if (VM.HomesPoolPath is not null)
+    {
+        <div class="homes-fields">
+            <div class="homes-field">
+                <span class="settings-field-label">@Resources.Web_ShareList_Label_Path</span>
+                <span class="detail-value--mono">@VM.HomesSharePath</span>
+            </div>
+            <div class="homes-field">
+                <label class="settings-field-label label-with-info" for="homes-pool">
+                    @Resources.Web_ShareList_Label_StoragePool
+                    <InfoButton Text="@T("Web_Settings_Homes_MoveHint", "Moves every home folder with all its files. Home folders are unavailable on all access paths while the move runs.")" />
+                </label>
+                <div class="homes-pool-row">
+                    <select id="homes-pool" class="edit-input" @bind="VM.HomesTargetPool" disabled="@Busy">
+                        @foreach (var pool in VM.StorageUsages)
+                        {
+                            <option value="@pool.StoragePath">@VM.ResolvePoolName(pool.StoragePath)</option>
+                        }
+                    </select>
+                    <button class="btn-primary" type="button" disabled="@(Busy || IsCurrentPool)" @onclick="() => _confirmMove = true">
+                        @(VM.IsMovingHomes ? "…" : Resources.Web_ShareList_Action_MovePool)
+                    </button>
+                </div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label-text label-with-info">
+                    @T("Web_Settings_Homes_Enabled", "Home folders enabled")
+                    <InfoButton Text="@T("Web_Settings_Homes_EnabledHint", "When off, no user has a home folder on any access path and the per-user switch is hidden. Files and per-user settings are kept.")" />
+                </span>
+                <label class="toggle-switch">
+                    <input type="checkbox" checked="@VM.HomesEnabled" disabled="@Busy"
+                           aria-label="@T("Web_Settings_Homes_Enabled", "Home folders enabled")"
+                           @onchange="e => SetEnabled(e.Value is true)" />
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+    }
+    else if (VM.StorageUsages.Count > 0)
+    {
+        <div class="homes-fields">
+            <div class="homes-field">
+                <label class="settings-field-label label-with-info" for="homes-setup-pool">
+                    @Resources.Web_ShareList_Label_StoragePool
+                    <InfoButton Text="@T("Web_Settings_Homes_PoolHint", "You can move the home folders to another pool later.")" />
+                </label>
+                <div class="homes-pool-row">
+                    <select id="homes-setup-pool" class="edit-input" @bind="VM.HomesSelectedPool" disabled="@Busy">
+                        @foreach (var pool in VM.StorageUsages)
+                        {
+                            <option value="@pool.StoragePath">@VM.ResolvePoolName(pool.StoragePath)</option>
+                        }
+                    </select>
+                    <button class="btn-primary" type="button" disabled="@Busy" @onclick="SetUp">
+                        @T("Web_Settings_Homes_SetUp", "Set up home folders")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <p class="settings-empty">@Resources.Web_Settings_Storage_NoStoragePoolsFound</p>
+    }
+</div>
+
+@if (VM.HomesPoolPath is not null)
+{
+    <div class="detail-section">
+        <span class="detail-label">@T("Web_Recycle_SectionLabel", "Recycle bin")</span>
+        <p class="settings-description">@T("Web_Settings_Homes_RecycleDescription", "Every home folder has its own recycle bin. These limits apply to each of them separately.")</p>
+        @if (VM.HomesRecycleLimits is { } limits)
+        {
+            <RecycleLimitFields Value="limits"
+                                GlobalMaxSizeBytes="VM.RecycleGlobalMaxSizeBytes"
+                                Hint="@T("Web_Settings_Homes_RecycleSizeHint", "Per home folder. When a home's recycle bin grows larger, its oldest deleted items are removed first. Checked hourly.")"
+                                Disabled="Busy"
+                                OnSave="SaveRecycleLimits" />
+        }
+    </div>
+
+    @if (_confirmMove)
+    {
+        <div class="modal-backdrop" @onclick="() => _confirmMove = false">
+            <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="homes-move-title" @onclick:stopPropagation="true">
+                <h2 class="modal-title" id="homes-move-title">@T("Web_Settings_Homes_MoveTitle", "Move home folders?")</h2>
+                <p class="modal-text">@string.Format(
+                    T("Web_Settings_Homes_MoveConfirm", "All home folders are moved to the pool {0}. They are unavailable for every user until the move has finished, which can take a while for large amounts of data."),
+                    VM.ResolvePoolName(VM.HomesTargetPool))</p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" @onclick="() => _confirmMove = false">@Resources.Web_Button_Cancel</button>
+                    <button type="button" class="btn-primary" disabled="@Busy" @onclick="Move">@Resources.Web_ShareList_Action_MovePool</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+
+    private static string T(string key, string fallback) => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    private bool _busy;
+    private bool _confirmMove;
+    private string? _error;
+    private string? _success;
+
+    private bool Busy => _busy || VM.IsMovingHomes;
+
+    private bool IsCurrentPool => string.Equals(VM.HomesTargetPool, VM.HomesPoolPath, StringComparison.Ordinal);
+
+    private Task SetEnabled(bool enabled) => RunAsync(() => VM.SetHomesEnabledAsync(enabled));
+
+    private Task SetUp() => RunAsync(VM.ConfigureHomesAsync);
+
+    private Task SaveRecycleLimits(RecycleLimits limits) => RunAsync(() => VM.SaveHomesRecycleLimitsAsync(limits));
+
+    private Task Move()
+    {
+        _confirmMove = false;
+        return RunAsync(VM.MoveHomesPoolAsync);
+    }
+
+    private async Task RunAsync(Func<Task<bool>> action)
+    {
+        _busy = true;
+        try
+        {
+            var ok = await action();
+            _error = ok ? null : VM.ErrorMessage;
+            _success = ok ? VM.SuccessMessage : null;
+        }
+        finally { _busy = false; }
+    }
+}

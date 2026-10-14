@@ -167,6 +167,7 @@ public partial class SettingsViewModel
                 RefreshSystemInfo();
                 await LoadPoolNamesAsync();
                 await LoadHomesAsync();
+                await LoadRecycleAsync();
             }
 
             if (CanManageBackups)

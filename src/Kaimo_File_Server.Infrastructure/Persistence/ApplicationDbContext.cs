@@ -29,6 +29,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<AccessEntry> AccessEntries { get; set; }
         public DbSet<ShareDefinition> ShareDefinitions { get; set; }
         public DbSet<FileVersion> FileVersions { get; set; }
+        public DbSet<RecycleBinEntry> RecycleBinEntries { get; set; }
         public DbSet<SambaLifecycleEventReceipt> SambaLifecycleEventReceipts { get; set; }
         public DbSet<ProviderProfile> ProviderProfiles { get; set; }
         public DbSet<StorageConnection> StorageConnections { get; set; }
@@ -214,6 +215,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.IsUserHomes).IsRequired().HasDefaultValue(false);
                 // At most one home-folder share may exist.
                 entity.HasIndex(e => e.IsUserHomes).IsUnique().HasFilter("\"IsUserHomes\"");
+                entity.Property(e => e.RecycleMaxSizeMode).HasConversion<int>().IsRequired();
 
                 entity.Property(e => e.CloudSettings)
                     .HasConversion(
@@ -229,6 +231,16 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                     .HasDefaultValue(WellKnownGUIDs.DEPARTMENT_GLOBAL);
 
                 entity.HasIndex(e => e.DepartmentId);
+            });
+
+            // Recycle-bin janitor bookkeeping (see RecycleBinJanitor); rebuildable from disk.
+            modelBuilder.Entity<RecycleBinEntry>(entity =>
+            {
+                entity.ToTable("recycle_bin_entries");
+                entity.HasKey(e => new { e.ShareId, e.Path });
+                entity.HasIndex(e => new { e.ShareId, e.FirstSeenUtc });
+                entity.HasOne<ShareDefinition>().WithMany().HasForeignKey(e => e.ShareId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<FileVersion>(entity =>

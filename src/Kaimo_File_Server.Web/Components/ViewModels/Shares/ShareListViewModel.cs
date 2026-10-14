@@ -14,6 +14,7 @@ using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.DynamicHelpers;
 using Kaimo_File_Server.Web.Helpers;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 
@@ -43,6 +44,7 @@ public partial class ShareListViewModel
     private readonly ICloudSyncOperationCoordinator? _cloudSyncOperations;
     private readonly IConfigRepository? _config;
     private readonly IDepartmentRepository? _departmentRepo;
+    private readonly SharePoolMoveService _poolMove;
 
     // Admin-assigned pool labels (normalized path → friendly name), refreshed in
     // LoadAsync. Empty until loaded, which falls back to path-derived names.
@@ -66,7 +68,8 @@ public partial class ShareListViewModel
         ISearchService? searchService = null,
         ICloudSyncOperationCoordinator? cloudSyncOperations = null,
         IConfigRepository? config = null,
-        IDepartmentRepository? departmentRepo = null)
+        IDepartmentRepository? departmentRepo = null,
+        SharePoolMoveService? poolMove = null)
     {
         _shareRepo = shareRepo;
         _userRepo = userRepo;
@@ -89,6 +92,9 @@ public partial class ShareListViewModel
         _cloudSyncOperations = cloudSyncOperations;
         _config = config;
         _departmentRepo = departmentRepo;
+        _poolMove = poolMove ?? new SharePoolMoveService(
+            shareRepo, lockManager, NullLogger<SharePoolMoveService>.Instance,
+            searchService, cloudSyncOperations);
     }
 
     /// <summary>
@@ -203,6 +209,8 @@ public partial class ShareListViewModel
             ErrorMessage = null;
 
             await RefreshPoolNamesAsync();
+            if (_config is not null)
+                GlobalRecycleMaxSizeBytes = await _config.GetAsync(RecycleBinJanitor.GlobalMaxSizeConfigKey, 0L);
 
             if (_departmentRepo is not null)
             {
@@ -754,348 +762,41 @@ public partial class ShareListViewModel
             return false;
         }
 
-        var sourcePath = Path.GetFullPath(SelectedShare.Path);
-        var destinationPath = BuildSharePath(targetPoolPath, SelectedShare.Name);
-        var sourceParent = Path.GetDirectoryName(sourcePath);
-
-        if (sourceParent is not null
-            && PathComparer.Equals(
-                Path.GetFullPath(sourceParent), Path.GetFullPath(targetPoolPath)))
-        {
-            EditSuccessMessage = Resources.Web_Share_StoragePoolUnchanged;
-            return true;
-        }
-
-        if (!Directory.Exists(sourcePath))
-        {
-            EditErrorMessage = Resources.Web_Error_SharePathMissing;
-            return false;
-        }
-
-        if (Directory.Exists(destinationPath) || File.Exists(destinationPath))
-        {
-            EditErrorMessage = Resources.Web_Error_StoragePoolDestinationExists;
-            return false;
-        }
-
-        var shareLock = _lockManager.GetLock(SelectedShare.Name);
         IsMovingPool = true;
         try
         {
-            if (!await shareLock.WaitAsync(TimeSpan.FromSeconds(30)))
+            var outcome = await _poolMove.MoveAsync(SelectedShare, targetPoolPath);
+            if (outcome.Result == SharePoolMoveResult.Unchanged)
             {
-                EditErrorMessage = Resources.Web_Error_ShareInUse;
+                EditSuccessMessage = Resources.Web_Share_StoragePoolUnchanged;
+                return true;
+            }
+            if (outcome.Result != SharePoolMoveResult.Moved)
+            {
+                EditErrorMessage = PoolMoveMessages.ErrorFor(outcome);
                 return false;
             }
 
-            try
+            EditSuccessMessage = string.Format(
+                Resources.Web_Share_StoragePoolChanged,
+                StoragePools.First(p => PathComparer.Equals(
+                    Path.GetFullPath(p.Path), Path.GetFullPath(targetPoolPath))).Name);
+
+            await LoadAsync();
+            var updated = Shares.FirstOrDefault(s => s.Id == SelectedShare.Id);
+            if (updated is not null)
             {
-                var cloudOperation = await TryBeginCloudSafeShareMutationAsync(
-                    SelectedShare.Id);
-                if (!cloudOperation.Acquired)
-                {
-                    EditErrorMessage = Resources.Web_Error_ShareInUse;
-                    return false;
-                }
-                await using var cloudOperationLease = cloudOperation.Lease;
-                var sourceWasCopied = await MoveDirectoryAcrossPoolsAsync(
-                    sourcePath, destinationPath);
-
-                try
-                {
-                    await _shareRepo.UpdateLocationAsync(
-                        SelectedShare.Id, SelectedShare.Name, destinationPath);
-                    SelectedShare.Path = destinationPath;
-                }
-                catch
-                {
-                    // Keep the persisted path usable when the DB update fails.
-                    SelectedShare.Path = sourcePath;
-                    if (sourceWasCopied)
-                        Directory.Delete(destinationPath, recursive: true);
-                    else
-                        Directory.Move(destinationPath, sourcePath);
-                    throw;
-                }
-
-                if (sourceWasCopied)
-                {
-                    try
-                    {
-                        Directory.Delete(sourcePath, recursive: true);
-                    }
-                    catch (Exception cleanupEx)
-                    {
-                        // The DB already points at the complete target copy. A
-                        // stale source copy is safe and can be removed manually.
-                        _logger.LogWarning(cleanupEx,
-                            "Share '{ShareName}' moved successfully, but old path '{SourcePath}' could not be removed",
-                            SelectedShare.Name, sourcePath);
-                    }
-                }
-
-                if (_searchService is not null)
-                {
-                    try
-                    {
-                        await _searchService.onDirectoryRenamed(
-                            sourcePath, destinationPath);
-                    }
-                    catch (Exception searchEx)
-                    {
-                        _logger.LogWarning(searchEx,
-                            "Share '{ShareName}' moved, but its search index could not be updated",
-                            SelectedShare.Name);
-                    }
-                }
-
-                _logger.LogInformation(
-                    "Share '{ShareName}' moved from '{SourcePath}' to storage pool '{PoolPath}'",
-                    SelectedShare.Name, sourcePath, targetPoolPath);
-
-                EditSuccessMessage = string.Format(
-                    Resources.Web_Share_StoragePoolChanged,
-                    StoragePools.First(p => PathComparer.Equals(
-                        Path.GetFullPath(p.Path), Path.GetFullPath(targetPoolPath))).Name);
-
-                await LoadAsync();
-                var updated = Shares.FirstOrDefault(s => s.Id == SelectedShare.Id);
-                if (updated is not null)
-                {
-                    SelectedShare = updated;
-                    EditSharePoolPath = targetPoolPath;
-                }
-
-                return true;
+                SelectedShare = updated;
+                EditSharePoolPath = targetPoolPath;
             }
-            finally
-            {
-                shareLock.Release();
-            }
-        }
-        catch (InsufficientPoolSpaceException ex)
-        {
-            _logger.LogWarning(
-                "Share '{ShareName}' not moved: target pool '{PoolPath}' has {Available} bytes free, {Required} bytes required",
-                SelectedShare.Name, targetPoolPath, ex.Available, ex.Required);
-            EditErrorMessage = string.Format(
-                Resources.ResourceManager.GetString("Web_Error_StoragePoolInsufficientSpace")
-                    ?? "Not enough free space in the target storage pool: {0} required, {1} available.",
-                FormatHelper.FormatFileSize(ex.Required),
-                FormatHelper.FormatFileSize(ex.Available));
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex,
-                "Error moving share '{ShareName}' from '{SourcePath}' to '{DestinationPath}'",
-                SelectedShare.Name, sourcePath, destinationPath);
-            EditErrorMessage = Resources.Web_Error_StoragePoolMoveFailed;
-            return false;
+
+            return true;
         }
         finally
         {
             IsMovingPool = false;
         }
     }
-
-    /// <returns>
-    /// <c>true</c> when a cross-filesystem copy was required and the source still
-    /// exists; <c>false</c> when an atomic directory rename moved the source.
-    /// </returns>
-    private static async Task<bool> MoveDirectoryAcrossPoolsAsync(
-        string sourcePath, string destinationPath)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)
-            ?? throw new InvalidOperationException("Destination has no parent directory."));
-
-        try
-        {
-            Directory.Move(sourcePath, destinationPath);
-            return false;
-        }
-        catch (IOException)
-        {
-            // A rename cannot cross filesystem/mount boundaries. Copy into a
-            // private staging directory first, publish it atomically in the
-            // target pool, then remove the old share only after the copy exists.
-        }
-
-        var targetPool = Path.GetDirectoryName(destinationPath)!;
-        var required = GetDirectorySize(sourcePath);
-        // ponytail: fixed headroom (block overhead + never fill a pool to 0 bytes);
-        // make it configurable if pools differ a lot in size.
-        var headroom = Math.Max(1L << 30, required / 50);
-        var available = new DriveInfo(targetPool).AvailableFreeSpace;
-        if (required + headroom > available)
-            throw new InsufficientPoolSpaceException(required + headroom, available);
-
-        var reserved = required + headroom;
-        var reservation = ReservePoolSpace(targetPool, reserved, available);
-        // Bytes already released from the reservation but not yet copied.
-        var credit = 0L;
-        var chunk = Math.Max(256L << 20, required / 20);
-
-        var stagingPath = destinationPath + ".kaimo-moving-" + Guid.NewGuid().ToString("N");
-        try
-        {
-            // Hand reserved space over to the copy BEFORE it is written, so the copy
-            // never needs twice the space and nobody else can fill the pool meanwhile.
-            // Released in chunks by closing and re-reserving smaller: shrinking an open
-            // file frees nothing on 9p/drvfs (Docker Desktop) until it is closed.
-            await CopyDirectoryAsync(sourcePath, stagingPath, length =>
-            {
-                if (credit < length)
-                {
-                    var release = Math.Min(Math.Max(chunk, length - credit), reserved - headroom);
-                    if (release > 0)
-                    {
-                        reserved -= release;
-                        credit += release;
-                        reservation.Dispose();
-                        reservation = ReservePoolSpace(targetPool, reserved,
-                            new DriveInfo(targetPool).AvailableFreeSpace);
-                    }
-                }
-                // Clamped: files that grew since sizing are covered by the headroom.
-                credit = Math.Max(0, credit - length);
-            });
-            Directory.Move(stagingPath, destinationPath);
-            return true;
-        }
-        catch
-        {
-            if (Directory.Exists(stagingPath))
-                Directory.Delete(stagingPath, recursive: true);
-            throw;
-        }
-        finally
-        {
-            reservation.Dispose();
-        }
-    }
-
-    private const string ReservationFilePrefix =
-        ShareEntryPolicy.InternalNamespacePrefix + "reserve-";
-
-    /// <summary>
-    /// Allocates <paramref name="bytes"/> in the target pool through a placeholder
-    /// file in the pool root. On Linux the preallocation is a real <c>fallocate</c>, so
-    /// the space is taken from every other writer (other moves, uploads, SMB) at once
-    /// and an overbooked pool fails here atomically. The file is deleted on close.
-    /// It deliberately stays visible while open: unlinking it early breaks on 9p/drvfs
-    /// bind mounts (Docker Desktop), where an unlinked file's handle returns ENOENT.
-    /// Leftovers from a crash are removed by <see cref="DeleteStaleReservations"/>.
-    /// ponytail: on filesystems without fallocate the file stays sparse and only the
-    /// free-space check protects the pool.
-    /// </summary>
-    private static FileStream ReservePoolSpace(string poolPath, long bytes, long available)
-    {
-        var path = Path.Combine(poolPath, ReservationFilePrefix + Guid.NewGuid().ToString("N"));
-        FileStream? stream = null;
-        try
-        {
-            stream = new FileStream(path, new FileStreamOptions
-            {
-                Mode = FileMode.CreateNew,
-                Access = FileAccess.Write,
-                Share = FileShare.None,
-                Options = FileOptions.DeleteOnClose,
-                PreallocationSize = bytes
-            });
-            stream.SetLength(bytes);
-            return stream;
-        }
-        catch (IOException ex)
-        {
-            stream?.Dispose();
-            File.Delete(path);
-            // Someone else took the space between the check and the allocation.
-            throw new InsufficientPoolSpaceException(bytes, available, ex);
-        }
-    }
-
-    /// <summary>
-    /// Removes reservation files a crashed move left in the pool roots. Call once at
-    /// startup, before any move can run: moves only happen inside this process.
-    /// </summary>
-    public static void DeleteStaleReservations(IEnumerable<string> poolPaths)
-    {
-        foreach (var pool in poolPaths)
-        {
-            try
-            {
-                foreach (var file in Directory.EnumerateFiles(pool, ReservationFilePrefix + "*"))
-                    File.Delete(file);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // Best effort: a leftover only costs space until the next start.
-            }
-        }
-    }
-
-    // Same set of files CopyDirectoryAsync copies: links are recreated, not followed.
-    private static long GetDirectorySize(string path)
-        => new DirectoryInfo(path)
-            .EnumerateFiles("*", new EnumerationOptions
-            {
-                RecurseSubdirectories = true,
-                AttributesToSkip = FileAttributes.ReparsePoint,
-                IgnoreInaccessible = false
-            })
-            .Sum(file => file.Length);
-
-    private sealed class InsufficientPoolSpaceException(
-        long required, long available, Exception? inner = null)
-        : IOException("Not enough free space in the target storage pool.", inner)
-    {
-        public long Required { get; } = required;
-        public long Available { get; } = available;
-    }
-
-    private static async Task CopyDirectoryAsync(
-        string sourcePath, string destinationPath, Action<long> beforeFileCopy)
-    {
-        Directory.CreateDirectory(destinationPath);
-
-        foreach (var entry in new DirectoryInfo(sourcePath).EnumerateFileSystemInfos())
-        {
-            var destinationEntry = Path.Combine(destinationPath, entry.Name);
-
-            // Preserve links as links. Following a link could copy data outside
-            // the share or recurse forever through a directory cycle.
-            if (entry.LinkTarget is not null)
-            {
-                if (entry is DirectoryInfo)
-                    Directory.CreateSymbolicLink(destinationEntry, entry.LinkTarget);
-                else
-                    File.CreateSymbolicLink(destinationEntry, entry.LinkTarget);
-                continue;
-            }
-
-            if (entry is DirectoryInfo directory)
-            {
-                await CopyDirectoryAsync(directory.FullName, destinationEntry, beforeFileCopy);
-                continue;
-            }
-
-            beforeFileCopy(((FileInfo)entry).Length);
-            await using var source = new FileStream(
-                entry.FullName, FileMode.Open, FileAccess.Read, FileShare.Read,
-                bufferSize: 1024 * 1024, useAsync: true);
-            await using var destination = new FileStream(
-                destinationEntry, FileMode.CreateNew, FileAccess.Write, FileShare.None,
-                bufferSize: 1024 * 1024, useAsync: true);
-            await source.CopyToAsync(destination);
-            File.SetLastWriteTimeUtc(
-                destinationEntry, File.GetLastWriteTimeUtc(entry.FullName));
-        }
-
-        Directory.SetLastWriteTimeUtc(
-            destinationPath, Directory.GetLastWriteTimeUtc(sourcePath));
-    }
-
 
     // -- Toggle Share Enabled and Recycle Enabled and Share Hidden --
 
@@ -1169,6 +870,53 @@ public partial class ShareListViewModel
             return false;
         }
     }
+
+    // -- Recycle-bin limits --
+
+    /// <summary>Global default size limit per recycle bin (0 = unlimited), shown for "inherit".</summary>
+    public long GlobalRecycleMaxSizeBytes { get; private set; }
+
+    public async Task<bool> SaveRecycleLimitsAsync(RecycleLimits limits)
+    {
+        if (SelectedShare is null) return false;
+
+        if (!EnsureSelectedShareWritable())
+            return false;
+
+        // Recycle-bin behavior is a share feature setting → EditShareSettings (like the toggle).
+        if (!await CanManageSelectedShareAsync(ManagementPermission.EditShareSettings))
+        { EditSuccessMessage = null; EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
+
+        if (!limits.IsValid)
+        {
+            EditSuccessMessage = null;
+            EditErrorMessage = Text("Web_Recycle_Error_Invalid",
+                "Invalid limits: the maximum size must be at least 1 MB and the retention 1 to 3650 days.");
+            return false;
+        }
+
+        try
+        {
+            SelectedShare.ApplyRecycleLimits(limits);
+            await _shareRepo.UpdateAsync(SelectedShare);
+
+            _logger.LogInformation("Recycle-bin limits of share '{ShareName}' changed to {Limits}",
+                SelectedShare.Name, limits);
+            EditErrorMessage = null;
+            EditSuccessMessage = Text("Web_Recycle_Saved", "Recycle bin limits saved.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving the recycle-bin limits");
+            EditSuccessMessage = null;
+            EditErrorMessage = Resources.Web_Error_ChangeStatusFailed;
+            return false;
+        }
+    }
+
+    private static string Text(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
 
     public async Task<bool> ToggleShareHiddenAsync()
     {

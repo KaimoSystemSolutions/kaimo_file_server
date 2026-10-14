@@ -12,6 +12,8 @@ Related: [Security model](../architecture/security-model.md) ·
 - The share is a regular `ShareDefinition` with `IsUserHomes = true`, created in a chosen pool as
   `<pool>/users`. An existing `<pool>/users` directory is adopted, so homes re-attach to their users
   after a database reset.
+- Setup, the global switch, the pool move and the recycle-bin limits live on Settings → Home folders
+  (`HomeFolderSettings.razor`); `/files/users` is the metadata overview of the individual homes.
 - The name `users` is used because `[homes]` is a reserved Samba section with special semantics.
 - The names `users` and `user` are reserved and rejected for other shares.
 - Provisioning is idempotent (`HomeDirectoryService`,
@@ -45,6 +47,7 @@ Per user with an enabled home:
 |---|---|
 | Disable a home | Removes the user's three entries and sets `HomeDirectoryEnabled = false`; files stay on disk |
 | Re-enable | Restores the entries |
+| Move to another pool (`MovePoolAsync`) | Same mechanics as a share move (`SharePoolMoveService`): the share is disabled while the folder is renamed or copied, then points to `<new pool>/users`. Home ACLs, metadata and links are share-relative and stay valid |
 | Global switch off | Disables the `users` share (`HomeDirectoryService.SetGloballyEnabledAsync`); every transport refuses a disabled share. Per-user state is kept |
 | Delete a home (`DeleteHomeAsync`) | Removes public links into it first, then the folder (including its recycle bin), metadata and ACL rows, file versions and the root entry; appends a `Deleted` change-log entry. The recycle bin is not used. An existing, enabled user immediately receives a new empty home |
 
@@ -70,6 +73,9 @@ any transport: it is an ordinary folder inside the home. Deleting `<userId>/docs
 - On SMB and on macOS, the dot name makes the folder hidden by default. The web UI shows it with
   the recycle-bin icon and the "empty recycle bin" action.
 - Recycled items count toward the size of the home.
+- The recycle-bin limits of the `users` share (maximum size, retention; see
+  [Storage and persistence](../architecture/storage-and-persistence.md#limits)) apply to every home bin
+  separately: one full home never purges items of another.
 - The sync API never syncs a recycle bin: `delta` skips it, and the change feed reports a recycle
   move as a delete of the old path and a restore as a subtree change at the new path.
 

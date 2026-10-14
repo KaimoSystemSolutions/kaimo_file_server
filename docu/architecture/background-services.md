@@ -27,6 +27,7 @@ mapping.
 |---|---|
 | `SearchIndexingService` | **Single owner** of all search index writes (Elasticsearch or the local PostgreSQL index, whichever is selected). Tails `file_change_log` in batches of 200 from a per-engine cursor persisted in `config_settings`; does not advance the cursor while no index engine is active or Elasticsearch is unreachable |
 | `NotificationDispatcherService` | **Single owner** of mail delivery. Leases `notification_events`, applies mail rules, renders and sends via SMTP, retries with backoff, prunes old rows |
+| `RecycleBinJanitorService` | **Single owner** of recycle-bin purges. Two minutes after start, then hourly, enforces the retention and maximum size of every recycle bin (see [Storage and persistence](storage-and-persistence.md#limits)). Does nothing in the read-only demo |
 | `ClientSyncRetentionService` | Every 6 h, prunes `file_change_log`, `client_request_receipts` and expired refresh tokens |
 | `CloudSyncSchedulerService` | Evaluates enabled sync schedules and enqueues due syncs; woken immediately when a sync definition changes |
 | `CloudSyncJobRunner` | Background job queue that executes manual and scheduled syncs off the request thread and reports progress |

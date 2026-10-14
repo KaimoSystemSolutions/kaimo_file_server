@@ -38,7 +38,7 @@ Tables by area:
 | Area | Tables |
 |---|---|
 | Identity and organization | `users`, `groups`, `user_groups`, `roles`, `departments`, `department_users`, `scoped_role_assignments` |
-| Shares and files | `share_definitions`, `file_metadata`, `access_entries`, `file_versions` |
+| Shares and files | `share_definitions`, `file_metadata`, `access_entries`, `file_versions`, `recycle_bin_entries` |
 | Authentication and security monitoring | `revoked_web_tokens`, `login_attempts`, `client_activity`, `refresh_tokens` |
 | Client sync API | `sync_devices`, `device_sync_profiles`, `client_request_receipts`, `file_change_log` |
 | External storage | `provider_profiles`, `storage_connections`, `storage_authorization_transactions`, `storage_device_authorization_sessions`, `storage_connection_credential_leases`, `sync_definitions`, `sync_definition_runtimes`, `cloud_access_shares`, `cloud_access_grants` |
@@ -56,6 +56,13 @@ Tables by area:
   is a separate bind mount (`/data/storage/pool01`, `/data/storage/pool02`, …).
 - A **share** (`ShareDefinition`) is a directory inside a pool. `ShareDefinition.Path` is its absolute
   path; all share I/O resolves through it (`src/Kaimo_File_Server.Infrastructure/Services/FileServiceFactory.cs`).
+- A share can be moved to another pool (share management, and Settings → Home folders for the
+  `users` share). `SharePoolMoveService` (`src/Kaimo_File_Server.Infrastructure/Services/SharePoolMoveService.cs`)
+  disables the share for the duration of the move (SMB drops it within one share sync and closes its
+  sessions; every other transport refuses a disabled share), renames the folder or, across file
+  systems, copies it into a space-reserved staging folder that is published atomically, updates
+  `ShareDefinition.Path`, removes the source and restores the previous enabled state. ACLs, metadata,
+  links and versions are share-relative; version blobs follow via `VersionStorageReconcilerService`.
 - A pool can carry a display label, stored in `config_settings` under `storage.poolNames`
   (`src/Kaimo_File_Server.Core/Storage/StoragePoolNaming.cs`). The label is presentation only; I/O
   always uses the mount path.
@@ -89,6 +96,27 @@ When `ShareDefinition.IsRecycleEnabled` is set, deleting an item moves it to
 ACLs, versions and the change log (`FileChangeType.Renamed`). Deleting inside `.RECYCLE_BIN` removes
 the item permanently. SMB deletes follow the same rule inside the VFS module
 (`src/samba-vfs/module/recycle_move.h`).
+
+### Limits
+
+Each recycle root (the share's `.RECYCLE_BIN`, or every `<userId>/.RECYCLE_BIN` of the home-folder
+share) can be limited:
+
+- **Maximum size**: `ShareDefinition.RecycleMaxSizeMode` is `Inherit` (global default
+  `recycle.maxSizeBytes` in `config_settings`, 0 = unlimited), `Custom` (`RecycleMaxSizeBytes`) or
+  `Unlimited`. Above the limit, the oldest deleted items are purged first until the bin is at or
+  below it. Deleting never fails because of the limit.
+- **Retention**: `RecycleRetentionDays`; items deleted longer ago are purged. Empty = never.
+
+`RecycleBinJanitorService` (Web host, hourly) enforces both on disk for every enabled share with an
+enabled bin, so deletes over Web, REST, WebDAV and SMB are treated alike; a bin may exceed its limit
+until the next run. The deletion time is the first run that saw an item (`recycle_bin_entries`), not a
+file timestamp: a folder moved into the bin keeps its children's old times, and bin folders change
+on every delete. A changed inode change time (restore and delete again) restarts the clock, so an
+item is purged at most one run late and never early. Purging an item removes it from disk, deletes
+its metadata/ACL rows and versions and appends a `Deleted` change-log entry. Folders are removed
+once a purge emptied them, or when they are empty and older than the retention themselves; the bin
+root always stays. Links are never followed and other mounted file systems are skipped.
 
 ## File versions
 

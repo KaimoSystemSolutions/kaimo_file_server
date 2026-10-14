@@ -81,7 +81,7 @@ builder.Services.AddElasticSearch(builder.Configuration);
 var baseStoragePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
 var applicationDataPath = builder.Configuration.GetValue<string>("Storage:ApplicationDataPath") ?? "/data/kaimo-system";
 var poolStoragePaths = Directory.GetDirectories(baseStoragePath).Select(path => path).ToList();
-ShareListViewModel.DeleteStaleReservations(poolStoragePaths);
+Kaimo_File_Server.Infrastructure.Services.SharePoolMoveService.DeleteStaleReservations(poolStoragePaths);
 
 builder.Services.AddCoreServices(poolStoragePaths, applicationDataPath);
 
@@ -350,6 +350,9 @@ builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.Clie
 // Owns all Elasticsearch index writes by tailing the change log, so file operations never block on
 // ES. Single-owner: registered only here (the web host), never in the SMB/host processes.
 builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.SearchIndexingService>();
+// Enforces recycle-bin retention and size limits for every transport. Single-owner like the indexer.
+builder.Services.AddScoped<Kaimo_File_Server.Infrastructure.Services.RecycleBinJanitor>();
+builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.RecycleBinJanitorService>();
 // Turns outbox notification events into mails and sends them. Single-owner like the indexer:
 // every process publishes, only the web host (which can decrypt the SMTP password) dispatches.
 builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Notifications.ISmtpMailSender,
@@ -407,6 +410,15 @@ builder.Services.AddScoped<CloudAccessViewModel>();
 builder.Services.AddScoped<CloudAccessShareBrowserViewModel>();
 builder.Services.AddScoped<RemoteCloudAccessFileBrowserViewModel>();
 
+// Share pool moves (share management and home folders). The search index is not written
+// from here: indexing is owned by SearchIndexingService.
+builder.Services.AddScoped(sp => new Kaimo_File_Server.Infrastructure.Services.SharePoolMoveService(
+    sp.GetRequiredService<IShareRepository>(),
+    sp.GetRequiredService<ShareLockManager>(),
+    sp.GetRequiredService<ILogger<Kaimo_File_Server.Infrastructure.Services.SharePoolMoveService>>(),
+    searchService: null,
+    sp.GetRequiredService<ICloudSyncOperationCoordinator>()));
+
 // ShareListViewModel receives configured pool destinations. File I/O itself
 // always uses the absolute path persisted on the selected share.
 builder.Services.AddScoped<ShareListViewModel>(sp =>
@@ -427,7 +439,8 @@ builder.Services.AddScoped<ShareListViewModel>(sp =>
         cloudSyncOperations:
             sp.GetRequiredService<ICloudSyncOperationCoordinator>(),
         config: sp.GetRequiredService<IConfigRepository>(),
-        departmentRepo: sp.GetRequiredService<IDepartmentRepository>()));
+        departmentRepo: sp.GetRequiredService<IDepartmentRepository>(),
+        poolMove: sp.GetRequiredService<Kaimo_File_Server.Infrastructure.Services.SharePoolMoveService>()));
 
 // ══════════════════════════════════════════
 //  DataProtection

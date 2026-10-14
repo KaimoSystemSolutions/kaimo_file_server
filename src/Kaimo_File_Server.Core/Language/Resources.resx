@@ -4870,7 +4870,7 @@
     <value>Size, status and public links of every home folder. Contents stay private.</value>
   </data>
   <data name="Web_Homes_NotConfigured" xml:space="preserve">
-    <value>Home folders are not set up yet. Choose a storage pool under Settings → Storage.</value>
+    <value>Home folders are not set up yet. Choose a storage pool under Settings → Home folders.</value>
   </data>
   <data name="Web_Homes_Empty" xml:space="preserve">
     <value>No home folders exist yet.</value>
@@ -4914,11 +4914,8 @@
   <data name="Web_Settings_Homes_Description" xml:space="preserve">
     <value>Every user gets a private folder users/&lt;user id&gt; that only they can access. Users see it as "user" in the web UI and app; administrators only see its size, status and links.</value>
   </data>
-  <data name="Web_Settings_Homes_Share" xml:space="preserve">
-    <value>Share</value>
-  </data>
   <data name="Web_Settings_Homes_PoolHint" xml:space="preserve">
-    <value>The pool cannot be changed once home folders are set up.</value>
+    <value>You can move the home folders to another pool later.</value>
   </data>
   <data name="Web_Settings_Homes_SetUp" xml:space="preserve">
     <value>Set up home folders</value>
@@ -4948,7 +4945,7 @@
     <value>Home folders are disabled for all users.</value>
   </data>
   <data name="Web_Homes_GloballyDisabled" xml:space="preserve">
-    <value>Home folders are disabled for all users (Settings → Storage). Files are kept.</value>
+    <value>Home folders are disabled for all users (Settings → Home folders). Files are kept.</value>
   </data>
   <data name="Web_Homes_Delete" xml:space="preserve">
     <value>Delete home folder</value>
@@ -7299,5 +7296,77 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   </data>
   <data name="Web_Settings_Tab_SystemStatus" xml:space="preserve">
     <value>System status</value>
+  </data>
+  <data name="Web_Settings_Tab_Homes" xml:space="preserve">
+    <value>Home folders</value>
+  </data>
+  <data name="Web_Settings_Homes_MoveHint" xml:space="preserve">
+    <value>Moves every home folder with all its files. Home folders are unavailable on all access paths while the move runs.</value>
+  </data>
+  <data name="Web_Settings_Homes_MoveTitle" xml:space="preserve">
+    <value>Move home folders?</value>
+  </data>
+  <data name="Web_Settings_Homes_MoveConfirm" xml:space="preserve">
+    <value>All home folders are moved to the pool {0}. They are unavailable for every user until the move has finished, which can take a while for large amounts of data.</value>
+  </data>
+  <data name="Web_Settings_Homes_Moved" xml:space="preserve">
+    <value>Home folders moved to pool {0}.</value>
+  </data>
+  <data name="Web_Settings_Homes_RecycleDescription" xml:space="preserve">
+    <value>Every home folder has its own recycle bin. These limits apply to each of them separately.</value>
+  </data>
+  <data name="Web_Settings_Homes_RecycleSizeHint" xml:space="preserve">
+    <value>Per home folder. When a home's recycle bin grows larger, its oldest deleted items are removed first. Checked hourly.</value>
+  </data>
+  <data name="Web_Recycle_SectionLabel" xml:space="preserve">
+    <value>Recycle bin</value>
+  </data>
+  <data name="Web_Recycle_LimitsLabel" xml:space="preserve">
+    <value>Recycle bin limits</value>
+  </data>
+  <data name="Web_Recycle_GlobalDescription" xml:space="preserve">
+    <value>Deleted items stay in the recycle bin of their share until they are restored or removed. Retention and individual limits are set per share and for home folders.</value>
+  </data>
+  <data name="Web_Recycle_DefaultMaxSize" xml:space="preserve">
+    <value>Default maximum size per recycle bin</value>
+  </data>
+  <data name="Web_Recycle_DefaultMaxSizeHint" xml:space="preserve">
+    <value>Applies to every share that does not set its own limit. Leave empty for unlimited. When a bin grows larger, its oldest deleted items are removed first.</value>
+  </data>
+  <data name="Web_Recycle_MaxSize" xml:space="preserve">
+    <value>Maximum size</value>
+  </data>
+  <data name="Web_Recycle_MaxSizeHint" xml:space="preserve">
+    <value>When the recycle bin grows larger, its oldest deleted items are removed first. Checked hourly.</value>
+  </data>
+  <data name="Web_Recycle_Mode_Inherit" xml:space="preserve">
+    <value>Global default ({0})</value>
+  </data>
+  <data name="Web_Recycle_Mode_Custom" xml:space="preserve">
+    <value>Custom size</value>
+  </data>
+  <data name="Web_Recycle_Mode_Unlimited" xml:space="preserve">
+    <value>Unlimited</value>
+  </data>
+  <data name="Web_Recycle_Unit" xml:space="preserve">
+    <value>Unit</value>
+  </data>
+  <data name="Web_Recycle_Retention" xml:space="preserve">
+    <value>Retention (days)</value>
+  </data>
+  <data name="Web_Recycle_RetentionNever" xml:space="preserve">
+    <value>Never</value>
+  </data>
+  <data name="Web_Recycle_RetentionHint" xml:space="preserve">
+    <value>Deleted items are removed permanently after this many days. Leave empty to keep them until the size limit applies.</value>
+  </data>
+  <data name="Web_Recycle_Saved" xml:space="preserve">
+    <value>Recycle bin limits saved.</value>
+  </data>
+  <data name="Web_Recycle_Error_Invalid" xml:space="preserve">
+    <value>Invalid limits: the maximum size must be at least 1 MB and the retention 1 to 3650 days.</value>
+  </data>
+  <data name="Web_ShareList_MovePoolHint" xml:space="preserve">
+    <value>The share is unavailable on all access paths while the move runs.</value>
   </data>
 </root>

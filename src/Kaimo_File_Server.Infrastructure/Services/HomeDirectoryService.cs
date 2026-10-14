@@ -44,7 +44,8 @@ public sealed class HomeDirectoryService(
     IFileVersionService versions,
     IShareLinkRepository shareLinks,
     IFileChangeLogRepository changeLog,
-    ILogger<HomeDirectoryService> logger)
+    ILogger<HomeDirectoryService> logger,
+    SharePoolMoveService? poolMove = null)
 {
     /// <summary>Name of the home-folder share, identical on every transport.</summary>
     public const string ShareName = "users";
@@ -187,6 +188,36 @@ public sealed class HomeDirectoryService(
 
         if (enabled)
             await BackfillAsync();
+    }
+
+    /// <summary>
+    /// Sets the recycle-bin limits that apply to every home bin (<c>&lt;userId&gt;/.RECYCLE_BIN</c>)
+    /// alike. Returns <c>false</c> while home folders are not configured or for invalid limits.
+    /// </summary>
+    public async Task<bool> SetRecycleLimitsAsync(RecycleLimits limits)
+    {
+        if (!limits.IsValid || await GetHomesShareAsync() is not { } share)
+            return false;
+
+        share.ApplyRecycleLimits(limits);
+        await shares.UpdateAsync(share);
+        logger.LogInformation("Home-folder recycle-bin limits changed to {Limits}", limits);
+        return true;
+    }
+
+    /// <summary>
+    /// Moves the home-folder share, with every home in it, into another storage pool (same
+    /// mechanics as a share move, see <see cref="SharePoolMoveService"/>). Home ACLs, metadata
+    /// and links are share-relative and stay valid. Returns <c>null</c> while home folders are
+    /// not configured. The caller validates that <paramref name="targetPoolPath"/> is a pool.
+    /// </summary>
+    public async Task<SharePoolMoveOutcome?> MovePoolAsync(string targetPoolPath)
+    {
+        if (await GetHomesShareAsync() is not { } share)
+            return null;
+        if (poolMove is null)
+            throw new InvalidOperationException("No pool move service is available.");
+        return await poolMove.MoveAsync(share, targetPoolPath);
     }
 
     /// <summary>

@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Infrastructure.Configuration;
+using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
@@ -37,6 +38,45 @@ public class SettingsViewModelSmbTests
             h.Vm.CloudAccessSettings.DirectoryCacheSeconds);
         h.CloudAccessSettings.Verify(s => s.SetAsync(It.Is<CloudAccessRuntimeSettings>(value =>
             value.DirectoryCacheSeconds == CloudAccessRuntimeSettings.MaxDirectoryCacheSeconds)), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(5L << 20, 5L << 20)]
+    [InlineData(null, 0L)]
+    public async Task SaveRecycleGlobalMaxSizeAsync_PersistsBytesOrZeroForUnlimited(long? input, long stored)
+    {
+        var h = new Harness(canManageDataServices: false, canManageSettings: true);
+        await h.Vm.LoadAsync();
+
+        var ok = await h.Vm.SaveRecycleGlobalMaxSizeAsync(input);
+
+        Assert.True(ok);
+        h.Config.Verify(c => c.SetAsync(RecycleBinJanitor.GlobalMaxSizeConfigKey, stored), Times.Once);
+        Assert.Equal(stored, h.Vm.RecycleGlobalMaxSizeBytes);
+    }
+
+    [Fact]
+    public async Task SaveRecycleGlobalMaxSizeAsync_BelowMinimum_IsRejected()
+    {
+        var h = new Harness(canManageDataServices: false, canManageSettings: true);
+        await h.Vm.LoadAsync();
+
+        var ok = await h.Vm.SaveRecycleGlobalMaxSizeAsync(1000);
+
+        Assert.False(ok);
+        h.Config.Verify(c => c.SetAsync(RecycleBinJanitor.GlobalMaxSizeConfigKey, It.IsAny<long>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SaveRecycleGlobalMaxSizeAsync_WithoutPermission_IsDenied()
+    {
+        var h = new Harness(canManageDataServices: true);
+        await h.Vm.LoadAsync();
+
+        var ok = await h.Vm.SaveRecycleGlobalMaxSizeAsync(5L << 20);
+
+        Assert.False(ok);
+        h.Config.Verify(c => c.SetAsync(RecycleBinJanitor.GlobalMaxSizeConfigKey, It.IsAny<long>()), Times.Never);
     }
 
     // ─────────────────────────── SmbProtocolSettings model ───────────────────────────

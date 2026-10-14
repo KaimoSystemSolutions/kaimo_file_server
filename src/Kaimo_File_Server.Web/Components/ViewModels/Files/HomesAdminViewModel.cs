@@ -38,7 +38,7 @@ public sealed class HomesAdminViewModel(
     public bool CanAccessPage { get; private set; }
     public bool IsConfigured { get; private set; }
 
-    /// <summary>False while home folders are switched off for everyone (Settings → Storage).</summary>
+    /// <summary>False while home folders are switched off for everyone (Settings → Home folders).</summary>
     public bool IsGloballyEnabled { get; private set; }
     public string? ErrorMessage { get; private set; }
     public string? SuccessMessage { get; private set; }

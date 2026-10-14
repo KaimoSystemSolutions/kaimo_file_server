@@ -1208,6 +1208,30 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.ToTable("provider_profiles", (string)null);
                 });
 
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.RecycleBinEntry", b =>
+                {
+                    b.Property<Guid>("ShareId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Path")
+                        .HasColumnType("text");
+
+                    b.Property<long>("CtimeTicks")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("FirstSeenUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("ShareId", "Path");
+
+                    b.HasIndex("ShareId", "FirstSeenUtc");
+
+                    b.ToTable("recycle_bin_entries", (string)null);
+                });
+
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.SambaLifecycleEventReceipt", b =>
                 {
                     b.Property<Guid>("EventId")
@@ -1284,6 +1308,15 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.Property<string>("Path")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<long?>("RecycleMaxSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("RecycleMaxSizeMode")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RecycleRetentionDays")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -2095,6 +2128,15 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ConnectionId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.RecycleBinEntry", b =>
+                {
+                    b.HasOne("Kaimo_File_Server.Core.Domain.ShareDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("ShareId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

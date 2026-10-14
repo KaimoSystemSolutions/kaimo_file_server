@@ -82,6 +82,54 @@ namespace Kaimo_File_Server.Core.Domain
         /// </summary>
         public int RecycleRootDepth => IsUserHomes ? 1 : 0;
 
+        /// <summary>Smallest accepted custom recycle-bin size limit (1 MB).</summary>
+        public const long MinRecycleMaxSizeBytes = 1L << 20;
+
+        /// <summary>Largest accepted recycle-bin retention (about ten years).</summary>
+        public const int MaxRecycleRetentionDays = 3650;
+
+        /// <summary>
+        /// How the recycle-bin size limit is determined. Applies per recycle root, so for the
+        /// home-folder share every <c>&lt;userId&gt;/.RECYCLE_BIN</c> gets the full limit.
+        /// </summary>
+        public RecycleLimitMode RecycleMaxSizeMode { get; set; } = RecycleLimitMode.Inherit;
+
+        /// <summary>Size limit in bytes; only used with <see cref="RecycleLimitMode.Custom"/>.</summary>
+        public long? RecycleMaxSizeBytes { get; set; }
+
+        /// <summary>
+        /// Days a deleted item stays in the recycle bin before it is purged;
+        /// <c>null</c> = never purge by age.
+        /// </summary>
+        public int? RecycleRetentionDays { get; set; }
+
+        /// <summary>
+        /// The effective recycle-bin size limit, or <c>null</c> for unlimited.
+        /// <paramref name="globalMaxSizeBytes"/> &lt;= 0 means the global default is unlimited.
+        /// </summary>
+        public long? GetEffectiveRecycleMaxSizeBytes(long globalMaxSizeBytes) => RecycleMaxSizeMode switch
+        {
+            RecycleLimitMode.Custom => RecycleMaxSizeBytes,
+            RecycleLimitMode.Unlimited => null,
+            _ => globalMaxSizeBytes > 0 ? globalMaxSizeBytes : null,
+        };
+
+        public RecycleLimits GetRecycleLimits()
+            => new(RecycleMaxSizeMode, RecycleMaxSizeBytes, RecycleRetentionDays);
+
+        /// <summary>Sets the limits; the size is only kept for <see cref="RecycleLimitMode.Custom"/>.</summary>
+        public void ApplyRecycleLimits(RecycleLimits limits)
+        {
+            RecycleMaxSizeMode = limits.Mode;
+            RecycleMaxSizeBytes = limits.Mode == RecycleLimitMode.Custom ? limits.MaxSizeBytes : null;
+            RecycleRetentionDays = limits.RetentionDays;
+        }
+
+        /// <summary>Whether a recycle-bin limit configuration may be saved.</summary>
+        public static bool IsValidRecycleLimits(RecycleLimitMode mode, long? maxSizeBytes, int? retentionDays)
+            => (mode != RecycleLimitMode.Custom || maxSizeBytes >= MinRecycleMaxSizeBytes)
+               && retentionDays is null or (>= 1 and <= MaxRecycleRetentionDays);
+
         public CloudSettings CloudSettings { get; set; } = new CloudSettings(new Dictionary<string, SyncedFolder>());
 
         public ICloudConnection? CloudConnection { get; set; }

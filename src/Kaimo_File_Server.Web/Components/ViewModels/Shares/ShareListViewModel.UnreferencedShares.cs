@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Core.Language;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
@@ -44,7 +45,7 @@ public partial class ShareListViewModel
                     .Where(dir => IsCandidateFolder(dir) && !used.Contains(NormalizePath(dir.FullName)))
                     .Select(dir => new UnreferencedFolder(
                         dir.Name, dir.FullName, pool.Name,
-                        GetDirectorySize(dir.FullName), dir.LastWriteTimeUtc)))
+                        SharePoolMoveService.GetDirectorySize(dir.FullName), dir.LastWriteTimeUtc)))
                 .OrderBy(f => f.PoolName).ThenBy(f => f.Name)
                 .ToList());
         }

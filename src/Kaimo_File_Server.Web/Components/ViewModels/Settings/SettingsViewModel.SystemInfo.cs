@@ -134,6 +134,9 @@ public partial class SettingsViewModel
     /// <summary>Pool that holds the home-folder share, or <c>null</c> while home folders are not set up.</summary>
     public string? HomesPoolPath { get; private set; }
 
+    /// <summary>Absolute path of the home-folder share, or <c>null</c> while home folders are not set up.</summary>
+    public string? HomesSharePath { get; private set; }
+
     /// <summary>Pool chosen in the setup form (only used while <see cref="HomesPoolPath"/> is null).</summary>
     public string HomesSelectedPool { get; set; } = "";
 
@@ -144,8 +147,11 @@ public partial class SettingsViewModel
     {
         var share = _homes is null ? null : await _homes.GetHomesShareAsync();
         HomesPoolPath = share is null ? null : Path.GetDirectoryName(share.Path);
+        HomesSharePath = share?.Path;
         HomesEnabled = share?.IsEnabled == true;
         HomesSelectedPool = StorageUsages.FirstOrDefault()?.StoragePath ?? "";
+        HomesTargetPool = HomesPoolPath ?? HomesSelectedPool;
+        HomesRecycleLimits = share?.GetRecycleLimits();
     }
 
     /// <summary>Enables or disables home folders for every user at once.</summary>
@@ -182,8 +188,8 @@ public partial class SettingsViewModel
     }
 
     /// <summary>
-    /// Creates the home-folder share on the selected pool. The pool is fixed afterwards;
-    /// existing homes are never moved.
+    /// Creates the home-folder share on the selected pool. It can be moved later with
+    /// <see cref="MoveHomesPoolAsync"/>.
     /// </summary>
     public async Task<bool> ConfigureHomesAsync()
     {

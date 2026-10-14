@@ -2,7 +2,7 @@
 @using Kaimo_File_Server.Core.Helpers
 
 @* Additional share settings ("Zusatz"): department, storage pool, availability status,
-   and visibility. Split out of the general settings panel so the general tab keeps only
+   visibility and recycle-bin limits. Split out of the general settings panel so the general tab keeps only
    the share identity (name, path) and its destructive action. *@
 
 @if (VM.EditSuccessMessage is not null)
@@ -19,7 +19,10 @@
     var isReadOnly = VM.IsSelectedShareReadOnly;
 
     <div class="detail-section">
-        <span class="detail-label">@Resources.Web_ShareList_Label_StoragePool</span>
+        <span class="detail-label label-with-info">
+            @Resources.Web_ShareList_Label_StoragePool
+            <InfoButton Text="@(Resources.ResourceManager.GetString("Web_ShareList_MovePoolHint") ?? "The share is unavailable on all access paths while the move runs.")" />
+        </span>
         <div class="detail-value-row">
             <select class="edit-input"
                     @bind="VM.EditSharePoolPath"
@@ -45,6 +48,7 @@
 
     @if (VM.Departments.Count > 0)
     {
+        <div class="extra-group-divider"></div>
         <div class="detail-section">
             <span class="detail-label">@Resources.Web_ShareList_Label_Department</span>
             <PrincipalPickerField Mode="SelectionMode.Single"
@@ -78,6 +82,7 @@
         </div>
     }
 
+    <div class="extra-group-divider"></div>
     <div class="detail-section">
         <span class="detail-label">@Resources.Web_ShareList_Label_Status</span>
         <div class="detail-value-row">
@@ -100,6 +105,18 @@
             <span class="detail-value">@(VM.SelectedShare.IsShareHidden ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)</span>
         </div>
     </div>
+
+    @if (VM.SelectedShare.IsRecycleEnabled)
+    {
+        <div class="extra-group-divider"></div>
+        <div class="detail-section">
+            <span class="detail-label">@(Resources.ResourceManager.GetString("Web_Recycle_LimitsLabel") ?? "Recycle bin limits")</span>
+            <RecycleLimitFields Value="VM.SelectedShare.GetRecycleLimits()"
+                                GlobalMaxSizeBytes="VM.GlobalRecycleMaxSizeBytes"
+                                Disabled="isReadOnly"
+                                OnSave="SaveRecycleLimits" />
+        </div>
+    }
 }
 
 @code {
@@ -110,5 +127,6 @@
     private async Task ChangeStoragePool() { await VM.ChangeStoragePoolAsync(); await OnChanged.InvokeAsync(); }
     private async Task ChangeDepartment() { await VM.ChangeDepartmentAsync(); await OnChanged.InvokeAsync(); }
     private async Task ToggleShareEnabled() { await VM.ToggleShareEnabledAsync(); await OnChanged.InvokeAsync(); }
+    private async Task SaveRecycleLimits(Kaimo_File_Server.Core.Domain.RecycleLimits limits) { await VM.SaveRecycleLimitsAsync(limits); await OnChanged.InvokeAsync(); }
     private async Task ToggleShareHidden() { await VM.ToggleShareHiddenAsync(); await OnChanged.InvokeAsync(); }
 }

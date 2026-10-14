@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Domain;
@@ -30,6 +31,7 @@ public sealed class HomeDirectoryServiceTests : IDisposable
     private readonly List<ShareLink> _links = [];
     private readonly List<FileChangeLogEntry> _changes = [];
     private readonly List<string> _deletedVersionPaths = [];
+    private readonly List<RecycleLimits> _updatedShares = [];
     private readonly Department _dept;
     private readonly HomeDirectoryService _sut;
     private readonly AclService _aclService;
@@ -118,15 +120,78 @@ public sealed class HomeDirectoryServiceTests : IDisposable
         changes.Setup(r => r.AppendAsync(It.IsAny<FileChangeLogEntry>(), It.IsAny<CancellationToken>()))
             .Returns((FileChangeLogEntry e, CancellationToken _) => { _changes.Add(e); return Task.CompletedTask; });
 
+        shares.Setup(r => r.UpdateAsync(It.IsAny<ShareDefinition>()))
+            .Returns(Task.CompletedTask)
+            .Callback<ShareDefinition>(s => _updatedShares.Add(s.GetRecycleLimits()));
+        shares.Setup(r => r.UpdateLocationAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>()))
+            .Returns((Guid id, string _, string path) => { _shares.Single(x => x.Id == id).Path = path; return Task.CompletedTask; });
+
         _sut = new HomeDirectoryService(
             shares.Object, users.Object, metadata.Object, acls.Object,
             versions.Object, links.Object, changes.Object,
-            NullLogger<HomeDirectoryService>.Instance);
+            NullLogger<HomeDirectoryService>.Instance,
+            new SharePoolMoveService(shares.Object, new ShareLockManager(), NullLogger<SharePoolMoveService>.Instance)
+            { DisableGracePeriod = TimeSpan.Zero });
     }
 
     public void Dispose()
     {
         try { Directory.Delete(_root, recursive: true); } catch (IOException) { }
+    }
+
+    [Fact]
+    public async Task SetRecycleLimitsAsync_PersistsOnTheHomeShare()
+    {
+        var alice = AddUser("alice");
+        await _sut.ConfigureAsync(_root, alice.Id);
+        var limits = new RecycleLimits(RecycleLimitMode.Custom, 10L << 20, 14);
+
+        Assert.True(await _sut.SetRecycleLimitsAsync(limits));
+
+        Assert.Equal(limits, _updatedShares.Last());
+        Assert.Equal(limits, (await _sut.GetHomesShareAsync())!.GetRecycleLimits());
+    }
+
+    [Fact]
+    public async Task SetRecycleLimitsAsync_InvalidOrNotConfigured_IsRejected()
+    {
+        Assert.False(await _sut.SetRecycleLimitsAsync(new RecycleLimits(RecycleLimitMode.Inherit, null, 7)));
+
+        var alice = AddUser("alice");
+        await _sut.ConfigureAsync(_root, alice.Id);
+        _updatedShares.Clear();
+
+        Assert.False(await _sut.SetRecycleLimitsAsync(new RecycleLimits(RecycleLimitMode.Custom, 10, null)));
+        Assert.Empty(_updatedShares);
+    }
+
+    [Fact]
+    public async Task MovePoolAsync_NotConfigured_ReturnsNull()
+        => Assert.Null(await _sut.MovePoolAsync(Path.Combine(_root, "pool-b")));
+
+    [Fact]
+    public async Task MovePoolAsync_MovesEveryHomeAndKeepsAccess()
+    {
+        var alice = AddUser("alice");
+        var poolA = Path.Combine(_root, "pool-a");
+        var poolB = Path.Combine(_root, "pool-b");
+        Directory.CreateDirectory(poolA);
+        Directory.CreateDirectory(poolB);
+        await _sut.ConfigureAsync(poolA, alice.Id);
+        var share = (await _sut.GetHomesShareAsync())!;
+        var home = HomeDirectoryService.HomePathOf(alice.Id);
+        await File.WriteAllTextAsync(Path.Combine(share.Path, home, "notes.txt"), "mine");
+
+        var outcome = await _sut.MovePoolAsync(poolB);
+
+        Assert.Equal(SharePoolMoveResult.Moved, outcome!.Result);
+        var moved = (await _sut.GetHomesShareAsync())!;
+        Assert.Equal(Path.Combine(poolB, HomeDirectoryService.ShareName), moved.Path);
+        Assert.True(moved.IsEnabled);
+        Assert.Equal("mine", await File.ReadAllTextAsync(Path.Combine(moved.Path, home, "notes.txt")));
+        Assert.False(Directory.Exists(Path.Combine(poolA, HomeDirectoryService.ShareName)));
+        // ACLs are share-relative: the owner keeps access without any re-provisioning.
+        Assert.True(await _aclService.HasAccessAsync(Ctx(alice), moved.Id, home + "/notes.txt", false, FilePermission.ListReadData));
     }
 
     private User AddUser(string username)

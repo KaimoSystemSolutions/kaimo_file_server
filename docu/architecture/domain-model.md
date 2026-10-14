@@ -35,7 +35,8 @@ erDiagram
 | `Department` | `departments` | Hierarchical via `ParentDepartmentId`. The global department has the fixed ID `WellKnownGUIDs.DEPARTMENT_GLOBAL` |
 | `DepartmentUser` | `department_users` | Many-to-many user ↔ department membership |
 | `ScopedRoleAssignment` | `scoped_role_assignments` | Assigns a role to a user or group with `ScopeType` `Global`, `Department` or `Share` and a `ScopeId`. This is the only way roles are assigned |
-| `ShareDefinition` | `share_definitions` | A directory in a storage pool, owned by exactly one department |
+| `ShareDefinition` | `share_definitions` | A directory in a storage pool, owned by exactly one department. Carries the recycle-bin flag and limits (`RecycleMaxSizeMode`/`RecycleMaxSizeBytes`, `RecycleRetentionDays`) |
+| `RecycleBinEntry` | `recycle_bin_entries` | Bookkeeping of the recycle-bin janitor: one row per item in a recycle bin with its first-seen time (effective deletion time) and change-time fingerprint. Rebuildable from disk |
 | `FileMetadata` | `file_metadata` | One row per file or folder that carries an owner or ACL entries. The share root has `Path = ""` and must exist for root-level ACLs |
 | `AccessEntry` | `access_entries` | Allow or deny entry with a `FilePermission` bitmask and `AclInheritance` flags |
 | `FileVersion` | `file_versions` | Historical version, keyed by `ShareId` + `FilePath`, pointing to a blob (`StoragePath`) |

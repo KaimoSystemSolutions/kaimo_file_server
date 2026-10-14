@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
@@ -99,7 +100,11 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
             NullLogger<ShareListViewModel>.Instance,
             _storagePools,
             _versions.Object,
-            cloudSyncOperations: cloudSyncOperations);
+            cloudSyncOperations: cloudSyncOperations,
+            poolMove: new SharePoolMoveService(
+                ShareRepo(), _lockManager, NullLogger<SharePoolMoveService>.Instance,
+                cloudSyncOperations: cloudSyncOperations)
+            { DisableGracePeriod = TimeSpan.Zero });
     }
 
     private async Task<(ShareListViewModel Sut, ShareDefinition Share)> LoadAndSelectAsync(
@@ -226,6 +231,59 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         await using var db = NewContext();
         var row = await db.ShareDefinitions.FindAsync(seeded.Id);
         Assert.True(row!.IsRecycleEnabled);
+    }
+
+    // ─────────────────────── Recycle-bin limits ───────────────────────
+
+    [Fact]
+    public async Task SaveRecycleLimitsAsync_PersistsLimits()
+    {
+        var actor = SeedUser("admin");
+        var seeded = SeedPoolShare("docs", isRecycleEnabled: true);
+        var (sut, _) = await LoadAndSelectAsync(seeded, actor);
+
+        var ok = await sut.SaveRecycleLimitsAsync(new RecycleLimits(RecycleLimitMode.Custom, 5L << 20, 30));
+
+        Assert.True(ok);
+        await using var db = NewContext();
+        var row = await db.ShareDefinitions.FindAsync(seeded.Id);
+        Assert.Equal(RecycleLimitMode.Custom, row!.RecycleMaxSizeMode);
+        Assert.Equal(5L << 20, row.RecycleMaxSizeBytes);
+        Assert.Equal(30, row.RecycleRetentionDays);
+    }
+
+    [Fact]
+    public async Task SaveRecycleLimitsAsync_Invalid_IsRejectedAndNotPersisted()
+    {
+        var actor = SeedUser("admin");
+        var seeded = SeedPoolShare("docs", isRecycleEnabled: true);
+        var (sut, _) = await LoadAndSelectAsync(seeded, actor);
+
+        var ok = await sut.SaveRecycleLimitsAsync(new RecycleLimits(RecycleLimitMode.Inherit, null, 0));
+
+        Assert.False(ok);
+        Assert.NotNull(sut.EditErrorMessage);
+        await using var db = NewContext();
+        Assert.Null((await db.ShareDefinitions.FindAsync(seeded.Id))!.RecycleRetentionDays);
+    }
+
+    [Fact]
+    public async Task SaveRecycleLimitsAsync_WithoutEditShareSettings_IsDenied()
+    {
+        var actor = SeedUser("viewer");
+        var seeded = SeedPoolShare("docs", isRecycleEnabled: true);
+        var sut = BuildSettingsOnlyManagerSut(actor);
+        _mgmtAuth
+            .Setup(m => m.CanManageShareAsync(It.IsAny<UserContext>(), It.IsAny<Guid>(), ManagementPermission.EditShareSettings))
+            .ReturnsAsync(false);
+        await sut.LoadAsync();
+        sut.SelectShare(sut.Shares.Single(s => s.Id == seeded.Id));
+
+        var ok = await sut.SaveRecycleLimitsAsync(new RecycleLimits(RecycleLimitMode.Unlimited, null, 7));
+
+        Assert.False(ok);
+        await using var db = NewContext();
+        Assert.Null((await db.ShareDefinitions.FindAsync(seeded.Id))!.RecycleRetentionDays);
     }
 
     [Fact]

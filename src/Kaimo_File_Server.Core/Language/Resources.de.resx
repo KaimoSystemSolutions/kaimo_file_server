@@ -4804,7 +4804,7 @@
     <value>Größe, Status und öffentliche Links jedes Home-Ordners. Die Inhalte bleiben privat.</value>
   </data>
   <data name="Web_Homes_NotConfigured" xml:space="preserve">
-    <value>Home-Ordner sind noch nicht eingerichtet. Wähle unter Einstellungen → Speicher einen Storage-Pool.</value>
+    <value>Home-Ordner sind noch nicht eingerichtet. Wähle unter Einstellungen → Home-Ordner einen Storage-Pool.</value>
   </data>
   <data name="Web_Homes_Empty" xml:space="preserve">
     <value>Es gibt noch keine Home-Ordner.</value>
@@ -4848,11 +4848,8 @@
   <data name="Web_Settings_Homes_Description" xml:space="preserve">
     <value>Jeder Benutzer erhält einen privaten Ordner users/&lt;Benutzer-ID&gt;, auf den nur er zugreifen kann. Benutzer sehen ihn in Web-UI und App als "user"; Administratoren sehen nur Größe, Status und Links.</value>
   </data>
-  <data name="Web_Settings_Homes_Share" xml:space="preserve">
-    <value>Freigabe</value>
-  </data>
   <data name="Web_Settings_Homes_PoolHint" xml:space="preserve">
-    <value>Der Pool kann nach dem Einrichten nicht mehr geändert werden.</value>
+    <value>Die Home-Ordner können später in einen anderen Pool verschoben werden.</value>
   </data>
   <data name="Web_Settings_Homes_SetUp" xml:space="preserve">
     <value>Home-Ordner einrichten</value>
@@ -4882,7 +4879,7 @@
     <value>Die Home-Ordner sind für alle Benutzer deaktiviert.</value>
   </data>
   <data name="Web_Homes_GloballyDisabled" xml:space="preserve">
-    <value>Die Home-Ordner sind für alle Benutzer deaktiviert (Einstellungen → Speicher). Die Dateien bleiben erhalten.</value>
+    <value>Die Home-Ordner sind für alle Benutzer deaktiviert (Einstellungen → Home-Ordner). Die Dateien bleiben erhalten.</value>
   </data>
   <data name="Web_Homes_Delete" xml:space="preserve">
     <value>Home-Ordner löschen</value>
@@ -7299,5 +7296,77 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   </data>
   <data name="Web_Settings_Tab_SystemStatus" xml:space="preserve">
     <value>Systemstatus</value>
+  </data>
+  <data name="Web_Settings_Tab_Homes" xml:space="preserve">
+    <value>Home-Ordner</value>
+  </data>
+  <data name="Web_Settings_Homes_MoveHint" xml:space="preserve">
+    <value>Verschiebt alle Home-Ordner mit allen Dateien. Während des Verschiebens sind die Home-Ordner über keinen Zugriffsweg erreichbar.</value>
+  </data>
+  <data name="Web_Settings_Homes_MoveTitle" xml:space="preserve">
+    <value>Home-Ordner verschieben?</value>
+  </data>
+  <data name="Web_Settings_Homes_MoveConfirm" xml:space="preserve">
+    <value>Alle Home-Ordner werden in den Pool {0} verschoben. Bis das Verschieben abgeschlossen ist, sind sie für alle Benutzer nicht erreichbar. Bei großen Datenmengen kann das eine Weile dauern.</value>
+  </data>
+  <data name="Web_Settings_Homes_Moved" xml:space="preserve">
+    <value>Home-Ordner in den Pool {0} verschoben.</value>
+  </data>
+  <data name="Web_Settings_Homes_RecycleDescription" xml:space="preserve">
+    <value>Jeder Home-Ordner hat einen eigenen Papierkorb. Diese Limits gelten für jeden davon einzeln.</value>
+  </data>
+  <data name="Web_Settings_Homes_RecycleSizeHint" xml:space="preserve">
+    <value>Pro Home-Ordner. Wird ein Papierkorb größer, werden zuerst die am längsten gelöschten Elemente endgültig entfernt. Wird stündlich geprüft.</value>
+  </data>
+  <data name="Web_Recycle_SectionLabel" xml:space="preserve">
+    <value>Papierkorb</value>
+  </data>
+  <data name="Web_Recycle_LimitsLabel" xml:space="preserve">
+    <value>Papierkorb-Limits</value>
+  </data>
+  <data name="Web_Recycle_GlobalDescription" xml:space="preserve">
+    <value>Gelöschte Elemente bleiben im Papierkorb ihres Shares, bis sie wiederhergestellt oder entfernt werden. Aufbewahrungsdauer und eigene Limits werden pro Share und für Home-Ordner festgelegt.</value>
+  </data>
+  <data name="Web_Recycle_DefaultMaxSize" xml:space="preserve">
+    <value>Standard-Maximalgröße pro Papierkorb</value>
+  </data>
+  <data name="Web_Recycle_DefaultMaxSizeHint" xml:space="preserve">
+    <value>Gilt für jeden Share ohne eigenes Limit. Leer lassen für unbegrenzt. Wird ein Papierkorb größer, werden zuerst die am längsten gelöschten Elemente endgültig entfernt.</value>
+  </data>
+  <data name="Web_Recycle_MaxSize" xml:space="preserve">
+    <value>Maximalgröße</value>
+  </data>
+  <data name="Web_Recycle_MaxSizeHint" xml:space="preserve">
+    <value>Wird der Papierkorb größer, werden zuerst die am längsten gelöschten Elemente endgültig entfernt. Wird stündlich geprüft.</value>
+  </data>
+  <data name="Web_Recycle_Mode_Inherit" xml:space="preserve">
+    <value>Globaler Standard ({0})</value>
+  </data>
+  <data name="Web_Recycle_Mode_Custom" xml:space="preserve">
+    <value>Eigene Größe</value>
+  </data>
+  <data name="Web_Recycle_Mode_Unlimited" xml:space="preserve">
+    <value>Unbegrenzt</value>
+  </data>
+  <data name="Web_Recycle_Unit" xml:space="preserve">
+    <value>Einheit</value>
+  </data>
+  <data name="Web_Recycle_Retention" xml:space="preserve">
+    <value>Aufbewahrung (Tage)</value>
+  </data>
+  <data name="Web_Recycle_RetentionNever" xml:space="preserve">
+    <value>Nie</value>
+  </data>
+  <data name="Web_Recycle_RetentionHint" xml:space="preserve">
+    <value>Gelöschte Elemente werden nach so vielen Tagen endgültig entfernt. Leer lassen, um sie zu behalten, bis das Größenlimit greift.</value>
+  </data>
+  <data name="Web_Recycle_Saved" xml:space="preserve">
+    <value>Papierkorb-Limits gespeichert.</value>
+  </data>
+  <data name="Web_Recycle_Error_Invalid" xml:space="preserve">
+    <value>Ungültige Limits: Die Maximalgröße muss mindestens 1 MB betragen und die Aufbewahrung 1 bis 3650 Tage.</value>
+  </data>
+  <data name="Web_ShareList_MovePoolHint" xml:space="preserve">
+    <value>Während des Verschiebens ist der Share über keinen Zugriffsweg erreichbar.</value>
   </data>
 </root>

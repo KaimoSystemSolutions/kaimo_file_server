@@ -130,5 +130,6 @@ internal enum SettingsTab
     ClientDevices,
     MailServer,
     Domains,
-    AccessRestrictions
+    AccessRestrictions,
+    Homes
 }

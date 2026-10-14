@@ -122,10 +122,13 @@ public static class SearchDestinations
         new("Web_Settings_Tab_Storage",
             ["storage", "speicher", "speicherpool", "pool", "festplatte", "disk"],
             "/settings?tab=storage", "folder.svg", Settings),
-        // Home-folder settings live in the storage tab. "users"/"user" deliberately
-        // overlap with the Users page: the share is named "users", its web label "user".
+        // "users"/"user" deliberately overlap with the Users page: the share is named
+        // "users", its web label "user".
         new("Web_Settings_Homes_Label",
             ["home", "homes", "users", "user", "home folder", "home-ordner", "heimverzeichnis", "benutzerordner"],
+            "/settings?tab=homes", "users.svg", Settings),
+        new("Web_Recycle_SectionLabel",
+            ["recycle bin", "papierkorb", "trash", "retention", "aufbewahrung"],
             "/settings?tab=storage", "folder.svg", Settings),
         new("Web_Settings_Tab_Search",
             ["search", "suche", "elasticsearch", "index", "indexierung", "suchmaschine"],

@@ -1,0 +1,134 @@
+@*
+    Recycle-bin limit editor (shared UI library): maximum size (inherit / custom / unlimited,
+    entered as MB or GB) and retention in days, with its own save button.
+
+    IsGlobalDefault renders only the size (empty = unlimited) for the global default; the
+    saved value is then Custom with the size, or Unlimited.
+    Used by the share settings panel, the Home folders settings tab and Settings → Storage.
+*@
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Helpers
+
+<div class="recycle-limits">
+    @* Own field wrapper instead of .form-group: that one renders uppercase labels and stretches
+       inputs in its column flex, which does not match the panels this is embedded in. *@
+    <div class="recycle-limits__field">
+        <label class="settings-field-label label-with-info" for="@(IsGlobalDefault ? $"{_id}-size" : $"{_id}-mode")">
+            @SizeLabel
+            <InfoButton Text="@SizeHint" />
+        </label>
+        <div class="recycle-limits__row">
+            @if (!IsGlobalDefault)
+            {
+                <select id="@($"{_id}-mode")" class="edit-input recycle-limits__mode"
+                        @bind="_mode" disabled="@Disabled">
+                    <option value="@RecycleLimitMode.Inherit">@InheritLabel</option>
+                    <option value="@RecycleLimitMode.Custom">@T("Web_Recycle_Mode_Custom", "Custom size")</option>
+                    <option value="@RecycleLimitMode.Unlimited">@T("Web_Recycle_Mode_Unlimited", "Unlimited")</option>
+                </select>
+            }
+            @if (IsGlobalDefault || _mode == RecycleLimitMode.Custom)
+            {
+                <input id="@($"{_id}-size")" class="edit-input recycle-limits__number" type="number" min="1" step="any"
+                       aria-label="@(IsGlobalDefault ? SizeLabel : T("Web_Recycle_Mode_Custom", "Custom size"))"
+                       placeholder="@(IsGlobalDefault ? T("Web_Recycle_Mode_Unlimited", "Unlimited") : null)"
+                       @bind="_size" disabled="@Disabled" />
+                <select class="edit-input recycle-limits__unit" aria-label="@T("Web_Recycle_Unit", "Unit")"
+                        @bind="_unit" disabled="@Disabled">
+                    <option value="@Mb">MB</option>
+                    <option value="@Gb">GB</option>
+                </select>
+            }
+        </div>
+    </div>
+
+    @if (!IsGlobalDefault)
+    {
+        <div class="recycle-limits__field">
+            <label class="settings-field-label label-with-info" for="@($"{_id}-days")">
+                @T("Web_Recycle_Retention", "Retention (days)")
+                <InfoButton Text="@T("Web_Recycle_RetentionHint", "Deleted items are removed permanently after this many days. Leave empty to keep them until the size limit applies.")" />
+            </label>
+            <div class="recycle-limits__row">
+                <input id="@($"{_id}-days")" class="edit-input recycle-limits__number" type="number"
+                       min="1" max="@ShareDefinition.MaxRecycleRetentionDays" step="1"
+                       placeholder="@T("Web_Recycle_RetentionNever", "Never")"
+                       @bind="_days" disabled="@Disabled" />
+            </div>
+        </div>
+    }
+
+    <div class="recycle-limits__actions">
+        <button type="button" class="btn-primary" disabled="@(Disabled || _saving)" @onclick="Save">
+            @(_saving ? "…" : Resources.Web_Common_Save)
+        </button>
+    </div>
+</div>
+
+@code {
+    private const long Mb = 1L << 20;
+    private const long Gb = 1L << 30;
+
+    /// <summary>The stored limits; the fields are reset whenever this value changes.</summary>
+    [Parameter, EditorRequired] public RecycleLimits Value { get; set; } = default!;
+
+    /// <summary>Global default in bytes (0 = unlimited), shown on the "inherit" option.</summary>
+    [Parameter] public long GlobalMaxSizeBytes { get; set; }
+
+    [Parameter] public bool IsGlobalDefault { get; set; }
+
+    /// <summary>Overrides the size hint, e.g. to say the limit applies per home folder.</summary>
+    [Parameter] public string? Hint { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public EventCallback<RecycleLimits> OnSave { get; set; }
+
+    private readonly string _id = "recycle-" + Guid.NewGuid().ToString("N")[..8];
+    private RecycleLimits? _shown;
+    private RecycleLimitMode _mode;
+    private decimal? _size;
+    private long _unit = Mb;
+    private int? _days;
+    private bool _saving;
+
+    protected override void OnParametersSet()
+    {
+        if (Value == _shown)
+            return;
+        _shown = Value;
+        _mode = Value.Mode;
+        _days = Value.RetentionDays;
+        (_size, _unit) = Value.MaxSizeBytes is not { } bytes ? ((decimal?)null, Mb)
+            : bytes % Gb == 0 ? (bytes / Gb, Gb)
+            : (Math.Round((decimal)bytes / Mb, 2), Mb);
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        try
+        {
+            long? bytes = _size is { } size ? (long)Math.Round(size * _unit) : null;
+            await OnSave.InvokeAsync(IsGlobalDefault
+                ? new RecycleLimits(bytes is null ? RecycleLimitMode.Unlimited : RecycleLimitMode.Custom, bytes, null)
+                : new RecycleLimits(_mode, _mode == RecycleLimitMode.Custom ? bytes : null, _days));
+        }
+        finally { _saving = false; }
+    }
+
+    private string SizeLabel => IsGlobalDefault
+        ? T("Web_Recycle_DefaultMaxSize", "Default maximum size per recycle bin")
+        : T("Web_Recycle_MaxSize", "Maximum size");
+
+    private string SizeHint => Hint ?? (IsGlobalDefault
+        ? T("Web_Recycle_DefaultMaxSizeHint", "Applies to every share that does not set its own limit. Leave empty for unlimited. When a bin grows larger, its oldest deleted items are removed first.")
+        : T("Web_Recycle_MaxSizeHint", "When the recycle bin grows larger, its oldest deleted items are removed first. Checked hourly."));
+
+    private string InheritLabel => string.Format(
+        T("Web_Recycle_Mode_Inherit", "Global default ({0})"),
+        GlobalMaxSizeBytes > 0 ? FormatHelper.FormatFileSize(GlobalMaxSizeBytes) : T("Web_Recycle_Mode_Unlimited", "Unlimited"));
+
+    private static string T(string key, string fallback) => Resources.ResourceManager.GetString(key) ?? fallback;
+}
