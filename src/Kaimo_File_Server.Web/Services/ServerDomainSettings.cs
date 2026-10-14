@@ -24,6 +24,14 @@ public sealed class ServerDomainSettings
     public string? DefaultAddress =>
         Addresses.Count == 0 ? null : Addresses[Math.Clamp(DefaultIndex, 0, Addresses.Count - 1)];
 
+    /// <summary>
+    /// Whether public links may be served under <paramref name="host"/> (the request host):
+    /// only the default address's host, or any host when no default is set.
+    /// </summary>
+    public bool AllowsPublicLinkHost(string? host)
+        => DefaultAddress is not { } address
+           || string.Equals(HostOf(address), host, StringComparison.OrdinalIgnoreCase);
+
     public void Normalize()
     {
         Addresses = (Addresses ?? new())
@@ -41,10 +49,13 @@ public sealed class ServerDomainSettings
         => Uri.TryCreate(address, UriKind.Absolute, out var uri)
            && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp);
 
-    /// <summary>The host name of an address (no scheme, no port), lower-case.</summary>
+    /// <summary>
+    /// The host name of an address (no scheme, no port), lower-case. Internationalized names are
+    /// returned in Punycode, the form browsers send in the Host header.
+    /// </summary>
     public static string HostOf(string address)
         => Uri.TryCreate(address, UriKind.Absolute, out var uri)
-            ? uri.Host.ToLowerInvariant()
+            ? uri.IdnHost.ToLowerInvariant()
             : address.Trim().ToLowerInvariant();
 
     public static ServerDomainSettings Default() => new();

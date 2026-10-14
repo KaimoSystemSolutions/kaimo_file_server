@@ -30,3 +30,8 @@
 .sharelink-size-input {
     width: 120px;
 }
+
+.sharelink-toggle-row {
+    max-width: 640px;
+    margin: var(--space-4) 0;
+}

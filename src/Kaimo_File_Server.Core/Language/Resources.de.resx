@@ -4434,6 +4434,12 @@
   <data name="Web_ShareLinkSettings_Hint" xml:space="preserve">
     <value>Link-URLs werden aus der Standard-Domain gebildet; ist keine hinterlegt, aus der Adresse, die der Browser gerade verwendet.</value>
   </data>
+  <data name="Web_ShareLinkSettings_RestrictToDefaultDomain" xml:space="preserve">
+    <value>Links nur über die Standard-Domain öffnen</value>
+  </data>
+  <data name="Web_ShareLinkSettings_RestrictToDefaultDomainHint" xml:space="preserve">
+    <value>Download- und Upload-Links sind unter jeder anderen Adresse nicht verfügbar. Ohne Standard-Domain öffnen sich Links unter jeder Adresse.</value>
+  </data>
   <data name="Web_PublicShare_Unavailable_Title" xml:space="preserve">
     <value>Link nicht verfügbar</value>
   </data>

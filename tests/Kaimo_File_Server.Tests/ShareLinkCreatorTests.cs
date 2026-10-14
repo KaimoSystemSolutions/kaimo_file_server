@@ -62,7 +62,8 @@ public sealed class ShareLinkCreatorTests
             new ShareDefinition("docs", "/data/docs") { Id = _link.ShareId });
         var fileServices = new Mock<IFileServiceFactory>();
         var controller = new PublicDownloadController(
-            tickets, shareLinks.Object, shares.Object, fileServices.Object, _contexts.Object)
+            tickets, shareLinks.Object, shares.Object, fileServices.Object, _contexts.Object,
+            ShareLinkHostRestrictionTests.Config(new ServerDomainSettings(), restrict: false))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

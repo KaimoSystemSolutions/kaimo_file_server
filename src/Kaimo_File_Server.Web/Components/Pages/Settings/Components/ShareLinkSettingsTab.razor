@@ -5,14 +5,15 @@
 @inject ShareLinkService ShareLinks
 
 @*
-    Settings tab for public share links: the global switch and per-file size ceiling for upload
-    links. The address link URLs are built from lives in the Domains tab.
+    Settings tab for public share links: the default-domain restriction, and the global switch and
+    per-file size ceiling for upload links. The address link URLs are built from lives in the
+    Domains tab.
 *@
 
 <div class="settings-section">
     <h2>@T("Web_Settings_Tab_ShareLinks", "Share Links")</h2>
     <p class="settings-hint">
-        @T("Web_ShareLinkSettings_Hint", "Link URLs are built from the default domain (Settings → Domains); without one, from the address the browser currently uses.")
+        @T("Web_ShareLinkSettings_Hint", "Link URLs are built from the default domain; without one, from the address the browser currently uses.")
     </p>
     <a class="btn-secondary btn-secondary--sm sharelink-domains-link" href="/settings?tab=Domains">
         @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
@@ -23,6 +24,18 @@
     {
         <div class="success-banner">@Resources.Web_ChangesSaved</div>
     }
+
+    <div class="toggle-row sharelink-toggle-row">
+        <span class="label-with-info">
+            @T("Web_ShareLinkSettings_RestrictToDefaultDomain", "Open links only under the default domain")
+            <InfoButton Text="@T("Web_ShareLinkSettings_RestrictToDefaultDomainHint", "Download and upload links are unavailable under any other address. Without a default domain, links open under every address.")" />
+        </span>
+        <label class="toggle-switch">
+            <input type="checkbox" @bind="_restrictToDefaultDomain"
+                   aria-label="@T("Web_ShareLinkSettings_RestrictToDefaultDomain", "Open links only under the default domain")" />
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
 
     <h3>@T("Web_ShareLinkSettings_UploadTitle", "Upload links")</h3>
     <p class="settings-hint">
@@ -48,6 +61,7 @@
 @code {
     private ShareLinkSettings _settings = ShareLinkSettings.Default();
     private bool _allowUploadLinks;
+    private bool _restrictToDefaultDomain = true;
     private long _maxUploadMb = ShareLinkSettings.DefaultMaxUploadFileSizeBytes / Mb;
     private bool _saved;
 
@@ -62,6 +76,7 @@
     {
         _settings = settings;
         _allowUploadLinks = settings.AllowUploadLinks;
+        _restrictToDefaultDomain = settings.RestrictToDefaultDomain;
         _maxUploadMb = settings.MaxUploadFileSizeBytes / Mb;
     }
 
@@ -73,6 +88,7 @@
             BaseAddresses = _settings.BaseAddresses.ToList(),
             DefaultIndex = _settings.DefaultIndex,
             AllowUploadLinks = _allowUploadLinks,
+            RestrictToDefaultDomain = _restrictToDefaultDomain,
             MaxUploadFileSizeBytes = _maxUploadMb * Mb,
         });
         Apply(await ShareLinks.GetSettingsAsync());

@@ -4500,6 +4500,12 @@
   <data name="Web_ShareLinkSettings_Hint" xml:space="preserve">
     <value>Link URLs are built from the default domain; without one, from the address the browser currently uses.</value>
   </data>
+  <data name="Web_ShareLinkSettings_RestrictToDefaultDomain" xml:space="preserve">
+    <value>Open links only under the default domain</value>
+  </data>
+  <data name="Web_ShareLinkSettings_RestrictToDefaultDomainHint" xml:space="preserve">
+    <value>Download and upload links are unavailable under any other address. Without a default domain, links open under every address.</value>
+  </data>
   <data name="Web_PublicShare_Unavailable_Title" xml:space="preserve">
     <value>Link unavailable</value>
   </data>

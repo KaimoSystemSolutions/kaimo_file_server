@@ -25,6 +25,7 @@ public sealed class PublicDownloadController(
     IShareRepository shares,
     IFileServiceFactory fileServiceFactory,
     IUserContextFactory userContextFactory,
+    Infrastructure.Configuration.IConfigRepository config,
     Core.Services.Notifications.INotificationPublisher? notifications = null) : ControllerBase
 {
     [HttpGet("download")]
@@ -33,6 +34,11 @@ public sealed class PublicDownloadController(
         if (string.IsNullOrWhiteSpace(ticket)
             || !tickets.TryConsume(ticket, out var download) || download is null)
             return BadRequest("The download link is invalid or has expired.");
+
+        // Defense in depth: tickets are only issued by the host-checked /shared page, but a
+        // download is also served only under an allowed host (checked after the cheap ticket gate).
+        if (!await ShareLinkSettings.AllowsHostAsync(config, Request.Host.Host))
+            return NotFound();
 
         // Atomic policy gate: enabled + within window + not exhausted, plus one access consumed.
         Core.Domain.ShareLink? link;

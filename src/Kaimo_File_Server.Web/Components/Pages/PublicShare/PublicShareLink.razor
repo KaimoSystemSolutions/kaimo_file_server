@@ -19,6 +19,7 @@
 @inject PublicUploadService Uploads
 @inject IShareRepository Shares
 @inject PublicShareFileBrowserViewModel Vm
+@inject ClientConnectionInfo Client
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -180,6 +181,11 @@ else if (_state == State.Upload)
             // Any trailing path (a guessed folder name, tampering) is always unavailable — the
             // browser navigates folders in place, so a legitimate visit never carries one.
             if (!string.IsNullOrWhiteSpace(SubPath)) { _state = State.NotFound; return; }
+
+            // Links only work under the default server domain. Checked before the token lookup so
+            // another host cannot even probe whether a token exists. Downloads and uploads are
+            // driven from this page, so this one gate covers them all.
+            if (!await ShareLinks.IsAllowedHostAsync(Client.Host)) { _state = State.NotFound; return; }
 
             _link = await ShareLinks.GetByTokenAsync(Token);
             if (_link is null) { _state = State.NotFound; return; }

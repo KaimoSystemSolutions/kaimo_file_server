@@ -94,6 +94,12 @@ public sealed class ShareLinkService(
             : $"{baseAddress}/shared/{token}";
     }
 
+    /// <summary>
+    /// Whether a public link may be opened under <paramref name="host"/> (the host the page was
+    /// requested under). See <see cref="ShareLinkSettings.RestrictToDefaultDomain"/>.
+    /// </summary>
+    public Task<bool> IsAllowedHostAsync(string? host) => ShareLinkSettings.AllowsHostAsync(config, host);
+
     public Task<ShareLink?> GetByTokenAsync(string token) => repository.GetByTokenAsync(token);
 
     /// <summary>Sets or clears a link's password in place (does not persist). Empty = clear.</summary>
