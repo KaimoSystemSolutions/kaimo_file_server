@@ -19,7 +19,8 @@ namespace Kaimo_File_Server.Infrastructure.Services;
 ///
 /// Robustness this buys over inline indexing:
 ///  • While ES is disabled or unreachable the cursor is NOT advanced, so the log accumulates and
-///    the indexer catches up once ES returns (bounded only by the log's retention window).
+///    the indexer catches up once ES returns (bounded only by the log's retention window). This
+///    also holds when ES drops out mid-batch: the batch stops before the entry that got no answer.
 ///  • A single global, Seq-ordered scan gives a total order, so create/delete of the same path
 ///    can never race the way independent per-request indexers did.
 ///  • The index is derived and rebuildable: a lost log row or a poison entry is healed by the
@@ -44,6 +45,12 @@ public sealed class SearchIndexingService(
     // True once this process knows the local index is built or has started its build. Reset on
     // every engine change, so returning to Local re-checks whether a canceled build must restart.
     private bool _localBuildChecked;
+
+    // An entry the engine drops out on repeatedly is most likely what crashes it (e.g. an
+    // out-of-memory analysis); retrying it forever would crash-loop the engine.
+    private const int MaxUnavailableAttempts = 3;
+    private long _unavailableSeq = -1;
+    private int _unavailableAttempts;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -97,31 +104,18 @@ public sealed class SearchIndexingService(
                 }
 
                 var shares = await BuildShareMapAsync(sp, stoppingToken);
-                foreach (var entry in batch)
-                {
-                    stoppingToken.ThrowIfCancellationRequested();
-                    try
-                    {
-                        await IndexEntryAsync(entry, search, searchAdmin, shares);
-                    }
-                    catch (Exception ex)
-                    {
-                        // Skip the entry but keep going: the index is rebuildable and one bad
-                        // row must never stall the pipeline behind it.
-                        logger.LogWarning(
-                            ex, "Search indexer failed on {ChangeType} {Path} (Seq {Seq}); skipping.",
-                            entry.ChangeType, entry.Path, entry.Seq);
-                    }
-                    cursor = entry.Seq;
-                }
+                (cursor, bool unavailable) = await ApplyBatchAsync(batch, cursor, shares, stoppingToken);
 
                 // ponytail: an engine switch during this batch lets the router send its tail to the
                 // new engine while the old engine's cursor still advances; at most one batch is
                 // missed there, healed by the gap check or a manual reindex.
                 await configStore.SetIndexCursorAsync(state.Engine, cursor);
 
-                // A full batch likely means more is waiting — loop immediately.
-                if (batch.Count == BatchSize)
+                // Engine went away mid-batch: back off like an inactive engine. Otherwise a full
+                // batch likely means more is waiting — loop immediately.
+                if (unavailable)
+                    delay = EsInactiveInterval;
+                else if (batch.Count == BatchSize)
                     delay = TimeSpan.Zero;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -136,6 +130,53 @@ public sealed class SearchIndexingService(
             if (delay > TimeSpan.Zero)
                 await Sleep(delay, stoppingToken);
         }
+    }
+
+    /// <summary>
+    /// Applies a batch in Seq order and returns the cursor to persist. A per-entry failure is
+    /// skipped (the index is rebuildable and one bad row must never stall the pipeline), but an
+    /// unreachable engine stops the batch before the failed entry, so it is retried once the
+    /// engine is back (<c>Unavailable</c> = true). An entry the engine drops out on
+    /// <see cref="MaxUnavailableAttempts"/> times in a row is skipped as a likely engine crasher.
+    /// </summary>
+    internal async Task<(long Cursor, bool Unavailable)> ApplyBatchAsync(
+        IReadOnlyList<FileChangeLogEntry> batch, long cursor,
+        IReadOnlyDictionary<Guid, ShareTarget> shares, CancellationToken ct)
+    {
+        foreach (var entry in batch)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                await IndexEntryAsync(entry, search, searchAdmin, shares);
+            }
+            catch (SearchUnavailableException ex)
+            {
+                if (entry.Seq != _unavailableSeq)
+                {
+                    _unavailableSeq = entry.Seq;
+                    _unavailableAttempts = 0;
+                }
+                if (++_unavailableAttempts < MaxUnavailableAttempts)
+                {
+                    logger.LogWarning(
+                        "Search engine unreachable at {ChangeType} {Path} (Seq {Seq}); pausing, the entry will be retried. {Error}",
+                        entry.ChangeType, entry.Path, entry.Seq, ex.Message);
+                    return (cursor, true);
+                }
+                logger.LogError(
+                    ex, "Search engine became unreachable {Attempts} times in a row on {ChangeType} {Path} (Seq {Seq}); skipping it.",
+                    _unavailableAttempts, entry.ChangeType, entry.Path, entry.Seq);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex, "Search indexer failed on {ChangeType} {Path} (Seq {Seq}); skipping.",
+                    entry.ChangeType, entry.Path, entry.Seq);
+            }
+            cursor = entry.Seq;
+        }
+        return (cursor, false);
     }
 
     private async Task<long> LoadCursorAsync(SearchEngine engine)

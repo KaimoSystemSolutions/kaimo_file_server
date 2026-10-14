@@ -5,6 +5,7 @@ using Elastic.Clients.Elasticsearch.Core.Search;
 using Elastic.Clients.Elasticsearch.IndexManagement;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
+using Elastic.Transport;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
@@ -32,6 +33,13 @@ public class ElasticSearchService : ISearchService
 
     private const int NgramMinGram = 2;
     private const int NgramMaxGram = 20;
+
+    // The 2–20 n-gram analysis holds every distinct gram of a document in heap at once. High-
+    // entropy content (base64 the blob filter misses, random identifiers) OOM-kills a 512 MB node
+    // at ~400 K chars and even a 1 GB node at 1 M chars; 200 K chars survived 512 MB in tests.
+    // ponytail: fixed cap, content beyond it is not searchable; lower NgramMaxGram (needs a new
+    // index version) if deeper full-text search on large files is required.
+    private const int MaxContentChars = 200_000;
 
     // Page size for pulling results from ES before ACL filtering; further pages are
     // fetched while too few readable hits remain (see SearchLimits).
@@ -72,10 +80,28 @@ public class ElasticSearchService : ISearchService
             // Deleted/renamed before the indexer got to it; the following log entry handles it.
             _logger.LogDebug("File vanished before indexing: {Path}", absolutePath);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not SearchUnavailableException)
         {
             _logger.LogError(ex, "Indexing failed for {Path}", absolutePath);
         }
+    }
+
+    /// <summary>
+    /// Throws <see cref="SearchUnavailableException"/> when Elasticsearch never answered
+    /// (connection refused, timeout) or answered that it cannot serve the request yet (502/503/504,
+    /// e.g. shards still unassigned right after a restart while the ping already succeeds), so the
+    /// caller can retry instead of losing the change. Any other HTTP error (e.g. a 4xx document
+    /// rejection, or a 429 circuit breaker on a huge document) is returned for the caller to handle.
+    /// </summary>
+    private static T Answered<T>(T response) where T : TransportResponse
+    {
+        if (response.ApiCallDetails is { HttpStatusCode: null or 502 or 503 or 504 } call)
+            throw new SearchUnavailableException(
+                call.HttpStatusCode is { } status
+                    ? $"Elasticsearch is unavailable (HTTP {status})"
+                    : "Elasticsearch did not respond: " + (call.OriginalException?.Message ?? "no HTTP response"),
+                call.OriginalException);
+        return response;
     }
 
     public async Task onFileDeleted(string absolutePath)
@@ -84,8 +110,8 @@ public class ElasticSearchService : ISearchService
         {
             // Delete by id (id == hash(absolutePath)), not by query: delete-by-query only sees
             // refreshed segments, so a file indexed <1s earlier was missed and left orphaned.
-            var response = await _client.DeleteAsync<FileDocument>(
-                SearchDocuments.GetStableId(absolutePath), d => d.Index(IndexName));
+            var response = Answered(await _client.DeleteAsync<FileDocument>(
+                SearchDocuments.GetStableId(absolutePath), d => d.Index(IndexName)));
 
             if (response.Result == Result.NotFound)
                 // Never indexed (hidden path, pre-existing file, vanished before indexing) — fine.
@@ -96,7 +122,7 @@ public class ElasticSearchService : ISearchService
             else
                 _logger.LogDebug("Removed document for '{Path}' from the index", absolutePath);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not SearchUnavailableException)
         {
             _logger.LogError(ex, "Deletion failed for {Path}", absolutePath);
         }
@@ -122,7 +148,7 @@ public class ElasticSearchService : ISearchService
 
                 await IndexDirectoryDocumentAsync(doc);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not SearchUnavailableException)
             {
                 _logger.LogError(ex, "Directory indexing failed for {Path}", absolutePath);
             }
@@ -136,16 +162,16 @@ public class ElasticSearchService : ISearchService
     /// </summary>
     private async Task IndexDirectoryDocumentAsync(FileDocument doc, CancellationToken ct = default)
     {
-        var existing = await _client.GetAsync<FileDocument>(doc.Id, g => g.Index(IndexName), ct);
+        var existing = Answered(await _client.GetAsync<FileDocument>(doc.Id, g => g.Index(IndexName), ct));
         if (existing.Found)
         {
             _logger.LogDebug("Directory {Id} already indexed, skipping", doc.Id);
             return;
         }
 
-        var response = await _client.IndexAsync(doc, idx => idx
+        var response = Answered(await _client.IndexAsync(doc, idx => idx
             .Index(IndexName)
-            .Id(doc.Id), ct);
+            .Id(doc.Id), ct));
 
         if (!response.IsValidResponse)
             _logger.LogError("Directory indexing failed for {Id}: {Error}",
@@ -163,9 +189,9 @@ public class ElasticSearchService : ISearchService
 
                 // delete-by-query only sees refreshed segments; refresh first so children
                 // indexed moments ago are not left orphaned.
-                await _client.Indices.RefreshAsync(IndexName);
+                Answered(await _client.Indices.RefreshAsync(IndexName));
 
-                var response = await _client.DeleteByQueryAsync<FileDocument>(IndexName, d => d
+                var response = Answered(await _client.DeleteByQueryAsync<FileDocument>(IndexName, d => d
                     .Query(q => q
                         .Bool(b => b
                             .Should(
@@ -175,7 +201,7 @@ public class ElasticSearchService : ISearchService
                             .MinimumShouldMatch(1)
                         )
                     )
-                );
+                ));
 
                 if (!response.IsValidResponse)
                     _logger.LogError("DeleteByQuery failed for directory '{Path}': {Error}",
@@ -185,7 +211,7 @@ public class ElasticSearchService : ISearchService
                         "{Count} Dokument(e) für Verzeichnis '{Path}' aus Index entfernt",
                         response.Deleted, absolutePath);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not SearchUnavailableException)
             {
                 _logger.LogError(ex, "Deleting the directory failed for {Path}", absolutePath);
             }
@@ -207,7 +233,7 @@ public class ElasticSearchService : ISearchService
                     ?? throw new InvalidOperationException(
                         $"No share definition contains '{newAbsolutePath}'.");
 
-                var existing = await _client.GetAsync<FileDocument>(oldId, g => g.Index(IndexName));
+                var existing = Answered(await _client.GetAsync<FileDocument>(oldId, g => g.Index(IndexName)));
                 if (!existing.Found || existing.Source is null)
                 {
                     _logger.LogWarning(
@@ -223,7 +249,7 @@ public class ElasticSearchService : ISearchService
                 _logger.LogDebug("Index updated (file): '{Old}' -> '{New}'",
                     oldAbsolutePath, newAbsolutePath);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not SearchUnavailableException)
             {
                 _logger.LogError(ex, "Index rename failed for file '{Old}'", oldAbsolutePath);
             }
@@ -250,7 +276,7 @@ public class ElasticSearchService : ISearchService
 
                 while (guard++ < maxIterations)
                 {
-                    var resp = await _client.SearchAsync<FileDocument>(s => s
+                    var resp = Answered(await _client.SearchAsync<FileDocument>(s => s
                         .Indices(IndexName)
                         .Size(500)
                         .Query(q => q
@@ -259,7 +285,7 @@ public class ElasticSearchService : ISearchService
                                 .Value(oldPrefix)
                             )
                         )
-                    );
+                    ));
 
                     if (!resp.IsValidResponse)
                     {
@@ -292,14 +318,14 @@ public class ElasticSearchService : ISearchService
 
                     // Make the deletions/re-indexes visible before the next page,
                     // so the old-prefix result set strictly shrinks and the loop ends.
-                    await _client.Indices.RefreshAsync(IndexName);
+                    Answered(await _client.Indices.RefreshAsync(IndexName));
                 }
 
                 // The renamed directory's OWN document (its absolutePath equals the
                 // old path without a trailing separator) is not covered by the
                 // child-prefix query above — rewrite it explicitly.
                 string oldDirId = SearchDocuments.GetStableId(oldAbsolutePath);
-                var ownDoc = await _client.GetAsync<FileDocument>(oldDirId, g => g.Index(IndexName));
+                var ownDoc = Answered(await _client.GetAsync<FileDocument>(oldDirId, g => g.Index(IndexName)));
                 if (ownDoc.Found && ownDoc.Source is not null)
                 {
                     var updatedOwn = BuildRenamedDocument(
@@ -312,7 +338,7 @@ public class ElasticSearchService : ISearchService
                     "Index aktualisiert (Verzeichnis): '{Old}' -> '{New}' ({Count} Dokument(e))",
                     oldAbsolutePath, newAbsolutePath, processed);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not SearchUnavailableException)
             {
                 _logger.LogError(ex, "Index rename failed for directory '{Old}'",
                     oldAbsolutePath);
@@ -358,9 +384,9 @@ public class ElasticSearchService : ISearchService
     /// </summary>
     private async Task ReplaceDocumentAsync(string oldId, FileDocument updated)
     {
-        var indexResp = await _client.IndexAsync(updated, idx => idx
+        var indexResp = Answered(await _client.IndexAsync(updated, idx => idx
             .Index(IndexName)
-            .Id(updated.Id));
+            .Id(updated.Id)));
 
         if (!indexResp.IsValidResponse)
         {
@@ -371,7 +397,7 @@ public class ElasticSearchService : ISearchService
 
         if (!string.Equals(oldId, updated.Id, StringComparison.Ordinal))
         {
-            await _client.DeleteAsync<FileDocument>(oldId, d => d.Index(IndexName));
+            Answered(await _client.DeleteAsync<FileDocument>(oldId, d => d.Index(IndexName)));
         }
     }
 
@@ -672,8 +698,8 @@ public class ElasticSearchService : ISearchService
     private async Task<ExistsResult> CheckForDocumentsExistance(FileDocument document, CancellationToken ct = default)
     {
 
-        var existing = await _client.GetAsync<FileDocument>(document.Id, g => g
-            .Index(IndexName));
+        var existing = Answered(await _client.GetAsync<FileDocument>(document.Id, g => g
+            .Index(IndexName)));
 
         if (!existing.Found)
             return ExistsResult.DoesntExist;
@@ -717,6 +743,11 @@ public class ElasticSearchService : ISearchService
         {
             content = await ContentProvider.GetContent(fileStream, fileName);
         }
+        if (content.Length > MaxContentChars)
+            // Never cut a surrogate pair in half: a lone high surrogate is invalid UTF-16.
+            content = content[..(char.IsHighSurrogate(content[MaxContentChars - 1])
+                ? MaxContentChars - 1
+                : MaxContentChars)];
 
         string sharePath = Path.GetRelativePath(share.Path, absolutePath);
 
@@ -743,8 +774,9 @@ public class ElasticSearchService : ISearchService
                 return;
 
             case ExistsResult.OldVersionExists:
+                // No delete first: indexing under the same id replaces the document, and a
+                // delete would leave the file unfindable if the engine dies during the write.
                 _logger.LogDebug("Found older version of {Id}, overwriting it", document.Id);
-                await _client.DeleteAsync<FileDocument>(document.Id, d => d.Index(IndexName), ct);
                 break;
 
             case ExistsResult.DoesntExist:
@@ -752,10 +784,24 @@ public class ElasticSearchService : ISearchService
                 break;
         }
 
-        var response = await _client.IndexAsync(document, idx => idx
+        var response = Answered(await _client.IndexAsync(document, idx => idx
             .Index(IndexName)
             .Id(document.Id),
-            ct);
+            ct));
+
+        // A document Elasticsearch rejects because of its content (e.g. a huge n-gram token
+        // stream) must not take the file name with it: retry name-only. No answer at all already
+        // threw above — that is an outage, not this document's fault, and is retried by the caller.
+        if (!response.IsValidResponse && document.Content.Length > 0)
+        {
+            _logger.LogWarning("Indexing with content failed for {Id}, retrying name-only: {Error}",
+                document.Id, response.DebugInformation);
+            document.Content = string.Empty;
+            response = Answered(await _client.IndexAsync(document, idx => idx
+                .Index(IndexName)
+                .Id(document.Id),
+                ct));
+        }
 
         if (!response.IsValidResponse)
             _logger.LogError("Indexing failed for {Id}: {Error}",

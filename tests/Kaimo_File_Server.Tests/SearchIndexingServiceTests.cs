@@ -216,6 +216,37 @@ public sealed class SearchIndexingServiceTests
     }
 
     [Fact]
+    public async Task ApplyBatch_EngineUnreachable_StopsBeforeEntry_AndSkipsItOnlyAfterRepeatedDropouts()
+    {
+        var (search, admin, shares) = Setup();
+        search.Setup(s => s.onFileDeleted("/abs/bad.txt"))
+            .ThrowsAsync(new SearchUnavailableException("Connection refused (elasticsearch:9200)"));
+        search.Setup(s => s.onFileDeleted("/abs/rejected.txt"))
+            .ThrowsAsync(new InvalidOperationException("per-document failure"));
+        var indexer = new SearchIndexingService(
+            Mock.Of<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>(),
+            Mock.Of<IServiceProvider>(), search.Object, admin.Object,
+            Mock.Of<ISearchConfigStore>(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<SearchIndexingService>.Instance);
+        FileChangeLogEntry Delete(long seq, string path)
+        {
+            var e = Entry(FileChangeType.Deleted, path);
+            e.Seq = seq;
+            return e;
+        }
+        var batch = new[] { Delete(1, "rejected.txt"), Delete(2, "bad.txt"), Delete(3, "c.txt") };
+
+        // A per-document failure is skipped; an unreachable engine stops before entry 2.
+        Assert.Equal((1L, true), await indexer.ApplyBatchAsync(batch, 0, shares, default));
+        Assert.Equal((1L, true), await indexer.ApplyBatchAsync(batch[1..], 1, shares, default));
+        search.Verify(s => s.onFileDeleted("/abs/c.txt"), Times.Never);
+
+        // Third dropout on the same entry: treated as an engine crasher and skipped.
+        Assert.Equal((3L, false), await indexer.ApplyBatchAsync(batch[1..], 1, shares, default));
+        search.Verify(s => s.onFileDeleted("/abs/c.txt"), Times.Once);
+    }
+
+    [Fact]
     public async Task UnknownShare_IsNoOp()
     {
         var (search, admin, shares) = Setup();

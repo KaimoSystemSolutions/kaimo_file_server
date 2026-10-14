@@ -48,6 +48,11 @@ so the router replaces the `NoOpSearchService` fallback. The Elasticsearch URL d
   created; changing an analyzer requires a new index.
 - File names and content use an n-gram index analyzer (`kaimo_ngram_index`, 2–20 characters) and a
   whole-token search analyzer (`kaimo_ngram_search`), so a query matches substrings of words.
+- Indexed content is capped at 200,000 characters (`MaxContentChars`): the n-gram analysis holds every
+  distinct gram of a document in heap, and larger high-entropy content out-of-memory-kills a 512 MB
+  node. Content beyond the cap is not searchable.
+- A document Elasticsearch rejects (an HTTP error other than 502/503/504) is retried name-only, so
+  the file name stays findable.
 - The Host creates the index with the correct mapping at startup (`InitializeAsync`) before any
   document is written; otherwise Elasticsearch would auto-create it with a default mapping.
 - Hidden paths (any segment starting with `.`: internal namespaces, version storage, `.git`, …) are
@@ -105,6 +110,10 @@ so the router replaces the `NoOpSearchService` fallback. The Elasticsearch URL d
    through the router and persists that cursor in `config_settings`.
 3. While no index engine is active (or Elasticsearch is unreachable), the cursor is not advanced; the
    log buffers changes until the indexer catches up (bounded by the change-log retention window).
+   The same holds when Elasticsearch drops out mid-batch (no answer, or HTTP 502/503/504): the batch
+   stops before that entry, the cursor stays on the last applied one and the indexer backs off for
+   10 s. An entry the engine drops out on 3 times in a row is skipped as a likely engine crasher;
+   any other per-entry failure is logged and skipped at once.
 4. A single, `Seq`-ordered reader gives a total order, so create and delete of the same path cannot
    race.
 5. Hidden paths are never indexed, the same rule the full reindex applies; the recycle bin is not
