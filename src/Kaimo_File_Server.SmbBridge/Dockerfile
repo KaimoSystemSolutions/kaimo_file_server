@@ -1,5 +1,5 @@
 # Kaimo SMB Bridge (gRPC control plane). Context = repository root (Kaimo_File_Server).
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.13 AS base
 # libgssapi-krb5-2: Npgsql tries GSSAPI optionally and complains otherwise on startup.
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
@@ -18,7 +18,10 @@ EXPOSE 5080
 # Build on the native build platform, but publish only the runtime assets for
 # the target architecture. Without -a, packages such as SkiaSharp copy native
 # binaries for every supported OS/architecture into the image.
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# SDK pinned to a patch version: newer SDKs prune packages that the framework
+# already contains from deps.json, which changes the NuGet license hash below.
+# Bump SDK and runtime together, then run third-party/nuget/update-licenses.py.
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.402 AS build
 ARG BUILD_CONFIGURATION=Release
 ARG TARGETARCH
 WORKDIR /src
