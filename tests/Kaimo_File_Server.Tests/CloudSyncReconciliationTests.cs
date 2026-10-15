@@ -677,7 +677,9 @@ public sealed class CloudSyncReconciliationTests
         }
 
         public Task<FileMetadata> GetMetadataAsync(string path, UserContext user)
-            => Task.FromResult(new FileMetadata { Path = Normalize(path), IsDirectory = DirExists(path) });
+            => DirExists(path) || HasFile(path)
+                ? Task.FromResult(new FileMetadata { Path = Normalize(path), IsDirectory = DirExists(path) })
+                : throw new FileNotFoundException($"'{path}' not found");
 
         public Task WriteFileAsync(string path, Stream data, UserContext user, CancellationToken ct = default)
             => WriteFileAsync(path, data, user, modifiedAtUtc: null, ct);

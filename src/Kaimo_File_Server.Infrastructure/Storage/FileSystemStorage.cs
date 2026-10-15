@@ -131,8 +131,16 @@ public class FileSystemStorage : IStorageEngine
         public ValueTask SetTimesAsync(FileTimes times, CancellationToken ct)
         {
             // Linux has no API to set the birth time; .NET silently writes mtime instead,
-            // which would clobber the modified date. Skip the creation time there.
-            if (OperatingSystem.IsLinux()) times = times with { Created = null };
+            // which would clobber the modified date. Store it where Samba and the web read it.
+            if (OperatingSystem.IsLinux())
+            {
+                FileSystemInfo info = IsDirectory ? new DirectoryInfo(AbsolutePath) : new FileInfo(AbsolutePath);
+                if (times.Created is { } created && created > DateTime.MinValue)
+                    FileBirthTime.TrySetUtc(info, created);
+                else if (times.LastWritten is not null)
+                    FileBirthTime.PinBeforeTimeChange(info);
+                times = times with { Created = null };
+            }
 
             if (IsDirectory)
             {
@@ -314,7 +322,11 @@ public class FileSystemStorage : IStorageEngine
 
             cancellationToken.ThrowIfCancellationRequested();
             if (File.Exists(fullPath))
+            {
+                // An overwrite changes the content, not the identity: keep the creation time.
+                FileBirthTime.PreserveOnReplace(fullPath, tempPath);
                 File.Replace(tempPath, fullPath, destinationBackupFileName: null);
+            }
             else
                 File.Move(tempPath, fullPath);
         }
@@ -335,6 +347,7 @@ public class FileSystemStorage : IStorageEngine
 
         if (Directory.Exists(fullTargetPath))
         {
+            FileBirthTime.PinBeforeTimeChange(new DirectoryInfo(fullTargetPath));
             Directory.SetLastWriteTimeUtc(fullTargetPath, utc);
             Directory.SetLastAccessTimeUtc(fullTargetPath, utc);
             return Task.CompletedTask;
@@ -343,8 +356,23 @@ public class FileSystemStorage : IStorageEngine
         if (!File.Exists(fullTargetPath))
             throw new IOException($"File does not exist: '{path}'");
 
+        FileBirthTime.PinBeforeTimeChange(new FileInfo(fullTargetPath));
         File.SetLastWriteTimeUtc(fullTargetPath, utc);
         File.SetLastAccessTimeUtc(fullTargetPath, utc);
+        return Task.CompletedTask;
+    }
+
+    public Task SetCreatedDateAsync(string path, DateTime time)
+    {
+        var fullTargetPath = ToAbsolutePath(path);
+        FileSystemInfo info = Directory.Exists(fullTargetPath)
+            ? new DirectoryInfo(fullTargetPath)
+            : File.Exists(fullTargetPath)
+                ? new FileInfo(fullTargetPath)
+                : throw new IOException($"File does not exist: '{path}'");
+
+        if (!FileBirthTime.TrySetUtc(info, time))
+            _logger.LogWarning(LogEvents.StorageCreatedTimeNotStored, LogMessages.StorageCreatedTimeNotStored, path);
         return Task.CompletedTask;
     }
     
@@ -553,6 +581,11 @@ public class FileSystemStorage : IStorageEngine
         var fullPath = ToAbsolutePath(normalized);
         var isDir = Directory.Exists(fullPath);
 
+        // A missing item is reported, never synthesized: callers rely on this as their
+        // existence probe (404s, create-only uploads, sync parent checks).
+        if (!isDir && !File.Exists(fullPath))
+            throw new FileNotFoundException($"'{normalized}' does not exist.", normalized);
+
         List<AccessEntry> acl = new();
 
         if (_serviceProvider != null)
@@ -597,11 +630,11 @@ public class FileSystemStorage : IStorageEngine
                 ShareId = _shareId,
                 Path = normalized,
                 Name = ShareRelativePath.GetFileName(normalized),
-                Size = fileInfo.Exists ? fileInfo.Length : 0,
+                Size = fileInfo.Length,
                 IsDirectory = false,
-                CreatedAt = fileInfo.Exists ? FileBirthTime.GetUtc(fileInfo) : DateTime.UtcNow,
-                ModifiedAt = fileInfo.Exists ? fileInfo.LastWriteTimeUtc : DateTime.UtcNow,
-                LastAccessedAt = fileInfo.Exists ? fileInfo.LastAccessTimeUtc : null,
+                CreatedAt = FileBirthTime.GetUtc(fileInfo),
+                ModifiedAt = fileInfo.LastWriteTimeUtc,
+                LastAccessedAt = fileInfo.LastAccessTimeUtc,
                 Acl = acl
             };
         }

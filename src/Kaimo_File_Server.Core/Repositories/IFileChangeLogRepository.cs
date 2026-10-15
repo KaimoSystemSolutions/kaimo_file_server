@@ -20,7 +20,8 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <c>Seq &gt; <paramref name="sinceSeq"/></c>, ordered ascending by <c>Seq</c>. When
         /// <paramref name="pathPrefix"/> is non-empty, an entry is included when either its
         /// <see cref="FileChangeLogEntry.Path"/> or its <see cref="FileChangeLogEntry.OldPath"/>
-        /// lies at or under the prefix, so a rename that leaves the subtree still surfaces.
+        /// lies at or under the prefix, so a rename that leaves the subtree still surfaces. The rename
+        /// or deletion of an ancestor of the prefix is included too: it moves or removes the subtree.
         /// </summary>
         Task<IReadOnlyList<FileChangeLogEntry>> GetChangesSinceAsync(
             Guid shareId, long sinceSeq, string? pathPrefix, int maxCount, CancellationToken ct = default);
@@ -56,5 +57,15 @@ namespace Kaimo_File_Server.Core.Repositories
         /// value has a gap and must re-bootstrap via a full <c>delta</c>.
         /// </summary>
         Task<long> GetOldestSeqAsync(CancellationToken ct = default);
+
+        /// <summary>
+        /// The <see cref="FileChangeType.Renamed"/> entry with <c>Seq &gt; <paramref name="afterSeq"/></c>
+        /// that moved <paramref name="path"/> itself or one of its ancestors: the first such entry, or
+        /// with <paramref name="newest"/> the latest one; <c>null</c> when there is none. A
+        /// <paramref name="beforeSeq"/> also limits it to <c>Seq &lt; beforeSeq</c>.
+        /// </summary>
+        Task<FileChangeLogEntry?> FindRenameCoveringAsync(
+            Guid shareId, string path, long afterSeq, bool newest, CancellationToken ct = default,
+            long? beforeSeq = null);
     }
 }

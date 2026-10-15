@@ -82,6 +82,46 @@ public sealed class FileChangeLogRepositoryTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task GetChangesSinceAsync_SurfacesRenameAndDeleteOfAnAncestor_ButNotOtherAncestorChanges()
+    {
+        var repo = Repo();
+        var share = Guid.NewGuid();
+
+        var renamed = Entry(share, FileChangeType.Renamed, "x", oldPath: "a", isDir: true);
+        var deleted = Entry(share, FileChangeType.Deleted, "a", isDir: true);
+        await repo.AppendAsync(renamed);
+        await repo.AppendAsync(Entry(share, FileChangeType.Renamed, "y", oldPath: "a2", isDir: true)); // sibling prefix
+        await repo.AppendAsync(Entry(share, FileChangeType.Modified, "a", isDir: true));               // folder time stamp
+        await repo.AppendAsync(Entry(share, FileChangeType.Created, "a/other.txt"));                   // outside a/b
+        await repo.AppendAsync(deleted);
+
+        var feed = await repo.GetChangesSinceAsync(share, 0, "a/b", 10);
+
+        Assert.Equal(new[] { renamed.Seq, deleted.Seq }, feed.Select(e => e.Seq).ToArray());
+        Assert.Equal(deleted.Seq, await repo.GetHeadSeqAsync(share, "a/b"));
+    }
+
+    [Fact]
+    public async Task FindRenameCoveringAsync_FindsRenamesOfThePathOrAnAncestor_FirstOrNewest()
+    {
+        var repo = Repo();
+        var share = Guid.NewGuid();
+
+        var first = Entry(share, FileChangeType.Renamed, "x", oldPath: "a", isDir: true);
+        await repo.AppendAsync(first);
+        await repo.AppendAsync(Entry(share, FileChangeType.Renamed, "z", oldPath: "a2", isDir: true));
+        await repo.AppendAsync(Entry(share, FileChangeType.Renamed, "a/c", oldPath: "a/q", isDir: true)); // sibling below a
+        var second = Entry(share, FileChangeType.Renamed, "a/b2", oldPath: "a/b", isDir: true);
+        await repo.AppendAsync(second);
+
+        Assert.Equal(first.Seq, (await repo.FindRenameCoveringAsync(share, "a/b", 0, newest: false))!.Seq);
+        Assert.Equal(second.Seq, (await repo.FindRenameCoveringAsync(share, "a/b", 0, newest: true))!.Seq);
+        Assert.Equal(second.Seq, (await repo.FindRenameCoveringAsync(share, "a/b", first.Seq, newest: false))!.Seq);
+        Assert.Null(await repo.FindRenameCoveringAsync(share, "a/b", second.Seq, newest: false));
+        Assert.Null(await repo.FindRenameCoveringAsync(Guid.NewGuid(), "a/b", 0, newest: false));
+    }
+
+    [Fact]
     public async Task GetChangesSinceAsync_RespectsMaxCount()
     {
         var repo = Repo();

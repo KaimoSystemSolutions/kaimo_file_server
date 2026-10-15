@@ -723,7 +723,13 @@ public interface ICloudConnection
     // mode in the storage layer would close it if it ever matters.
     private static async Task<bool> LocalParentExistsAsync(
         IFileService fileService, UserContext user, string localChild)
-        => (await fileService.GetMetadataAsync(ShareRelativePath.GetParent(localChild), user)).IsDirectory;
+    {
+        try
+        {
+            return (await fileService.GetMetadataAsync(ShareRelativePath.GetParent(localChild), user)).IsDirectory;
+        }
+        catch (FileNotFoundException) { return false; }
+    }
 
     /// <summary>
     /// Classifies an exception as a transient fault worth retrying. Definitive

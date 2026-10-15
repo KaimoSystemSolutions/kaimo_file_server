@@ -50,6 +50,17 @@ public sealed class SyncQueryServiceTests
     private static FileMetadata File(string path, long size = 1) => new() { Path = path, Name = path.Split('/')[^1], Size = size };
 
     [Fact]
+    public async Task Entries_carry_the_creation_time()
+    {
+        var created = new DateTime(2012, 2, 2, 2, 2, 2, DateTimeKind.Utc);
+        Children("", new FileMetadata { Path = "a.txt", Name = "a.txt", CreatedAt = created });
+
+        var delta = await _sut.EnumerateAsync(_share.Id, "", _user);
+
+        Assert.Equal(created, Assert.Single(delta.Entries).CreatedAtUtc);
+    }
+
+    [Fact]
     public async Task UnknownShare_Throws()
     {
         await Assert.ThrowsAsync<KeyNotFoundException>(

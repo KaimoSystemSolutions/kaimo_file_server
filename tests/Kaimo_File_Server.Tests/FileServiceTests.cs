@@ -913,6 +913,27 @@ public class FileServiceTests
             () => _sut.GetMetadataAsync("/test.txt", ctx));
     }
 
+    [Fact]
+    public async Task GetMetadataAsync_MissingPath_WithAccess_ThrowsFileNotFound()
+    {
+        _storageMock.Setup(s => s.GetMetadataAsync(It.IsAny<string>())).ThrowsAsync(new FileNotFoundException());
+        AllowAccess(FilePermission.ListReadData);
+
+        await Assert.ThrowsAsync<FileNotFoundException>(
+            () => _sut.GetMetadataAsync("/missing.txt", CreateContext()));
+    }
+
+    [Fact]
+    public async Task GetMetadataAsync_MissingPath_WithoutAccess_ThrowsUnauthorized()
+    {
+        // No existence oracle: a caller without list rights gets 403 whether or not the item exists.
+        _storageMock.Setup(s => s.GetMetadataAsync(It.IsAny<string>())).ThrowsAsync(new FileNotFoundException());
+        DenyAccess(FilePermission.ListReadData);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _sut.GetMetadataAsync("/missing.txt", CreateContext()));
+    }
+
     // ═══════════════════ ListAsync ═══════════════════
 
     [Fact]

@@ -789,7 +789,10 @@ public class FileService : IFileService
             : await _storage.ReadAsync(normalized);
     }
 
-    public async Task SetModifiedAtAsync(string path, UserContext user, DateTime time)
+    public Task SetModifiedAtAsync(string path, UserContext user, DateTime time)
+        => SetModifiedAtAsync(path, user, time, createdAtUtc: null);
+
+    public async Task SetModifiedAtAsync(string path, UserContext user, DateTime? modifiedAtUtc, DateTime? createdAtUtc)
     {
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
@@ -800,7 +803,10 @@ public class FileService : IFileService
         if (!await _storage.ExistsAsync(normalized))
             throw new FileNotFoundException($"'{normalized}' does not exist.", normalized);
 
-        await _storage.SetModifiedDateAsync(normalized, time);
+        if (createdAtUtc is { } created)
+            await _storage.SetCreatedDateAsync(normalized, created);
+        if (modifiedAtUtc is { } modified)
+            await _storage.SetModifiedDateAsync(normalized, modified);
 
         // The mtime is part of the item tag: log it so feed-based clients rebuild a current tag.
         await AppendFileUpsertAsync(FileChangeType.Modified, normalized);
@@ -809,7 +815,10 @@ public class FileService : IFileService
     public Task WriteFileAsync(string path, Stream data, UserContext user, CancellationToken cancellationToken = default)
         => WriteFileAsync(path, data, user, modifiedAtUtc: null, cancellationToken);
 
-    public async Task WriteFileAsync(string path, Stream data, UserContext user, DateTime? modifiedAtUtc, CancellationToken cancellationToken = default)
+    public Task WriteFileAsync(string path, Stream data, UserContext user, DateTime? modifiedAtUtc, CancellationToken cancellationToken = default)
+        => WriteFileAsync(path, data, user, modifiedAtUtc, createdAtUtc: null, cancellationToken);
+
+    public async Task WriteFileAsync(string path, Stream data, UserContext user, DateTime? modifiedAtUtc, DateTime? createdAtUtc, CancellationToken cancellationToken = default)
     {
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
@@ -824,9 +833,10 @@ public class FileService : IFileService
         // stored time then never goes backwards (other devices decide "newest wins" on it),
         // and every overwrite changes the size:mtime item tag, so If-Match and listing ETags
         // still detect it.
-        DateTime? previousModifiedAt = modifiedAtUtc is not null && existedBefore
-            ? (await _storage.GetMetadataAsync(normalized)).ModifiedAt.ToUniversalTime()
+        var previous = (modifiedAtUtc is not null || createdAtUtc is not null) && existedBefore
+            ? await _storage.GetMetadataAsync(normalized)
             : null;
+        DateTime? previousModifiedAt = previous?.ModifiedAt.ToUniversalTime();
 
         await _storage.WriteAsync(normalized, data, cancellationToken);
 
@@ -835,6 +845,12 @@ public class FileService : IFileService
         if (modifiedAtUtc is { } sourceModifiedAt
             && (previousModifiedAt is null || sourceModifiedAt.ToUniversalTime() > previousModifiedAt))
             await _storage.SetModifiedDateAsync(normalized, sourceModifiedAt);
+
+        // The creation time only ever moves back: an older source time means the item existed
+        // earlier on the other side, so both sides converge on the earliest one.
+        if (createdAtUtc is { } sourceCreatedAt
+            && (previous is null || sourceCreatedAt.ToUniversalTime() < previous.CreatedAt.ToUniversalTime()))
+            await _storage.SetCreatedDateAsync(normalized, sourceCreatedAt);
 
         if (!existedBefore)
             await RecordOwnerAsync(normalized, isDirectory: false, user);
@@ -1005,7 +1021,17 @@ public class FileService : IFileService
     public async Task<FileMetadata> GetMetadataAsync(string path, UserContext user)
     {
         var normalized = ShareRelativePath.Normalize(path);
-        var meta = await _storage.GetMetadataAsync(normalized);
+        FileMetadata meta;
+        try
+        {
+            meta = await _storage.GetMetadataAsync(normalized);
+        }
+        catch (FileNotFoundException)
+        {
+            // Authorize before revealing that the item does not exist (no existence oracle).
+            await EnsureAccessAsync(user, normalized, false, FilePermission.ListReadData);
+            throw;
+        }
 
         await EnsureAccessAsync(user, normalized, meta.IsDirectory, FilePermission.ListReadData);
 

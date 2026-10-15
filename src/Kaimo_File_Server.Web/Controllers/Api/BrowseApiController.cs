@@ -5,9 +5,11 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Components.ViewModels;
+using Kaimo_File_Server.Web.Controllers.WebDav;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
@@ -26,6 +28,12 @@ public sealed class BrowseApiController : ApiControllerBase
 {
     /// <summary>Optional upload header carrying the source mtime as Unix epoch milliseconds (UTC).</summary>
     public const string ModifiedAtHeader = "X-Kaimo-Modified-At";
+
+    /// <summary>
+    /// Optional upload / stamp header carrying the source creation time as Unix epoch milliseconds
+    /// (UTC); also returned on downloads so a client can give its copy the same creation time.
+    /// </summary>
+    public const string CreatedAtHeader = "X-Kaimo-Created-At";
 
     /// <summary>
     /// Optional download header (<c>true</c>): the read is a sync transfer, not a user access, so the
@@ -144,6 +152,8 @@ public sealed class BrowseApiController : ApiControllerBase
             Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
             Response.Headers[HeaderNames.LastModified] =
                 meta.ModifiedAt.ToUniversalTime().ToString("R");
+            Response.Headers[CreatedAtHeader] = new DateTimeOffset(meta.CreatedAt.ToUniversalTime())
+                .ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture);
             // enableRangeProcessing lets clients resume/segment large downloads.
             return File(stream, "application/octet-stream",
                 fileDownloadName: meta.Name,
@@ -160,7 +170,9 @@ public sealed class BrowseApiController : ApiControllerBase
     /// <c>X-Kaimo-Modified-At</c> header (Unix epoch milliseconds, UTC) preserves the
     /// source modification time — on an overwrite only when it is newer than the stored
     /// one; otherwise, and without the header, the file keeps its write time. A stamped time
-    /// is also used as the last-access time (the copy was not opened since).
+    /// is also used as the last-access time (the copy was not opened since). An optional
+    /// <c>X-Kaimo-Created-At</c> header sets the creation time of a new file; an overwrite adopts
+    /// it only when it is older, and otherwise keeps the creation time of the replaced file.
     /// </summary>
     [HttpPut("{shareId:guid}/content")]
     public async Task<IActionResult> Upload(Guid shareId, [FromQuery] string? path, CancellationToken ct)
@@ -180,15 +192,18 @@ public sealed class BrowseApiController : ApiControllerBase
                 "Upload body must be raw file bytes, not a form "
                 + "(Content-Type must not be multipart/form-data or application/x-www-form-urlencoded).");
 
-        if (!TryReadModifiedAtHeader(out var modifiedAtUtc, out var rawModifiedAt))
+        if (!TryReadTimeHeader(ModifiedAtHeader, out var modifiedAtUtc, out var rawModifiedAt))
             return InvalidModifiedAt();
+        if (!TryReadTimeHeader(CreatedAtHeader, out var createdAtUtc, out var rawCreatedAt))
+            return InvalidCreatedAt();
 
-        // The mtime is part of the fingerprint (reusing a key with a different mtime is a
-        // different request, not a replay); without it the fingerprint stays as before.
+        // The times are part of the fingerprint (reusing a key with a different time is a
+        // different request, not a replay); without them the fingerprint stays as before.
         var fingerprint = RequestFingerprint.Compute(
             "PUT", $"{shareId}/{resolved.Path}",
             "len:" + (Request.ContentLength?.ToString() ?? "?")
-            + (modifiedAtUtc is null ? "" : ";mtime:" + rawModifiedAt.Trim()));
+            + (modifiedAtUtc is null ? "" : ";mtime:" + rawModifiedAt.Trim())
+            + (createdAtUtc is null ? "" : ";ctime:" + rawCreatedAt.Trim()));
 
         return await ExecuteIdempotentAsync(resolved.User.User.Id, fingerprint, () => GuardAsync(async () =>
         {
@@ -204,7 +219,7 @@ public sealed class BrowseApiController : ApiControllerBase
                     return ApiPreconditionFailed();
             }
 
-            await resolved.Fs.WriteFileAsync(resolved.Path, Request.Body, resolved.User, modifiedAtUtc, ct);
+            await resolved.Fs.WriteFileAsync(resolved.Path, Request.Body, resolved.User, modifiedAtUtc, createdAtUtc, ct);
             var meta = await resolved.Fs.GetMetadataAsync(resolved.Path, resolved.User);
             Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
             return Ok(FileEntryDto.From(meta));
@@ -213,9 +228,10 @@ public sealed class BrowseApiController : ApiControllerBase
 
     /// <summary>
     /// Stamps the modification time (and, like an upload, the last-access time) of an existing
-    /// file or directory from the required <c>X-Kaimo-Modified-At</c> header. Sync clients use it
-    /// to give a folder the source time after writing its content. Retries are safe: the same
-    /// time yields the same item tag, though each call appends another <c>Modified</c> feed entry.
+    /// file or directory from the <c>X-Kaimo-Modified-At</c> header and/or its creation time from
+    /// <c>X-Kaimo-Created-At</c>; at least one is required. Sync clients use it to give a folder the
+    /// source times after writing its content. Retries are safe: the same time yields the same item
+    /// tag, though each call appends another <c>Modified</c> feed entry.
     /// </summary>
     [HttpPut("{shareId:guid}/modified-at")]
     public async Task<IActionResult> SetModifiedAt(Guid shareId, [FromQuery] string? path)
@@ -226,12 +242,16 @@ public sealed class BrowseApiController : ApiControllerBase
         if (string.IsNullOrEmpty(resolved!.Path))
             return ApiBadRequest("invalid_path", "A file or directory path is required.");
 
-        if (!TryReadModifiedAtHeader(out var modifiedAtUtc, out _) || modifiedAtUtc is null)
+        if (!TryReadTimeHeader(ModifiedAtHeader, out var modifiedAtUtc, out _))
             return InvalidModifiedAt();
+        if (!TryReadTimeHeader(CreatedAtHeader, out var createdAtUtc, out _))
+            return InvalidCreatedAt();
+        if (modifiedAtUtc is null && createdAtUtc is null)
+            return ApiBadRequest("missing_time_header", $"{ModifiedAtHeader} or {CreatedAtHeader} is required.");
 
         return await GuardAsync(async () =>
         {
-            await resolved.Fs.SetModifiedAtAsync(resolved.Path, resolved.User, modifiedAtUtc.Value);
+            await resolved.Fs.SetModifiedAtAsync(resolved.Path, resolved.User, modifiedAtUtc, createdAtUtc);
             var meta = await resolved.Fs.GetMetadataAsync(resolved.Path, resolved.User);
             Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
             return Ok(FileEntryDto.From(meta));
@@ -239,13 +259,14 @@ public sealed class BrowseApiController : ApiControllerBase
     }
 
     /// <summary>
-    /// Parses the optional <c>X-Kaimo-Modified-At</c> header. Returns false only for a present but
-    /// invalid value; an absent header yields true with a null time.
+    /// Parses an optional epoch-milliseconds time header (<c>X-Kaimo-Modified-At</c>,
+    /// <c>X-Kaimo-Created-At</c>). Returns false only for a present but invalid value; an absent
+    /// header yields true with a null time.
     /// </summary>
-    private bool TryReadModifiedAtHeader(out DateTime? modifiedAtUtc, out string raw)
+    private bool TryReadTimeHeader(string header, out DateTime? utc, out string raw)
     {
-        modifiedAtUtc = null;
-        raw = Request.Headers[ModifiedAtHeader].ToString();
+        utc = null;
+        raw = Request.Headers[header].ToString();
         if (string.IsNullOrWhiteSpace(raw))
             return true;
 
@@ -253,12 +274,15 @@ public sealed class BrowseApiController : ApiControllerBase
             || epochMs < 0 || epochMs > DateTimeOffset.MaxValue.ToUnixTimeMilliseconds())
             return false;
 
-        modifiedAtUtc = DateTimeOffset.FromUnixTimeMilliseconds(epochMs).UtcDateTime;
+        utc = DateTimeOffset.FromUnixTimeMilliseconds(epochMs).UtcDateTime;
         return true;
     }
 
     private IActionResult InvalidModifiedAt()
         => ApiBadRequest("invalid_modified_at", $"{ModifiedAtHeader} must be Unix epoch milliseconds (UTC).");
+
+    private IActionResult InvalidCreatedAt()
+        => ApiBadRequest("invalid_created_at", $"{CreatedAtHeader} must be Unix epoch milliseconds (UTC).");
 
     /// <summary>
     /// Creates a directory. Creating a directory that already exists is treated as
@@ -328,6 +352,116 @@ public sealed class BrowseApiController : ApiControllerBase
             await fs.RenameAsync(from, to, user);
             return NoContent();
         }));
+    }
+
+    /// <summary>
+    /// Copies a file or directory (recursively), possibly into another share. The copy keeps the
+    /// source modification times. An existing target yields 409 <c>target_exists</c> unless
+    /// <see cref="TransferRequest.Overwrite"/> is set (file replaced, folder merged); a file/folder
+    /// clash is always 409 <c>type_mismatch</c>. The target's folder must exist (else 404
+    /// <c>target_parent_missing</c>). 201 when the target was created, 204 when it already
+    /// existed. Supports <c>Idempotency-Key</c>.
+    /// </summary>
+    [HttpPost("copy")]
+    public Task<IActionResult> Copy([FromBody] TransferRequest request) => TransferAsync(request, isMove: false);
+
+    /// <summary>
+    /// Moves a file or directory, possibly into another share. Within a share it is an atomic
+    /// rename (replacing a file or merging into a folder copies first); across shares the source is
+    /// deleted only after the whole copy succeeded. Same conflict rules and status codes as copy.
+    /// </summary>
+    [HttpPost("move")]
+    public Task<IActionResult> Move([FromBody] TransferRequest request) => TransferAsync(request, isMove: true);
+
+    private async Task<IActionResult> TransferAsync(TransferRequest? request, bool isMove)
+    {
+        var user = await ResolveUserAsync(_userContextFactory);
+        if (user is null) return ApiUnauthorized();
+
+        if (request is null
+            || !ShareRelativePath.TryNormalizeStrict(request.SourcePath, out var from, allowRoot: false)
+            || !ShareRelativePath.TryNormalizeStrict(request.TargetPath, out var to, allowRoot: false))
+            return ApiBadRequest("invalid_path", "Both 'sourcePath' and 'targetPath' must be valid paths.");
+
+        var source = await _shares.GetByIdAsync(request.SourceShareId);
+        var target = request.TargetShareId == request.SourceShareId
+            ? source
+            : await _shares.GetByIdAsync(request.TargetShareId);
+        if (source is null || !source.IsEnabled || target is null || !target.IsEnabled)
+            return ApiNotFound("Share not found.");
+
+        var sameShare = source.Id == target.Id;
+        // An ancestor as target would merge the source into itself (p/c onto p writes p/c/c to p/c).
+        if (sameShare && (to == from
+                || to.StartsWith(from + "/", StringComparison.Ordinal)
+                || from.StartsWith(to + "/", StringComparison.Ordinal)))
+            return ApiBadRequest("invalid_target", "The target must not be the source, lie inside it or contain it.");
+
+        var sourceFs = _fileServiceFactory.CreateForShare(source);
+        var targetFs = sameShare ? sourceFs : _fileServiceFactory.CreateForShare(target);
+        var fingerprint = RequestFingerprint.Compute(
+            "POST", isMove ? "move" : "copy", $"{source.Id}/{from}", $"{target.Id}/{to}",
+            request.Overwrite ? "overwrite" : null);
+
+        // ponytail: runs inside the request; add a job endpoint if proxies time out on huge folders.
+        return await ExecuteIdempotentAsync(user.User.Id, fingerprint, () => GuardAsync(async () =>
+        {
+            var item = await WebDavController.FindAsync(sourceFs, from, user);
+            if (item is null) return ApiNotFound("Source not found.");
+
+            // The storage would create missing folders silently, unchecked and unlogged.
+            if (!await WebDavController.ParentExistsAsync(targetFs, to, user))
+                return NotFound(new ApiError("target_parent_missing", "The target folder does not exist."));
+
+            var existing = await WebDavController.FindAsync(targetFs, to, user);
+            if (existing is not null && existing.IsDirectory != item.IsDirectory)
+                return Conflict(new ApiError("type_mismatch", "The target exists with a different type."));
+            if (existing is not null && !request.Overwrite)
+                return Conflict(new ApiError("target_exists", "The target already exists."));
+
+            // Checked up front: a move that copies first would otherwise leave a duplicate behind.
+            if (isMove && !await sourceFs.CanDeleteAsync(from, user))
+                return ApiForbidden();
+
+            if (isMove && sameShare && existing is null)
+            {
+                await sourceFs.RenameAsync(from, to, user);
+            }
+            else
+            {
+                // Replacing or merging copies first, so a failure (no write access, a busy path) leaves
+                // the old target intact. A copy is a new item (new creation time, as in Explorer); a
+                // move keeps its identity.
+                await WebDavCopy.CopyAsync(sourceFs, from, targetFs, to, user, infinity: true,
+                    HttpContext.RequestAborted, preserveTimes: true, preserveCreated: isMove);
+                if (isMove)
+                    await sourceFs.DeleteFileAsync(from, user, source.IsRecycleEnabled);
+            }
+
+            return existing is null ? StatusCode(StatusCodes.Status201Created) : NoContent();
+        }));
+    }
+
+    /// <summary>
+    /// Size of a file, or the recursive content size of a directory (what the web file browser
+    /// shows). Computed on demand, so clients should request it only when it is displayed.
+    /// </summary>
+    [HttpGet("{shareId:guid}/size")]
+    public async Task<IActionResult> Size(Guid shareId, [FromQuery] string? path)
+    {
+        var (resolved, error) = await ResolveAsync(shareId, path);
+        if (error is not null) return error;
+
+        return await GuardAsync(async () =>
+        {
+            var meta = await WebDavController.FindAsync(resolved!.Fs, resolved.Path, resolved.User);
+            if (meta is null) return ApiNotFound();
+
+            var size = meta.IsDirectory
+                ? await resolved.Fs.GetDirectorySizeAsync(resolved.Path, resolved.User)
+                : meta.Size;
+            return Ok(new SizeDto(resolved.Path, meta.IsDirectory, size));
+        });
     }
 
     /// <summary>
@@ -445,7 +579,38 @@ public sealed class BrowseApiController : ApiControllerBase
         {
             return Conflict(new ApiError("conflict", ex.Message));
         }
+        // A 409 is stored for an Idempotency-Key, so transient failures must not become one: every
+        // retry with the same key would replay it.
+        catch (BadHttpRequestException ex)
+        {
+            // The request body failed (too large → 413, truncated → 400), not the file operation.
+            return StatusCode(ex.StatusCode, new ApiError(
+                ex.StatusCode == StatusCodes.Status413PayloadTooLarge ? "payload_too_large" : "bad_request",
+                ex.Message));
+        }
+        catch (IOException) when (HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            return ApiBadRequest("request_aborted", "The client aborted the request.");
+        }
+        catch (IOException ex) when (IsDiskFull(ex))
+        {
+            return StatusCode(StatusCodes.Status507InsufficientStorage, new ApiError("insufficient_storage", ex.Message));
+        }
+        catch (CloudSyncOperationConflictException ex)
+        {
+            Response.Headers[HeaderNames.RetryAfter] = "5";
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new ApiError("path_busy", ex.Message));
+        }
+        catch (IOException ex)
+        {
+            // Target already exists, or another storage-level failure.
+            return Conflict(new ApiError("conflict", ex.Message));
+        }
     }
+
+    /// <summary>ENOSPC / EDQUOT (.NET puts the raw errno into HResult on Unix), or the Win32 disk-full HRESULTs.</summary>
+    private static bool IsDiskFull(IOException ex)
+        => ex.HResult is 28 or 122 or unchecked((int)0x80070070) or unchecked((int)0x80070027);
 
     /// <summary>
     /// Metadata for a path, or <c>null</c> when it does not exist — used for

@@ -26,5 +26,15 @@ public sealed record FileEntryDto(
 /// <summary>Source and destination for a rename/move.</summary>
 public sealed record RenameRequest(string From, string To);
 
+/// <summary>
+/// Source and target of a copy or move; the shares may differ. With <paramref name="Overwrite"/>
+/// an existing target file is replaced and an existing target folder is merged.
+/// </summary>
+public sealed record TransferRequest(
+    Guid SourceShareId, string SourcePath, Guid TargetShareId, string TargetPath, bool Overwrite = false);
+
+/// <summary>Size of a file, or the recursive content size of a directory, in bytes.</summary>
+public sealed record SizeDto(string Path, bool IsDirectory, long Size);
+
 /// <summary>One stored version of a file.</summary>
 public sealed record FileVersionDto(DateTime SnapshotTimestampUtc, long Size, string ContentHash);

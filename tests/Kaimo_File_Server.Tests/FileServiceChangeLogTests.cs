@@ -181,6 +181,50 @@ public sealed class FileServiceChangeLogTests
     }
 
     [Fact]
+    public async Task WriteFileAsync_NewFile_StampsTheSourceCreationTime()
+    {
+        var created = new DateTime(2019, 3, 4, 5, 6, 7, DateTimeKind.Utc);
+        _storage.Setup(s => s.IsDirectoryAsync("docs/a.txt")).ReturnsAsync(false);
+        _storage.Setup(s => s.ExistsAsync("docs/a.txt")).ReturnsAsync(false);
+        _storage.Setup(s => s.GetMetadataAsync("docs/a.txt")).ReturnsAsync(new FileMetadata());
+
+        await _sut.WriteFileAsync("/docs/a.txt", Stream.Null, Ctx(), modifiedAtUtc: null, createdAtUtc: created);
+
+        _storage.Verify(s => s.SetCreatedDateAsync("docs/a.txt", created), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(2018, true)]   // older than the stored creation time → adopted
+    [InlineData(2021, false)]  // newer → the file existed earlier, keep it
+    public async Task WriteFileAsync_Overwrite_AdoptsOnlyAnOlderCreationTime(int year, bool adopted)
+    {
+        var stored = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var source = new DateTime(year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        _storage.Setup(s => s.IsDirectoryAsync("docs/a.txt")).ReturnsAsync(false);
+        _storage.Setup(s => s.ExistsAsync("docs/a.txt")).ReturnsAsync(true);
+        _storage.Setup(s => s.GetMetadataAsync("docs/a.txt"))
+            .ReturnsAsync(new FileMetadata { CreatedAt = stored, ModifiedAt = stored });
+
+        await _sut.WriteFileAsync("/docs/a.txt", Stream.Null, Ctx(), modifiedAtUtc: null, createdAtUtc: source);
+
+        _storage.Verify(s => s.SetCreatedDateAsync("docs/a.txt", source), adopted ? Times.Once() : Times.Never());
+    }
+
+    [Fact]
+    public async Task SetModifiedAtAsync_WithOnlyACreationTime_StampsJustThat()
+    {
+        var created = new DateTime(2017, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        _storage.Setup(s => s.IsDirectoryAsync("docs")).ReturnsAsync(true);
+        _storage.Setup(s => s.ExistsAsync("docs")).ReturnsAsync(true);
+        _storage.Setup(s => s.GetMetadataAsync("docs")).ReturnsAsync(new FileMetadata { IsDirectory = true });
+
+        await _sut.SetModifiedAtAsync("/docs", Ctx(), modifiedAtUtc: null, createdAtUtc: created);
+
+        _storage.Verify(s => s.SetCreatedDateAsync("docs", created), Times.Once);
+        _storage.Verify(s => s.SetModifiedDateAsync(It.IsAny<string>(), It.IsAny<DateTime>()), Times.Never);
+    }
+
+    [Fact]
     public async Task SetModifiedAtAsync_MissingItem_ThrowsNotFound()
     {
         _storage.Setup(s => s.IsDirectoryAsync("docs/gone.txt")).ReturnsAsync(false);

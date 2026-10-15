@@ -24,6 +24,7 @@ Related: [Storage and persistence](../architecture/storage-and-persistence.md) (
 5. [Incremental change feed (`change_seq`)](#5-incremental-change-feed-change_seq)
 6. [Change wait (long-poll)](#6-change-wait-long-poll)
 7. [Change notification & battery model](#7-change-notification--battery-model)
+8. [Renamed or missing sync folder](#8-renamed-or-missing-sync-folder)
 
 ---
 
@@ -121,8 +122,8 @@ change **sequence**:
 ```jsonc
 {
   "entries": [
-    { "path": "projects/2026", "isDirectory": true,  "size": 0,      "modifiedAtUtc": "…" },
-    { "path": "projects/2026/a.pdf", "isDirectory": false, "size": 1234, "modifiedAtUtc": "…" }
+    { "path": "projects/2026", "isDirectory": true,  "size": 0,      "modifiedAtUtc": "…", "createdAtUtc": "…" },
+    { "path": "projects/2026/a.pdf", "isDirectory": false, "size": 1234, "modifiedAtUtc": "…", "createdAtUtc": "…" }
   ],
   "token": "638…",
   "seq": 4211
@@ -168,7 +169,9 @@ changes included, which the coarse token alone cannot see:
   reconciles with a scoped `delta` of `path`).
 - `oldPath` is set only on `Renamed` (the source). A rename that moves an item
   **out** of the watched subtree still appears (matched on its old path), so the
-  client can apply the disappearance.
+  client can apply the disappearance. A rename or delete of an **ancestor** of the watched
+  folder appears too (its `path` lies outside the subtree): the synced folder itself moved
+  or vanished — the next `delta`/`changes` call answers as described in [§8](#8-renamed-or-missing-sync-folder).
 - `size` / `modifiedAtUtc` accompany creates and modifies so the client can rebuild
   the item tag without a metadata round trip.
 - `seq` in the envelope is the cursor to store next. It advances even when a page is
@@ -239,3 +242,41 @@ The goal is *fast propagation both ways* without draining mobile batteries.
 Client-side guidance: back off `changes/wait` on repeated failures, pause syncing on
 metered networks or low battery if the user opts in, and honor each profile's
 direction to avoid needless transfers.
+
+---
+
+## 8. Renamed or missing sync folder
+
+A connection names its remote folder by path. When that folder — or any folder above it — is
+renamed or moved (web, SMB, WebDAV or another device), `delta` and `changes` stop with:
+
+```jsonc
+// 409
+{ "code": "sync_root_renamed", "message": "…", "renameId": 4307 }
+```
+
+The body carries no path. Ask where the folder went:
+
+```
+GET /api/v1/sync/{shareId}/renames/4307?path=projects/2026
+```
+```jsonc
+{ "renameId": 4307, "oldPath": "projects/2026", "newPath": "archive/2026", "renamedAtUtc": "…" }
+```
+
+The server follows every later rename of the folder, so `newPath` is its current location. The
+client then re-points its connection with `PUT profiles/{id}` (`relativePath = newPath`); the
+server never edits a connection itself (design rule 2). Paths inside the folder are unchanged,
+so the client keeps its baseline and cursor (keyed to the new path) and continues — a full
+`delta` once is a cheap safety net.
+
+- With a cursor (`changes?since=`) only renames after it count; `delta` uses the latest rename.
+- A folder renamed away and back (`a → x → a`) still exists and syncs normally.
+- `404 sync_root_missing` — the folder is gone and no rename explains it (deleted — also into the
+  recycle bin, which the log records as a rename —, renamed outside the server, or renamed into a
+  folder the caller may not list). The client should stop
+  the connection and let the user pick a new folder instead of re-creating the old path.
+- `GET renames/{id}`: `404` when the id is unknown or did not move `path`; `403` without list
+  access on the new location.
+- A **share** rename needs nothing: connections reference the share by id, and every path is
+  relative to the share.

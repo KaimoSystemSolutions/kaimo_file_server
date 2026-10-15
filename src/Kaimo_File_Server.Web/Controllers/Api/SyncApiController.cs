@@ -197,6 +197,7 @@ public sealed class SyncApiController : ApiControllerBase
 
         var fs = _fileServiceFactory.CreateForShare(share);
         if (IsHomesRoot(share, root)) return ApiForbidden();
+        if (await CheckRootGoneAsync(fs, share, root, since: null, user) is { } gone) return gone;
         if (!await fs.CanListAsync(root, user)) return ApiForbidden();
 
         var delta = await _syncQuery.EnumerateAsync(shareId, root, user, HttpContext.RequestAborted);
@@ -228,6 +229,7 @@ public sealed class SyncApiController : ApiControllerBase
         // probe for hidden content.
         var fs = _fileServiceFactory.CreateForShare(share);
         if (IsHomesRoot(share, root)) return ApiForbidden();
+        if (await CheckRootGoneAsync(fs, share, root, since, user) is { } gone) return gone;
         if (!await fs.CanListAsync(root, user)) return ApiForbidden();
 
         var ct = HttpContext.RequestAborted;
@@ -260,6 +262,73 @@ public sealed class SyncApiController : ApiControllerBase
             visible.Select(FileChangeDto.From).ToList(), nextSeq, truncated, reset);
         return Ok(dto);
     }
+
+    /// <summary>
+    /// Where a renamed sync root went. <paramref name="renameId"/> comes from a 409
+    /// <c>sync_root_renamed</c>; <paramref name="path"/> is the root the client synced. The chain of
+    /// later renames is followed, so the answer is the folder's current path. The client then updates
+    /// its connection (<c>PUT profiles/{id}</c>) — the server never re-points a profile itself.
+    /// </summary>
+    [HttpGet("{shareId:guid}/renames/{renameId:long}")]
+    public async Task<IActionResult> RootRename(Guid shareId, long renameId, [FromQuery] string? path)
+    {
+        var user = await ResolveUserAsync(_userContextFactory);
+        if (user is null) return ApiUnauthorized();
+
+        var share = await _shares.GetByIdAsync(shareId);
+        if (share is null || !share.IsEnabled) return ApiNotFound("Share not found.");
+
+        if (!ShareRelativePath.TryNormalizeStrict(path ?? string.Empty, out var root, allowRoot: false))
+            return ApiBadRequest("invalid_path", "The path is not a valid share-relative path.");
+
+        var move = await SyncRootRelocation.ResolveAsync(
+            _changeLog, shareId, root, renameId - 1, newest: false, HttpContext.RequestAborted);
+        if (move is null || move.RenameId != renameId || IsInRecycleBin(share, move))
+            return ApiNotFound("No such rename of this folder.");
+
+        var fs = _fileServiceFactory.CreateForShare(share);
+        if (!await fs.CanListAsync(move.NewPath, user)) return ApiForbidden();
+
+        return Ok(new SyncRootRenameDto(renameId, root, move.NewPath, move.RenamedAtUtc));
+    }
+
+    /// <summary>
+    /// <c>null</c> while the sync root exists. Otherwise 409 <c>sync_root_renamed</c> when the change
+    /// log shows it (or an ancestor) was renamed to a folder that exists and the caller may list
+    /// (with a cursor, only renames after it count), else 404 <c>sync_root_missing</c> — or 403 when
+    /// the caller may not list the old path either, so a missing path cannot be probed. Without this
+    /// check a renamed root broke the walk with a 500, and a renamed ancestor went unnoticed.
+    /// </summary>
+    private async Task<IActionResult?> CheckRootGoneAsync(
+        IFileService fs, ShareDefinition share, string root, long? since, UserContext user)
+    {
+        if (root.Length == 0 || Directory.Exists(fs.ToAbsolutePath(root)))
+            return null;
+
+        async Task<bool> Usable(SyncRootMove m)
+            => !IsInRecycleBin(share, m)
+               && Directory.Exists(fs.ToAbsolutePath(m.NewPath))
+               && await fs.CanListAsync(m.NewPath, user);
+
+        var ct = HttpContext.RequestAborted;
+        var move = since is { } cursor
+            ? await SyncRootRelocation.ResolveAsync(_changeLog, share.Id, root, cursor, newest: false, ct)
+            : await SyncRootRelocation.ResolveNewestAcceptedAsync(_changeLog, share.Id, root, Usable, ct);
+        if (move is not null && await Usable(move))
+            return Conflict(new SyncRootRenamedError(
+                "sync_root_renamed", "The synced folder was renamed; resolve it via renames/{renameId}.",
+                move.RenameId));
+
+        return await fs.CanListAsync(root, user)
+            ? NotFound(new ApiError("sync_root_missing", "The synced folder no longer exists."))
+            : ApiForbidden();
+    }
+
+    /// <summary>
+    /// With the recycle bin on, a delete is logged as a rename into it: the folder is gone, not moved.
+    /// </summary>
+    private static bool IsInRecycleBin(ShareDefinition share, SyncRootMove move)
+        => ShareEntryPolicy.IsRecycleBinPath(move.NewPath, share.RecycleRootDepth);
 
     /// <summary>
     /// The root of the home-folder share holds every user's home. Each user may list it (SMB

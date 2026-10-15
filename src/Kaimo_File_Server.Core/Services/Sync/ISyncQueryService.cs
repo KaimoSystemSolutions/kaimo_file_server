@@ -7,11 +7,13 @@ namespace Kaimo_File_Server.Core.Services.Sync
     /// <param name="IsDirectory">Whether the item is a directory.</param>
     /// <param name="Size">Content size in bytes (0 for directories).</param>
     /// <param name="ModifiedAtUtc">Last content/metadata modification time (UTC).</param>
+    /// <param name="CreatedAtUtc">Creation time (UTC), as web and SMB report it.</param>
     public readonly record struct SyncEntry(
         string Path,
         bool IsDirectory,
         long Size,
-        DateTime ModifiedAtUtc);
+        DateTime ModifiedAtUtc,
+        DateTime CreatedAtUtc = default);
 
     /// <summary>Result of enumerating a synced subtree for one device.</summary>
     /// <param name="Entries">

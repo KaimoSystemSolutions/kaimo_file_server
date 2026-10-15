@@ -37,6 +37,11 @@ namespace Kaimo_File_Server.Core.Services.File
         // Same as above, but stamps the source modification time (e.g. from a sync client) on the
         // written file before the change-log entry is recorded; null keeps the write time.
         Task WriteFileAsync(string path, Stream data, UserContext user, DateTime? modifiedAtUtc, CancellationToken cancellationToken = default);
+        // Same as above, plus a source creation time: always kept on a new file, adopted by an
+        // overwrite only when it is older (the item existed earlier on the other side).
+        // Implementations without creation-time support fall back to the overload above.
+        Task WriteFileAsync(string path, Stream data, UserContext user, DateTime? modifiedAtUtc, DateTime? createdAtUtc, CancellationToken cancellationToken = default)
+            => WriteFileAsync(path, data, user, modifiedAtUtc, cancellationToken);
         Task CreateFileAsync(string path, UserContext user);
         Task CreateDirectoryAsync(string path, UserContext user);
         Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled);
@@ -48,6 +53,9 @@ namespace Kaimo_File_Server.Core.Services.File
         Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format, UserContext user);
 
         Task SetModifiedAtAsync(string path, UserContext user, DateTime time);
+        // Stamps a modification and/or creation time (null = leave unchanged) on an existing item.
+        Task SetModifiedAtAsync(string path, UserContext user, DateTime? modifiedAtUtc, DateTime? createdAtUtc)
+            => modifiedAtUtc is { } time ? SetModifiedAtAsync(path, user, time) : Task.CompletedTask;
         // ------------ Hooks ------------
 
         Task OnFileCreated(string absolutePath, Task<Stream> fileData);

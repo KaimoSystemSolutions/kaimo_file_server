@@ -33,6 +33,7 @@ public static class LogEvents
     #region Infrastructure (2000-2999)
 
     public static readonly EventId StorageAclLoadFailed = new(2001, nameof(StorageAclLoadFailed));
+    public static readonly EventId StorageCreatedTimeNotStored = new(2002, nameof(StorageCreatedTimeNotStored));
     public static readonly EventId SeedBootstrapAdminSkipped = new(2101, nameof(SeedBootstrapAdminSkipped));
     public static readonly EventId SeedAdminRoleMissing = new(2102, nameof(SeedAdminRoleMissing));
     public static readonly EventId SeedBootstrapAdminPassword = new(2103, nameof(SeedBootstrapAdminPassword));

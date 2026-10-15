@@ -68,8 +68,8 @@ public static class UploadFolderPath
     /// parents first, and returns the share paths it actually created. Existing folders are
     /// merged into (creating them again would re-stamp their owner and log a bogus change);
     /// a file in the way throws <see cref="IOException"/>.
-    /// Existence is probed on disk: GetMetadataAsync reports a missing path as a file and
-    /// needs list rights, which a write-only drop box does not grant.
+    /// Existence is probed on disk: GetMetadataAsync needs list rights, which a write-only
+    /// drop box does not grant.
     /// </summary>
     public static async Task<List<string>> EnsureFoldersAsync(
         IFileService fs, string baseDir, string relativeDir, UserContext user,

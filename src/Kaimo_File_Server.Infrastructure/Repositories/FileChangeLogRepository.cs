@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Domain.ClientSync;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -107,11 +108,29 @@ public sealed class FileChangeLogRepository : IFileChangeLogRepository
         return await db.FileChangeLog.AsNoTracking().MinAsync(e => (long?)e.Seq, ct) ?? 0L;
     }
 
+    public async Task<FileChangeLogEntry?> FindRenameCoveringAsync(
+        Guid shareId, string path, long afterSeq, bool newest, CancellationToken ct = default,
+        long? beforeSeq = null)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+
+        var selfAndAncestors = ShareRelativePath.BuildHierarchy(path);
+        var before = beforeSeq ?? long.MaxValue;
+        var query = db.FileChangeLog.AsNoTracking().Where(e =>
+            e.ShareId == shareId && e.Seq > afterSeq && e.Seq < before && e.ChangeType == FileChangeType.Renamed &&
+            e.OldPath != null && selfAndAncestors.Contains(e.OldPath));
+
+        query = newest ? query.OrderByDescending(e => e.Seq) : query.OrderBy(e => e.Seq);
+        return await query.FirstOrDefaultAsync(ct);
+    }
+
     /// <summary>
     /// Restricts a change-log query to a subtree: the root itself plus everything strictly beneath
     /// it, matched on either <c>Path</c> or <c>OldPath</c> so a rename leaving the subtree is still
     /// reported. The <c>"/"</c> guard prevents a sibling like <c>docs2</c> matching prefix
-    /// <c>docs</c>. An empty prefix covers the whole share.
+    /// <c>docs</c>. Renaming or deleting an ancestor moves or removes the whole subtree, so those
+    /// entries match as well (other ancestor changes, e.g. a folder time stamp, do not). An empty
+    /// prefix covers the whole share.
     /// </summary>
     private static IQueryable<FileChangeLogEntry> ApplyPrefixFilter(
         IQueryable<FileChangeLogEntry> query, string? pathPrefix)
@@ -120,8 +139,11 @@ public sealed class FileChangeLogRepository : IFileChangeLogRepository
             return query;
 
         string childPrefix = pathPrefix + "/";
+        var ancestors = ShareRelativePath.BuildHierarchy(pathPrefix);
         return query.Where(e =>
             e.Path == pathPrefix || e.Path.StartsWith(childPrefix) ||
-            (e.OldPath != null && (e.OldPath == pathPrefix || e.OldPath.StartsWith(childPrefix))));
+            (e.OldPath != null && (e.OldPath == pathPrefix || e.OldPath.StartsWith(childPrefix))) ||
+            (e.ChangeType == FileChangeType.Renamed && e.OldPath != null && ancestors.Contains(e.OldPath)) ||
+            (e.ChangeType == FileChangeType.Deleted && ancestors.Contains(e.Path)));
     }
 }

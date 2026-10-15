@@ -40,6 +40,12 @@ namespace Kaimo_File_Server.Core.Storage
         /// time to the same value, so a copied item looks untouched since that modification.
         /// </summary>
         Task SetModifiedDateAsync(string path, DateTime time);
+        /// <summary>
+        /// Stamps a source creation time on a file or directory, stored so that every transport
+        /// (web, SMB) reports it. Throws <see cref="IOException"/> when the item does not exist.
+        /// Engines that cannot store a creation time keep the default no-op.
+        /// </summary>
+        Task SetCreatedDateAsync(string path, DateTime time) => Task.CompletedTask;
         public string ToAbsolutePath(string shareRelativePath);
         /// <summary>
         /// Calculates the total size of all files within a directory (recursive).

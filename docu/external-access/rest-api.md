@@ -107,11 +107,14 @@ All browse endpoints are ACL-checked per call.
 | `GET /api/v1/browse/shares` | Shares the caller may browse. | — |
 | `GET /api/v1/browse/{shareId}/list?path=` | Directory children (+ `ETag`). | `If-None-Match` → 304 |
 | `GET /api/v1/browse/{shareId}/metadata?path=` | One item's metadata (+ item-tag `ETag`). | — |
-| `GET /api/v1/browse/{shareId}/content?path=` | Download; supports `Range` (+ item-tag `ETag`). Optional `X-Kaimo-Preserve-Access-Time: true` for sync reads. | — |
-| `PUT /api/v1/browse/{shareId}/content?path=` | Upload/overwrite (body = bytes). Optional `X-Kaimo-Modified-At` preserves the source mtime. | `If-Match`, `If-None-Match: *`, `Idempotency-Key` |
+| `GET /api/v1/browse/{shareId}/content?path=` | Download; supports `Range` (+ item-tag `ETag`, `X-Kaimo-Created-At`). Optional `X-Kaimo-Preserve-Access-Time: true` for sync reads. | — |
+| `PUT /api/v1/browse/{shareId}/content?path=` | Upload/overwrite (body = bytes). Optional `X-Kaimo-Modified-At` / `X-Kaimo-Created-At` preserve the source times. | `If-Match`, `If-None-Match: *`, `Idempotency-Key` |
 | `POST /api/v1/browse/{shareId}/directory?path=` | Create a directory. | `Idempotency-Key` |
-| `PUT /api/v1/browse/{shareId}/modified-at?path=` | Stamp the mtime (and atime) of an existing file or directory from the required `X-Kaimo-Modified-At` header; returns the item (+ item-tag `ETag`). `404` if missing. | — (safe to retry: same time → same item tag; each call still appends a `Modified` feed entry) |
-| `POST /api/v1/browse/{shareId}/rename` | Body `{ "from": "...", "to": "..." }`. | `If-Match`, `Idempotency-Key` |
+| `PUT /api/v1/browse/{shareId}/modified-at?path=` | Stamp the mtime (and atime) and/or the creation time of an existing file or directory from `X-Kaimo-Modified-At` / `X-Kaimo-Created-At` (at least one required); returns the item (+ item-tag `ETag`). `404` if missing. | — (safe to retry: same time → same item tag; each call still appends a `Modified` feed entry) |
+| `POST /api/v1/browse/{shareId}/rename` | Body `{ "from": "...", "to": "..." }`. Rename or move within one share. `409 conflict` if the target exists. | `If-Match`, `Idempotency-Key` |
+| `POST /api/v1/browse/copy` | Copy a file or folder (recursively), also across shares. See [Copy & move](#copy--move). | `Idempotency-Key` |
+| `POST /api/v1/browse/move` | Move a file or folder, also across shares. See [Copy & move](#copy--move). | `Idempotency-Key` |
+| `GET /api/v1/browse/{shareId}/size?path=` | `{ path, isDirectory, size }`: a file's size or a folder's recursive content size in bytes. | — |
 | `DELETE /api/v1/browse/{shareId}/item?path=` | Delete (recycle bin if the share has one). | `If-Match`, `Idempotency-Key` |
 | `GET /api/v1/browse/{shareId}/versions?path=` | Stored versions of a file (newest first). | — |
 | `GET /api/v1/browse/{shareId}/version-content?path=&timestamp=` | Download one version. | — |
@@ -139,7 +142,19 @@ on `PUT content` to keep the source file's mtime; the file, the returned item ta
 - A value that is not a non-negative integer (e.g. a pre-1970 time) →
   `400 invalid_modified_at`; omit the header for such files.
 - A stamped time is also used as the **last-access time** (the copy was not opened since).
-- Creation time is not transferred (Linux cannot set it).
+
+**Preserving the creation time.** `X-Kaimo-Created-At: <Unix epoch milliseconds, UTC>` on
+`PUT content` or `PUT modified-at` sets the creation time; `GET content` returns the stored one in
+the same header, and `list`/`metadata`/`delta` carry it as `createdAtUtc`.
+
+- A **new** file always takes the sent time; an **overwrite** takes it only when it is *older*
+  (the item existed earlier on the other side), so two-way sync converges on the earliest time.
+- An overwrite never resets the creation time otherwise (also without the header).
+- Linux cannot set a birth time, so the server stores it in Samba's `user.DOSATTRIB` xattr — the
+  web UI and SMB clients report the same value. Invalid values → `400 invalid_created_at`.
+
+**Folder size.** `GET size` sums the folder's content on demand (the same value the web file
+browser shows). It walks the whole subtree, so request it only when it is displayed.
 
 **Folder times.** Writing into a directory moves its mtime to "now". A sync client that wants
 to keep the source folder time calls `PUT modified-at` on the folder **after** its content is
@@ -148,6 +163,28 @@ written (deepest first is not required; stamping a child never changes its paren
 **Access time.** Downloads and other reads count as an access. A sync client sends
 `X-Kaimo-Preserve-Access-Time: true` on `GET content` so a transfer leaves the file's
 last-access time unchanged. Server-internal reads (search indexing, versioning) never count.
+
+### Copy & move
+
+```jsonc
+// POST /api/v1/browse/copy  or  /api/v1/browse/move
+{ "sourceShareId": "…", "sourcePath": "docs/a", "targetShareId": "…", "targetPath": "archive/a", "overwrite": false }
+```
+One item per request; `targetPath` is the full new path (its parent must exist). Responses:
+
+- `201` target created, `204` target existed and was overwritten (file) or merged (folder).
+- `409 target_exists` — the target exists and `overwrite` is `false`. Let the user choose, then
+  retry with `overwrite: true` or a different `targetPath` (e.g. "name (1)" to keep both).
+- `409 type_mismatch` — a file would replace a folder or vice versa (never overwritten).
+- `400 invalid_target` — the target is the source or lies inside it (same share).
+- `404` — source (or the target's parent) missing; `403` — no read/write access (for a move also
+  no delete access on the source, checked before anything is copied).
+
+Copies keep the source **modification** times and get a new creation time (as in Explorer).
+A move within one share is an atomic rename (into an existing folder with `overwrite`: merged);
+across shares it copies — keeping modification **and** creation times — and deletes the source
+only after the whole copy succeeded. The copy runs inside the request, so a very large folder
+can take a while; use a generous client timeout.
 
 ### 3.1 Safe mutations: conditional requests & idempotency keys
 
@@ -174,7 +211,7 @@ silently overwriting.
 
 **Idempotency keys (`Idempotency-Key`) — replay-safe retries.**
 Send `Idempotency-Key: <opId>` (a stable, per-device id for the operation) on `PUT content`,
-`POST directory`, `POST rename`, or `DELETE item`. The first request executes and the
+`POST directory`, `POST rename`, `POST copy`, `POST move`, or `DELETE item`. The first request executes and the
 server records the outcome, scoped to `(device, key)`. A repeat:
 
 - **same key + same request** → the stored status and body are **replayed** (the operation
@@ -210,8 +247,10 @@ Every error uses a uniform envelope with a **stable, non-localized machine code*
 ```
 Common codes: `unauthorized` (401), `forbidden` (403), `not_found` (404),
 `invalid_path` / `invalid_request` / `invalid_timestamp` / `invalid_idempotency_key` /
-`invalid_query` (400), `precondition_failed` (412), `idempotency_key_conflict` (422),
-`conflict` (409), `locked_out` / `rate_limited` (429), `search_timeout` (503). Clients should branch on `code`, not on `message` (the message
+`invalid_query` / `invalid_modified_at` / `invalid_created_at` / `invalid_target` (400),
+`precondition_failed` (412), `idempotency_key_conflict` (422), `conflict` / `target_exists` /
+`type_mismatch` / `sync_root_renamed` (409), `sync_root_missing` (404), `locked_out` /
+`rate_limited` (429), `search_timeout` (503). Clients should branch on `code`, not on `message` (the message
 is an English developer hint; user-facing text is localized in the app). A body or
 parameter that cannot be bound at all (malformed JSON, wrong types, invalid GUIDs)
 yields `invalid_request` (400) in the same envelope.

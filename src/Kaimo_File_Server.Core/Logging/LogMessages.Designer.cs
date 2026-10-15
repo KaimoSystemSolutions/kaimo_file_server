@@ -405,6 +405,15 @@ namespace Kaimo_File_Server.Core.Logging {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Creation time of {Path} not stored: the file system rejects user xattrs..
+        /// </summary>
+        public static string StorageCreatedTimeNotStored {
+            get {
+                return ResourceManager.GetString("StorageCreatedTimeNotStored", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Database ready..
         /// </summary>
         public static string DatabaseReady {

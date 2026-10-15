@@ -342,9 +342,10 @@ public sealed class ExternalStorageSyncViewModel(
             throw new InvalidOperationException(Text(
                 "Web_ExternalStorage_PathInUse", "This local folder already has a sync."));
 
-        var metadata = await fileServices.CreateForShare(share)
-            .GetMetadataAsync(localPath, _actor!);
-        if (!metadata.IsDirectory)
+        FileMetadata? metadata = null;
+        try { metadata = await fileServices.CreateForShare(share).GetMetadataAsync(localPath, _actor!); }
+        catch (FileNotFoundException) { }
+        if (metadata is not { IsDirectory: true })
             throw new InvalidOperationException(Text(
                 "Web_CloudSync_Error_LocalFolder", "Select an existing local folder."));
     }

@@ -95,8 +95,7 @@ public sealed class WebDavController : ControllerBase
 
         return await GuardAsync(async () =>
         {
-            // Confirm the item really exists — GetMetadataAsync fabricates metadata for
-            // a missing file, which would otherwise turn a 404 into a bogus 207.
+            // Confirm the item really exists via the parent listing (null → 404).
             var meta = relativePath.Length == 0
                 ? await fs.GetMetadataAsync(string.Empty, user)
                 : await FindAsync(fs, relativePath, user);
@@ -481,13 +480,11 @@ public sealed class WebDavController : ControllerBase
 
     /// <summary>
     /// Metadata for an existing item, or <c>null</c> when it does not exist.
-    /// <see cref="IFileService.GetMetadataAsync"/> cannot be used as an existence
-    /// probe: the file-system storage fabricates metadata for a missing file instead
-    /// of throwing. Existence is therefore confirmed by listing the parent (which is
-    /// also how a WebDAV client reaches the item), and the returned entry carries the
-    /// real size/mtime an <c>If-Match</c> needs. The share root always exists.
+    /// Existence is confirmed by listing the parent (which is also how a WebDAV client
+    /// reaches the item), and the returned entry carries the real size/mtime an
+    /// <c>If-Match</c> needs. The share root always exists.
     /// </summary>
-    private static async Task<FileMetadata?> FindAsync(IFileService fs, string path, UserContext user)
+    internal static async Task<FileMetadata?> FindAsync(IFileService fs, string path, UserContext user)
     {
         if (path.Length == 0)
             return await fs.GetMetadataAsync(string.Empty, user);
@@ -502,7 +499,7 @@ public sealed class WebDavController : ControllerBase
     }
 
     /// <summary>True when the parent collection of <paramref name="path"/> exists (the share root always does).</summary>
-    private static async Task<bool> ParentExistsAsync(IFileService fs, string path, UserContext user)
+    internal static async Task<bool> ParentExistsAsync(IFileService fs, string path, UserContext user)
     {
         var parent = ShareRelativePath.GetParent(path);
         return parent.Length == 0 || await FindAsync(fs, parent, user) is { IsDirectory: true };

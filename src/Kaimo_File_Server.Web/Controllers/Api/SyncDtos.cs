@@ -39,10 +39,10 @@ public sealed record UpdateSyncProfileRequest(
     string? RelativePath, string? LocalPath, SyncMode Mode, bool Enabled);
 
 /// <summary>One entry in a delta enumeration.</summary>
-public sealed record SyncEntryDto(string Path, bool IsDirectory, long Size, DateTime ModifiedAtUtc)
+public sealed record SyncEntryDto(string Path, bool IsDirectory, long Size, DateTime ModifiedAtUtc, DateTime CreatedAtUtc)
 {
     public static SyncEntryDto From(SyncEntry e) =>
-        new(e.Path, e.IsDirectory, e.Size, e.ModifiedAtUtc);
+        new(e.Path, e.IsDirectory, e.Size, e.ModifiedAtUtc, e.CreatedAtUtc);
 }
 
 /// <summary>
@@ -81,3 +81,12 @@ public sealed record FileChangeDto(
 /// </summary>
 public sealed record ChangesFeedDto(
     IReadOnlyList<FileChangeDto> Changes, long Seq, bool Truncated, bool Reset);
+
+/// <summary>
+/// 409 body of <c>delta</c>/<c>changes</c> when the synced folder no longer exists because it (or an
+/// ancestor) was renamed. Carries no path; resolve it via <c>GET sync/{shareId}/renames/{RenameId}</c>.
+/// </summary>
+public sealed record SyncRootRenamedError(string Code, string Message, long RenameId);
+
+/// <summary>Where a renamed sync root went: <see cref="OldPath"/> (as synced) is now <see cref="NewPath"/>.</summary>
+public sealed record SyncRootRenameDto(long RenameId, string OldPath, string NewPath, DateTime RenamedAtUtc);

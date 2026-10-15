@@ -89,7 +89,7 @@ namespace Kaimo_File_Server.Core.Services.Sync
                     continue;
 
                 sink.Add(new SyncEntry(
-                    item.Path, item.IsDirectory, item.Size, item.ModifiedAt));
+                    item.Path, item.IsDirectory, item.Size, item.ModifiedAt, item.CreatedAt));
 
                 if (item.IsDirectory)
                     await WalkAsync(fileService, item.Path, recycleRootDepth, user, sink, ct);
