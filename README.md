@@ -5,6 +5,9 @@ It is a docker compose solutions, which is meant to be running on a VM / LXC of 
 
 🚧 Kaimo File Server is still under developement, make backups if you use it with sensible data. 
 Please feel free to test the active beta and let me know your feedback on it.
+For your information beta version are **not** supported for upgrading to the full 1.0 release.
+
+
 
 ## ✨ Features
 
