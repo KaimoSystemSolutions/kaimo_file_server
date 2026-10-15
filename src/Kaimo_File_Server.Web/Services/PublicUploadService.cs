@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Web.Helpers;
 using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Web.Services;
@@ -43,6 +44,9 @@ public sealed class PublicUploadService(
     // ponytail: in-process only; an SMB write racing the existence check could still collide.
     private static readonly ConcurrentDictionary<string, byte> InFlight = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>How deep an uploaded folder may nest below the link folder.</summary>
+    public const int MaxFolderDepth = 16;
+
     /// <summary>Whether uploads are currently possible at all (settings switch, demo mode).</summary>
     public async Task<bool> IsUploadEnabledAsync()
         => demo?.ReadOnly != true && (await shareLinks.GetSettingsAsync()).AllowUploadLinks;
@@ -52,9 +56,12 @@ public sealed class PublicUploadService(
     /// the stream may deliver (the reserved size) and must enforce it — e.g.
     /// <c>IBrowserFile.OpenReadStream(maxAllowedSize)</c> — so a client that lies about the size
     /// cannot exceed its reservation.
+    /// <paramref name="relativeDir"/> is the file's folder within an uploaded folder
+    /// ("Photos/2024"); it is created below the link folder and existing folders are merged into.
     /// </summary>
     public async Task<PublicUploadResult> UploadAsync(
-        ShareLink link, string fileName, long size, Func<long, Stream> openStream, CancellationToken ct = default)
+        ShareLink link, string fileName, long size, Func<long, Stream> openStream, CancellationToken ct = default,
+        string? relativeDir = null)
     {
         // The read-only demo never accepts writes, anonymous ones least of all.
         if (demo?.ReadOnly == true || link.Kind != ShareLinkKind.Upload || string.IsNullOrEmpty(link.Token))
@@ -64,9 +71,13 @@ public sealed class PublicUploadService(
         if (!settings.AllowUploadLinks)
             return new(PublicUploadStatus.Unavailable);
 
-        // Only the leaf name counts; a visitor can never choose a sub-path.
+        // Only the leaf name of fileName counts. A visitor can choose a sub-path only through
+        // relativeDir, whose every segment must be a valid folder name — so it always stays
+        // inside the link folder.
         var name = Path.GetFileName((fileName ?? string.Empty).Replace('\\', '/')).Trim();
         if (name.Length == 0 || name is "." or ".." || !WindowsFileNameHelper.IsValid(name))
+            return new(PublicUploadStatus.InvalidName);
+        if (!UploadFolderPath.TryNormalize(relativeDir, out var subDir, MaxFolderDepth))
             return new(PublicUploadStatus.InvalidName);
 
         if (!link.IsExtensionAllowed(name))
@@ -91,16 +102,24 @@ public sealed class PublicUploadService(
         }
 
         var fs = fileServices.CreateForShare(share);
-        var folder = ShareRelativePath.Normalize(link.RootRelativePath);
+        var linkFolder = ShareRelativePath.Normalize(link.RootRelativePath);
+        var folder = subDir.Length == 0 ? linkFolder : Combine(linkFolder, subDir);
         string? target = null;
+        List<string> createdFolders = [];
         try
         {
+            // Folders only appear together with a file: empty folders of an upload are not
+            // created, and ones created here are removed again if the file fails.
+            createdFolders = await UploadFolderPath.EnsureFoldersAsync(fs, linkFolder, subDir, creator, ct);
+
             target = await ClaimFreeNameAsync(share.Id, fs, folder, name, creator);
 
             await using (var stream = RateLimitedStream.Wrap(openStream(size), link.MaxBytesPerSecond))
                 await fs.WriteFileAsync(target, stream, creator, ct);
 
-            var stored = ShareRelativePath.GetFileName(target);
+            var stored = subDir.Length == 0
+                ? ShareRelativePath.GetFileName(target)
+                : $"{subDir}/{ShareRelativePath.GetFileName(target)}";
             logger.LogInformation(
                 "Public upload via link {LinkId}: '{Path}' ({Size} bytes) on share {ShareId} as {User}",
                 link.Id, target, size, share.Id, creator.User.Username);
@@ -112,8 +131,12 @@ public sealed class PublicUploadService(
         catch (Exception ex)
         {
             // The storage layer publishes only complete files, so nothing partial remains;
-            // just give the reservation back.
+            // just give the reservation back. Folders this upload created would otherwise let a
+            // visitor create folders for free by cancelling uploads.
             await links.ReleaseUploadAsync(link.Id, size);
+            if (target is not null)
+                InFlight.TryRemove(Key(share.Id, target), out _);
+            await RemoveEmptyFoldersAsync(share.Id, fs, createdFolders, creator);
 
             if (ex is OperationCanceledException)
                 return new(PublicUploadStatus.Cancelled);
@@ -167,6 +190,30 @@ public sealed class PublicUploadService(
         var fallback = Combine(folder, $"{stem} ({Guid.NewGuid():N}){ext}");
         InFlight.TryAdd(Key(shareId, fallback), 0);
         return fallback;
+    }
+
+    // Best effort, deepest first. The file-service delete is recursive, so a folder is only
+    // removed while it is empty on disk and no other upload is writing into it.
+    private static async Task RemoveEmptyFoldersAsync(
+        Guid shareId, IFileService fs, List<string> folders, Core.Domain.Identity.UserContext creator)
+    {
+        for (var i = folders.Count - 1; i >= 0; i--)
+        {
+            var folder = folders[i];
+            var inFlightPrefix = Key(shareId, folder + "/");
+            try
+            {
+                if (InFlight.Keys.Any(k => k.StartsWith(inFlightPrefix, StringComparison.OrdinalIgnoreCase)) ||
+                    Directory.EnumerateFileSystemEntries(fs.ToAbsolutePath(folder)).Any())
+                    return; // its parents are not empty either
+
+                await fs.DeleteFileAsync(folder, creator, isRecycleEnabled: false);
+            }
+            catch
+            {
+                return;
+            }
+        }
     }
 
     private static string Combine(string folder, string leaf)

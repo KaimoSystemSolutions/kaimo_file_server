@@ -55,6 +55,34 @@
             @Assets.SVG("download.svg", new SvgOptions(Width: 16, Height: 16))
             <span>@T("Web_Action_DownloadAll")</span>
         </button>
+        @if (VM.Capabilities.CanUpload)
+        {
+            <div class="upload-menu">
+                <button class="btn-secondary page-command @(_showUploadMenu ? "page-command--active" : "")"
+                        title="@T("Web_Upload_Button")"
+                        aria-haspopup="menu" aria-expanded="@(_showUploadMenu ? "true" : "false")"
+                        @onclick="() => _showUploadMenu = !_showUploadMenu"
+                        disabled="@(VM.IsLoading || VM.ErrorMessage is not null)">
+                    @Assets.SVG("upload.svg", new SvgOptions(Width: 16, Height: 16))
+                    <span>@T("Web_Upload_Button")</span>
+                    @Assets.SVG("chevron_down.svg", new SvgOptions(Width: 12, Height: 12))
+                </button>
+                @if (_showUploadMenu)
+                {
+                    <div class="context-menu-backdrop" @onclick="() => _showUploadMenu = false"></div>
+                    <div class="context-menu upload-menu-panel" role="menu">
+                        <button type="button" class="context-menu-item" role="menuitem" @onclick="OpenFileUploadDialog">
+                            @Assets.SVG("file.svg", new SvgOptions(Width: 16, Height: 16))
+                            <span>@T("Web_Upload_Files")</span>
+                        </button>
+                        <button type="button" class="context-menu-item" role="menuitem" @onclick="OpenFolderUploadDialog">
+                            @Assets.SVG("folder.svg", new SvgOptions(Width: 16, Height: 16, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)"))
+                            <span>@T("Web_Upload_Folder")</span>
+                        </button>
+                    </div>
+                }
+            </div>
+        }
         @if (VM.Capabilities.CanCreateDirectory)
         {
             <button class="btn-secondary page-command" title="@Resources.Web_CreateFolder_Title"

@@ -629,6 +629,10 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             : $"{CurrentPath}/{fileName}";
     }
 
+    // Target of a folder-upload entry: relativeDir is validated by the caller (UploadFolderPath).
+    private string GetCurrentPath(string fileName, string? relativeDir)
+        => string.IsNullOrEmpty(relativeDir) ? GetCurrentPath(fileName) : GetCurrentPath($"{relativeDir}/{fileName}");
+
     /// <summary>
     /// Shared implementation for Rename and Move: both are just "relocate item from
     /// one share-relative path to another" as far as the file service is concerned.
@@ -1425,7 +1429,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     }
 
     public async Task<OperationResult> UploadFileAsync(string fileName, Stream fileStream,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, string? relativeDir = null)
     {
         if (_fileService is null || CurrentShare is null)
             return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
@@ -1443,8 +1447,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         if (userContext is null)
             return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
 
-        var targetPath = GetCurrentPath(fileName);
-        
+        var targetPath = GetCurrentPath(fileName, relativeDir);
+
         try
         {
             await _fileService.WriteFileAsync(targetPath, fileStream, userContext, cancellationToken);
@@ -1471,6 +1475,43 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
                     => OperationResult.Fail(Resources.Web_Error_FileExists),
                 _ => OperationResult.Fail(Resources.Web_Error_UploadFailed)
             };
+        }
+    }
+
+    public async Task<OperationResult> EnsureFolderAsync(string relativeDir,
+        CancellationToken cancellationToken = default)
+    {
+        if (_fileService is null || CurrentShare is null)
+            return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
+
+        var userContext = await GetCurrentUserContextAsync();
+        if (userContext is null)
+            return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
+
+        // Only missing folders are created; existing ones are merged into. Cancellation
+        // propagates so the upload batch can stop as cancelled.
+        try
+        {
+            await UploadFolderPath.EnsureFoldersAsync(
+                _fileService, CurrentPath, relativeDir, userContext, cancellationToken);
+            return OperationResult.Ok();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return OperationResult.Fail(Resources.Web_Error_AccessDenied);
+        }
+        catch (CloudSyncOperationConflictException)
+        {
+            return OperationResult.Fail(Resources.Web_Error_ShareInUse);
+        }
+        catch (IOException ex) when (ex.Message.Contains("not a folder", StringComparison.Ordinal))
+        {
+            return OperationResult.Fail(Resources.Web_Error_ItemExists);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Error creating upload folder '{Path}'", relativeDir);
+            return OperationResult.Fail(Resources.Web_Error_CreateFolderFailed);
         }
     }
 
@@ -1560,7 +1601,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     /// session's sticky choice, or hold it for the user. Always consumes <paramref name="stream"/>.
     /// </summary>
     public async Task<UploadResult> UploadWithConflictHandlingAsync(
-        string fileName, Stream stream, CancellationToken ct = default)
+        string fileName, Stream stream, CancellationToken ct = default, string? relativeDir = null)
     {
         if (_fileService is null || CurrentShare is null || !WindowsFileNameHelper.IsValid(fileName))
             return UploadResult.Failed;
@@ -1568,7 +1609,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         var user = await GetCurrentUserContextAsync();
         if (user is null) return UploadResult.Failed;
 
-        var target = ShareRelativePath.Normalize(GetCurrentPath(fileName));
+        var target = ShareRelativePath.Normalize(GetCurrentPath(fileName, relativeDir));
 
         // Probe for an existing item; the read stream doubles as the source for the
         // identical-content check when the caller may read it.
@@ -1598,7 +1639,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             existingContent?.Dispose();
             try
             {
-                var r = await UploadFileAsync(fileName, stream, ct);
+                var r = await UploadFileAsync(fileName, stream, ct, relativeDir);
                 return r.Success ? UploadResult.Uploaded : UploadResult.Failed;
             }
             finally
@@ -1649,7 +1690,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         var existingMeta = existsOnDisk ? await SafeGetMetadataAsync(target, user) : null;
         var conflict = new PendingUploadConflict
         {
-            FileName = fileName,
+            // Shown in the conflict dialog; the relative path tells same-named files apart.
+            FileName = string.IsNullOrEmpty(relativeDir) ? fileName : $"{relativeDir}/{fileName}",
             TargetRelativePath = target,
             StagedTempPath = tempPath,
             IncomingSize = incomingSize,

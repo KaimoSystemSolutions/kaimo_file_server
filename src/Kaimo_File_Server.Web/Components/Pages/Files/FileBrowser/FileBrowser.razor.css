@@ -719,6 +719,17 @@
     white-space: nowrap;
 }
 
+/* "Upload ▾": the global .context-menu, anchored below its button instead of the pointer. */
+.upload-menu {
+    position: relative;
+}
+
+.upload-menu-panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+}
+
 .page-command--active {
     border-color: var(--accent-border);
     background: var(--accent-subtle);

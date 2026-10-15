@@ -77,6 +77,10 @@ public abstract class RemoteFileBrowserViewModelBase : IFileBrowserViewModel
     public abstract Task<OperationResult> UploadFileAsync(
         string fileName,
         Stream fileStream,
+        CancellationToken cancellationToken = default,
+        string? relativeDir = null);
+    public abstract Task<OperationResult> EnsureFolderAsync(
+        string relativeDir,
         CancellationToken cancellationToken = default);
 
     public virtual long GetMaxPreviewSizeBytes() => 25L * 1024 * 1024;

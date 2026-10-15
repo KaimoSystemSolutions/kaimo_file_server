@@ -26,6 +26,7 @@ public partial class FileBrowser
     private string _aclFolderPath = "";
     private bool _showCreateFolder;
     private string _newFolderName = "";
+    private bool _showUploadMenu;
     private bool _showDeleteConfirm;
     private List<FileMetadata> _deleteTargets = new();
     private string? _deleteError;

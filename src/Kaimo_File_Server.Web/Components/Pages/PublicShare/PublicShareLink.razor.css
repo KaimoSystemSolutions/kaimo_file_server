@@ -84,7 +84,8 @@
 }
 
 .public-upload-drop:hover,
-.public-upload-drop:focus-within {
+.public-upload-drop:focus-within,
+.public-upload-drop--over {
     border-color: var(--accent);
     background: var(--bg-hover);
 }
@@ -102,6 +103,13 @@
     height: 100%;
     opacity: 0;
     cursor: inherit;
+}
+
+.public-upload-folder {
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
 }
 
 .public-upload-limits {

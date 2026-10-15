@@ -2592,6 +2592,30 @@
   <data name="Web_Upload_SkippedIdentical" xml:space="preserve">
     <value>{0} identische Datei(en) übersprungen.</value>
   </data>
+  <data name="Web_Upload_Button" xml:space="preserve">
+    <value>Hochladen</value>
+  </data>
+  <data name="Web_Upload_Files" xml:space="preserve">
+    <value>Dateien…</value>
+  </data>
+  <data name="Web_Upload_Folder" xml:space="preserve">
+    <value>Ordner…</value>
+  </data>
+  <data name="Web_Upload_TooManyFiles" xml:space="preserve">
+    <value>Zu viele Dateien. Es können höchstens {0} Dateien auf einmal hochgeladen werden.</value>
+  </data>
+  <data name="Web_Upload_InvalidFolderName" xml:space="preserve">
+    <value>Ungültiger Ordnername.</value>
+  </data>
+  <data name="Web_Upload_SelectionTooLarge" xml:space="preserve">
+    <value>Die Auswahl ist zu groß (zu viele Dateien oder zu lange Pfade). Bitte in kleineren Teilen hochladen.</value>
+  </data>
+  <data name="Web_Upload_FilesCount" xml:space="preserve">
+    <value>{0} Dateien</value>
+  </data>
+  <data name="Web_PublicUpload_ChooseFolder" xml:space="preserve">
+    <value>Ordner hochladen</value>
+  </data>
   <data name="Web_Upload_ConflictsPending" xml:space="preserve">
     <value>{0} Datei(en) warten auf eine Konfliktentscheidung.</value>
   </data>

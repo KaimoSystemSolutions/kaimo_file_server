@@ -93,7 +93,12 @@ builder.Services.AddScoped<IConfigRepository, ConfigRepository>();
 // ══════════════════════════════════════════
 
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents()
+    // InputFile reports the metadata of every selected file in ONE message, and a folder
+    // upload also sends each file's folder. The 32 KB default fails at a few hundred files.
+    // fileUpload.js (MAX_MESSAGE_BYTES) refuses folder selections that would not fit; keep
+    // both values in step.
+    .AddHubOptions(options => options.MaximumReceiveMessageSize = 1024 * 1024);
 
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorizationCore();

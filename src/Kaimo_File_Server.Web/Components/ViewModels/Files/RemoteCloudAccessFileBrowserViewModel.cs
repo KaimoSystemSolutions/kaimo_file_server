@@ -209,13 +209,33 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
     }
 
     public override async Task<OperationResult> UploadFileAsync(
-        string fileName, Stream fileStream, CancellationToken cancellationToken = default)
+        string fileName, Stream fileStream, CancellationToken cancellationToken = default,
+        string? relativeDir = null)
         => await RunWriteAsync(files => files.WriteAsync(
-                RemotePath(ShareRelativePath.Combine(CurrentPath, fileName)),
+                RemotePath(ShareRelativePath.Combine(
+                    ShareRelativePath.Combine(CurrentPath, relativeDir), fileName)),
                 fileStream,
                 overwrite: true,
                 cancellationToken),
             R("Web_CloudAccess_Error_Upload"));
+
+    // Providers differ on whether creating an existing folder fails, so look before creating.
+    public override async Task<OperationResult> EnsureFolderAsync(
+        string relativeDir, CancellationToken cancellationToken = default)
+        => await RunWriteAsync(async files =>
+            {
+                foreach (var prefix in UploadFolderPath.Prefixes(ShareRelativePath.Normalize(relativeDir)))
+                {
+                    var parent = ShareRelativePath.Combine(CurrentPath, ShareRelativePath.GetParent(prefix));
+                    var name = ShareRelativePath.GetFileName(prefix);
+                    var siblings = await files.ListAsync(RemotePath(parent), cancellationToken);
+                    if (siblings.Any(s => s.IsDirectory && string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)))
+                        continue;
+                    await files.CreateDirectoryAsync(
+                        RemotePath(ShareRelativePath.Combine(CurrentPath, prefix)), cancellationToken);
+                }
+            },
+            R("Web_CloudAccess_Error_CreateFolder"));
 
     public async Task<string?> GetDownloadUrlAsync(FileMetadata file)
     {

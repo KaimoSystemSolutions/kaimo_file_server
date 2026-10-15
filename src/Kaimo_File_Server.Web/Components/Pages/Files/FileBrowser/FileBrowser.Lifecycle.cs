@@ -165,7 +165,7 @@ public partial class FileBrowser
             _jsInitializedForId = _fileDropZone.Id;
             _dotNetRef ??= DotNetObjectReference.Create(this);
             if (VM.Capabilities.CanUpload)
-                await JS.InvokeVoidAsync("initFileUpload", "#file-drop-zone");
+                await JS.InvokeVoidAsync("initFileUpload", "#file-drop-zone", _dotNetRef);
             await JS.InvokeVoidAsync("fileMarquee.initialize", "#file-selection-area", _dotNetRef);
             if (VM.Capabilities.CanMove)
                 await JS.InvokeVoidAsync("initInternalDragDrop");

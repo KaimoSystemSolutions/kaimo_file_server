@@ -146,6 +146,12 @@ public sealed class FileBrowserViewModelContractTests
         public override Task<OperationResult> UploadFileAsync(
             string fileName,
             Stream fileStream,
+            CancellationToken cancellationToken = default,
+            string? relativeDir = null)
+            => Task.FromResult(OperationResult.Ok());
+
+        public override Task<OperationResult> EnsureFolderAsync(
+            string relativeDir,
             CancellationToken cancellationToken = default)
             => Task.FromResult(OperationResult.Ok());
     }

@@ -105,6 +105,131 @@ public sealed class PublicUploadLinkTests
         _fs.Verify(f => f.WriteFileAsync("inbox/evil.txt", It.IsAny<Stream>(), _creator, It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    // ---- Folder uploads ----
+    // Folder existence is probed on disk, so these tests map share paths into a temp folder
+    // and let the mocked file service create and delete real directories there.
+
+    private sealed class DiskShare : IDisposable
+    {
+        public string Root { get; } = Directory.CreateTempSubdirectory("kaimo-public-upload-").FullName;
+        public string Abs(string path) => Path.Combine(Root, path.Replace('/', Path.DirectorySeparatorChar));
+        public void Dispose() => Directory.Delete(Root, recursive: true);
+    }
+
+    private DiskShare UseDisk()
+    {
+        var disk = new DiskShare();
+        Directory.CreateDirectory(disk.Abs("inbox"));
+        _fs.Setup(f => f.ToAbsolutePath(It.IsAny<string>())).Returns<string>(disk.Abs);
+        _fs.Setup(f => f.CreateDirectoryAsync(It.IsAny<string>(), _creator))
+            .Callback<string, UserContext>((path, _) => Directory.CreateDirectory(disk.Abs(path)))
+            .Returns(Task.CompletedTask);
+        _fs.Setup(f => f.DeleteFileAsync(It.IsAny<string>(), _creator, false))
+            .Callback<string, UserContext, bool>((path, _, _) => Directory.Delete(disk.Abs(path)))
+            .Returns(Task.CompletedTask);
+        // Like the real FileService: a missing path is reported as a file, never as missing.
+        _fs.Setup(f => f.GetMetadataAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(new FileMetadata { IsDirectory = false });
+        return disk;
+    }
+
+    [Fact]
+    public async Task Upload_IntoSubFolder_CreatesMissingFoldersBelowLinkFolder()
+    {
+        using var disk = UseDisk();
+        _fs.Setup(f => f.ListAsync("inbox/Photos/2024", _creator)).ReturnsAsync([]);
+
+        var result = await Uploader().UploadAsync(
+            _link, "a.jpg", 1, _ => new MemoryStream(new byte[1]), relativeDir: "Photos/2024");
+
+        Assert.Equal(PublicUploadStatus.Uploaded, result.Status);
+        Assert.Equal("Photos/2024/a.jpg", result.StoredName);
+        _fs.Verify(f => f.CreateDirectoryAsync("inbox/Photos", _creator), Times.Once);
+        _fs.Verify(f => f.CreateDirectoryAsync("inbox/Photos/2024", _creator), Times.Once);
+        _fs.Verify(f => f.WriteFileAsync("inbox/Photos/2024/a.jpg", It.IsAny<Stream>(), _creator, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Upload_IntoSubFolder_FailedWrite_RemovesOnlyTheFoldersItCreated()
+    {
+        using var disk = UseDisk();
+        Directory.CreateDirectory(disk.Abs("inbox/Photos"));
+        _fs.Setup(f => f.WriteFileAsync(It.IsAny<string>(), It.IsAny<Stream>(), _creator, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException());
+
+        var result = await Uploader().UploadAsync(
+            _link, "a.jpg", 1, _ => new MemoryStream(new byte[1]), relativeDir: "Photos/2024/Summer");
+
+        Assert.Equal(PublicUploadStatus.Cancelled, result.Status);
+        // A cancelled upload must not leave free folders behind; the pre-existing one stays.
+        Assert.False(Directory.Exists(disk.Abs("inbox/Photos/2024")));
+        Assert.True(Directory.Exists(disk.Abs("inbox/Photos")));
+        _fs.Verify(f => f.DeleteFileAsync("inbox/Photos", It.IsAny<UserContext>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Upload_IntoSubFolder_FailedWrite_KeepsFoldersThatGainedContent()
+    {
+        using var disk = UseDisk();
+        _fs.Setup(f => f.WriteFileAsync(It.IsAny<string>(), It.IsAny<Stream>(), _creator, It.IsAny<CancellationToken>()))
+            .Callback(() => File.WriteAllText(disk.Abs("inbox/Photos/other.jpg"), "x")) // another upload landed
+            .ThrowsAsync(new IOException("disk full"));
+
+        var result = await Uploader().UploadAsync(
+            _link, "a.jpg", 1, _ => new MemoryStream(new byte[1]), relativeDir: "Photos/2024");
+
+        Assert.Equal(PublicUploadStatus.Failed, result.Status);
+        Assert.False(Directory.Exists(disk.Abs("inbox/Photos/2024")));
+        Assert.True(File.Exists(disk.Abs("inbox/Photos/other.jpg")));
+    }
+
+    [Fact]
+    public async Task Upload_IntoExistingSubFolder_MergesAndNeverOverwrites()
+    {
+        using var disk = UseDisk();
+        Directory.CreateDirectory(disk.Abs("inbox/Photos"));
+        _fs.Setup(f => f.ListAsync("inbox/Photos", _creator)).ReturnsAsync([new FileMetadata { Name = "a.jpg" }]);
+
+        var result = await Uploader().UploadAsync(
+            _link, "a.jpg", 1, _ => new MemoryStream(new byte[1]), relativeDir: "Photos");
+
+        Assert.Equal("Photos/a (2).jpg", result.StoredName);
+        _fs.Verify(f => f.CreateDirectoryAsync(It.IsAny<string>(), It.IsAny<UserContext>()), Times.Never);
+        _fs.Verify(f => f.WriteFileAsync("inbox/Photos/a (2).jpg", It.IsAny<Stream>(), _creator, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("..")]
+    [InlineData("../outside")]
+    [InlineData("a/../../b")]
+    [InlineData("a/./b")]
+    [InlineData("bad:name")]
+    [InlineData("trailing.")]
+    [InlineData("1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17")]
+    public async Task Upload_InvalidSubFolder_IsRejectedWithoutReservingOrWriting(string relativeDir)
+    {
+        var result = await Uploader().UploadAsync(_link, "a.txt", 1, _ => Stream.Null, relativeDir: relativeDir);
+
+        Assert.Equal(PublicUploadStatus.InvalidName, result.Status);
+        _links.Verify(r => r.TryReserveUploadAsync(It.IsAny<string>(), It.IsAny<long>()), Times.Never);
+        _fs.Verify(f => f.CreateDirectoryAsync(It.IsAny<string>(), It.IsAny<UserContext>()), Times.Never);
+        _fs.Verify(f => f.WriteFileAsync(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<UserContext>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Upload_SubFolderNameTakenByFile_FailsAndReleasesReservation()
+    {
+        using var disk = UseDisk();
+        File.WriteAllText(disk.Abs("inbox/Photos"), "x");
+
+        var result = await Uploader().UploadAsync(
+            _link, "a.jpg", 3, _ => new MemoryStream(new byte[3]), relativeDir: "Photos");
+
+        Assert.Equal(PublicUploadStatus.Failed, result.Status);
+        _links.Verify(r => r.ReleaseUploadAsync(_link.Id, 3), Times.Once);
+        _fs.Verify(f => f.WriteFileAsync(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<UserContext>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public async Task Upload_NeverOverwrites_PicksNextFreeName()
     {

@@ -27,10 +27,46 @@ public partial class FileBrowser
             FileSelectionCoordinator.SelectionRequested += OnFileSelectionRequested;
     }
 
+    // Folder structure of the next selection. IBrowserFile only carries the leaf name, so
+    // fileUpload.js registers the folder of every file (same order as the files) right
+    // BEFORE it hands the files to the global input; the next batch takes it from here.
+    private sealed record PendingUploadPaths(string?[] Dirs, string[] EmptyDirs);
+    private PendingUploadPaths? _pendingUploadPaths;
+
+    // Empty arrays withdraw a registration whose files never reached the input.
     [JSInvokable]
-    public void OnFilesDropped(int fileCount)
+    public void SetPendingUploadPaths(string[] dirs, int[] dirIndex, string[] emptyDirs)
+        => _pendingUploadPaths = dirIndex.Length == 0 && emptyDirs.Length == 0
+            ? null
+            : new PendingUploadPaths(UploadFolderPath.Unpack(dirs, dirIndex), emptyDirs);
+
+    [JSInvokable]
+    public void OnUploadTooManyFiles(int maxFiles)
+        => ShowUploadError(string.Format(T("Web_Upload_TooManyFiles"), maxFiles));
+
+    [JSInvokable]
+    public void OnUploadSelectionTooLarge()
+        => ShowUploadError(T("Web_Upload_SelectionTooLarge"));
+
+    private void ShowUploadError(string message)
+        => InvokeAsync(() =>
+        {
+            Toast.Show(message, ToastType.Error);
+            StateHasChanged();
+        });
+
+    private Task OpenFileUploadDialog()
     {
-        StateHasChanged();
+        _showUploadMenu = false;
+        UploadCoordinator.RequestUpload();
+        return Task.CompletedTask;
+    }
+
+    private async Task OpenFolderUploadDialog()
+    {
+        _showUploadMenu = false;
+        _dotNetRef ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("kaimoUpload.pickFolder", _dotNetRef);
     }
 
     /// <summary>
@@ -53,12 +89,40 @@ public partial class FileBrowser
         try
         {
             var files = e.GetMultipleFiles(int.MaxValue);
-            if (files.Count == 0) return;
+
+            // Paths only belong to this selection when they line up with its files; a plain
+            // file-dialog selection never registers any and uploads flat as before.
+            var pending = Interlocked.Exchange(ref _pendingUploadPaths, null);
+            var folderUpload = pending is not null && pending.Dirs.Length == files.Count;
+            var emptyDirs = folderUpload ? pending!.EmptyDirs : [];
+            if (files.Count == 0)
+            {
+                // A drop of nothing but empty folders.
+                if (emptyDirs.Length > 0)
+                {
+                    await CreateUploadFoldersAsync(emptyDirs, new HashSet<string>(StringComparer.OrdinalIgnoreCase), CancellationToken.None);
+                    await VM.LoadShareAsync(ShareName, EffectiveLoadSubPath);
+                    await InvokeAsync(StateHasChanged);
+                }
+                return;
+            }
+
+            // The folder of each file below the drop target ("" = the target itself), or
+            // null when the client sent an invalid one (the file then fails).
+            var fileDirs = new string?[files.Count];
+            for (var i = 0; i < files.Count; i++)
+                fileDirs[i] = !folderUpload ? ""
+                    : pending!.Dirs[i] is { } raw && UploadFolderPath.TryNormalize(raw, out var dir) ? dir : null;
 
         // Name-collision handling is a local-share feature; remote/cloud browsers keep
         // their own overwrite semantics and fall back to the plain upload call below.
         var local = VM as FileBrowserViewModel;
         local?.BeginUploadBatch();
+
+        // Folders created (or found) during this batch, and ones that could not be.
+        var readyDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var failedDirs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        string DisplayName(int i) => string.IsNullOrEmpty(fileDirs[i]) ? files[i].Name : $"{fileDirs[i]}/{files[i].Name}";
 
         long totalBytes = files.Sum(f => f.Size);
         long totalUploadedBytes = 0;
@@ -78,13 +142,13 @@ public partial class FileBrowser
         using var job = Jobs.Start(
             string.Format(
                 Resources.ResourceManager.GetString("Web_Jobs_Upload_Title") ?? "Upload: {0}",
-                files.Count == 1 ? files[0].Name : $"{files.Count} files"),
-            BuildProgressText(files[0].Name, 0, files.Count, currentSpeedBytesPerSec),
+                BuildBatchLabel(files, fileDirs)),
+            BuildProgressText(DisplayName(0), 0, files.Count, currentSpeedBytesPerSec),
             "upload");
 
         string toastId = null!;
         toastId = Toast.Show(
-            BuildProgressText(files[0].Name, 0, files.Count, currentSpeedBytesPerSec),
+            BuildProgressText(DisplayName(0), 0, files.Count, currentSpeedBytesPerSec),
             ToastType.Progress,
             onDismiss: () =>
             {
@@ -97,13 +161,37 @@ public partial class FileBrowser
         await InvokeAsync(StateHasChanged);
         await Task.Yield();
 
-        foreach (var file in files)
+        for (var index = 0; index < files.Count; index++)
         {
             if (job.CancellationToken.IsCancellationRequested)
                 break;
 
+            var file = files[index];
+            var relativeDir = fileDirs[index];
+            var displayName = DisplayName(index);
             long fileBytesUploaded = 0;
             bool processingShown = false;
+
+            // Folder uploads: the file's folder must exist before the file can land in it.
+            string? folderError;
+            try
+            {
+                folderError = relativeDir is null
+                    ? T("Web_Upload_InvalidFolderName")
+                    : await EnsureUploadFolderAsync(relativeDir, readyDirs, failedDirs, job.CancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            if (folderError is not null)
+            {
+                failedFiles.Add(displayName);
+                failureReasons.Add(folderError);
+                totalUploadedBytes += file.Size;
+                completedCount++;
+                continue;
+            }
 
             Stream stream;
             try
@@ -112,7 +200,7 @@ public partial class FileBrowser
             }
             catch (IOException)
             {
-                failedFiles.Add(file.Name);
+                failedFiles.Add(displayName);
                 completedCount++;
                 continue;
             }
@@ -137,10 +225,10 @@ public partial class FileBrowser
                                 Toast.Update(
                                     toastId,
                                     BuildProcessingText(
-                                        file.Name, completedCount, files.Count),
+                                        displayName, completedCount, files.Count),
                                     progress: 100);
                                 job.Update(
-                                    BuildProcessingText(file.Name, completedCount, files.Count),
+                                    BuildProcessingText(displayName, completedCount, files.Count),
                                     100);
                                 StateHasChanged();
                             });
@@ -161,10 +249,10 @@ public partial class FileBrowser
                             InvokeAsync(() =>
                             {
                                 Toast.Update(toastId,
-                                    BuildProgressText(file.Name, completedCount, files.Count, currentSpeedBytesPerSec),
+                                    BuildProgressText(displayName, completedCount, files.Count, currentSpeedBytesPerSec),
                                     progress: percent);
                                 job.Update(
-                                    BuildProgressText(file.Name, completedCount, files.Count, currentSpeedBytesPerSec),
+                                    BuildProgressText(displayName, completedCount, files.Count, currentSpeedBytesPerSec),
                                     percent);
                                 StateHasChanged();
                             });
@@ -174,7 +262,7 @@ public partial class FileBrowser
                     if (local is not null)
                     {
                         var outcome = await local.UploadWithConflictHandlingAsync(
-                            file.Name, progressStream, job.CancellationToken);
+                            file.Name, progressStream, job.CancellationToken, relativeDir);
                         switch (outcome)
                         {
                             case FileBrowserViewModel.UploadResult.SkippedIdentical:
@@ -184,7 +272,7 @@ public partial class FileBrowser
                                 heldCount++;
                                 break;
                             case FileBrowserViewModel.UploadResult.Failed:
-                                failedFiles.Add(file.Name);
+                                failedFiles.Add(displayName);
                                 break;
                             // Uploaded / Discarded need no per-file bookkeeping.
                         }
@@ -192,10 +280,10 @@ public partial class FileBrowser
                     else
                     {
                         var result = await VM.UploadFileAsync(
-                            file.Name, progressStream, job.CancellationToken);
+                            file.Name, progressStream, job.CancellationToken, relativeDir);
                         if (!result.Success)
                         {
-                            failedFiles.Add(file.Name);
+                            failedFiles.Add(displayName);
                             if (!string.IsNullOrWhiteSpace(result.Error))
                                 failureReasons.Add(result.Error);
                         }
@@ -219,6 +307,10 @@ public partial class FileBrowser
 
         stopwatch.Stop();
 
+        // Empty folders carry no file that would have created them on the way.
+        if (!job.CancellationToken.IsCancellationRequested && emptyDirs.Length > 0)
+            await CreateUploadFoldersAsync(emptyDirs, readyDirs, job.CancellationToken);
+
         // Held files are neither done nor failed — the conflict dialog resolves them.
         var notes = new List<string>();
         if (skippedCount > 0)
@@ -237,7 +329,7 @@ public partial class FileBrowser
             string baseMsg = uploaded <= 0
                 ? notes.FirstOrDefault() ?? string.Format(Resources.Web_Upload_BatchSuccess, 0)
                 : files.Count == 1
-                    ? string.Format(Resources.Web_Upload_Success, files[0].Name)
+                    ? string.Format(Resources.Web_Upload_Success, DisplayName(0))
                     : string.Format(Resources.Web_Upload_BatchSuccess, uploaded);
             // If the only outcome note is already the whole message, don't repeat it.
             var text = uploaded <= 0 ? baseMsg : (baseMsg + suffix);
@@ -276,6 +368,71 @@ public partial class FileBrowser
         }
     }
 
+
+    /// <summary>
+    /// Makes sure a folder-upload target folder exists. Returns null when it does, else the
+    /// error; each folder is checked once per batch and a failure is remembered so the
+    /// remaining files in it fail fast with the same reason.
+    /// </summary>
+    private async Task<string?> EnsureUploadFolderAsync(
+        string relativeDir, HashSet<string> readyDirs, Dictionary<string, string> failedDirs,
+        CancellationToken cancellationToken)
+    {
+        if (relativeDir.Length == 0 || readyDirs.Contains(relativeDir))
+            return null;
+        if (failedDirs.TryGetValue(relativeDir, out var known))
+            return known;
+
+        var result = await VM.EnsureFolderAsync(relativeDir, cancellationToken);
+        if (result.Success)
+        {
+            readyDirs.Add(relativeDir);
+            return null;
+        }
+
+        var error = result.Error ?? Resources.Web_Error_CreateFolderFailed;
+        failedDirs[relativeDir] = error;
+        return error;
+    }
+
+    private async Task CreateUploadFoldersAsync(
+        IEnumerable<string> rawDirs, HashSet<string> readyDirs, CancellationToken cancellationToken)
+    {
+        var failedDirs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            foreach (var raw in rawDirs)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!UploadFolderPath.TryNormalize(raw, out var dir)) continue;
+                if (await EnsureUploadFolderAsync(dir, readyDirs, failedDirs, cancellationToken) is { } error)
+                    Toast.Show(error, ToastType.Error);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The batch reports itself as cancelled.
+        }
+    }
+
+    // "report.pdf", "Photos (120 files)" for a single dropped folder, or "37 files".
+    private static string BuildBatchLabel(IReadOnlyList<IBrowserFile> files, string?[] fileDirs)
+    {
+        if (files.Count == 1 && string.IsNullOrEmpty(fileDirs[0]))
+            return files[0].Name;
+
+        var count = string.Format(T("Web_Upload_FilesCount"), files.Count);
+        string? root = null;
+        foreach (var dir in fileDirs)
+        {
+            var top = string.IsNullOrEmpty(dir) ? null : dir.Split('/')[0];
+            if (top is null || (root is not null && !string.Equals(root, top, StringComparison.OrdinalIgnoreCase)))
+                return count;
+            root = top;
+        }
+
+        return $"{root} ({count})";
+    }
 
     // Refresh the listing after a held upload conflict is resolved (a write may have
     // added or replaced a file).

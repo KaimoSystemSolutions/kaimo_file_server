@@ -169,10 +169,20 @@ public interface IFileBrowserViewModel
     Task<List<FileMetadata>> ListDirectoryAsync(string directoryPath);
     Task CopyAsync(FileMetadata item, string targetPath, CancellationToken cancellationToken);
     Task<(byte[] Data, string ContentType, PreviewKind Kind)?> ReadFileForPreviewAsync(FileMetadata file);
+    /// <param name="relativeDir">Validated sub-folder below the current directory for a
+    /// folder upload (see <c>UploadFolderPath</c>); null/"" uploads into the directory itself.</param>
     Task<OperationResult> UploadFileAsync(
         string fileName,
         Stream fileStream,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string? relativeDir = null);
+
+    /// <summary>
+    /// Creates <paramref name="relativeDir"/> (and any missing parent) below the current
+    /// directory for a folder upload. Folders that already exist are kept, so an upload
+    /// merges into them.
+    /// </summary>
+    Task<OperationResult> EnsureFolderAsync(string relativeDir, CancellationToken cancellationToken = default);
     long GetMaxPreviewSizeBytes();
     long GetMaxUploadSizeBytes();
     string ShareRelativeOf(FileMetadata item);

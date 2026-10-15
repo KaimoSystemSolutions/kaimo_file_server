@@ -2592,6 +2592,30 @@
   <data name="Web_Upload_SkippedIdentical" xml:space="preserve">
     <value>{0} identical file(s) skipped.</value>
   </data>
+  <data name="Web_Upload_Button" xml:space="preserve">
+    <value>Upload</value>
+  </data>
+  <data name="Web_Upload_Files" xml:space="preserve">
+    <value>Files…</value>
+  </data>
+  <data name="Web_Upload_Folder" xml:space="preserve">
+    <value>Folder…</value>
+  </data>
+  <data name="Web_Upload_TooManyFiles" xml:space="preserve">
+    <value>Too many files. At most {0} files can be uploaded at once.</value>
+  </data>
+  <data name="Web_Upload_InvalidFolderName" xml:space="preserve">
+    <value>Invalid folder name.</value>
+  </data>
+  <data name="Web_Upload_SelectionTooLarge" xml:space="preserve">
+    <value>The selection is too large (too many files or too long paths). Please upload it in smaller parts.</value>
+  </data>
+  <data name="Web_Upload_FilesCount" xml:space="preserve">
+    <value>{0} files</value>
+  </data>
+  <data name="Web_PublicUpload_ChooseFolder" xml:space="preserve">
+    <value>Upload a folder</value>
+  </data>
   <data name="Web_Upload_ConflictsPending" xml:space="preserve">
     <value>{0} file(s) waiting for a conflict decision.</value>
   </data>
