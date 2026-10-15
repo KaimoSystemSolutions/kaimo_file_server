@@ -550,12 +550,12 @@ public sealed class MailNotificationTests : DatabaseTestBase
 
     // ───────────────────────── Page rendering (bUnit smoke) ─────────────────────────
 
-    private Bunit.TestContext PageContext(ManagementPermission permissions)
+    private BunitContext PageContext(ManagementPermission permissions)
     {
         var actor = SeedMailUser("page" + Guid.NewGuid().ToString("N")[..6], "page@example.com");
-        var ctx = new Bunit.TestContext();
+        var ctx = new BunitContext();
         ctx.JSInterop.Mode = Bunit.JSRuntimeMode.Loose;
-        Bunit.TestDoubles.FakeAuthorizationExtensions.AddTestAuthorization(ctx).SetAuthorized(actor.Username);
+        ctx.AddAuthorization().SetAuthorized(actor.Username);
 
         var mgmt = new Mock<IManagementAuthService>();
         mgmt.Setup(m => m.GetEffectivePermissionsAtAsync(It.IsAny<UserContext>(), ScopeType.Global, Guid.Empty))
@@ -601,7 +601,7 @@ public sealed class MailNotificationTests : DatabaseTestBase
         await _dispatcher.ProcessEventsAsync(default);
 
         using var ctx = PageContext(ManagementPermission.ManageNotifications);
-        var cut = ctx.RenderComponent<Kaimo_File_Server.Web.Components.Pages.Notifications.Notifications>();
+        var cut = ctx.Render<Kaimo_File_Server.Web.Components.Pages.Notifications.Notifications>();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".notif-cat__head")), TimeSpan.FromSeconds(5));
 
         // Rules: categories start collapsed; expanding one shows its events and rules.
@@ -638,7 +638,7 @@ public sealed class MailNotificationTests : DatabaseTestBase
     public void NotificationsPage_WithoutPermission_ShowsTheBanner()
     {
         using var ctx = PageContext(ManagementPermission.ManageMailServer);
-        var cut = ctx.RenderComponent<Kaimo_File_Server.Web.Components.Pages.Notifications.Notifications>();
+        var cut = ctx.Render<Kaimo_File_Server.Web.Components.Pages.Notifications.Notifications>();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".error-banner")), TimeSpan.FromSeconds(5));
         Assert.Empty(cut.FindAll(".notif-tabs"));
     }
@@ -647,7 +647,7 @@ public sealed class MailNotificationTests : DatabaseTestBase
     public void MailServerSettingsTab_RendersTheForm()
     {
         using var ctx = PageContext(ManagementPermission.ManageMailServer);
-        var cut = ctx.RenderComponent<Kaimo_File_Server.Web.Components.Pages.Settings.Components.MailServerSettings>();
+        var cut = ctx.Render<Kaimo_File_Server.Web.Components.Pages.Settings.Components.MailServerSettings>();
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("#smtp-host")), TimeSpan.FromSeconds(5));
         Assert.Equal("page@example.com", cut.Find("#smtp-test-to").GetAttribute("value"));
     }

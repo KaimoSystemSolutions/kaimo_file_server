@@ -27,7 +27,7 @@ public class LogViewerComponentTests
     [Fact]
     public void Information_is_off_by_default_and_toggles_the_visible_list()
     {
-        using var ctx = new Bunit.TestContext();
+        using var ctx = new BunitContext();
         var cut = RenderViewer(ctx, _ =>
         [
             new() { Sequence = 2, Level = LogLevel.Error, Service = "web", Message = "err-msg" },
@@ -51,7 +51,7 @@ public class LogViewerComponentTests
     public void Information_from_multiple_restarts_renders_without_duplicate_key_crash()
     {
         var day = new DateTimeOffset(2026, 9, 26, 8, 0, 0, TimeSpan.Zero);
-        using var ctx = new Bunit.TestContext();
+        using var ctx = new BunitContext();
         var cut = RenderViewer(ctx, _ =>
         [
             new() { TimestampUtc = day.AddHours(2), Sequence = 9, Level = LogLevel.Error, Service = "web", Instance = "3b0f4275a62e", Message = "err-msg" },
@@ -78,7 +78,7 @@ public class LogViewerComponentTests
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var pastDay = new DateOnly(2026, 9, 20);
         var pastStart = new DateTimeOffset(2026, 9, 20, 7, 0, 0, TimeSpan.Zero);
-        using var ctx = new Bunit.TestContext();
+        using var ctx = new BunitContext();
         var cut = RenderViewer(ctx, query => query.UtcDate == pastDay
             ?
             [
@@ -118,7 +118,7 @@ public class LogViewerComponentTests
     // The mocked reader applies the level allow-list itself; the callback decides
     // which rows exist for a given query (e.g. per UtcDate).
     private static IRenderedComponent<LogViewer> RenderViewer(
-        Bunit.TestContext ctx,
+        BunitContext ctx,
         Func<LogArchiveQuery, List<LogArchiveEntry>> entries)
     {
         var reader = new Mock<ILogArchiveReader>();
@@ -134,7 +134,7 @@ public class LogViewerComponentTests
                   return new LogArchiveQueryResult(filtered, false);
               });
 
-        var authz = ctx.AddTestAuthorization();
+        var authz = ctx.AddAuthorization();
         authz.SetAuthorized("tester");
 
         var userContext = new UserContext(
@@ -157,6 +157,6 @@ public class LogViewerComponentTests
             managementAuth.Object,
             NullLogger<LogViewerViewModel>.Instance));
 
-        return ctx.RenderComponent<LogViewer>();
+        return ctx.Render<LogViewer>();
     }
 }
