@@ -24,9 +24,14 @@ public static class SearchServiceExtensions
         var url = configuration["Elasticsearch:Url"] ?? "http://elasticsearch:9200";
 
         var settings = new ElasticsearchClientSettings(new Uri(url))
-            .DefaultIndex("kaimo-files-v2");
+            .DefaultIndex(ElasticSearchService.DefaultIndexName);
 
         var client = new ElasticsearchClient(settings);
+
+        // Crash markers must survive a process/container restart, so they live on the
+        // persistent application-data volume (see ContentProvider.ExtractGuarded).
+        ContentProvider.GuardDirectory = Path.Combine(
+            configuration["Storage:ApplicationDataPath"] ?? "/data/kaimo-system", ".kaimo-extract-guard");
 
         services.AddSingleton(client);
         services.AddSingleton<SearchAclFilter>();

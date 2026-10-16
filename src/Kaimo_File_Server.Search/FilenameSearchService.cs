@@ -132,7 +132,8 @@ public sealed class FilenameSearchService
                 {
                     RecurseSubdirectories = true,
                     IgnoreInaccessible = true,
-                    AttributesToSkip = FileAttributes.System
+                    // Symbolic links are never followed (see SearchDocuments.CollectReindexTargetsAsync).
+                    AttributesToSkip = FileAttributes.System | FileAttributes.ReparsePoint
                 };
 
                 // Match files by name...

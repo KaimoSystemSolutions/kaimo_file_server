@@ -15,6 +15,13 @@ public class FileDocument
     public long FileSizeBytes { get; set; }
 
     /// <summary>
+    /// The file's last-write time (UTC ticks) when it was indexed. Together with
+    /// <see cref="FileSizeBytes"/> it lets a reindex skip unchanged files without reading them.
+    /// Null for directories and for files indexed by name while still locked by their writer.
+    /// </summary>
+    public long? FileModifiedTicks { get; set; }
+
+    /// <summary>
     /// True when this hit is a directory rather than a file. Directories are
     /// indexed by name only (no content) so they show up in search too. The UI
     /// uses this to pick a folder icon and to navigate INTO the folder instead of

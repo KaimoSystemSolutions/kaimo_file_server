@@ -1,5 +1,6 @@
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Storage;
 
 namespace Kaimo_File_Server.Core.Services.File
@@ -47,6 +48,29 @@ namespace Kaimo_File_Server.Core.Services.File
         Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled);
         Task<FileMetadata> GetMetadataAsync(string path, UserContext user);
         Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user);
+
+        /// <summary>
+        /// The item as the parent listing shows it, or null when it is missing, hidden or not
+        /// readable for <paramref name="user"/> (a parent the user may not list throws, like
+        /// <see cref="ListAsync"/>). The share root ("") is its own metadata. Implementations
+        /// should answer without listing the parent; this default does exactly that lookup.
+        /// </summary>
+        async Task<FileMetadata?> FindEntryAsync(string path, UserContext user)
+        {
+            if (path.Length == 0)
+                return await GetMetadataAsync(string.Empty, user);
+
+            var name = ShareRelativePath.GetFileName(path);
+            try
+            {
+                return (await ListAsync(ShareRelativePath.GetParent(path), user))
+                    .FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.Ordinal));
+            }
+            catch (Exception ex) when (ex is DirectoryNotFoundException or FileNotFoundException)
+            {
+                return null; // the parent itself is missing
+            }
+        }
         Task RenameAsync(string oldPath, string newPath, UserContext user);
         Task<long> GetDirectorySizeAsync(string relativePath, UserContext userContext);
         Task UnzipAsync(string zipPath, string targetPath, UserContext user);

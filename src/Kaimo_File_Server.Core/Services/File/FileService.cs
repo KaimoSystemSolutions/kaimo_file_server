@@ -714,8 +714,43 @@ public class FileService : IFileService
                 visible.Add(entry.Item);
         }
 
-        
+
         return visible;
+    }
+
+    /// <summary>
+    /// The same rules as <see cref="ListAsync"/> applied to the parent, in the same order, but
+    /// for one entry: a constant number of storage and ACL calls instead of stat-ing and
+    /// authorizing every sibling (a WebDAV PUT into a folder of n files used to cost O(n)).
+    /// </summary>
+    public async Task<FileMetadata?> FindEntryAsync(string path, UserContext user)
+    {
+        var normalized = ShareRelativePath.Normalize(path);
+        if (normalized.Length == 0)
+            return await GetMetadataAsync(string.Empty, user);
+
+        var parent = ShareRelativePath.GetParent(normalized);
+        if (!ShareEntryPolicy.IsVisibleInFileBrowser(parent, _recycleRootDepth))
+            throw new UnauthorizedAccessException(
+                $"Internal share path '{parent}' is not browser-visible.");
+
+        if (!await _acl.HasAccessAsync(user, _shareId, parent, true, FilePermission.ListReadData))
+            throw new UnauthorizedAccessException($"List denied for '{parent}'");
+
+        if (!await _storage.ExistsAsync(parent) || !await _storage.IsDirectoryAsync(parent))
+            return null;
+
+        if (!ShareEntryPolicy.IsVisibleInFileBrowser(normalized, _recycleRootDepth)
+            || !await _storage.ExistsAsync(normalized))
+            return null;
+
+        FileMetadata entry;
+        try { entry = await _storage.GetMetadataAsync(normalized); }
+        catch (FileNotFoundException) { return null; } // deleted meanwhile
+
+        var access = await _acl.HasAccessBatchAsync(
+            user, _shareId, [(normalized, entry.IsDirectory)], FilePermission.ListReadData);
+        return access.TryGetValue(normalized, out var allowed) && allowed ? entry : null;
     }
 
     // ------------------ Batch Permission Check ------------------

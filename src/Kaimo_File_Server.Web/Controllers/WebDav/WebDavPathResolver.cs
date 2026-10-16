@@ -69,12 +69,43 @@ public static class WebDavPathResolver
         if (!SambaName.IsValidShareName(shareName))
             return false;
 
+        // In a URL '/' is the only separator. A literal backslash (%5C) would turn into a
+        // separator below (and is no legal name character for SMB clients), so it is rejected
+        // instead of silently addressing a subfolder.
+        var itemPath = trimmed[(slash + 1)..];
+        if (requestPath.Contains('\\') || HasOverlongName(itemPath))
+            return false;
+
         // Recycle-bin and versioning paths are legal targets, so allow the
         // internal-namespace guard to pass here; per-item ACLs still apply, and
         // the file service rejects writes into reserved namespaces itself.
         return ShareRelativePath.TryNormalizeStrict(
-            trimmed[(slash + 1)..], out relativePath,
+            itemPath, out relativePath,
             allowRoot: true, allowInternalNamespace: true);
+    }
+
+    // File systems (ext4, xfs, NTFS via SMB) hold at most 255 bytes per name.
+    private const int MaxNameBytes = 255;
+
+    private static bool HasOverlongName(string path)
+        => path.Split('/').Any(name => System.Text.Encoding.UTF8.GetByteCount(name) > MaxNameBytes);
+
+    /// <summary>
+    /// True when the path names a valid share but the part below it can never be a valid item
+    /// path (traversal, control characters, backslash, a name over 255 bytes). The request is
+    /// malformed (400) rather than aimed at something missing (404) or conflicting (409).
+    /// </summary>
+    public static bool IsMalformedItemPath(string? requestPath)
+    {
+        if (TrySplit(requestPath, out _, out _))
+            return false;
+
+        var trimmed = (requestPath ?? string.Empty).Replace('\\', '/');
+        if (trimmed.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
+            trimmed = trimmed[Prefix.Length..];
+        trimmed = trimmed.Trim('/');
+        var slash = trimmed.IndexOf('/');
+        return slash > 0 && SambaName.IsValidShareName(trimmed[..slash]);
     }
 
     /// <summary>

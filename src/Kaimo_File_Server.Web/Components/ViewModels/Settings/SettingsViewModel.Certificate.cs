@@ -113,13 +113,13 @@ public partial class SettingsViewModel
             _logger.LogInformation(
                 "HTTPS certificate settings saved (LifetimeDays={Days}) and certificate reissued",
                 CertSettings.LifetimeDays);
-            SuccessMessage = "Zertifikatseinstellungen gespeichert und neues Zertifikat erzeugt.";
+            SuccessMessage = R("Web_Settings_Cert_SettingsSaved");
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to save certificate settings");
-            ErrorMessage = "Zertifikatseinstellungen konnten nicht gespeichert werden.";
+            ErrorMessage = R("Web_Settings_Cert_SettingsSaveFailed");
             return false;
         }
     }
@@ -140,13 +140,13 @@ public partial class SettingsViewModel
         {
             await _certProvider.RegenerateAsync();
             await LoadCertificateStateAsync();
-            SuccessMessage = "Neues selbstsigniertes Zertifikat erzeugt. Es wird ohne Neustart ausgeliefert.";
+            SuccessMessage = R("Web_Settings_Cert_Regenerated");
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to regenerate certificate");
-            ErrorMessage = "Zertifikat konnte nicht neu erzeugt werden.";
+            ErrorMessage = R("Web_Settings_Cert_RegenerateFailed");
             return false;
         }
     }
@@ -170,7 +170,7 @@ public partial class SettingsViewModel
 
         if (certBytes.Length == 0)
         {
-            ErrorMessage = "Bitte zuerst eine Zertifikatsdatei (.pfx/.p12 oder .pem/.crt/.cer) auswählen.";
+            ErrorMessage = R("Web_Settings_Cert_NoFileSelected");
             return false;
         }
 
@@ -182,7 +182,7 @@ public partial class SettingsViewModel
                 keyBytes);
             CustomCertPassword = "";
             await LoadCertificateStateAsync();
-            SuccessMessage = "Eigenes Zertifikat übernommen. Die automatische Erneuerung ist dafür pausiert.";
+            SuccessMessage = R("Web_Settings_Cert_CustomImported");
             return true;
         }
         catch (InvalidOperationException ex)
@@ -193,7 +193,7 @@ public partial class SettingsViewModel
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to import custom certificate");
-            ErrorMessage = "Eigenes Zertifikat konnte nicht übernommen werden.";
+            ErrorMessage = R("Web_Settings_Cert_CustomImportFailed");
             return false;
         }
     }

@@ -84,4 +84,18 @@ public sealed class SearchConfigStore : ISearchConfigStore
         var config = scope.ServiceProvider.GetRequiredService<IConfigRepository>();
         await config.SetAsync(SearchConfigKeys.LocalIndexBuiltKey, built ? SearchConfigKeys.LocalIndexVersion : 0);
     }
+
+    public async Task<string> GetElasticIndexBuiltAsync()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var config = scope.ServiceProvider.GetRequiredService<IConfigRepository>();
+        return await config.GetFreshAsync(SearchConfigKeys.ElasticIndexBuiltKey, string.Empty) ?? string.Empty;
+    }
+
+    public async Task SetElasticIndexBuiltAsync(string indexName)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var config = scope.ServiceProvider.GetRequiredService<IConfigRepository>();
+        await config.SetAsync(SearchConfigKeys.ElasticIndexBuiltKey, indexName);
+    }
 }

@@ -189,4 +189,30 @@ public sealed class SearchIndexRepositoryPostgresTests : PostgresTestBase
             (await Find("alpha")).Select(h => h.FileName).Order());
         Assert.Equal(2, (await Repo.GetStatsAsync()).Documents);
     }
+
+    private Task<List<FileDocument>> Query(string text)
+        => Repo.SearchAsync(LocalIndexSearchService.Tokenize(text), null, null, 0, 50);
+
+    [PostgresFact]
+    public async Task Search_MatchesDecomposedNamesAndSharpS()
+    {
+        await Put("Kündigung.txt");                 // macOS client: NFD name
+        await Put("address.txt", "Hauptstraße 5");
+        await Put("old.txt", "HAUPTSTRASSE 7");
+
+        Assert.Equal(["Kündigung.txt"], (await Query("Kündigung")).Select(h => h.FileName));
+        Assert.Equal(["address.txt", "old.txt"], (await Query("hauptstrasse")).Select(h => h.FileName).Order());
+        Assert.Equal(["address.txt", "old.txt"], (await Query("Hauptstraße")).Select(h => h.FileName).Order());
+    }
+
+    [PostgresFact]
+    public async Task Search_ExcerptStartsAtTheFirstMatchOfAnyTerm_CaseInsensitively()
+    {
+        await Put("long.txt", new string('x', 5000) + " Delta and GAMMA " + new string('y', 5000));
+
+        var hit = Assert.Single(await Find("gamma", "delta"));
+
+        Assert.NotNull(hit.HighlightSnippet);
+        Assert.Contains("Delta and GAMMA", hit.HighlightSnippet);
+    }
 }

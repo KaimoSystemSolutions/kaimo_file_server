@@ -41,6 +41,19 @@ public class FileSystemStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task WriteAsync_AcceptsNamesUpToTheFileSystemLimit()
+    {
+        // The temporary file must not embed the name: "<name>" + 44 characters of suffix used
+        // to exceed the 255-byte limit for every name over ~210 bytes.
+        var name = new string('n', 250) + ".txt";
+
+        await _sut.WriteAsync(name, new MemoryStream([1]));
+
+        Assert.True(File.Exists(Path.Combine(_testRoot, name)));
+        Assert.Single(Directory.GetFileSystemEntries(_testRoot));
+    }
+
+    [Fact]
     public async Task ReadAsync_PreservingAccessTime_RestoresItOnDispose()
     {
         var fullPath = Path.Combine(_testRoot, "atime.txt");

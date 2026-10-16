@@ -421,7 +421,9 @@ public sealed class WebDavController : ControllerBase
 
         if (!WebDavPathResolver.TrySplit(Request.Path.Value, out var shareName, out var relativePath)
             || shareName.Length == 0)
-            return (null, new StatusCodeResult(StatusCodes.Status404NotFound));
+            return (null, new StatusCodeResult(WebDavPathResolver.IsMalformedItemPath(Request.Path.Value)
+                ? StatusCodes.Status400BadRequest
+                : StatusCodes.Status404NotFound));
 
         if (!allowRoot && relativePath.Length == 0)
             return (null, new StatusCodeResult(StatusCodes.Status403Forbidden));
@@ -479,24 +481,13 @@ public sealed class WebDavController : ControllerBase
     }
 
     /// <summary>
-    /// Metadata for an existing item, or <c>null</c> when it does not exist.
-    /// Existence is confirmed by listing the parent (which is also how a WebDAV client
-    /// reaches the item), and the returned entry carries the real size/mtime an
+    /// Metadata for an existing item, or <c>null</c> when it does not exist for this user.
+    /// Same answer as a lookup in the parent listing (which is how a WebDAV client reaches the
+    /// item), without listing the parent; the entry carries the real size/mtime an
     /// <c>If-Match</c> needs. The share root always exists.
     /// </summary>
-    internal static async Task<FileMetadata?> FindAsync(IFileService fs, string path, UserContext user)
-    {
-        if (path.Length == 0)
-            return await fs.GetMetadataAsync(string.Empty, user);
-
-        var parent = ShareRelativePath.GetParent(path);
-        var name = ShareRelativePath.GetFileName(path);
-        List<FileMetadata> siblings;
-        try { siblings = await fs.ListAsync(parent, user); }
-        catch (DirectoryNotFoundException) { return null; } // parent itself is missing
-        catch (FileNotFoundException) { return null; }
-        return siblings.FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.Ordinal));
-    }
+    internal static Task<FileMetadata?> FindAsync(IFileService fs, string path, UserContext user)
+        => fs.FindEntryAsync(path, user);
 
     /// <summary>True when the parent collection of <paramref name="path"/> exists (the share root always does).</summary>
     internal static async Task<bool> ParentExistsAsync(IFileService fs, string path, UserContext user)

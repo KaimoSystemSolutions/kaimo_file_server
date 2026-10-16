@@ -18,7 +18,44 @@ public sealed class LocalSearchIndexTests
     {
         var tokens = LocalIndexSearchService.Tokenize("Report_2024.PDF a report Ünter");
 
-        Assert.Equal(new[] { "report", "2024", "pdf", "ünter" }, tokens);
+        // "ünter" also as its decomposed form, which file names from macOS clients use.
+        Assert.Equal(new[] { "report", "2024", "pdf", "ünter", "ünter" }, tokens);
+    }
+
+    [Fact]
+    public void Tokenize_ComposesDecomposedInput_InsteadOfSplittingAtTheMark()
+    {
+        var tokens = LocalIndexSearchService.Tokenize("Kündigung");
+
+        Assert.Equal(new[] { "kündigung", "kündigung" }, tokens);
+    }
+
+    [Theory]
+    [InlineData("STRASSE", "strasse", "straße")]
+    [InlineData("Straße", "straße", "strasse")]
+    public void Tokenize_AddsTheSharpSSpellingVariant(string query, string first, string variant)
+        => Assert.Equal(new[] { first, variant }, LocalIndexSearchService.Tokenize(query));
+
+    [Fact]
+    public void Mark_DropsLiteralMarkTagsFromTheText()
+    {
+        var marked = LocalIndexSearchService.Mark("a <mark>fake</mark> real", new[] { "real" });
+
+        Assert.Equal("a fake <mark>real</mark>", marked);
+    }
+
+    [Fact]
+    public void BuildSearchSql_ScansContentOncePerRowForMatching_AndNeverLowercasesWholeDocuments()
+    {
+        var (sql, parameters) = SearchIndexRepository.BuildSearchSql(
+            new[] { "alpha", "beta", "ab" }, null, null, offset: 0, limit: 50);
+
+        var values = parameters.Cast<NpgsqlParameter>().Select(p => p.Value).ToList();
+        // One alternation over the content terms decides the match (index-backed, one pass).
+        Assert.Contains("(alpha|beta)", values);
+        Assert.DoesNotContain("\"Content\" ILIKE", sql);
+        Assert.DoesNotContain("lower(d.\"Content\")", sql);
+        Assert.Contains("regexp_instr", sql);
     }
 
     [Fact]
@@ -88,7 +125,8 @@ public sealed class LocalSearchIndexTests
     public void StripEncodedBlobs_DropsBase64AndHexPayloads_KeepsWordsAndUrls()
     {
         var blob = Convert.ToBase64String(Enumerable.Range(0, 300).Select(i => (byte)(i * 37)).ToArray());
-        var hash = new string('a', 30) + "0123456789abcdef0123456789abcdef0123";
+        // A hex dump longer than any hash (hashes themselves are kept, see ContentProviderTextDetectionTests).
+        var hash = Convert.ToHexString(Enumerable.Range(0, 100).Select(i => (byte)(i * 41 + 3)).ToArray()).ToLowerInvariant();
         const string words = "Beschäftigungsverhältnisse quarterly-report https://example.com/a/b/c?id=123";
         const string longWord = "Donaudampfschifffahrtsgesellschaftskapitaenswitwenrentenversicherung";
 
@@ -99,6 +137,26 @@ public sealed class LocalSearchIndexTests
         Assert.Contains("<vault>", result);
         Assert.Contains(words, result);
         Assert.Contains(longWord, result);
+    }
+
+    [Fact]
+    public void StripEncodedBlobs_DropsBase64UrlPayloads_KeepsHyphenatedSlugs()
+    {
+        // base64url ('-' and '_' instead of '+' and '/'), e.g. JWTs and API tokens: the separators
+        // split it into runs shorter than 60, so the plain base64 rule alone misses most of it.
+        var bytes = Enumerable.Range(0, 300).Select(i => (byte)(i * 37 + 11)).ToArray();
+        var b64url = Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        Assert.Contains('-', b64url);
+        const string slug = "C--Users-Marco-source-repos-Kaimo-File-Server-CLAUDE-SPACE--worktrees-feature-2026";
+        const string snake = "kaimo_file_server_search_index_rebuild_version_2026_10_15_final";
+
+        var result = ContentProvider.StripEncodedBlobs($"token: {b64url} {slug} {snake}");
+
+        Assert.DoesNotContain(b64url[..20], result);
+        Assert.DoesNotContain(b64url[^20..], result);
+        Assert.Contains("token:", result);
+        Assert.Contains(slug, result);
+        Assert.Contains(snake, result);
     }
 
     [Theory]

@@ -40,10 +40,19 @@ public static class SearchConfigKeys
     public const string LocalIndexBuiltKey = "search.local.built-version";
 
     /// <summary>
+    /// Name of the Elasticsearch index whose last full (all-shares) build completed. While it
+    /// differs from the index in use, the router (re)starts a full build on startup, so an
+    /// interrupted first build of a new index is never left half-done.
+    /// </summary>
+    public const string ElasticIndexBuiltKey = "search.es.built-index";
+
+    /// <summary>
     /// Version of what the local index stores per file. Bump it whenever content extraction
     /// or the set of indexed paths changes. 2: encoded blobs stripped, recycle bins indexed.
+    /// 3: base64url payloads stripped as well. 4: UTF-16/Windows-1252 decoded, control characters
+    /// tolerated, text NFC-normalized, hashes kept by the blob filter, symbolic links skipped.
     /// </summary>
-    public const int LocalIndexVersion = 2;
+    public const int LocalIndexVersion = 4;
 
     /// <summary>The cursor key of an index-backed engine.</summary>
     public static string CursorKeyFor(SearchEngine engine)
@@ -112,6 +121,14 @@ public interface ISearchConfigStore
 
     /// <summary>Records that a full build has completed with the current version (or clears it).</summary>
     Task SetLocalIndexBuiltAsync(bool built);
+
+    /// <summary>
+    /// Name of the Elasticsearch index whose last full build completed ("" when none did).
+    /// </summary>
+    Task<string> GetElasticIndexBuiltAsync();
+
+    /// <summary>Records the index whose full build completed ("" clears it).</summary>
+    Task SetElasticIndexBuiltAsync(string indexName);
 }
 
 /// <summary>Effective runtime state of the search engine, for the settings UI.</summary>

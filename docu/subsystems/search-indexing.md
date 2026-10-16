@@ -20,7 +20,7 @@ flowchart LR
     ops[File operations<br/>all transports] --> log[(file_change_log)]
     log --> idx["SearchIndexingService<br/>(Web, single owner)"]
     idx --> router[SearchServiceRouter]
-    router -->|Elasticsearch selected and reachable| es[ElasticSearchService] --> ES[(Elasticsearch<br/>kaimo-files-v2)]
+    router -->|Elasticsearch selected and reachable| es[ElasticSearchService] --> ES[(Elasticsearch<br/>kaimo-files-v3)]
     router -->|local indexing selected| li[LocalIndexSearchService] --> PG[(PostgreSQL<br/>search_documents)]
     router -->|otherwise| fn[FilenameSearchService]
     q[Search request] --> router
@@ -44,10 +44,23 @@ so the router replaces the `NoOpSearchService` fallback. The Elasticsearch URL d
 
 ## Index
 
-- Index name `kaimo-files-v2`. The suffix is versioned because analyzers are fixed when a field is
-  created; changing an analyzer requires a new index.
-- File names and content use an n-gram index analyzer (`kaimo_ngram_index`, 2–20 characters) and a
-  whole-token search analyzer (`kaimo_ngram_search`), so a query matches substrings of words.
+- Index name `kaimo-files-v3`. The suffix is versioned because analyzers are fixed when a field is
+  created; changing an analyzer requires a new index. When the router finds the current index missing
+  (first activation, a new version or a lost volume), `EnsureIndexAsync` creates it and the router
+  starts a full reindex to fill it. The index whose full (all-shares) pass completed is recorded
+  (config key `search.es.built-index`); until that record names the index in use, every start
+  resumes the build, so an interrupted build (restart, cancel, outage) is never left half-done. Only
+  after a completed pass are the indexes of earlier versions (`kaimo-files-v2`, `kaimo-files`)
+  deleted. Search reads the new index while it is being filled.
+- File names use an n-gram index analyzer of 2–20 characters (`kaimo_ngram_index`), content one of
+  3–10 characters (`kaimo_content_index`; 2–20 made the index ~35x the size of the local one), both
+  over letters and digits. The search analyzers split the query where the n-gram tokenizers split
+  (any character that is no letter or digit: `.`, `_`, `:` …) and truncate each term to the longest
+  indexed gram, so `invoice.pdf` and words longer than the span still match.
+- `fileName.std` and `content.std` hold whole words (standard tokenizer, one token per CJK
+  character) for ranking, fuzzy content matches and scripts without spaces.
+- Every analyzer maps `ß` to `ss` (so `STRASSE` finds `Straße`). Names and content are stored in
+  Unicode NFC and queries are normalized to NFC (macOS clients create decomposed names).
 - Indexed content is capped at 200,000 characters (`MaxContentChars`): the n-gram analysis holds every
   distinct gram of a document in heap, and larger high-entropy content out-of-memory-kills a 512 MB
   node. Content beyond the cap is not searchable.
@@ -58,6 +71,10 @@ so the router replaces the `NoOpSearchService` fallback. The Elasticsearch URL d
 - Hidden paths (any segment starting with `.`: internal namespaces, version storage, `.git`, …) are
   never indexed (`ShareEntryPolicy.IsExcludedFromSearch`). The share's or home's own recycle bin is
   the exception: it is indexed, and searches leave it out unless asked for (see [Querying](#querying)).
+- Symbolic links are never followed by the reindex walk (nor by the filename search), see
+  [Symbolic links](#symbolic-links).
+- A full reindex sweeps the documents of the walked shares whose files it did not visit (deleted or
+  moved directly on the volume); documents written after the pass started are kept.
 
 ## Engine selection
 
@@ -77,11 +94,16 @@ so the router replaces the `NoOpSearchService` fallback. The Elasticsearch URL d
   trusted extension; external PostgreSQL servers need the `contrib` package, and the application's
   database user needs the `CREATE` privilege on the database. The migration runs for every
   installation, regardless of the selected engine, so without that privilege the app does not start.
-- Query terms are runs of letters/digits (lowercased, at least 2 characters, at most 10). Each term
-  matches as a case-insensitive substring (`ILIKE`) of the file name and — from three characters on —
-  of the content; terms are OR-combined like the Elasticsearch `match` query. Ranking uses the
-  Elasticsearch boosts: name 4, whole word in content 2, content substring 1. The excerpt is cut in
-  SQL around the first content match, only for the returned page.
+- Query terms are runs of letters/digits with their combining marks (NFC, lowercased, at least 2
+  characters, at most 10). Each term also matches in its spelling variants: decomposed (NFD names
+  from macOS clients) and `ß`/`ss`. Each term matches as a case-insensitive substring (`ILIKE`) of
+  the file name and — from three characters on — of the content; terms are OR-combined like the
+  Elasticsearch `match` query. Whether the content matches is one case-insensitive regex alternation
+  over all terms (index-backed by `pg_trgm`, one pass per row); measured, `ILIKE` and `lower()` over
+  whole documents were the dominant cost. Ranking uses the Elasticsearch boosts (name 4, whole word
+  in content 2, content substring 1), the content boosts looking at the first 20,000 characters
+  only. The excerpt is cut in SQL around the first content match (`regexp_instr`), only for the
+  returned page.
 - Renames and directory moves are a single transaction that rewrites id (`md5()` in SQL), paths and
   share, and marks the moved rows as current, so a reindex running meanwhile does not sweep them;
   subtree deletes are one statement.
@@ -136,10 +158,33 @@ so the router replaces the `NoOpSearchService` fallback. The Elasticsearch URL d
 | `.svg` | Not extracted; indexed by name only |
 | Other | Magic bytes: `%PDF-` goes to PdfPig, a ZIP is tried as a Word document; otherwise text is indexed and binary data (media, archives, executables) is indexed by name only |
 
-A file that cannot be parsed (corrupt or encrypted) is still indexed by its name. Plain text is
-stripped of encoded payloads first: runs of at least 60 base64 characters containing a digit
-(encrypted vaults and backups, embedded attachments, keys) carry no searchable words but would
-otherwise dominate the index size.
+A file that cannot be parsed (corrupt or encrypted) is still indexed by its name. A parser that
+takes the whole process down (out of memory, stack overflow) is caught by a crash guard: a marker
+named after the SHA-256 of the content, counting the attempts in flight, is written to
+`<ApplicationDataPath>/.kaimo-extract-guard` before parsing and removed afterwards. One attempt that
+died is retried (it may have been an unrelated shutdown); after two, the content is indexed by name
+only and a warning names the marker to delete for another try.
+
+Plain text: a head with a NUL byte or more than 5 % other control bytes is binary; stray controls
+(ESC of colored logs, form feeds) are not. UTF-16 is decoded by its byte-order mark, bytes that are
+no valid UTF-8 as Windows-1252. Plain text is stripped of encoded payloads first: runs of at least
+60 base64/base64url characters whose letters and digits switch between upper case, lower case and
+digit at more than 42 % of neighbor pairs (random data; identifiers, compounds such as
+`…verordnung2024` and slugs stay well below) carry no searchable words but would otherwise dominate
+the index size. Hex runs up to 128 characters are hashes and kept.
+
+Every extracted text is finally cleaned: ANSI escape sequences are removed, other control characters
+become spaces, the private-use highlight markers (U+E000/U+E001) are dropped and the text is
+normalized to NFC.
+
+## Symbolic links
+
+Symbolic links inside a share can only be created directly on the volume (no transport creates
+one). The server never follows them: `FileSystemStorage` treats any path that passes through a link
+as missing (one `lstat` per path segment), listings, archives and folder sizes skip them, and the
+reindex and filename walks do not enter them. A link to `/etc/passwd` therefore cannot be served,
+written through, archived or indexed, and a loop (`x -> .`) cannot multiply entries. Samba applies
+its own link settings to SMB access.
 
 ## Querying
 
@@ -154,5 +199,8 @@ otherwise dominate the index size.
   scanned raw hits, so restrictive ACLs do not produce an empty first page.
 - Results carry share, share-relative path, name, type, size and highlighted snippet segments, never
   server paths or full indexed text.
+- Both engines mark matches internally with private-use characters that indexed text never holds and
+  convert them to `<mark>` tags last (`SearchDocuments.ToMarkup`, `LocalIndexSearchService.Mark`),
+  after removing literal `<mark>` tags of the file name or content, so a file cannot fake a highlight.
 - The REST endpoint `POST /api/v1/search` adds a per-user token-bucket rate limit and a 10-second
   time box; concurrent filename walks are capped process-wide.

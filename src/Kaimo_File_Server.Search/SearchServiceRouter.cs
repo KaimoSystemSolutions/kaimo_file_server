@@ -237,16 +237,45 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
     private async Task EnsureEsInitializedAsync(CancellationToken ct)
     {
         if (_esInitialized) return;
+        bool needsBuild;
         await _initLock.WaitAsync(ct);
         try
         {
             if (_esInitialized) return;
-            await _es.InitializeAsync(ct);
+            bool created = await _es.EnsureIndexAsync(ct);
+            needsBuild = await NeedsFullEsBuildAsync(created);
             _esInitialized = true;
         }
         finally
         {
             _initLock.Release();
+        }
+
+        // A new index (first activation, a new mapping version, a lost volume) is empty, and one
+        // whose first build was interrupted is incomplete: fill it from disk. A reindex already
+        // running (it may have created the index itself) is left alone.
+        if (needsBuild)
+            await TryStartReindexAsync(shareName: null, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// True unless a full pass has completed into the index in use. A freshly created index
+    /// clears the record first, since the one it replaces may have been built before.
+    /// </summary>
+    private async Task<bool> NeedsFullEsBuildAsync(bool created)
+    {
+        try
+        {
+            if (created)
+                await _configStore.SetElasticIndexBuiltAsync(string.Empty);
+            return created || await _configStore.GetElasticIndexBuiltAsync() != _es.IndexName;
+        }
+        catch (Exception ex)
+        {
+            // The record lives in the database; without it, only a newly created index is known
+            // to need a build. Searching must not fail over this.
+            _logger.LogWarning(ex, "Could not read whether the search index was completely built");
+            return created;
         }
     }
 
@@ -512,6 +541,13 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
             {
                 await EnsureEsInitializedAsync(ct);
                 await _es.ReindexAllAsync(progress, ct, shareName);
+                // Only a completed all-shares pass makes the index complete; until then every
+                // start resumes the build, and the indexes of earlier mapping versions are kept.
+                if (string.IsNullOrEmpty(shareName))
+                {
+                    await _configStore.SetElasticIndexBuiltAsync(_es.IndexName);
+                    await _es.DeleteLegacyIndexesAsync(ct);
+                }
             }
 
             lock (_reindexGate)

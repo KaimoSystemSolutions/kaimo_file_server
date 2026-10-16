@@ -39,6 +39,31 @@ public sealed class WebDavTests
         Assert.False(WebDavPathResolver.TrySplit(requestPath, out _, out _));
     }
 
+    [Theory]
+    [InlineData("/dav/Projekte/a\\b.txt")]      // backslash: a separator on Windows/SMB, never part of a name
+    [InlineData("/dav/Projekte/a\tb.txt")]
+    [InlineData("/dav/Projekte/line\nbreak")]
+    public void TrySplit_rejects_names_no_file_system_client_can_hold(string requestPath)
+    {
+        Assert.False(WebDavPathResolver.TrySplit(requestPath, out _, out _));
+        Assert.True(WebDavPathResolver.IsMalformedItemPath(requestPath));
+    }
+
+    [Fact]
+    public void TrySplit_limits_each_name_to_255_utf8_bytes()
+    {
+        var longest = new string('ä', 127) + "x";    // 255 bytes
+        Assert.True(WebDavPathResolver.TrySplit("/dav/Projekte/" + longest, out _, out _));
+        Assert.False(WebDavPathResolver.TrySplit("/dav/Projekte/" + longest + "x", out _, out _));
+        Assert.True(WebDavPathResolver.IsMalformedItemPath("/dav/Projekte/" + longest + "x"));
+    }
+
+    [Theory]
+    [InlineData("/dav/No Such Share!/file.txt")]  // an invalid share name is an unknown share: 404
+    [InlineData("/dav/Projekte/file.txt")]        // well-formed
+    public void IsMalformedItemPath_is_false_for_unknown_shares_and_valid_paths(string requestPath)
+        => Assert.False(WebDavPathResolver.IsMalformedItemPath(requestPath));
+
     [Fact]
     public void TrySplit_allows_recycle_bin_path()
     {

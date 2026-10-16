@@ -24,6 +24,11 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
     // shorter pattern, and a full scan of every document's content would exceed the search timeout.
     internal const int MinContentTokenLength = 3;
 
+    // Leading content characters the per-term ranking looks at. Whether a document matches is
+    // still decided over its whole content; only the order among matches ignores what lies deeper.
+    // ponytail: fixed window; a stored rank vector (tsvector) would rank on everything.
+    private const int ScoreWindowChars = 20_000;
+
     private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
 
     public SearchIndexRepository(IDbContextFactory<ApplicationDbContext> dbFactory)
@@ -71,11 +76,14 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
     }
 
     // ponytail: VACUUM FULL locks the table exclusively while it rewrites it (seconds for a
-    // typical index, searches wait meanwhile). Only run after a version rebuild; switch to
-    // pg_repack or plain VACUUM if indexes grow into the GB range.
+    // typical index, minutes in the GB range; searches wait meanwhile). Only run after a version
+    // rebuild; switch to pg_repack or plain VACUUM if that lock becomes a problem.
     public async Task CompactAsync(CancellationToken ct = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        // No command timeout: rewriting a large index outlasts the default and was aborted
+        // (the token still cancels it).
+        db.Database.SetCommandTimeout(0);
         // VACUUM cannot run inside a transaction; ExecuteSql issues it as a single statement.
         await db.Database.ExecuteSqlRawAsync("VACUUM (FULL, ANALYZE) search_documents", ct);
     }
@@ -182,8 +190,13 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
     /// Builds the ranked search statement. Each token is OR-combined (like the Elasticsearch
     /// match query) and scored with the Elasticsearch boosts: name substring 4, whole word in the
     /// content 2, content substring 1. The inner query ranks and pages over ids only; the
-    /// excerpt is computed afterwards for the page's rows alone, so no full content is
-    /// lowercased or transferred for non-returned hits.
+    /// excerpt is computed afterwards for the page's rows alone.
+    /// Cost model (measured): a case-insensitive pass over the content is the expensive part —
+    /// ILIKE ~2x a regex pass, lower() of a whole document as much again. So whether the content
+    /// matches at all is one regex alternation over every term (pg_trgm serves it from the index
+    /// for selective terms), the per-term ranking only looks at the first
+    /// <see cref="ScoreWindowChars"/> characters (PostgreSQL decompresses just that slice), and
+    /// the excerpt position comes from one regexp_instr that stops at the first match.
     /// </summary>
     internal static (string Sql, object[] Parameters) BuildSearchSql(
         IReadOnlyList<string> tokens, string? shareName, string? pathPrefix, int offset, int limit,
@@ -199,7 +212,7 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
 
         var match = new List<string>();
         var score = new List<string>();
-        var positions = new List<string>();
+        var contentTerms = new List<string>();
         foreach (var token in tokens)
         {
             var like = Param("%" + EscapeLike(token) + "%");
@@ -209,12 +222,18 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
             if (token.Length < MinContentTokenLength)
                 continue;
 
-            match.Add($"""d."Content" ILIKE {like}""");
-            score.Add($"""CASE WHEN d."Content" ILIKE {like} THEN 1 ELSE 0 END""");
-            // Tokens are letters/digits only (see LocalIndexSearchService.Tokenize), so they are
-            // safe inside a regex; \m and \M are PostgreSQL's word-start/word-end anchors.
-            score.Add($"""CASE WHEN d."Content" ~* {Param(@"\m" + token + @"\M")} THEN 2 ELSE 0 END""");
-            positions.Add($"NULLIF(strpos(l.lc, {Param(token.ToLowerInvariant())}), 0)");
+            // Tokens are letters, marks and digits only (see LocalIndexSearchService.Tokenize), so
+            // they are safe inside a regex; \m and \M are PostgreSQL's word-start/word-end anchors.
+            contentTerms.Add(token);
+            score.Add($"""CASE WHEN w.lead ~* {Param(token)} THEN 1 ELSE 0 END""");
+            score.Add($"""CASE WHEN w.lead ~* {Param(@"\m" + token + @"\M")} THEN 2 ELSE 0 END""");
+        }
+
+        string? anyContentTerm = null;
+        if (contentTerms.Count > 0)
+        {
+            anyContentTerm = Param("(" + string.Join("|", contentTerms) + ")");
+            match.Add($"""d."Content" ~* {anyContentTerm}""");
         }
 
         var where = new StringBuilder($"({string.Join(" OR ", match)})");
@@ -238,28 +257,32 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
                  AND d."SharePath" !~* {Param("(^|/)[.]" + ShareEntryPolicy.RecycleBinName[1..] + "(/|$)")}
                 """);
 
-        var excerpt = positions.Count == 0
-            ? "NULL::text"
-            : $"""
-              CASE WHEN p.pos IS NULL THEN NULL
-                   ELSE substring(d."Content" from greatest(p.pos - {FragmentLead}, 1) for {FragmentLength}) END
-              """;
-        var position = positions.Count == 0 ? "NULL::int" : $"COALESCE({string.Join(", ", positions)})";
+        var position = anyContentTerm is null
+            ? "0"
+            : $"""regexp_instr(d."Content", {anyContentTerm}, 1, 1, 0, 'i')""";
+
+        // The ranking window is cut once per matching row (OFFSET 0 keeps the subquery from being
+        // inlined, which would repeat the cut for every term).
+        var window = anyContentTerm is null
+            ? ""
+            : $"""CROSS JOIN LATERAL (SELECT left(d."Content", {ScoreWindowChars}) AS lead OFFSET 0) w""";
 
         var sql = $"""
             WITH hits AS (
                 SELECT d."Id", ({string.Join(" + ", score)}) AS score
                 FROM search_documents d
+                {window}
                 WHERE {where}
                 ORDER BY score DESC, d."Id"
                 OFFSET {Param(offset)} LIMIT {Param(limit)}
             )
             SELECT d."Id", d."FileName", d."ShareName", d."AbsolutePath", d."SharePath", d."FileType",
                    d."SizeBytes", d."IsDirectory", d."CreatedUtc", d."IndexedUtc",
-                   {excerpt} AS "Fragment"
+                   CASE WHEN p.pos = 0 THEN NULL
+                        ELSE substring(d."Content" from greatest(p.pos - {FragmentLead}, 1) for {FragmentLength}) END
+                   AS "Fragment"
             FROM hits h
             JOIN search_documents d ON d."Id" = h."Id"
-            CROSS JOIN LATERAL (SELECT lower(d."Content") AS lc) l
             CROSS JOIN LATERAL (SELECT {position} AS pos) p
             ORDER BY h.score DESC, h."Id"
             """;

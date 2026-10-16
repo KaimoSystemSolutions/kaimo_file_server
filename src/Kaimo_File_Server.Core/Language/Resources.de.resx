@@ -3435,6 +3435,33 @@
   <data name="Web_Settings_CloudAccess_CacheSaveFailed" xml:space="preserve">
     <value>Cloud-Zugriff-Cache-Einstellungen konnten nicht gespeichert werden.</value>
   </data>
+  <data name="Web_Settings_Cert_SettingsSaved" xml:space="preserve">
+    <value>Zertifikatseinstellungen gespeichert und neues Zertifikat erzeugt.</value>
+  </data>
+  <data name="Web_Settings_Cert_SettingsSaveFailed" xml:space="preserve">
+    <value>Zertifikatseinstellungen konnten nicht gespeichert werden.</value>
+  </data>
+  <data name="Web_Settings_Cert_Regenerated" xml:space="preserve">
+    <value>Neues selbstsigniertes Zertifikat erzeugt. Es wird ohne Neustart ausgeliefert.</value>
+  </data>
+  <data name="Web_Settings_Cert_RegenerateFailed" xml:space="preserve">
+    <value>Zertifikat konnte nicht neu erzeugt werden.</value>
+  </data>
+  <data name="Web_Settings_Cert_NoFileSelected" xml:space="preserve">
+    <value>Bitte zuerst eine Zertifikatsdatei (.pfx/.p12 oder .pem/.crt/.cer) auswählen.</value>
+  </data>
+  <data name="Web_Settings_Cert_CustomImported" xml:space="preserve">
+    <value>Eigenes Zertifikat übernommen. Die automatische Erneuerung ist dafür pausiert.</value>
+  </data>
+  <data name="Web_Settings_Cert_CustomImportFailed" xml:space="preserve">
+    <value>Eigenes Zertifikat konnte nicht übernommen werden.</value>
+  </data>
+  <data name="Web_Settings_Session_Saved" xml:space="preserve">
+    <value>Sitzungsprüfung gespeichert (alle {0}s).</value>
+  </data>
+  <data name="Web_Settings_Session_SaveFailed" xml:space="preserve">
+    <value>Sitzungs-Einstellung konnte nicht gespeichert werden.</value>
+  </data>
   <data name="Web_ExternalStorage_Title" xml:space="preserve">
     <value>Externer Speicher</value>
   </data>

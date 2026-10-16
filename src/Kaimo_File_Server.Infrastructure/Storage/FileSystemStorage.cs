@@ -198,6 +198,7 @@ public class FileSystemStorage : IStorageEngine
 
 
     private readonly string _rootPath;
+    private readonly string _rootFullPath;
     private readonly Guid _shareId;
     private readonly IServiceProvider? _serviceProvider;
     private readonly ILogger _logger;
@@ -208,6 +209,7 @@ public class FileSystemStorage : IStorageEngine
     public FileSystemStorage(string rootPath, Guid shareId, IServiceProvider? serviceProvider)
     {
         _rootPath = rootPath;
+        _rootFullPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(rootPath));
         _shareId = shareId;
         _serviceProvider = serviceProvider;
         _logger = serviceProvider?.GetService<ILogger<FileSystemStorage>>()
@@ -222,10 +224,44 @@ public class FileSystemStorage : IStorageEngine
         // Internal server-owned paths (for example immutable Samba close
         // captures) are valid storage paths. Client-facing bridge ingress
         // rejects those namespaces before invoking the storage layer.
-        return ShareRelativePath.ToContainedAbsolutePath(
+        var fullPath = ShareRelativePath.ToContainedAbsolutePath(
             _rootPath, shareRelativePath,
             allowRoot: true, allowInternalNamespace: true);
+        EnsureNotThroughLink(fullPath, shareRelativePath);
+        return fullPath;
     }
+
+    /// <summary>
+    /// Symbolic links below the share root (no transport can create one; only a direct write on
+    /// the volume can) are never followed: a link to /etc/passwd would be served, a link to a
+    /// foreign directory written into, and a loop (x -> .) recursed forever. An item reached
+    /// through a link therefore counts as missing. One lstat per path segment.
+    /// </summary>
+    private void EnsureNotThroughLink(string fullPath, string shareRelativePath)
+    {
+        var root = _rootFullPath;
+        for (var path = fullPath; path.Length > root.Length; path = Path.GetDirectoryName(path)!)
+        {
+            if (new FileInfo(path).LinkTarget is not null)
+                throw new FileNotFoundException(
+                    $"'{shareRelativePath}' is reached through a symbolic link, which is not followed.",
+                    shareRelativePath);
+        }
+    }
+
+    // Every entry except symbolic links (hidden ones included, like Directory.GetFiles).
+    private static readonly EnumerationOptions WithoutLinks = new()
+    {
+        AttributesToSkip = FileAttributes.ReparsePoint,
+        IgnoreInaccessible = false,
+    };
+
+    private static readonly EnumerationOptions WithoutLinksRecursive = new()
+    {
+        AttributesToSkip = FileAttributes.ReparsePoint,
+        IgnoreInaccessible = false,
+        RecurseSubdirectories = true,
+    };
 
     // ------------------ Read / Write / Delete ------------------
 
@@ -307,7 +343,9 @@ public class FileSystemStorage : IStorageEngine
         // web overwrite must never truncate or delete the previous destination.
         var tempPath = Path.Combine(
             parentPath,
-            $".{Path.GetFileName(fullPath)}.kaimo-{Guid.NewGuid():N}.tmp");
+            // The name is not embedded: a long target name plus the suffix would exceed the
+            // 255-byte name limit although the target name itself fits.
+            $".kaimo-upload-{Guid.NewGuid():N}.tmp");
 
         try
         {
@@ -418,7 +456,7 @@ public class FileSystemStorage : IStorageEngine
     
     private void AddDirectoryToZip(ZipArchive zip, string dirPath, string entryBase)
     {
-        foreach (var file in Directory.GetFiles(dirPath, "*", SearchOption.AllDirectories))
+        foreach (var file in Directory.GetFiles(dirPath, "*", WithoutLinksRecursive))
         {
             var entryName = Path.Combine(entryBase, Path.GetRelativePath(dirPath, file))
                 .Replace('\\', '/');
@@ -445,7 +483,7 @@ public class FileSystemStorage : IStorageEngine
     
     private void AddDirectoryToTar(TarWriter tarWriter, string dirPath, string entryBase)
     {
-        foreach (var file in Directory.GetFiles(dirPath, "*", SearchOption.AllDirectories))
+        foreach (var file in Directory.GetFiles(dirPath, "*", WithoutLinksRecursive))
         {
             var entryName = Path.Combine(entryBase, Path.GetRelativePath(dirPath, file))
                 .Replace('\\', '/');
@@ -557,13 +595,13 @@ public class FileSystemStorage : IStorageEngine
 
         try
         {
-            foreach (var file in Directory.EnumerateFiles(path))
+            foreach (var file in Directory.EnumerateFiles(path, "*", WithoutLinks))
             {
                 try { total += new FileInfo(file).Length; }
                 catch { /* skip inaccessible file */ }
             }
 
-            foreach (var dir in Directory.EnumerateDirectories(path))
+            foreach (var dir in Directory.EnumerateDirectories(path, "*", WithoutLinks))
             {
                 total += CalculateDirectorySizeSafe(dir);
             }
@@ -654,7 +692,7 @@ public class FileSystemStorage : IStorageEngine
         if (!Directory.Exists(fullPath))
             throw new DirectoryNotFoundException($"Directory '{normalized}' does not exist.");
 
-        foreach (var dir in Directory.GetDirectories(fullPath))
+        foreach (var dir in Directory.GetDirectories(fullPath, "*", WithoutLinks))
         {
             var dirInfo = new DirectoryInfo(dir);
             entries.Add(new FileMetadata
@@ -671,7 +709,7 @@ public class FileSystemStorage : IStorageEngine
             });
         }
 
-        foreach (var file in Directory.GetFiles(fullPath))
+        foreach (var file in Directory.GetFiles(fullPath, "*", WithoutLinks))
         {
             var fileInfo = new FileInfo(file);
             entries.Add(new FileMetadata

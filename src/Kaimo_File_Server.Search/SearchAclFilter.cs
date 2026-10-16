@@ -51,7 +51,7 @@ public sealed class SearchAclFilter
             {
                 // Fail closed: can't verify the share → don't reveal its files.
                 _logger.LogDebug(
-                    "Suchtreffer für nicht auflösbaren/deaktivierten Share '{Share}' verworfen", group.Key);
+                    "Search hits of the unresolvable or disabled share '{Share}' discarded", group.Key);
                 continue;
             }
 

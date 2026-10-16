@@ -13,6 +13,26 @@ namespace Kaimo_File_Server.Search;
 /// </summary>
 internal static class SearchDocuments
 {
+    /// <summary>
+    /// Private-use characters the engines mark matches with internally. Indexed text never holds
+    /// them (<see cref="ContentProvider.Clean"/>), so unlike a literal "&lt;mark&gt;" in a file
+    /// they cannot be forged; <see cref="ToMarkup"/> turns them into the public tags.
+    /// </summary>
+    public const char HighlightOpen = '';
+    public const char HighlightClose = '';
+
+    /// <summary>
+    /// Converts an internally marked snippet to the public format (matches wrapped in literal
+    /// &lt;mark&gt;…&lt;/mark&gt;). Literal tags already in the text are removed first, so file
+    /// content cannot fake a highlight.
+    /// </summary>
+    public static string? ToMarkup(string? marked)
+        => marked?
+            .Replace("<mark>", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("</mark>", "", StringComparison.OrdinalIgnoreCase)
+            .Replace(HighlightOpen.ToString(), "<mark>")
+            .Replace(HighlightClose.ToString(), "</mark>");
+
     /// <summary>Stable document id: lowercase hex <c>md5(absolutePath)</c>.</summary>
     public static string GetStableId(string absolutePath)
     {
@@ -76,7 +96,9 @@ internal static class SearchDocuments
         {
             RecurseSubdirectories = true,
             IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.System
+            // Symbolic links are never followed: one pointing outside the share would index
+            // foreign files (/etc/passwd), a loop (x -> .) would multiply every entry.
+            AttributesToSkip = FileAttributes.System | FileAttributes.ReparsePoint
         };
 
         using var scope = scopeFactory.CreateScope();

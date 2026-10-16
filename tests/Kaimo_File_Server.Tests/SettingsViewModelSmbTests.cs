@@ -346,6 +346,50 @@ public class SettingsViewModelSmbTests
         Assert.Null(h.Vm.SuccessMessage);
     }
 
+    [Theory]
+    [InlineData("en", "Session check saved (every 120s).")]
+    [InlineData("de", "Sitzungsprüfung gespeichert (alle 120s).")]
+    public async Task SaveSessionSecurityAsync_SuccessMessage_IsLocalized(string culture, string expected)
+    {
+        var previous = System.Globalization.CultureInfo.CurrentUICulture;
+        System.Globalization.CultureInfo.CurrentUICulture = new System.Globalization.CultureInfo(culture);
+        try
+        {
+            var h = new Harness(canManageDataServices: false, canManageSettings: true);
+            await h.Vm.LoadAsync();
+            h.Vm.SessionRevalidationSeconds = 120;
+
+            Assert.True(await h.Vm.SaveSessionSecurityAsync());
+            Assert.Equal(expected, h.Vm.SuccessMessage);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = previous;
+        }
+    }
+
+    /// <summary>Every message key used by the Certificate/Security settings exists in both cultures.</summary>
+    [Theory]
+    [InlineData("Web_Settings_Cert_SettingsSaved")]
+    [InlineData("Web_Settings_Cert_SettingsSaveFailed")]
+    [InlineData("Web_Settings_Cert_Regenerated")]
+    [InlineData("Web_Settings_Cert_RegenerateFailed")]
+    [InlineData("Web_Settings_Cert_NoFileSelected")]
+    [InlineData("Web_Settings_Cert_CustomImported")]
+    [InlineData("Web_Settings_Cert_CustomImportFailed")]
+    [InlineData("Web_Settings_Session_Saved")]
+    [InlineData("Web_Settings_Session_SaveFailed")]
+    public void SettingsMessageKeys_ExistInBothCultures(string key)
+    {
+        var rm = Kaimo_File_Server.Core.Language.Resources.ResourceManager;
+        var en = rm.GetString(key, System.Globalization.CultureInfo.InvariantCulture);
+        var de = rm.GetString(key, new System.Globalization.CultureInfo("de"));
+
+        Assert.False(string.IsNullOrWhiteSpace(en));
+        Assert.False(string.IsNullOrWhiteSpace(de));
+        Assert.NotEqual(en, de);
+    }
+
     // ─────────────────────────── Test harness ───────────────────────────
 
     private sealed class Harness

@@ -83,13 +83,13 @@ public partial class SettingsViewModel
                 SessionSecuritySettings.RevalidationSecondsKey, SessionRevalidationSeconds);
             _logger.LogInformation(
                 "Session revalidation interval set to {Seconds}s", SessionRevalidationSeconds);
-            SuccessMessage = $"Sitzungsprüfung gespeichert (alle {SessionRevalidationSeconds}s).";
+            SuccessMessage = string.Format(R("Web_Settings_Session_Saved"), SessionRevalidationSeconds);
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to save session security setting");
-            ErrorMessage = "Sitzungs-Einstellung konnte nicht gespeichert werden.";
+            ErrorMessage = R("Web_Settings_Session_SaveFailed");
             return false;
         }
     }

@@ -97,7 +97,7 @@ public class LoginViewModel
                 case LoginOutcome.LockedOut:
                     var minutes = Math.Max(1, (int)Math.Ceiling(result.RetryAfter.TotalMinutes));
                     _logger.LogWarning(
-                        "Login gesperrt (Brute-Force-Schutz) für {Username}, erneut in {Minutes} min",
+                        "Login locked (brute-force protection) for {Username}, retry in {Minutes} min",
                         Username, minutes);
                     // Never disclose the real reason outward — see default below.
                     ErrorMessage = Resources.Web_Login_InvalidCredentials;

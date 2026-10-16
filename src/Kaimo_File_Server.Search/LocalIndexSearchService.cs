@@ -197,7 +197,7 @@ public sealed partial class LocalIndexSearchService : ISearchService
             if (stamp is { } current && await _index.TouchIfUnchangedAsync(id, size, current, indexedUtc, ct))
                 return;
 
-            content = PrepareContent(await ContentProvider.GetContent(stream, fileName));
+            content = PrepareContent(await ContentProvider.GetContent(stream, fileName, _logger));
         }
 
         await _index.UpsertAsync(new FileDocument
@@ -256,21 +256,37 @@ public sealed partial class LocalIndexSearchService : ISearchService
     public Task InitializeAsync(CancellationToken ct = default) => Task.CompletedTask;
 
     /// <summary>
-    /// Splits the query like the Elasticsearch standard tokenizer + n-gram index do: runs of
-    /// letters/digits, lowercased, at least two characters, de-duplicated. Anything else
-    /// (punctuation, LIKE/regex metacharacters) never reaches the database.
+    /// Splits the query like the Elasticsearch query tokenizer + n-gram index do: runs of
+    /// letters/digits (with their combining marks), NFC-normalized, lowercased, at least two
+    /// characters, de-duplicated. Anything else (punctuation, LIKE/regex metacharacters) never
+    /// reaches the database. Each term is followed by its spelling variants, which match as
+    /// alternatives: the decomposed form (file names from macOS clients are NFD; content is
+    /// NFC) and ß written as "ss" or the other way round (PostgreSQL's ILIKE keeps them apart).
     /// </summary>
     internal static IReadOnlyList<string> Tokenize(string? searchText)
     {
         if (string.IsNullOrWhiteSpace(searchText))
             return Array.Empty<string>();
 
-        return TokenRegex().Matches(searchText)
+        return TokenRegex().Matches(searchText.Normalize())
             .Select(m => m.Value.ToLowerInvariant())
             .Where(t => t.Length >= 2)
             .Distinct()
             .Take(MaxQueryTokens)
+            .SelectMany(SpellingVariants)
+            .Distinct()
             .ToList();
+    }
+
+    private static IEnumerable<string> SpellingVariants(string term)
+    {
+        yield return term;
+        if (term.Normalize(NormalizationForm.FormD) is var decomposed && decomposed != term)
+            yield return decomposed;
+        if (term.Contains('ß'))
+            yield return term.Replace("ß", "ss");
+        else if (term.Contains("ss", StringComparison.Ordinal))
+            yield return term.Replace("ss", "ß");
     }
 
     /// <summary>
@@ -286,6 +302,9 @@ public sealed partial class LocalIndexSearchService : ISearchService
 
     internal static string Mark(string text, IReadOnlyList<string> tokens)
     {
+        // Literal tags in a file name or content must not pose as highlights.
+        text = text.Replace("<mark>", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("</mark>", "", StringComparison.OrdinalIgnoreCase);
         var marked = new bool[text.Length];
         foreach (var token in tokens)
             for (int i = text.IndexOf(token, StringComparison.OrdinalIgnoreCase);
@@ -310,7 +329,7 @@ public sealed partial class LocalIndexSearchService : ISearchService
         return content.Length > MaxContentChars ? content[..MaxContentChars] : content;
     }
 
-    [GeneratedRegex(@"[\p{L}\p{N}]+")]
+    [GeneratedRegex(@"[\p{L}\p{M}\p{N}]+")]
     private static partial Regex TokenRegex();
 
     // ══════════════════════════════════════════
@@ -334,6 +353,7 @@ public sealed partial class LocalIndexSearchService : ISearchService
 
         int total = targets.Files.Count + targets.Directories.Count;
         int done = 0;
+        var failures = new ReindexFailureLog(_logger);
         progress?.Report((0, total));
 
         foreach (var file in targets.Files)
@@ -351,7 +371,7 @@ public sealed partial class LocalIndexSearchService : ISearchService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Reindex: local indexing failed for '{Path}'", file.Path);
+                failures.Add(file.Path, ex);
                 // Keep the previous entry (if any) through the sweep: the file still exists,
                 // it just could not be read right now (e.g. locked).
                 await TryTouchAsync(file.Path, started, ct);
@@ -375,12 +395,14 @@ public sealed partial class LocalIndexSearchService : ISearchService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Reindex: local indexing failed for directory '{Path}'", directory.Path);
+                failures.Add(directory.Path, ex);
                 await TryTouchAsync(directory.Path, started, ct);
             }
 
             progress?.Report((++done, total));
         }
+
+        failures.LogSummary(total);
 
         ct.ThrowIfCancellationRequested();
         int swept = await _index.SweepAsync(targets.Shares.Select(s => s.Name).ToList(), started, ct);

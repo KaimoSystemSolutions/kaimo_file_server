@@ -19,20 +19,40 @@ public class ElasticSearchService : ISearchService
 {
     // NOTE: the index name is versioned. Changing a field's analyzer requires a
     // NEW index (analyzers are fixed at field-creation time). Bumping the suffix
-    // forces InitializeAsync to build a fresh index with the current mapping.
-    // The old "kaimo-files" index can be deleted manually; existing files are
-    // re-indexed as they are written/renamed.
-    private const string IndexName = "kaimo-files-v2";
+    // makes EnsureIndexAsync build a fresh index with the current mapping; the router
+    // then starts a full reindex and deletes the legacy indexes below once it has completed.
+    // v3: query tokenizer splits on punctuation, query terms truncated to the n-gram span,
+    // CJK via whole-character sub-fields, ß folded to ss, content n-grams 3–10.
+    internal const string DefaultIndexName = "kaimo-files-v3";
+    private static readonly string[] LegacyIndexNames = ["kaimo-files-v2", "kaimo-files"];
 
-    // Index-time analyzer: breaks tokens into n-grams so a substring of a word
+    private readonly string _indexName;
+
+    /// <summary>The index this service reads and writes.</summary>
+    internal string IndexName => _indexName;
+
+    // Index-time analyzer of file names: breaks tokens into n-grams so a substring of a word
     // (e.g. "ocum" inside "document") still produces a matching token.
     private const string NgramIndexAnalyzer = "kaimo_ngram_index";
-    // Search-time analyzer: keeps the user's query as whole tokens (lowercased)
-    // so it matches against the indexed n-grams without exploding into noise.
+    // Search-time analyzer: splits the user's query exactly where the index tokenizer splits
+    // (anything but letters and digits: ".", "_", ":" …), lowercases and cuts each term to the
+    // longest indexed n-gram, so "invoice.pdf" and words longer than the span still match.
     private const string NgramSearchAnalyzer = "kaimo_ngram_search";
+    // Content uses a narrower span: 2–20 grams cost ~19 terms per character and made the index
+    // ~35x the size of the local one; 3–10 cost 8. Whole words are matched via "content.std".
+    private const string ContentIndexAnalyzer = "kaimo_content_index";
+    private const string ContentSearchAnalyzer = "kaimo_content_search";
+    // Whole-word analysis (standard tokenizer: one token per CJK character) for ranking, fuzzy
+    // matching and scripts without spaces, where single characters are words.
+    private const string WordAnalyzer = "kaimo_words";
 
     private const int NgramMinGram = 2;
     private const int NgramMaxGram = 20;
+    private const int ContentMinGram = 3;
+    private const int ContentMaxGram = 10;
+
+    // Documents read per page while sweeping stale ones after a reindex.
+    private const int SweepPageSize = 1000;
 
     // The 2–20 n-gram analysis holds every distinct gram of a document in heap at once. High-
     // entropy content (base64 the blob filter misses, random identifiers) OOM-kills a 512 MB node
@@ -50,23 +70,28 @@ public class ElasticSearchService : ISearchService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly SearchAclFilter _aclFilter;
 
-    private enum ExistsResult
-    {
-        ExactFileExists,
-        OldVersionExists,
-        DoesntExist
-    }
-
     public ElasticSearchService(
         ElasticsearchClient client,
         ILogger<ElasticSearchService> logger,
         IServiceScopeFactory scopeFactory,
         SearchAclFilter aclFilter)
+        : this(client, logger, scopeFactory, aclFilter, DefaultIndexName)
+    {
+    }
+
+    /// <summary>Uses <paramref name="indexName"/> instead of the production index (tests).</summary>
+    internal ElasticSearchService(
+        ElasticsearchClient client,
+        ILogger<ElasticSearchService> logger,
+        IServiceScopeFactory scopeFactory,
+        SearchAclFilter aclFilter,
+        string indexName)
     {
         _client = client;
         _logger = logger;
         _scopeFactory = scopeFactory;
         _aclFilter = aclFilter;
+        _indexName = indexName;
     }
 
     public async Task onFileCreated(string absolutePath, Task<Stream> fileData, CancellationToken ct = default)
@@ -111,7 +136,7 @@ public class ElasticSearchService : ISearchService
             // Delete by id (id == hash(absolutePath)), not by query: delete-by-query only sees
             // refreshed segments, so a file indexed <1s earlier was missed and left orphaned.
             var response = Answered(await _client.DeleteAsync<FileDocument>(
-                SearchDocuments.GetStableId(absolutePath), d => d.Index(IndexName)));
+                SearchDocuments.GetStableId(absolutePath), d => d.Index(_indexName)));
 
             if (response.Result == Result.NotFound)
                 // Never indexed (hidden path, pre-existing file, vanished before indexing) — fine.
@@ -162,7 +187,7 @@ public class ElasticSearchService : ISearchService
     /// </summary>
     private async Task IndexDirectoryDocumentAsync(FileDocument doc, CancellationToken ct = default)
     {
-        var existing = Answered(await _client.GetAsync<FileDocument>(doc.Id, g => g.Index(IndexName), ct));
+        var existing = Answered(await _client.GetAsync<FileDocument>(doc.Id, g => g.Index(_indexName), ct));
         if (existing.Found)
         {
             _logger.LogDebug("Directory {Id} already indexed, skipping", doc.Id);
@@ -170,7 +195,7 @@ public class ElasticSearchService : ISearchService
         }
 
         var response = Answered(await _client.IndexAsync(doc, idx => idx
-            .Index(IndexName)
+            .Index(_indexName)
             .Id(doc.Id), ct));
 
         if (!response.IsValidResponse)
@@ -189,9 +214,9 @@ public class ElasticSearchService : ISearchService
 
                 // delete-by-query only sees refreshed segments; refresh first so children
                 // indexed moments ago are not left orphaned.
-                Answered(await _client.Indices.RefreshAsync(IndexName));
+                Answered(await _client.Indices.RefreshAsync(_indexName));
 
-                var response = Answered(await _client.DeleteByQueryAsync<FileDocument>(IndexName, d => d
+                var response = Answered(await _client.DeleteByQueryAsync<FileDocument>(_indexName, d => d
                     .Query(q => q
                         .Bool(b => b
                             .Should(
@@ -208,7 +233,7 @@ public class ElasticSearchService : ISearchService
                         absolutePath, response.DebugInformation);
                 else
                     _logger.LogDebug(
-                        "{Count} Dokument(e) für Verzeichnis '{Path}' aus Index entfernt",
+                        "Removed {Count} document(s) of directory '{Path}' from the index",
                         response.Deleted, absolutePath);
             }
             catch (Exception ex) when (ex is not SearchUnavailableException)
@@ -233,11 +258,11 @@ public class ElasticSearchService : ISearchService
                     ?? throw new InvalidOperationException(
                         $"No share definition contains '{newAbsolutePath}'.");
 
-                var existing = Answered(await _client.GetAsync<FileDocument>(oldId, g => g.Index(IndexName)));
+                var existing = Answered(await _client.GetAsync<FileDocument>(oldId, g => g.Index(_indexName)));
                 if (!existing.Found || existing.Source is null)
                 {
                     _logger.LogWarning(
-                        "Umbenennung: kein Index-Dokument für '{Old}' gefunden — übersprungen",
+                        "Rename: no index document found for '{Old}', skipped",
                         oldAbsolutePath);
                     return;
                 }
@@ -277,7 +302,7 @@ public class ElasticSearchService : ISearchService
                 while (guard++ < maxIterations)
                 {
                     var resp = Answered(await _client.SearchAsync<FileDocument>(s => s
-                        .Indices(IndexName)
+                        .Indices(_indexName)
                         .Size(500)
                         .Query(q => q
                             .Prefix(p => p
@@ -290,7 +315,7 @@ public class ElasticSearchService : ISearchService
                     if (!resp.IsValidResponse)
                     {
                         _logger.LogError(
-                            "Verzeichnis-Umbenennung: Suche fehlgeschlagen für '{Old}': {Error}",
+                            "Directory rename: search failed for '{Old}': {Error}",
                             oldAbsolutePath, resp.DebugInformation);
                         return;
                     }
@@ -318,14 +343,14 @@ public class ElasticSearchService : ISearchService
 
                     // Make the deletions/re-indexes visible before the next page,
                     // so the old-prefix result set strictly shrinks and the loop ends.
-                    Answered(await _client.Indices.RefreshAsync(IndexName));
+                    Answered(await _client.Indices.RefreshAsync(_indexName));
                 }
 
                 // The renamed directory's OWN document (its absolutePath equals the
                 // old path without a trailing separator) is not covered by the
                 // child-prefix query above — rewrite it explicitly.
                 string oldDirId = SearchDocuments.GetStableId(oldAbsolutePath);
-                var ownDoc = Answered(await _client.GetAsync<FileDocument>(oldDirId, g => g.Index(IndexName)));
+                var ownDoc = Answered(await _client.GetAsync<FileDocument>(oldDirId, g => g.Index(_indexName)));
                 if (ownDoc.Found && ownDoc.Source is not null)
                 {
                     var updatedOwn = BuildRenamedDocument(
@@ -335,7 +360,7 @@ public class ElasticSearchService : ISearchService
                 }
 
                 _logger.LogDebug(
-                    "Index aktualisiert (Verzeichnis): '{Old}' -> '{New}' ({Count} Dokument(e))",
+                    "Index updated (directory): '{Old}' -> '{New}' ({Count} document(s))",
                     oldAbsolutePath, newAbsolutePath, processed);
             }
             catch (Exception ex) when (ex is not SearchUnavailableException)
@@ -349,9 +374,9 @@ public class ElasticSearchService : ISearchService
     /// <summary>
     /// Builds a fresh document for a moved file: recomputes the stable id, share
     /// name, share-relative path, file name and type from the new absolute path,
-    /// while preserving the indexed content and original creation time.
+    /// while preserving the indexed content, size/last-write stamp and original creation time.
     /// </summary>
-    private static FileDocument BuildRenamedDocument(
+    internal static FileDocument BuildRenamedDocument(
         FileDocument source,
         string newAbsolutePath,
         ShareDefinition share)
@@ -361,7 +386,7 @@ public class ElasticSearchService : ISearchService
         return new FileDocument
         {
             Id = SearchDocuments.GetStableId(newAbsolutePath),
-            FileName = Path.GetFileName(newAbsolutePath),
+            FileName = Path.GetFileName(newAbsolutePath).Normalize(),
             ShareName = share.Name,
             AbsolutePath = newAbsolutePath,
             SharePath = sharePath,
@@ -370,6 +395,8 @@ public class ElasticSearchService : ISearchService
                 ? string.Empty
                 : Path.GetExtension(newAbsolutePath).TrimStart('.'),
             FileSizeBytes = source.FileSizeBytes,
+            // A rename keeps content and last-write time, so the next reindex can still skip it.
+            FileModifiedTicks = source.FileModifiedTicks,
             IsDirectory = source.IsDirectory,
             Created = source.Created,
             Modified = DateTime.UtcNow,
@@ -385,7 +412,7 @@ public class ElasticSearchService : ISearchService
     private async Task ReplaceDocumentAsync(string oldId, FileDocument updated)
     {
         var indexResp = Answered(await _client.IndexAsync(updated, idx => idx
-            .Index(IndexName)
+            .Index(_indexName)
             .Id(updated.Id)));
 
         if (!indexResp.IsValidResponse)
@@ -397,7 +424,7 @@ public class ElasticSearchService : ISearchService
 
         if (!string.Equals(oldId, updated.Id, StringComparison.Ordinal))
         {
-            Answered(await _client.DeleteAsync<FileDocument>(oldId, d => d.Index(IndexName)));
+            Answered(await _client.DeleteAsync<FileDocument>(oldId, d => d.Index(_indexName)));
         }
     }
 
@@ -405,18 +432,26 @@ public class ElasticSearchService : ISearchService
     //  Index lifecycle
     // ══════════════════════════════════════════
 
-    public async Task InitializeAsync(CancellationToken ct = default)
+    public Task InitializeAsync(CancellationToken ct = default) => EnsureIndexAsync(ct);
+
+    /// <summary>
+    /// Creates the index with the current mapping unless it exists. Returns true when it was
+    /// created now: it is empty then, and the caller starts a full reindex.
+    /// </summary>
+    public async Task<bool> EnsureIndexAsync(CancellationToken ct = default)
     {
         // Don't touch the index until the cluster can actually allocate shards.
         // Creating an index against an unhealthy (red) node leaves its primary
         // shard unassigned -> every later _search returns 503 "all shards failed".
         await WaitForClusterReadyAsync(ct);
 
-        var exists = await _client.Indices.ExistsAsync(IndexName, ct);
+        var exists = await _client.Indices.ExistsAsync(_indexName, ct);
         if (exists.Exists)
-            return;
+            return false;
 
-        var createRequest = new CreateIndexRequest(IndexName)
+        TokenChar[] wordChars = [TokenChar.Letter, TokenChar.Digit];
+        string[] fold = ["kaimo_fold"];
+        var createRequest = new CreateIndexRequest(_indexName)
         {
             Settings = new IndexSettings
             {
@@ -430,6 +465,11 @@ public class ElasticSearchService : ISearchService
                 MaxNgramDiff = NgramMaxGram - NgramMinGram,
                 Analysis = new IndexSettingsAnalysis
                 {
+                    // "STRASSE" and "straße" are the same word; lowercase alone keeps them apart.
+                    CharFilters = new CharFilters
+                    {
+                        { "kaimo_fold", new MappingCharFilter { Mappings = ["ß => ss", "ẞ => ss"] } }
+                    },
                     Tokenizers = new Tokenizers
                     {
                         {
@@ -437,24 +477,65 @@ public class ElasticSearchService : ISearchService
                             {
                                 MinGram = NgramMinGram,
                                 MaxGram = NgramMaxGram,
-                                TokenChars = new[] { TokenChar.Letter, TokenChar.Digit }
+                                TokenChars = wordChars
                             }
-                        }
+                        },
+                        {
+                            "kaimo_content_tokenizer", new NGramTokenizer
+                            {
+                                MinGram = ContentMinGram,
+                                MaxGram = ContentMaxGram,
+                                TokenChars = wordChars
+                            }
+                        },
+                        // Splits exactly where the n-gram tokenizers split (Java regex).
+                        { "kaimo_query_tokenizer", new PatternTokenizer { Pattern = @"[^\p{L}\p{N}]+" } }
+                    },
+                    TokenFilters = new TokenFilters
+                    {
+                        { "kaimo_name_truncate", new TruncateTokenFilter { Length = NgramMaxGram } },
+                        { "kaimo_content_truncate", new TruncateTokenFilter { Length = ContentMaxGram } }
                     },
                     Analyzers = new Analyzers
                     {
                         {
                             NgramIndexAnalyzer, new CustomAnalyzer
                             {
+                                CharFilter = fold,
                                 Tokenizer = "kaimo_ngram_tokenizer",
-                                Filter = new[] { "lowercase" }
+                                Filter = ["lowercase"]
                             }
                         },
                         {
                             NgramSearchAnalyzer, new CustomAnalyzer
                             {
+                                CharFilter = fold,
+                                Tokenizer = "kaimo_query_tokenizer",
+                                Filter = ["lowercase", "kaimo_name_truncate"]
+                            }
+                        },
+                        {
+                            ContentIndexAnalyzer, new CustomAnalyzer
+                            {
+                                CharFilter = fold,
+                                Tokenizer = "kaimo_content_tokenizer",
+                                Filter = ["lowercase"]
+                            }
+                        },
+                        {
+                            ContentSearchAnalyzer, new CustomAnalyzer
+                            {
+                                CharFilter = fold,
+                                Tokenizer = "kaimo_query_tokenizer",
+                                Filter = ["lowercase", "kaimo_content_truncate"]
+                            }
+                        },
+                        {
+                            WordAnalyzer, new CustomAnalyzer
+                            {
+                                CharFilter = fold,
                                 Tokenizer = "standard",
-                                Filter = new[] { "lowercase" }
+                                Filter = ["lowercase"]
                             }
                         }
                     }
@@ -469,9 +550,37 @@ public class ElasticSearchService : ISearchService
         var response = await _client.Indices.CreateAsync(createRequest, ct);
 
         if (!response.IsValidResponse)
+        {
             _logger.LogError("Index could not be created: {Error}", response.DebugInformation);
-        else
-            _logger.LogDebug("Index '{Index}' created", IndexName);
+            return false;
+        }
+
+        _logger.LogInformation("Search index '{Index}' created; a full reindex fills it", _indexName);
+        return true;
+    }
+
+    /// <summary>
+    /// Frees the disk space of indexes built with an earlier mapping version (best effort). Called
+    /// once the production index is completely built, so an interrupted build loses nothing.
+    /// </summary>
+    internal async Task DeleteLegacyIndexesAsync(CancellationToken ct)
+    {
+        if (_indexName != DefaultIndexName)
+            return;
+
+        foreach (var legacy in LegacyIndexNames)
+        {
+            try
+            {
+                if ((await _client.Indices.ExistsAsync(legacy, ct)).Exists
+                    && (await _client.Indices.DeleteAsync(legacy, ct)).IsValidResponse)
+                    _logger.LogInformation("Deleted the outdated search index '{Index}'", legacy);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Could not delete the outdated search index '{Index}'", legacy);
+            }
+        }
     }
 
     /// <summary>
@@ -496,21 +605,21 @@ public class ElasticSearchService : ISearchService
                 }
 
                 _logger.LogWarning(
-                    "Elasticsearch-Cluster noch nicht bereit (Status rot), Versuch {Attempt}/{Max}",
+                    "Elasticsearch cluster not ready yet (status red), attempt {Attempt}/{Max}",
                     attempt, maxAttempts);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex,
-                    "Elasticsearch noch nicht erreichbar, Versuch {Attempt}/{Max}", attempt, maxAttempts);
+                    "Elasticsearch not reachable yet, attempt {Attempt}/{Max}", attempt, maxAttempts);
             }
 
             await Task.Delay(2000, ct);
         }
 
         _logger.LogError(
-            "Elasticsearch-Cluster ist nach {Max} Versuchen weiterhin rot/unerreichbar. " +
-            "Bitte ES-Health prüfen (Shard-Allocation / Disk-Watermark / Container-Neustart).",
+            "Elasticsearch cluster is still red/unreachable after {Max} attempts. " +
+            "Check the cluster health (shard allocation, disk watermark, container restart).",
             maxAttempts);
     }
 
@@ -553,12 +662,15 @@ public class ElasticSearchService : ISearchService
     /// When <paramref name="shareName"/> / <paramref name="pathPrefix"/> are set, the
     /// query is filtered to that share (and folder subtree) via keyword filters.
     /// </summary>
-    private async Task<List<FileDocument>> RawSearchAsync(
+    internal async Task<List<FileDocument>> RawSearchAsync(
         string searchText, string? shareName, string? pathPrefix, bool includeRecycleBin,
         int from, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(searchText))
             return new List<FileDocument>();
+
+        // Names and content are indexed in NFC; a query typed on macOS may arrive decomposed.
+        searchText = searchText.Normalize();
 
         var scopeFilters = BuildScopeFilters(shareName, pathPrefix);
         // Recycle-bin documents (any ".RECYCLE_BIN" segment; only the share's/home's own bin
@@ -577,7 +689,7 @@ public class ElasticSearchService : ISearchService
             };
 
         var response = await _client.SearchAsync<FileDocument>(s => s
-            .Indices(IndexName)
+            .Indices(_indexName)
             .From(from)
             .Size(RawFetchSize)
             .Query(q => q
@@ -587,6 +699,13 @@ public class ElasticSearchService : ISearchService
                         // Partial-word matches on the file name (n-gram analyzed).
                         sh => sh.Match(m => m
                             .Field("fileName")
+                            .Query(searchText)
+                            .Boost(4)
+                        ),
+                        // Whole words of the file name: single CJK characters are below the
+                        // n-gram minimum and only match here.
+                        sh => sh.Match(m => m
+                            .Field("fileName.std")
                             .Query(searchText)
                             .Boost(4)
                         ),
@@ -616,19 +735,16 @@ public class ElasticSearchService : ISearchService
                         b.MustNot(excludeFilters);
                 })
             )
+            // Matches are marked with private-use characters that indexed text never holds, so a
+            // literal "<mark>" in a file cannot pose as a highlight (see SearchDocuments.ToMarkup).
             .Highlight(h => h
+                .PreTags(ImmutableList.Create(SearchDocuments.HighlightOpen.ToString()))
+                .PostTags(ImmutableList.Create(SearchDocuments.HighlightClose.ToString()))
                 .Fields(f => f
-                    .Add("content", hf => hf
-                        .NumberOfFragments(1)
-                        .FragmentSize(100)
-                        .PreTags(ImmutableList.Create("<mark>"))
-                        .PostTags(ImmutableList.Create("</mark>"))
-                    )
-                    .Add("fileName", hf => hf
-                        .NumberOfFragments(1)
-                        .PreTags(ImmutableList.Create("<mark>"))
-                        .PostTags(ImmutableList.Create("</mark>"))
-                    )
+                    .Add("content", hf => hf.NumberOfFragments(1).FragmentSize(100))
+                    .Add("content.std", hf => hf.NumberOfFragments(1).FragmentSize(100))
+                    .Add("fileName", hf => hf.NumberOfFragments(1))
+                    .Add("fileName.std", hf => hf.NumberOfFragments(1))
                 )
             ), ct);
 
@@ -645,14 +761,17 @@ public class ElasticSearchService : ISearchService
         foreach (var hit in response.Hits)
         {
             var doc = hit.Source!;
-            if (hit.Highlight?.TryGetValue("fileName", out var nameFragments) == true && nameFragments.Any())
+            // The file name when it matched, otherwise the content excerpt.
+            string? fragment = null;
+            foreach (var field in (ReadOnlySpan<string>)["fileName", "fileName.std", "content", "content.std"])
             {
-                doc.HighlightSnippet = nameFragments.First();
+                if (hit.Highlight?.TryGetValue(field, out var fragments) == true && fragments.FirstOrDefault() is { } first)
+                {
+                    fragment = first;
+                    break;
+                }
             }
-            else if (hit.Highlight?.TryGetValue("content", out var fragments) == true && fragments.Any())
-            {
-                doc.HighlightSnippet = fragments.First();
-            }
+            doc.HighlightSnippet = SearchDocuments.ToMarkup(fragment);
             results.Add(doc);
         }
 
@@ -695,27 +814,24 @@ public class ElasticSearchService : ISearchService
     //  Indexing
     // ══════════════════════════════════════════
 
-    private async Task<ExistsResult> CheckForDocumentsExistance(FileDocument document, CancellationToken ct = default)
+    /// <summary>
+    /// True when the index already holds this file at the same path with the same size and
+    /// last-write time, so its content need not be read or extracted again (mirrors the local
+    /// index). Documents indexed before timestamps were stored carry none and are rewritten once.
+    /// </summary>
+    private async Task<bool> IsIndexedUnchangedAsync(FileDocument document, CancellationToken ct)
     {
-
+        // The stored content is not needed for the comparison; it can be up to MaxContentChars.
         var existing = Answered(await _client.GetAsync<FileDocument>(document.Id, g => g
-            .Index(IndexName)));
+            .Index(_indexName)
+            .SourceExcludes("content"), ct));
 
-        if (!existing.Found)
-            return ExistsResult.DoesntExist;
-
-        var existingFile = existing.Source;
-
-        bool sameContent = document.Content.Equals(existingFile?.Content);
-        bool samePath = document.AbsolutePath.Equals(existingFile?.AbsolutePath) && document.FileName.Equals(existingFile.FileName);
-
-        if (samePath && sameContent)
-            return ExistsResult.ExactFileExists;
-
-        if (samePath)
-            return ExistsResult.OldVersionExists;
-
-        return ExistsResult.DoesntExist;
+        return existing.Found
+               && existing.Source is { } indexed
+               && indexed.AbsolutePath == document.AbsolutePath
+               && indexed.FileName == document.FileName
+               && indexed.FileSizeBytes == document.FileSizeBytes
+               && indexed.FileModifiedTicks == document.FileModifiedTicks;
     }
 
     private async Task IndexDocumentIfNotExistsAsync(
@@ -735,57 +851,50 @@ public class ElasticSearchService : ISearchService
             return;
         }
 
-        // IMPORTANT: dispose the read stream immediately. Leaving the FileStream
-        // open keeps an OS handle on the file, which on Windows-backed bind mounts
-        // blocks renaming/moving the containing directory ("access denied").
-        string content;
-        await using (var fileStream = await fileData)
-        {
-            content = await ContentProvider.GetContent(fileStream, fileName);
-        }
-        if (content.Length > MaxContentChars)
-            // Never cut a surrogate pair in half: a lone high surrogate is invalid UTF-16.
-            content = content[..(char.IsHighSurrogate(content[MaxContentChars - 1])
-                ? MaxContentChars - 1
-                : MaxContentChars)];
-
-        string sharePath = Path.GetRelativePath(share.Path, absolutePath);
-
         FileDocument document = new FileDocument
         {
             Id = SearchDocuments.GetStableId(absolutePath),
-            FileName = fileName,
+            // NFC like content and queries: macOS clients create decomposed names.
+            FileName = fileName.Normalize(),
             ShareName = share.Name,
             AbsolutePath = absolutePath,
-            SharePath = sharePath,
-            Content = content,
+            SharePath = Path.GetRelativePath(share.Path, absolutePath),
             FileType = Path.GetExtension(fileName).TrimStart('.'),
-            FileSizeBytes = new FileInfo(absolutePath).Length,
             Created = DateTime.UtcNow,
             Modified = DateTime.UtcNow
         };
 
-        ExistsResult existenceCheck = await CheckForDocumentsExistance(document, ct);
-
-        switch (existenceCheck)
+        // IMPORTANT: dispose the read stream immediately. Leaving the FileStream
+        // open keeps an OS handle on the file, which on Windows-backed bind mounts
+        // blocks renaming/moving the containing directory ("access denied").
+        await using (var fileStream = await fileData)
         {
-            case ExistsResult.ExactFileExists:
-                _logger.LogDebug("Document {Id} already indexed, skipping", document.Id);
+            var info = new FileInfo(absolutePath);
+            document.FileSizeBytes = info.Length; // throws FileNotFoundException when the file is gone
+            // An SMB file still locked by its writer arrives as Stream.Null (name-only). Store no
+            // stamp then, so the Modified entry on close re-extracts the real content.
+            document.FileModifiedTicks = ReferenceEquals(fileStream, Stream.Null) ? null : info.LastWriteTimeUtc.Ticks;
+
+            if (document.FileModifiedTicks is not null && await IsIndexedUnchangedAsync(document, ct))
+            {
+                _logger.LogDebug("Document {Id} already indexed and unchanged, skipping", document.Id);
                 return;
+            }
 
-            case ExistsResult.OldVersionExists:
-                // No delete first: indexing under the same id replaces the document, and a
-                // delete would leave the file unfindable if the engine dies during the write.
-                _logger.LogDebug("Found older version of {Id}, overwriting it", document.Id);
-                break;
-
-            case ExistsResult.DoesntExist:
-                _logger.LogDebug("Indexing new document {Id}", document.Id);
-                break;
+            document.Content = await ContentProvider.GetContent(fileStream, fileName, _logger);
         }
+        if (document.Content.Length > MaxContentChars)
+            // Never cut a surrogate pair in half: a lone high surrogate is invalid UTF-16.
+            document.Content = document.Content[..(char.IsHighSurrogate(document.Content[MaxContentChars - 1])
+                ? MaxContentChars - 1
+                : MaxContentChars)];
+
+        // No delete first: indexing under the same id replaces the document, and a
+        // delete would leave the file unfindable if the engine dies during the write.
+        _logger.LogDebug("Indexing document {Id}", document.Id);
 
         var response = Answered(await _client.IndexAsync(document, idx => idx
-            .Index(IndexName)
+            .Index(_indexName)
             .Id(document.Id),
             ct));
 
@@ -798,7 +907,7 @@ public class ElasticSearchService : ISearchService
                 document.Id, response.DebugInformation);
             document.Content = string.Empty;
             response = Answered(await _client.IndexAsync(document, idx => idx
-                .Index(IndexName)
+                .Index(_indexName)
                 .Id(document.Id),
                 ct));
         }
@@ -811,14 +920,17 @@ public class ElasticSearchService : ISearchService
     /// <summary>
     /// Re-indexes every file currently on disk under the persisted share paths. Used to
     /// catch up files that arrived while indexing was off, or were added out of
-    /// band (e.g. directly on the volume). Already-indexed, unchanged files are
-    /// skipped by the existing dedupe check, so a reindex is cheap to repeat.
+    /// band (e.g. directly on the volume). Already-indexed files with the same size and
+    /// last-write time are skipped without being read, so a reindex is cheap to repeat.
     /// Hidden/system folders (".versions", ".dp-keys", …) are skipped; the recycle bin is indexed.
+    /// After a complete pass, documents of the walked shares whose files are gone (deleted or
+    /// moved out of band) are swept, like the local index does. A canceled pass sweeps nothing.
     /// </summary>
     public async Task ReindexAllAsync(
         IProgress<(int done, int total)>? progress, CancellationToken ct = default,
         string? shareName = null)
     {
+        var started = DateTime.UtcNow;
         // Ensure the index exists with the correct (n-gram) mapping before writing.
         await InitializeAsync(ct);
 
@@ -828,8 +940,12 @@ public class ElasticSearchService : ISearchService
 
         int total = files.Count + dirs.Count;
         int done = 0;
+        var failures = new ReindexFailureLog(_logger);
         progress?.Report((0, total));
 
+        // An outage (SearchUnavailableException) aborts the pass: every further entry would fail
+        // the same way. The router reports it once as a failed reindex; unchanged entries are
+        // skipped cheaply when it is restarted.
         foreach (var file in files)
         {
             ct.ThrowIfCancellationRequested();
@@ -839,9 +955,9 @@ public class ElasticSearchService : ISearchService
                     file.Path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true));
                 await IndexDocumentIfNotExistsAsync(file.Path, data, ct, file.Share);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not SearchUnavailableException)
             {
-                _logger.LogWarning(ex, "Reindex: indexing failed for '{Path}'", file.Path);
+                failures.Add(file.Path, ex);
             }
 
             done++;
@@ -861,19 +977,95 @@ public class ElasticSearchService : ISearchService
                 if (doc is not null)
                     await IndexDirectoryDocumentAsync(doc, ct);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not SearchUnavailableException)
             {
-                _logger.LogWarning(ex,
-                    "Reindex: indexing failed for directory '{Path}'", directory.Path);
+                failures.Add(directory.Path, ex);
             }
 
             done++;
             progress?.Report((done, total));
         }
 
+        failures.LogSummary(total);
+
+        ct.ThrowIfCancellationRequested();
+        int swept = await SweepAsync(targets, started, ct);
+
         _logger.LogDebug(
-            "Reindex abgeschlossen: {Done}/{Total} Einträge ({Files} Dateien, {Dirs} Verzeichnisse)",
-            done, total, files.Count, dirs.Count);
+            "Reindex completed: {Done}/{Total} entries ({Files} files, {Dirs} directories), {Swept} stale document(s) removed",
+            done, total, files.Count, dirs.Count, swept);
+    }
+
+    /// <summary>
+    /// Deletes the documents of the walked shares that the pass did not visit: their files were
+    /// deleted or moved directly on the volume, so no change-log entry ever removed them.
+    /// Documents written since <paramref name="startedUtc"/> (a change indexed during the pass)
+    /// are kept. Entries that failed to index were visited and are kept as well.
+    /// </summary>
+    private async Task<int> SweepAsync(ReindexTargets targets, DateTime startedUtc, CancellationToken ct)
+    {
+        if (targets.Shares.Count == 0)
+            return 0;
+
+        var visited = targets.Files.Concat(targets.Directories)
+            .Select(entry => SearchDocuments.GetStableId(entry.Path))
+            .ToHashSet(StringComparer.Ordinal);
+
+        Answered(await _client.Indices.RefreshAsync(_indexName, ct));
+
+        var inShares = new BoolQuery
+        {
+            Should = targets.Shares.Select(s => (Query)new TermQuery { Field = "shareName", Value = s.Name }).ToList(),
+            MinimumShouldMatch = 1
+        };
+
+        var stale = new List<string>();
+        ICollection<FieldValue>? after = null;
+        while (true)
+        {
+            var page = Answered(await _client.SearchAsync<SweepHit>(new SearchRequest(_indexName)
+            {
+                Size = SweepPageSize,
+                Query = inShares,
+                Sort = [new SortOptions { Field = new FieldSort { Field = "id", Order = SortOrder.Asc } }],
+                SearchAfter = after,
+                Source = new SourceConfig(new SourceFilter { Includes = new[] { "modified" } })
+            }, ct));
+
+            if (!page.IsValidResponse)
+            {
+                _logger.LogError("Sweeping stale search documents failed: {Error}", page.DebugInformation);
+                return 0;
+            }
+
+            foreach (var hit in page.Hits)
+            {
+                if (hit.Id is { } id && !visited.Contains(id) && hit.Source?.Modified < startedUtc)
+                    stale.Add(id);
+            }
+
+            if (page.Hits.Count < SweepPageSize)
+                break;
+            after = page.Hits.Last().Sort?.ToList();
+        }
+
+        // ponytail: one request per stale document; out-of-band deletions are usually few.
+        // Switch to a bulk delete if sweeps of whole emptied shares become common.
+        foreach (var id in stale)
+        {
+            ct.ThrowIfCancellationRequested();
+            Answered(await _client.DeleteAsync<FileDocument>(id, d => d.Index(_indexName), ct));
+        }
+
+        if (stale.Count > 0)
+            Answered(await _client.Indices.RefreshAsync(_indexName, ct));
+        return stale.Count;
+    }
+
+    /// <summary>The one field the sweep reads (<see cref="FileDocument"/> requires them all).</summary>
+    private sealed class SweepHit
+    {
+        public DateTime Modified { get; set; }
     }
 
     private static Properties getProperties()
@@ -883,14 +1075,15 @@ public class ElasticSearchService : ISearchService
             { "id",            new KeywordProperty() },
             // File name is n-gram analyzed for partial-word matching, with a
             // lowercased whole-token search analyzer. A keyword sub-field is kept
-            // for exact matching / sorting.
+            // for exact matching / sorting; "std" holds whole words (CJK characters).
             { "fileName",      new TextProperty
                 {
                     Analyzer = NgramIndexAnalyzer,
                     SearchAnalyzer = NgramSearchAnalyzer,
                     Fields = new Properties
                     {
-                        { "keyword", new KeywordProperty() }
+                        { "keyword", new KeywordProperty() },
+                        { "std", new TextProperty { Analyzer = WordAnalyzer } }
                     }
                 }
             },
@@ -899,19 +1092,21 @@ public class ElasticSearchService : ISearchService
             { "sharePath",     new KeywordProperty() },
             // Content is n-gram analyzed so a substring inside a word (e.g. "Gom"
             // inside "GommeHD") matches. The "std" sub-field keeps a whole-word
-            // standard analysis for relevance ranking and fuzzy matching.
+            // analysis for relevance ranking, fuzzy matching and CJK characters.
             { "content",       new TextProperty
                 {
-                    Analyzer = NgramIndexAnalyzer,
-                    SearchAnalyzer = NgramSearchAnalyzer,
+                    Analyzer = ContentIndexAnalyzer,
+                    SearchAnalyzer = ContentSearchAnalyzer,
                     Fields = new Properties
                     {
-                        { "std", new TextProperty { Analyzer = "standard" } }
+                        { "std", new TextProperty { Analyzer = WordAnalyzer } }
                     }
                 }
             },
             { "fileType",      new KeywordProperty() },
             { "fileSizeBytes", new LongNumberProperty() },
+            // Existing indexes map this field dynamically (as long) on first write.
+            { "fileModifiedTicks", new LongNumberProperty() },
             { "isDirectory",   new BooleanProperty() },
             { "created",       new DateProperty() },
             { "modified",      new DateProperty() },
