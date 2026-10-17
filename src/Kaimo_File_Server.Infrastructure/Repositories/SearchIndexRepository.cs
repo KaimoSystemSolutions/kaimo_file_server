@@ -68,11 +68,37 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
             """, ct) == 1;
     }
 
-    public async Task ResetContentStampsAsync(CancellationToken ct = default)
+    public Task ResetContentStampsAsync(CancellationToken ct = default)
+        => ResetContentStampsAsync(ResetBatchSize, ct);
+
+    // Rows per reset statement. A row update is rarely HOT here (bulk-filled pages), so each one
+    // also re-inserts the row into the trigram GIN index; one statement over the whole table
+    // exceeded the command timeout on large indexes.
+    private const int ResetBatchSize = 1_000;
+
+    /// <summary>
+    /// Clears the stamps in primary-key ranges, one short statement each: no single long
+    /// transaction holds row locks against live indexing, and an interrupted reset resumes
+    /// cheaply (already cleared rows are skipped by the IS NOT NULL filter).
+    /// </summary>
+    internal async Task ResetContentStampsAsync(int batchSize, CancellationToken ct)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(ct);
-        await db.Database.ExecuteSqlAsync(
-            $"""UPDATE search_documents SET "FileModifiedUtc" = NULL WHERE "FileModifiedUtc" IS NOT NULL""", ct);
+        var after = string.Empty;
+        while (true)
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync(ct);
+            var upper = (await db.Database.SqlQuery<string?>($"""
+                SELECT max("Id") AS "Value" FROM (
+                    SELECT "Id" FROM search_documents WHERE "Id" > {after} ORDER BY "Id" LIMIT {batchSize}) b
+                """).ToListAsync(ct)).SingleOrDefault();
+            if (upper is null)
+                return;
+            await db.Database.ExecuteSqlAsync($"""
+                UPDATE search_documents SET "FileModifiedUtc" = NULL
+                WHERE "Id" > {after} AND "Id" <= {upper} AND "FileModifiedUtc" IS NOT NULL
+                """, ct);
+            after = upper;
+        }
     }
 
     // ponytail: VACUUM FULL locks the table exclusively while it rewrites it (seconds for a

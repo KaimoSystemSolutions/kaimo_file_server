@@ -114,6 +114,22 @@ public sealed class SearchIndexRepositoryPostgresTests : PostgresTestBase
     }
 
     [PostgresFact]
+    public async Task ResetContentStamps_ClearsEveryRowAcrossBatchBoundaries()
+    {
+        var names = Enumerable.Range(0, 7).Select(i => $"f{i}.txt").ToList();
+        foreach (var name in names)
+            await Put(name, "x");
+
+        // Batch size 3 forces three full/partial batches plus the empty terminating one.
+        await Repo.ResetContentStampsAsync(3, CancellationToken.None);
+
+        foreach (var name in names)
+            Assert.False(await Repo.TouchIfUnchangedAsync(Doc(name).Id, 0, T0, T0.AddHours(1)));
+        // A second run over already cleared rows is a harmless no-op.
+        await Repo.ResetContentStampsAsync(3, CancellationToken.None);
+    }
+
+    [PostgresFact]
     public async Task MoveDirectory_RewritesIdsPathsAndNames_AndReplacesTargetEntries()
     {
         await Put("old", dir: true);
