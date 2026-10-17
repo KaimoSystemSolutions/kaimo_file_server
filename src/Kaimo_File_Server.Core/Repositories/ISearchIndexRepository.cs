@@ -48,14 +48,21 @@ public interface ISearchIndexRepository
 
     /// <summary>
     /// Raw, ranked, UNFILTERED search page. Each token matches as a case-insensitive substring of
-    /// the file name and, from three characters on, of the content. <see cref="FileDocument.HighlightSnippet"/>
-    /// carries an unmarked content excerpt around the first content match (or null).
+    /// the file name and, from three characters on, of the content; two-character tokens only
+    /// rank when a longer token is present. No excerpt is filled in (see <see cref="GetExcerptsAsync"/>).
     /// Recycle-bin documents are left out unless <paramref name="includeRecycleBin"/> is set.
     /// Results must pass the ACL filter before they are exposed.
     /// </summary>
     Task<List<FileDocument>> SearchAsync(
         IReadOnlyList<string> tokens, string? shareName, string? pathPrefix,
         int offset, int limit, bool includeRecycleBin = false, CancellationToken ct = default);
+
+    /// <summary>
+    /// Unmarked content excerpts around the first content match of any token, keyed by document
+    /// id. Documents without a content match are missing from the result.
+    /// </summary>
+    Task<Dictionary<string, string>> GetExcerptsAsync(
+        IReadOnlyCollection<string> ids, IReadOnlyList<string> tokens, CancellationToken ct = default);
 
     /// <summary>Deletes documents of the given shares that were not touched since <paramref name="indexedBefore"/>.</summary>
     Task<int> SweepAsync(IReadOnlyCollection<string> shareNames, DateTime indexedBefore, CancellationToken ct = default);

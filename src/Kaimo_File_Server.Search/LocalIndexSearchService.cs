@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 using Kaimo_File_Server.Core.Domain;
@@ -27,7 +28,7 @@ public sealed partial class LocalIndexSearchService : ISearchService
     // Elasticsearch stores all of it. Make it a setting if deeper content search is needed.
     internal const int MaxContentChars = 1_000_000;
 
-    // Page size for pulling ranked hits before ACL filtering (same as Elasticsearch).
+    // Ranked hits per ACL batch (same page size as Elasticsearch).
     private const int RawFetchSize = 50;
 
     // Upper bound on OR-combined query terms, so a pasted paragraph cannot build a huge statement.
@@ -232,23 +233,32 @@ public sealed partial class LocalIndexSearchService : ISearchService
         if (tokens.Count == 0)
             return new List<FileDocument>();
 
-        // Page through the ranked hits until enough readable ones are collected, so matches
-        // the user may not read cannot crowd out the ones they may.
+        var sw = Stopwatch.StartNew();
+
+        // Rank once: every further page would sort all matches again. Then walk the ranked hits
+        // until enough readable ones are collected, so matches the user may not read cannot
+        // crowd out the ones they may.
+        var ranked = await _index.SearchAsync(tokens, shareName, pathPrefix, 0, SearchLimits.MaxRawScan, includeRecycleBin, ct);
         var allowed = new List<FileDocument>();
-        for (int from = 0; from < SearchLimits.MaxRawScan; from += RawFetchSize)
+        foreach (var page in ranked.Chunk(RawFetchSize))
         {
-            var raw = await _index.SearchAsync(tokens, shareName, pathPrefix, from, RawFetchSize, includeRecycleBin, ct);
-            foreach (var doc in raw)
-                doc.HighlightSnippet = BuildHighlight(doc.FileName, doc.HighlightSnippet, tokens);
-
             // SECURITY: every hit must pass an ACL check before it is exposed.
-            if (raw.Count > 0)
-                allowed.AddRange(await _aclFilter.FilterAsync(raw, user, ct));
-
-            if (raw.Count < RawFetchSize || allowed.Count >= SearchLimits.MinVisibleHits)
+            allowed.AddRange(await _aclFilter.FilterAsync(page.ToList(), user, ct));
+            if (allowed.Count >= SearchLimits.MinVisibleHits)
                 break;
         }
 
+        // Excerpts cost a pass over each document's content: only for the shown hits, and not
+        // for name hits (their highlight is the name).
+        var needExcerpt = allowed.Where(d => !NameMatches(d.FileName, tokens)).Select(d => d.Id).ToList();
+        var excerpts = needExcerpt.Count == 0
+            ? new Dictionary<string, string>()
+            : await _index.GetExcerptsAsync(needExcerpt, tokens, ct);
+        foreach (var doc in allowed)
+            doc.HighlightSnippet = BuildHighlight(doc.FileName, excerpts.GetValueOrDefault(doc.Id), tokens);
+
+        _logger.LogDebug("Local search: {Ranked} ranked, {Visible} visible in {Elapsed} ms",
+            ranked.Count, allowed.Count, sw.ElapsedMilliseconds);
         return allowed;
     }
 
@@ -295,10 +305,13 @@ public sealed partial class LocalIndexSearchService : ISearchService
     /// </summary>
     internal static string? BuildHighlight(string fileName, string? excerpt, IReadOnlyList<string> tokens)
     {
-        if (tokens.Any(t => fileName.Contains(t, StringComparison.OrdinalIgnoreCase)))
+        if (NameMatches(fileName, tokens))
             return Mark(fileName, tokens);
         return string.IsNullOrEmpty(excerpt) ? null : Mark(excerpt, tokens);
     }
+
+    private static bool NameMatches(string fileName, IReadOnlyList<string> tokens)
+        => tokens.Any(t => fileName.Contains(t, StringComparison.OrdinalIgnoreCase));
 
     internal static string Mark(string text, IReadOnlyList<string> tokens)
     {

@@ -3,6 +3,7 @@ using System.Text;
 using Kaimo_File_Server.Infrastructure.Repositories;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Tests.Infrastructure;
+using Npgsql;
 using Xunit;
 
 namespace Kaimo_File_Server.Tests;
@@ -54,7 +55,9 @@ public sealed class SearchIndexRepositoryPostgresTests : PostgresTestBase
         var hits = await Find("report");
 
         Assert.Equal(new[] { "report-2026.txt", "notes.txt" }, hits.Select(h => h.FileName));
-        Assert.Contains("report", hits[1].HighlightSnippet);
+        var excerpts = await Repo.GetExcerptsAsync(hits.Select(h => h.Id).ToList(), ["report"]);
+        Assert.Contains("report", excerpts[hits[1].Id]);
+        Assert.False(excerpts.ContainsKey(hits[0].Id)); // name hit only, no content match
         Assert.Equal(new[] { "notes.txt" }, (await Find("arterl")).Select(h => h.FileName));
     }
 
@@ -227,8 +230,94 @@ public sealed class SearchIndexRepositoryPostgresTests : PostgresTestBase
         await Put("long.txt", new string('x', 5000) + " Delta and GAMMA " + new string('y', 5000));
 
         var hit = Assert.Single(await Find("gamma", "delta"));
+        var excerpts = await Repo.GetExcerptsAsync([hit.Id], ["gamma", "delta"]);
 
-        Assert.NotNull(hit.HighlightSnippet);
-        Assert.Contains("Delta and GAMMA", hit.HighlightSnippet);
+        Assert.Contains("Delta and GAMMA", excerpts[hit.Id]);
+    }
+
+    [PostgresFact]
+    public async Task Search_TwoCharTermBesideALongerOne_OnlyRanks()
+    {
+        await Put("kw42-only.txt", "nothing");
+        await Put("bericht.txt", "nothing");
+        await Put("kw42-bericht.txt", "nothing");
+        await Put("notes.txt", "der bericht zur kw");
+
+        Assert.Equal(new[] { "kw42-bericht.txt", "bericht.txt", "notes.txt" },
+            (await Find("kw", "42", "bericht")).Select(h => h.FileName));
+    }
+
+    [PostgresFact]
+    public async Task Search_TwoCharTermBesideALongerOne_StaysOnTheTrigramIndex()
+    {
+        await Put("a.txt", "bericht");
+        var (sql, parameters) = SearchIndexRepository.BuildSearchSql(["kw", "42", "bericht"], null, null, 0, 50);
+
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using (var off = new NpgsqlCommand("SET enable_seqscan = off", connection))
+            await off.ExecuteNonQueryAsync();
+        await using var explain = new NpgsqlCommand("EXPLAIN " + sql, connection);
+        foreach (var p in parameters.Cast<NpgsqlParameter>())
+            explain.Parameters.Add(p.Clone());
+        var plan = new StringBuilder();
+        await using (var reader = await explain.ExecuteReaderAsync())
+            while (await reader.ReadAsync())
+                plan.AppendLine(reader.GetString(0));
+
+        // With seq scans disabled the planner still falls back to one when no index path exists.
+        Assert.DoesNotContain("Seq Scan on search_documents", plan.ToString());
+    }
+
+    [PostgresFact]
+    public async Task Search_UsesTheTrigramIndex_EvenWhereThePlannerWouldScan()
+    {
+        // A small table makes a sequential scan look cheapest, but it runs the content regex
+        // over every document (measured: 343 ms on a 3k-document dev index vs. a few ms).
+        for (int i = 0; i < 50; i++)
+            await Put($"doc{i}.txt", "some ordinary text " + i);
+        var plans = new PlanRecorder();
+
+        var hits = await new SearchIndexRepository(FactoryWith(plans)).SearchAsync(["ordinary"], null, null, 0, 50);
+
+        Assert.Equal(50, hits.Count);
+        var plan = Assert.Single(plans.Plans);
+        Assert.DoesNotContain("Seq Scan on search_documents", plan);
+    }
+
+    /// <summary>EXPLAINs each query on its own connection and transaction, so session settings apply.</summary>
+    private sealed class PlanRecorder : Microsoft.EntityFrameworkCore.Diagnostics.DbCommandInterceptor
+    {
+        public List<string> Plans { get; } = new();
+
+        public override async ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<System.Data.Common.DbDataReader>> ReaderExecutingAsync(
+            System.Data.Common.DbCommand command, Microsoft.EntityFrameworkCore.Diagnostics.CommandEventData eventData,
+            Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<System.Data.Common.DbDataReader> result,
+            CancellationToken ct = default)
+        {
+            if (command.CommandText.Contains("WITH hits", StringComparison.Ordinal))
+            {
+                await using var explain = new NpgsqlCommand("EXPLAIN " + command.CommandText,
+                    (NpgsqlConnection)command.Connection!, (NpgsqlTransaction?)command.Transaction);
+                foreach (NpgsqlParameter p in command.Parameters)
+                    explain.Parameters.Add(p.Clone());
+                var plan = new StringBuilder();
+                await using (var reader = await explain.ExecuteReaderAsync(ct))
+                    while (await reader.ReadAsync(ct))
+                        plan.AppendLine(reader.GetString(0));
+                Plans.Add(plan.ToString());
+            }
+            return result;
+        }
+    }
+
+    [PostgresFact]
+    public async Task GetExcerpts_SkipsUnknownIdsAndTwoCharTerms()
+    {
+        await Put("a.txt", "ab cd text");
+
+        Assert.Empty(await Repo.GetExcerptsAsync([Md5(Abs("a.txt"))], ["ab"]));
+        Assert.Empty(await Repo.GetExcerptsAsync(["missing"], ["text"]));
+        Assert.Empty(await Repo.GetExcerptsAsync([], ["text"]));
     }
 }

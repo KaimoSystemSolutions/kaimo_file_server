@@ -55,7 +55,8 @@ public sealed class LocalSearchIndexTests
         Assert.Contains("(alpha|beta)", values);
         Assert.DoesNotContain("\"Content\" ILIKE", sql);
         Assert.DoesNotContain("lower(d.\"Content\")", sql);
-        Assert.Contains("regexp_instr", sql);
+        // Excerpts are fetched separately for the shown hits only (GetExcerptsAsync).
+        Assert.DoesNotContain("regexp_instr", sql);
     }
 
     [Fact]
@@ -167,6 +168,33 @@ public sealed class LocalSearchIndexTests
     [InlineData("uid\\.RECYCLE_BIN", true)]
     public void IsRecycleBinScope_DetectsScopesInsideARecycleBin(string? prefix, bool expected)
         => Assert.Equal(expected, SearchServiceRouter.IsRecycleBinScope(prefix));
+
+    [Fact]
+    public void BuildSearchSql_TwoCharTermsOnlyScore_WhenALongerTermIsPresent()
+    {
+        // "kw" -> @p0 and "42" -> @p1: a pattern without a full trigram cannot use the index,
+        // and inside the OR it would force a sequential scan over every document's content.
+        var (sql, _) = SearchIndexRepository.BuildSearchSql(new[] { "kw", "42", "bericht" }, null, null, 0, 50);
+
+        var where = sql[sql.IndexOf("WHERE", StringComparison.Ordinal)..sql.IndexOf("ORDER BY", StringComparison.Ordinal)];
+        Assert.DoesNotMatch(@"ILIKE @p0\b", where);
+        Assert.DoesNotMatch(@"ILIKE @p1\b", where);
+        Assert.Matches(@"""FileName"" ILIKE @p\d+", where);
+        // They still rank: a name containing them comes first.
+        Assert.Matches(@"CASE WHEN d.""FileName"" ILIKE @p0\b", sql);
+        Assert.Matches(@"CASE WHEN d.""FileName"" ILIKE @p1\b", sql);
+    }
+
+    [Fact]
+    public void BuildSearchSql_TwoCharTermsAlone_StillMatchFileNames()
+    {
+        var (sql, _) = SearchIndexRepository.BuildSearchSql(new[] { "ab", "cd" }, null, null, 0, 50);
+
+        var where = sql[sql.IndexOf("WHERE", StringComparison.Ordinal)..sql.IndexOf("ORDER BY", StringComparison.Ordinal)];
+        Assert.Matches(@"ILIKE @p0\b", where);
+        Assert.Matches(@"ILIKE @p1\b", where);
+        Assert.DoesNotContain("Content", where);
+    }
 
     [Fact]
     public void BuildSearchSql_FiltersRecycleBinUnlessRequested()

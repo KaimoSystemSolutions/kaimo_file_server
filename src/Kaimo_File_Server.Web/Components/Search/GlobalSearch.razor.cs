@@ -408,14 +408,12 @@ public partial class GlobalSearch : IDisposable
 
         var plan = ResolvePlan();
 
-        var files = new List<FileDocument>();
-        foreach (var (share, sub) in plan.Targets)
-        {
-            // Always fetched with the recycle bin; the toggle only filters the display, so it
-            // switches the results live without another round trip.
-            var hits = await SearchService.SearchAsync(_searchQuery, _user, share, sub, token, includeRecycleBin: true);
-            files.AddRange(hits.Select(ToWebHit).OfType<FileDocument>());
-        }
+        // Several picked shares are searched concurrently (the search service is a shared
+        // singleton, safe for parallel calls). Always fetched with the recycle bin; the toggle
+        // only filters the display, so it switches the results live without another round trip.
+        var perTarget = await Task.WhenAll(plan.Targets.Select(t =>
+            SearchService.SearchAsync(_searchQuery, _user, t.Share, t.Sub, token, includeRecycleBin: true)));
+        var files = perTarget.SelectMany(hits => hits).Select(ToWebHit).OfType<FileDocument>().ToList();
 
         var dests = plan.Dest
             ? await SearchDestinations.MatchAsync(_searchQuery, ManagementAuth, _user, token)
