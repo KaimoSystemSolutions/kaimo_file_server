@@ -9,7 +9,7 @@ using Xunit;
 namespace Kaimo_File_Server.Tests;
 
 /// <summary>
-/// The local search index against real PostgreSQL (pg_trgm, md5(), ILIKE, LIKE escaping).
+/// The local search index against real PostgreSQL (pg_trgm, tsvector, md5(), ILIKE, LIKE escaping).
 /// Skipped unless <c>KAIMO_TEST_PG</c> is set.
 /// </summary>
 public sealed class SearchIndexRepositoryPostgresTests : PostgresTestBase
@@ -248,7 +248,7 @@ public sealed class SearchIndexRepositoryPostgresTests : PostgresTestBase
     }
 
     [PostgresFact]
-    public async Task Search_TwoCharTermBesideALongerOne_StaysOnTheTrigramIndex()
+    public async Task Search_TwoCharTermBesideALongerOne_StaysOnTheIndexes()
     {
         await Put("a.txt", "bericht");
         var (sql, parameters) = SearchIndexRepository.BuildSearchSql(["kw", "42", "bericht"], null, null, 0, 50);
@@ -270,10 +270,10 @@ public sealed class SearchIndexRepositoryPostgresTests : PostgresTestBase
     }
 
     [PostgresFact]
-    public async Task Search_UsesTheTrigramIndex_EvenWhereThePlannerWouldScan()
+    public async Task Search_UsesTheIndexes_EvenWhereThePlannerWouldScan()
     {
-        // A small table makes a sequential scan look cheapest, but it runs the content regex
-        // over every document (measured: 343 ms on a 3k-document dev index vs. a few ms).
+        // A small table makes a sequential scan look cheapest, but it reads every document's
+        // word vector (measured: 343 ms on a 3k-document dev index vs. a few ms).
         for (int i = 0; i < 50; i++)
             await Put($"doc{i}.txt", "some ordinary text " + i);
         var plans = new PlanRecorder();
@@ -283,6 +283,7 @@ public sealed class SearchIndexRepositoryPostgresTests : PostgresTestBase
         Assert.Equal(50, hits.Count);
         var plan = Assert.Single(plans.Plans);
         Assert.DoesNotContain("Seq Scan on search_documents", plan);
+        Assert.DoesNotContain("Seq Scan on search_terms", plan);
     }
 
     /// <summary>EXPLAINs each query on its own connection and transaction, so session settings apply.</summary>
@@ -295,7 +296,7 @@ public sealed class SearchIndexRepositoryPostgresTests : PostgresTestBase
             Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<System.Data.Common.DbDataReader> result,
             CancellationToken ct = default)
         {
-            if (command.CommandText.Contains("WITH hits", StringComparison.Ordinal))
+            if (command.CommandText.Contains("WITH pts", StringComparison.Ordinal))
             {
                 await using var explain = new NpgsqlCommand("EXPLAIN " + command.CommandText,
                     (NpgsqlConnection)command.Connection!, (NpgsqlTransaction?)command.Transaction);
@@ -312,6 +313,18 @@ public sealed class SearchIndexRepositoryPostgresTests : PostgresTestBase
     }
 
     [PostgresFact]
+    public async Task GetExcerpts_FindsAMatchBeyondTheLeadingWindow()
+    {
+        // The excerpt is looked for in the leading characters first (cheap); a match only
+        // further in must still be found.
+        await Put("deep.txt", string.Concat(Enumerable.Repeat("filler ", 6000)) + "the Budget line");
+
+        var excerpts = await Repo.GetExcerptsAsync([Md5(Abs("deep.txt"))], ["budget"]);
+
+        Assert.Contains("the Budget line", excerpts[Md5(Abs("deep.txt"))]);
+    }
+
+    [PostgresFact]
     public async Task GetExcerpts_SkipsUnknownIdsAndTwoCharTerms()
     {
         await Put("a.txt", "ab cd text");
@@ -319,5 +332,68 @@ public sealed class SearchIndexRepositoryPostgresTests : PostgresTestBase
         Assert.Empty(await Repo.GetExcerptsAsync([Md5(Abs("a.txt"))], ["ab"]));
         Assert.Empty(await Repo.GetExcerptsAsync(["missing"], ["text"]));
         Assert.Empty(await Repo.GetExcerptsAsync([], ["text"]));
+    }
+
+    [PostgresFact]
+    public async Task Search_FindsWordParts_InsideMailAddressesAndUrls()
+    {
+        // The word parser keeps an address or URL as one word; the term dictionary still
+        // finds the parts inside it, like the Elasticsearch n-grams do.
+        await Put("contact.txt", "Kontakt: max@firma.de, siehe https://www.kaimo.de/docs/handbuch");
+
+        Assert.Equal(["contact.txt"], (await Find("firma")).Select(h => h.FileName));
+        Assert.Equal(["contact.txt"], (await Find("handbuch")).Select(h => h.FileName));
+        Assert.Equal(["contact.txt"], (await Find("ntak")).Select(h => h.FileName));
+        Assert.Empty(await Find("firmade")); // never across word boundaries
+    }
+
+    [PostgresFact]
+    public async Task Search_RanksWholeWordsAboveWordParts_AnywhereInTheContent()
+    {
+        // The whole word sits far beyond the first 20,000 characters the regex ranking used to read.
+        await Put("deep.txt", string.Concat(Enumerable.Repeat("filler ", 5000)) + "budget");
+        await Put("early.txt", "budgeting starts here");
+
+        Assert.Equal(["deep.txt", "early.txt"], (await Find("budget")).Select(h => h.FileName));
+    }
+
+    [PostgresFact]
+    public async Task Upsert_ContentBeyondTheWordVectorLimit_StillIndexesItsLeadingWords()
+    {
+        // 250,000 distinct three-character CJK words: 2.25 MB of lexemes, more than a tsvector holds.
+        static string Word(int i) => new([(char)(0x4E00 + i % 20000), (char)(0x4E00 + i / 20000), '一']);
+        var content = string.Join(' ', Enumerable.Range(0, 250_000).Select(Word));
+
+        await Put("huge.txt", content);
+
+        Assert.Equal(["huge.txt"], (await Find(Word(1))).Select(h => h.FileName));
+    }
+
+    [PostgresFact]
+    public async Task Compact_DropsDictionaryWordsNoDocumentUsesAnyMore()
+    {
+        await Put("a.txt", "zebra");
+        await Put("b.txt", "yak");
+        await Repo.DeleteAsync(Md5(Abs("a.txt")));
+
+        Assert.Equal(["zebra", "yak"], await Terms("zebra", "yak"));
+        await Repo.CompactAsync();
+
+        Assert.Equal(["yak"], await Terms("zebra", "yak"));
+        Assert.Equal(["b.txt"], (await Find("yak")).Select(h => h.FileName));
+    }
+
+    private async Task<List<string>> Terms(params string[] words)
+    {
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT \"Term\" FROM search_terms WHERE \"Term\" = ANY(@w)", connection);
+        cmd.Parameters.AddWithValue("w", words);
+        var found = new List<string>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            found.Add(reader.GetString(0));
+        return words.Where(found.Contains).ToList();
     }
 }

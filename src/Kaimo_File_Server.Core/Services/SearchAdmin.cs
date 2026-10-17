@@ -51,8 +51,9 @@ public static class SearchConfigKeys
     /// or the set of indexed paths changes. 2: encoded blobs stripped, recycle bins indexed.
     /// 3: base64url payloads stripped as well. 4: UTF-16/Windows-1252 decoded, control characters
     /// tolerated, text NFC-normalized, hashes kept by the blob filter, symbolic links skipped.
+    /// 5: word vector (tsvector) and word dictionary replace the content trigram index.
     /// </summary>
-    public const int LocalIndexVersion = 4;
+    public const int LocalIndexVersion = 5;
 
     /// <summary>The cursor key of an index-backed engine.</summary>
     public static string CursorKeyFor(SearchEngine engine)

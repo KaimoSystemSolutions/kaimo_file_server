@@ -45,18 +45,41 @@ public sealed class LocalSearchIndexTests
     }
 
     [Fact]
-    public void BuildSearchSql_ScansContentOncePerRowForMatching_AndNeverLowercasesWholeDocuments()
+    public void BuildSearchSql_MatchesContentThroughTheWordIndex_NeverReadsTheContent()
     {
         var (sql, parameters) = SearchIndexRepository.BuildSearchSql(
             new[] { "alpha", "beta", "ab" }, null, null, offset: 0, limit: 50);
 
         var values = parameters.Cast<NpgsqlParameter>().Select(p => p.Value).ToList();
-        // One alternation over the content terms decides the match (index-backed, one pass).
-        Assert.Contains("(alpha|beta)", values);
-        Assert.DoesNotContain("\"Content\" ILIKE", sql);
-        Assert.DoesNotContain("lower(d.\"Content\")", sql);
+        // Whole words are tsquery literals over the stored word vector; word parts come from
+        // the term dictionary. The (TOASTed) content itself is never touched by the ranking.
+        Assert.Contains("'alpha'", values);
+        Assert.Contains("'beta'", values);
+        Assert.DoesNotContain("'ab'", values);
+        Assert.Contains("\"ContentTsv\" @@", sql);
+        Assert.Contains("search_terms", sql);
+        Assert.DoesNotContain("\"Content\"", sql);
         // Excerpts are fetched separately for the shown hits only (GetExcerptsAsync).
         Assert.DoesNotContain("regexp_instr", sql);
+    }
+
+    [Fact]
+    public void ContentWords_SplitLikeQueryTerms_LowercasedDistinct_WithoutWordsTooShortToMatch()
+    {
+        Assert.Equal(["max", "firma", "kündigung", "x2024"],
+            SearchIndexRepository.ContentWords("Max@Firma.de, firma FIRMA ab Kündigung x2024 z"));
+        Assert.Empty(SearchIndexRepository.ContentWords(""));
+    }
+
+    [Fact]
+    public void ContentWords_StayBelowTheWordVectorLimit_KeepingTheLeadingWords()
+    {
+        // 250,000 distinct 9-byte words: 2.25 MB, more than a tsvector's 1 MB of lexemes.
+        static string Word(int i) => new([(char)(0x4E00 + i % 20000), (char)(0x4E00 + i / 20000), '一']);
+        var words = SearchIndexRepository.ContentWords(string.Join(' ', Enumerable.Range(0, 250_000).Select(Word)));
+
+        Assert.Equal(1_000_000 / 9, words.Length);
+        Assert.Equal(Word(0), words[0]);
     }
 
     [Fact]
@@ -118,8 +141,8 @@ public sealed class LocalSearchIndexTests
         Assert.Contains(@"a\%b/c\_d/%", values);
         // A two-character term only checks the file name (no trigram index for content).
         Assert.Equal(1, values.Count(v => Equals(v, "%ab%")));
-        Assert.DoesNotContain(@"\mab\M", values);
-        Assert.Contains(@"\mreport\M", values);
+        Assert.DoesNotContain("'ab'", values);
+        Assert.Contains("'report'", values);
     }
 
     [Fact]
@@ -173,16 +196,17 @@ public sealed class LocalSearchIndexTests
     public void BuildSearchSql_TwoCharTermsOnlyScore_WhenALongerTermIsPresent()
     {
         // "kw" -> @p0 and "42" -> @p1: a pattern without a full trigram cannot use the index,
-        // and inside the OR it would force a sequential scan over every document's content.
+        // and as a candidate source it would force a sequential scan over every document.
         var (sql, _) = SearchIndexRepository.BuildSearchSql(new[] { "kw", "42", "bericht" }, null, null, 0, 50);
 
-        var where = sql[sql.IndexOf("WHERE", StringComparison.Ordinal)..sql.IndexOf("ORDER BY", StringComparison.Ordinal)];
-        Assert.DoesNotMatch(@"ILIKE @p0\b", where);
-        Assert.DoesNotMatch(@"ILIKE @p1\b", where);
-        Assert.Matches(@"""FileName"" ILIKE @p\d+", where);
+        var candidates = Candidates(sql);
+        Assert.DoesNotMatch(@"@p0\b", candidates);
+        Assert.DoesNotMatch(@"@p1\b", candidates);
+        Assert.Matches(@"""FileName"" ILIKE @p\d+", candidates);
         // They still rank: a name containing them comes first.
-        Assert.Matches(@"CASE WHEN d.""FileName"" ILIKE @p0\b", sql);
-        Assert.Matches(@"CASE WHEN d.""FileName"" ILIKE @p1\b", sql);
+        var ranking = sql[sql.LastIndexOf("ORDER BY", StringComparison.Ordinal)..];
+        Assert.Matches(@"CASE WHEN d.""FileName"" ILIKE @p0\b", ranking);
+        Assert.Matches(@"CASE WHEN d.""FileName"" ILIKE @p1\b", ranking);
     }
 
     [Fact]
@@ -190,11 +214,14 @@ public sealed class LocalSearchIndexTests
     {
         var (sql, _) = SearchIndexRepository.BuildSearchSql(new[] { "ab", "cd" }, null, null, 0, 50);
 
-        var where = sql[sql.IndexOf("WHERE", StringComparison.Ordinal)..sql.IndexOf("ORDER BY", StringComparison.Ordinal)];
-        Assert.Matches(@"ILIKE @p0\b", where);
-        Assert.Matches(@"ILIKE @p1\b", where);
-        Assert.DoesNotContain("Content", where);
+        var candidates = Candidates(sql);
+        Assert.Matches(@"ILIKE @p0\b", candidates);
+        Assert.Matches(@"ILIKE @p1\b", candidates);
+        Assert.DoesNotContain("Content", candidates);
     }
+
+    /// <summary>The candidate part of the statement: everything before the per-document aggregation.</summary>
+    private static string Candidates(string sql) => sql[..sql.IndexOf("hits AS", StringComparison.Ordinal)];
 
     [Fact]
     public void BuildSearchSql_FiltersRecycleBinUnlessRequested()

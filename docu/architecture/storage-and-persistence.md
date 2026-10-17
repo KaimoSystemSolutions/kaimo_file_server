@@ -18,7 +18,7 @@ A single logical file is represented in up to five independently durable stores:
 | PostgreSQL | `kaimo_file_server` database | Metadata, ownership, ACLs, version rows, shares, configuration | Authoritative for permissions and history |
 | Version blobs | `<pool>/.kaimo-versions/` | Compressed, content-addressed historical content | Referenced by `file_versions` rows |
 | Elasticsearch | index `kaimo-files-v3` | Searchable file names and content (engine "Elasticsearch") | Derived, rebuildable |
-| PostgreSQL | table `search_documents` | Searchable file names and content (engine "local indexing") | Derived, rebuildable |
+| PostgreSQL | tables `search_documents`, `search_terms` | Searchable file names and content (engine "local indexing") | Derived, rebuildable |
 | Snapshot cache | `/data/kaimo-system/.kaimo-snapshots/` | Materialized @GMT "Previous Versions" views for SMB | Derived, rebuildable |
 
 No transaction spans these stores. `FileService` (`src/Kaimo_File_Server.Core/Services/File/FileService.cs`)

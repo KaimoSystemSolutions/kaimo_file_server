@@ -1,3 +1,5 @@
+using NpgsqlTypes;
+
 namespace Kaimo_File_Server.Infrastructure.Persistence;
 
 /// <summary>
@@ -19,10 +21,26 @@ public sealed class SearchDocumentRecord
     public long SizeBytes { get; set; }
     public string Content { get; set; } = string.Empty;
 
+    /// <summary>
+    /// The distinct lowercased words of <see cref="Content"/> (<c>strip(to_tsvector('simple', …))</c>),
+    /// GIN-indexed: matching and ranking read this instead of the content itself.
+    /// </summary>
+    public NpgsqlTsVector ContentTsv { get; set; } = NpgsqlTsVector.Empty;
+
     /// <summary>Last-write time of the file when its content was extracted; null = re-extract on next write.</summary>
     public DateTime? FileModifiedUtc { get; set; }
     public DateTime CreatedUtc { get; set; }
 
     /// <summary>Last time the document was written or confirmed; drives the reindex sweep.</summary>
     public DateTime IndexedUtc { get; set; }
+}
+
+/// <summary>
+/// The word dictionary of the local search index (<c>search_terms</c>): every word any
+/// <see cref="SearchDocumentRecord.ContentTsv"/> contains, trigram-indexed, so a search term is
+/// resolved to the words containing it before the word index is queried.
+/// </summary>
+public sealed class SearchTermRecord
+{
+    public string Term { get; set; } = string.Empty;
 }

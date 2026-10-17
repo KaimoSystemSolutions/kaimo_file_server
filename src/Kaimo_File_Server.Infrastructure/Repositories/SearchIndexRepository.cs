@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Infrastructure.Persistence;
@@ -9,52 +10,85 @@ using Npgsql;
 namespace Kaimo_File_Server.Infrastructure.Repositories;
 
 /// <summary>
-/// PostgreSQL implementation of <see cref="ISearchIndexRepository"/> over <c>search_documents</c>.
-/// Raw SQL throughout: ranking, prefix rewrites and the id recomputation (<c>md5()</c>) are
-/// single statements that EF LINQ cannot express. All values are bound as parameters.
-/// Stateless over the context factory, so it is registered as a singleton.
+/// PostgreSQL implementation of <see cref="ISearchIndexRepository"/> over <c>search_documents</c>
+/// and its word dictionary <c>search_terms</c>. Raw SQL throughout: ranking, prefix rewrites and
+/// the id recomputation (<c>md5()</c>) are single statements that EF LINQ cannot express. All
+/// values are bound as parameters. Stateless over the context factory, so it is registered as a
+/// singleton.
+///
+/// Content search is an inverted index, not a scan: each document stores its distinct words as a
+/// GIN-indexed tsvector, and <c>search_terms</c> holds every word any document contains, trigram-
+/// indexed. A search term is first resolved to the dictionary words containing it, then those
+/// words are looked up in the word index — the content itself is only read for excerpts.
 /// </summary>
-public sealed class SearchIndexRepository : ISearchIndexRepository
+public sealed partial class SearchIndexRepository : ISearchIndexRepository
 {
     // Characters of context kept on each side of the first content match in the excerpt.
     private const int FragmentLead = 40;
     private const int FragmentLength = 120;
 
-    // Content-substring matching starts at three characters: a trigram index cannot serve a
-    // shorter pattern, and a full scan of every document's content would exceed the search timeout.
+    // Leading content characters searched for the excerpt before the whole content is.
+    private const int ExcerptWindowChars = 20_000;
+
+    // Content matching starts at three characters: a trigram index cannot serve a shorter
+    // pattern, neither on file names nor on the word dictionary.
     internal const int MinContentTokenLength = 3;
 
-    // Leading content characters the per-term ranking looks at. Whether a document matches is
-    // still decided over its whole content; only the order among matches ignores what lies deeper.
-    // ponytail: fixed window; a stored rank vector (tsvector) would rank on everything.
-    private const int ScoreWindowChars = 20_000;
+    // Dictionary words one search term expands to, shortest first (closest to the term; the
+    // term itself as a whole word always fits). A document whose only matching words lie beyond
+    // the cap is missed — only possible for very short, unselective terms, whose hits exceed
+    // SearchLimits.MaxRawScan anyway.
+    // ponytail: fixed cap; raise it or fall back to a content scan if such misses show up.
+    internal const int MaxTermsPerToken = 5_000;
+
+    // A tsvector holds at most 1 MB of lexemes (PostgreSQL's MAXSTRPOS, 1,048,575 bytes). Words
+    // past this budget are left out of the word vector; only documents with that much distinct
+    // vocabulary are affected, and their excerpts still come from the whole content.
+    private const int MaxWordBytes = 1_000_000;
+
+    // PostgreSQL ignores longer lexemes (a tsvector entry is at most 2 KB).
+    private const int MaxLexemeBytes = 2_046;
 
     private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
 
     public SearchIndexRepository(IDbContextFactory<ApplicationDbContext> dbFactory)
         => _dbFactory = dbFactory;
 
+    /// <summary>
+    /// One statement writes the document, its word vector and its new dictionary words, so they
+    /// commit together (<see cref="CompactAsync"/> relies on that). Words are inserted in sorted
+    /// order, so concurrent writers sharing words cannot deadlock on the dictionary.
+    /// </summary>
     public async Task UpsertAsync(
         FileDocument doc, DateTime? fileModifiedUtc, DateTime indexedUtc, CancellationToken ct = default)
     {
+        var words = ContentWords(doc.Content);
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
         await db.Database.ExecuteSqlAsync($"""
-            INSERT INTO search_documents
-                ("Id", "FileName", "ShareName", "AbsolutePath", "SharePath", "FileType",
-                 "IsDirectory", "SizeBytes", "Content", "FileModifiedUtc", "CreatedUtc", "IndexedUtc")
-            VALUES ({doc.Id}, {doc.FileName}, {doc.ShareName}, {doc.AbsolutePath}, {doc.SharePath}, {doc.FileType},
-                    {doc.IsDirectory}, {doc.FileSizeBytes}, {doc.Content}, {fileModifiedUtc}, {doc.Created}, {indexedUtc})
-            ON CONFLICT ("Id") DO UPDATE SET
-                "FileName" = EXCLUDED."FileName",
-                "ShareName" = EXCLUDED."ShareName",
-                "AbsolutePath" = EXCLUDED."AbsolutePath",
-                "SharePath" = EXCLUDED."SharePath",
-                "FileType" = EXCLUDED."FileType",
-                "IsDirectory" = EXCLUDED."IsDirectory",
-                "SizeBytes" = EXCLUDED."SizeBytes",
-                "Content" = EXCLUDED."Content",
-                "FileModifiedUtc" = EXCLUDED."FileModifiedUtc",
-                "IndexedUtc" = EXCLUDED."IndexedUtc"
+            WITH doc AS (
+                INSERT INTO search_documents
+                    ("Id", "FileName", "ShareName", "AbsolutePath", "SharePath", "FileType",
+                     "IsDirectory", "SizeBytes", "Content", "ContentTsv", "FileModifiedUtc", "CreatedUtc", "IndexedUtc")
+                VALUES ({doc.Id}, {doc.FileName}, {doc.ShareName}, {doc.AbsolutePath}, {doc.SharePath}, {doc.FileType},
+                        {doc.IsDirectory}, {doc.FileSizeBytes}, {doc.Content}, array_to_tsvector({words}),
+                        {fileModifiedUtc}, {doc.Created}, {indexedUtc})
+                ON CONFLICT ("Id") DO UPDATE SET
+                    "FileName" = EXCLUDED."FileName",
+                    "ShareName" = EXCLUDED."ShareName",
+                    "AbsolutePath" = EXCLUDED."AbsolutePath",
+                    "SharePath" = EXCLUDED."SharePath",
+                    "FileType" = EXCLUDED."FileType",
+                    "IsDirectory" = EXCLUDED."IsDirectory",
+                    "SizeBytes" = EXCLUDED."SizeBytes",
+                    "Content" = EXCLUDED."Content",
+                    "ContentTsv" = EXCLUDED."ContentTsv",
+                    "FileModifiedUtc" = EXCLUDED."FileModifiedUtc",
+                    "IndexedUtc" = EXCLUDED."IndexedUtc"
+                RETURNING "ContentTsv")
+            INSERT INTO search_terms ("Term")
+            SELECT w.lexeme FROM doc, unnest(doc."ContentTsv") w
+            ORDER BY 1
+            ON CONFLICT DO NOTHING
             """, ct);
     }
 
@@ -104,14 +138,31 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
     // ponytail: VACUUM FULL locks the table exclusively while it rewrites it (seconds for a
     // typical index, minutes in the GB range; searches wait meanwhile). Only run after a version
     // rebuild; switch to pg_repack or plain VACUUM if that lock becomes a problem.
+    // ponytail: the word dictionary only shrinks here; prune it periodically if it grows too far.
+    /// <summary>
+    /// Also rebuilds the word dictionary from the stored word vectors. Deletes and content changes
+    /// never remove dictionary words (they only cost a few extra lookups), so this is where words
+    /// no document uses any more go. The TRUNCATE lock holds writers back until the new dictionary
+    /// is committed, and a writer adds its words in the same statement as its document, so no
+    /// word is lost to a concurrent write.
+    /// </summary>
     public async Task CompactAsync(CancellationToken ct = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
         // No command timeout: rewriting a large index outlasts the default and was aborted
         // (the token still cancels it).
         db.Database.SetCommandTimeout(0);
+        await using (var tx = await db.Database.BeginTransactionAsync(ct))
+        {
+            await db.Database.ExecuteSqlRawAsync("TRUNCATE search_terms", ct);
+            await db.Database.ExecuteSqlRawAsync("""
+                INSERT INTO search_terms ("Term")
+                SELECT word FROM ts_stat('SELECT "ContentTsv" FROM search_documents')
+                """, ct);
+            await tx.CommitAsync(ct);
+        }
         // VACUUM cannot run inside a transaction; ExecuteSql issues it as a single statement.
-        await db.Database.ExecuteSqlRawAsync("VACUUM (FULL, ANALYZE) search_documents", ct);
+        await db.Database.ExecuteSqlRawAsync("VACUUM (FULL, ANALYZE) search_documents, search_terms", ct);
     }
 
     public async Task TouchAsync(string id, DateTime indexedUtc, CancellationToken ct = default)
@@ -193,11 +244,11 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
 
         var (sql, parameters) = BuildSearchSql(tokens, shareName, pathPrefix, offset, limit, includeRecycleBin);
 
-        // The planner prices a regex like a cheap comparison and ignores the decompression of
-        // each document, so on small or mid-sized tables it picks a sequential scan that runs the
-        // content regex over every document (measured 343 ms vs. a few ms over the trigram index).
-        // Discouraging seq scans for this one read-only statement keeps it on the index; a query
-        // without any index path (two-character terms only) still falls back to a scan.
+        // The planner ignores the decompression of each document's word vector, so on small or
+        // mid-sized tables it picks a sequential scan that reads all of them (measured with the
+        // former content regex: 343 ms vs. a few ms over the index). Discouraging seq scans for
+        // this one read-only statement keeps it on the indexes; a query without any index path
+        // (two-character terms only) still falls back to a scan.
         var rows = await _dbFactory.ExecuteResilientAsync(async db =>
         {
             await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -223,8 +274,12 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
     }
 
     /// <summary>
-    /// The excerpt position comes from one regexp_instr that stops at the first match of any
-    /// content term; documents without a content match get no entry.
+    /// The excerpt position comes from regexp_instr at the first match of any content term;
+    /// documents without a content match get no entry. PostgreSQL's regex converts its whole
+    /// input before matching (measured ~3 ms per 500 KB document), so the leading
+    /// <see cref="ExcerptWindowChars"/> characters — decompressed alone — are searched first and
+    /// the whole content only when they hold no match. OFFSET 0 keeps the lateral subquery from
+    /// being inlined, which would run the regex twice per row (filter and fragment).
     /// </summary>
     public async Task<Dictionary<string, string>> GetExcerptsAsync(
         IReadOnlyCollection<string> ids, IReadOnlyList<string> tokens, CancellationToken ct = default)
@@ -238,7 +293,10 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
         var rows = await db.Database.SqlQuery<ExcerptRow>($"""
             SELECT d."Id", substring(d."Content" from greatest(p.pos - {FragmentLead}, 1) for {FragmentLength}) AS "Fragment"
             FROM search_documents d
-            CROSS JOIN LATERAL (SELECT regexp_instr(d."Content", {alternation}, 1, 1, 0, 'i') AS pos) p
+            CROSS JOIN LATERAL (
+                SELECT coalesce(nullif(regexp_instr(left(d."Content", {ExcerptWindowChars}), {alternation}, 1, 1, 0, 'i'), 0),
+                                regexp_instr(d."Content", {alternation}, 1, 1, 0, 'i')) AS pos
+                OFFSET 0) p
             WHERE d."Id" = ANY({idArray}) AND p.pos > 0
             """).ToListAsync(ct);
         return rows.ToDictionary(r => r.Id, r => r.Fragment);
@@ -258,16 +316,15 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
     /// <summary>
     /// Builds the ranked search statement. Each token is OR-combined (like the Elasticsearch
     /// match query) and scored with the Elasticsearch boosts: name substring 4, whole word in the
-    /// content 2, content substring 1. Excerpts are not part of it: they cost a pass over each
-    /// document's content and are fetched by <see cref="GetExcerptsAsync"/> for the shown hits only.
-    /// Cost model (measured): a case-insensitive pass over the content is the expensive part —
-    /// ILIKE ~2x a regex pass, lower() of a whole document as much again. So whether the content
-    /// matches at all is one regex alternation over every term (pg_trgm serves it from the index
-    /// for selective terms), and the per-term ranking only looks at the first
-    /// <see cref="ScoreWindowChars"/> characters (PostgreSQL decompresses just that slice).
-    /// Two-character terms have no trigram, so they cannot use the index: with a longer term
-    /// present they only rank, otherwise one of them in the OR would force a sequential scan
-    /// that runs the content regex over every document.
+    /// content 2, content word containing the token 1. Candidates come from index lookups only
+    /// (file-name trigrams, word index), each scoring its content points; they are summed per
+    /// document and the name points added for the final order. Neither matching nor ranking
+    /// reads the content; excerpts are fetched by <see cref="GetExcerptsAsync"/> for the shown
+    /// hits only. Word parts match within one word, not across word boundaries (like n-grams).
+    /// Two-character terms have no trigram, so they cannot use an index: with a longer term
+    /// present they only rank, otherwise they match file names by a sequential scan.
+    /// Tokens are letters, marks and digits only (see LocalIndexSearchService.Tokenize), so they
+    /// are safe as tsquery literals.
     /// </summary>
     internal static (string Sql, object[] Parameters) BuildSearchSql(
         IReadOnlyList<string> tokens, string? shareName, string? pathPrefix, int offset, int limit,
@@ -281,72 +338,74 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
             return name;
         }
 
-        var match = new List<string>();
-        var score = new List<string>();
+        var nameMatch = new List<string>();
+        var nameScore = new List<string>();
+        var contentArms = new List<string>();
         bool anyLongTerm = tokens.Any(t => t.Length >= MinContentTokenLength);
         foreach (var token in tokens)
         {
             var like = Param("%" + EscapeLike(token) + "%");
             if (!anyLongTerm || token.Length >= MinContentTokenLength)
-                match.Add($"""d."FileName" ILIKE {like}""");
-            score.Add($"""CASE WHEN d."FileName" ILIKE {like} THEN 4 ELSE 0 END""");
+                nameMatch.Add($"""d."FileName" ILIKE {like}""");
+            nameScore.Add($"""CASE WHEN d."FileName" ILIKE {like} THEN 4 ELSE 0 END""");
 
             if (token.Length < MinContentTokenLength)
                 continue;
 
-            // \m and \M are PostgreSQL's word-start/word-end anchors (see ContentAlternation).
-            score.Add($"""CASE WHEN w.lead ~* {Param(token)} THEN 1 ELSE 0 END""");
-            score.Add($"""CASE WHEN w.lead ~* {Param(@"\m" + token + @"\M")} THEN 2 ELSE 0 END""");
+            // Any word containing the token: its dictionary words as one OR tsquery, each quoted
+            // with quotes and backslashes doubled as tsquery input requires. No word -> NULL -> no rows.
+            contentArms.Add($"""
+                SELECT d."Id", 1 FROM search_documents d WHERE d."ContentTsv" @@ (
+                    SELECT CAST(string_agg('''' || replace(replace(t."Term", '\', '\\'), '''', '''''') || '''', ' | ') AS tsquery)
+                    FROM (SELECT "Term" FROM search_terms WHERE "Term" LIKE {like}
+                          ORDER BY length("Term"), "Term" LIMIT {MaxTermsPerToken}) t)
+                """);
+            // The token as a whole word.
+            contentArms.Add($"""
+                SELECT d."Id", 2 FROM search_documents d WHERE d."ContentTsv" @@ CAST({Param("'" + token + "'")} AS tsquery)
+                """);
         }
 
-        string? anyContentTerm = null;
-        if (ContentAlternation(tokens) is { } alternation)
-        {
-            anyContentTerm = Param(alternation);
-            match.Add($"""d."Content" ~* {anyContentTerm}""");
-        }
-
-        var where = new StringBuilder($"({string.Join(" OR ", match)})");
+        var filters = new List<string>();
         if (!string.IsNullOrWhiteSpace(shareName))
         {
-            where.Append($""" AND d."ShareName" = {Param(shareName)}""");
+            filters.Add($"""d."ShareName" = {Param(shareName)}""");
 
             // Same scope rule as the Elasticsearch keyword filter: the folder itself or anything
             // strictly below it, so a sibling like "reports2" is not swept in by "reports".
             var prefix = (pathPrefix ?? string.Empty).Replace('\\', '/').Trim('/');
             if (prefix.Length > 0)
-                where.Append($"""
-                     AND (d."SharePath" = {Param(prefix)} OR d."SharePath" LIKE {Param(EscapeLike(prefix + "/") + "%")})
+                filters.Add($"""
+                    (d."SharePath" = {Param(prefix)} OR d."SharePath" LIKE {Param(EscapeLike(prefix + "/") + "%")})
                     """);
         }
 
         // Recycle-bin documents: any ".RECYCLE_BIN" segment (only the share's/home's own bin is
         // ever indexed), case-insensitive like ShareEntryPolicy.
         if (!includeRecycleBin)
-            where.Append($"""
-                 AND d."SharePath" !~* {Param("(^|/)[.]" + ShareEntryPolicy.RecycleBinName[1..] + "(/|$)")}
+            filters.Add($"""
+                d."SharePath" !~* {Param("(^|/)[.]" + ShareEntryPolicy.RecycleBinName[1..] + "(/|$)")}
                 """);
 
-        // The ranking window is cut once per matching row (OFFSET 0 keeps the subquery from being
-        // inlined, which would repeat the cut for every term).
-        var window = anyContentTerm is null
-            ? ""
-            : $"""CROSS JOIN LATERAL (SELECT left(d."Content", {ScoreWindowChars}) AS lead OFFSET 0) w""";
+        var arms = new List<string>
+        {
+            $"""SELECT d."Id", 0 AS p FROM search_documents d WHERE {string.Join(" OR ", nameMatch)}"""
+        };
+        arms.AddRange(contentArms);
+        var where = filters.Count == 0 ? "" : "WHERE " + string.Join(" AND ", filters);
 
         var sql = $"""
-            WITH hits AS (
-                SELECT d."Id", ({string.Join(" + ", score)}) AS score
-                FROM search_documents d
-                {window}
-                WHERE {where}
-                ORDER BY score DESC, d."Id"
-                OFFSET {Param(offset)} LIMIT {Param(limit)}
-            )
+            WITH pts AS (
+            {string.Join("\nUNION ALL\n", arms)}
+            ),
+            hits AS (SELECT "Id", sum(p) AS p FROM pts GROUP BY "Id")
             SELECT d."Id", d."FileName", d."ShareName", d."AbsolutePath", d."SharePath", d."FileType",
                    d."SizeBytes", d."IsDirectory", d."CreatedUtc", d."IndexedUtc"
             FROM hits h
             JOIN search_documents d ON d."Id" = h."Id"
-            ORDER BY h.score DESC, h."Id"
+            {where}
+            ORDER BY h.p + {string.Join(" + ", nameScore)} DESC, d."Id"
+            OFFSET {Param(offset)} LIMIT {Param(limit)}
             """;
         return (sql, parameters.ToArray());
     }
@@ -369,13 +428,46 @@ public sealed class SearchIndexRepository : ISearchIndexRepository
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
         var stats = await db.Database.SqlQueryRaw<StatsRow>("""
-            SELECT count(*) AS "Documents", pg_total_relation_size('search_documents') AS "Bytes"
+            SELECT count(*) AS "Documents",
+                   pg_total_relation_size('search_documents') + pg_total_relation_size('search_terms') AS "Bytes"
             FROM search_documents
             """).SingleAsync(ct);
         return new SearchIndexStats(stats.Documents, stats.Bytes);
     }
 
     /// <summary>Escapes the LIKE wildcards so user input always matches literally (PostgreSQL's default LIKE escape is '\').</summary>
+    /// <summary>
+    /// The distinct words of a document as its word vector stores them: split and lowercased
+    /// exactly like the query terms (LocalIndexSearchService.Tokenize), so a term and a word
+    /// compare equal. Words under <see cref="MinContentTokenLength"/> characters are left out —
+    /// no content term can match inside them. Built here rather than by to_tsvector, whose parser
+    /// keeps addresses and URLs as one word and whose size limit counts positions as well.
+    /// Leading words win once <see cref="MaxWordBytes"/> is reached.
+    /// </summary>
+    internal static string[] ContentWords(string content)
+    {
+        var words = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        int bytes = 0;
+        foreach (Match m in WordRegex().Matches(content))
+        {
+            if (m.Length < MinContentTokenLength)
+                continue;
+            var word = m.Value.ToLowerInvariant();
+            int size = Encoding.UTF8.GetByteCount(word);
+            if (size > MaxLexemeBytes || !seen.Add(word))
+                continue;
+            if ((bytes += size) > MaxWordBytes)
+                break;
+            words.Add(word);
+        }
+        return words.ToArray();
+    }
+
+    // Same pattern as LocalIndexSearchService.TokenRegex.
+    [GeneratedRegex(@"[\p{L}\p{M}\p{N}]+")]
+    private static partial Regex WordRegex();
+
     internal static string EscapeLike(string value)
         => value.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_");
 

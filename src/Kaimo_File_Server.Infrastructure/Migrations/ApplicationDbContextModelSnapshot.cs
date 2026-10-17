@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using NpgsqlTypes;
 
 #nullable disable
 
@@ -17,7 +18,7 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
@@ -1858,6 +1859,12 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<NpgsqlTsVector>("ContentTsv")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tsvector")
+                        .HasDefaultValueSql("''::tsvector");
+
                     b.Property<DateTime>("CreatedUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -1895,10 +1902,9 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
 
                     NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("AbsolutePath"), new[] { "text_pattern_ops" });
 
-                    b.HasIndex("Content");
+                    b.HasIndex("ContentTsv");
 
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Content"), "gin");
-                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Content"), new[] { "gin_trgm_ops" });
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ContentTsv"), "gin");
 
                     b.HasIndex("FileName");
 
@@ -1910,6 +1916,21 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("ShareName", "SharePath"), new[] { "text_ops", "text_pattern_ops" });
 
                     b.ToTable("search_documents", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Infrastructure.Persistence.SearchTermRecord", b =>
+                {
+                    b.Property<string>("Term")
+                        .HasColumnType("text");
+
+                    b.HasKey("Term");
+
+                    b.HasIndex("Term");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Term"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Term"), new[] { "gin_trgm_ops" });
+
+                    b.ToTable("search_terms", (string)null);
                 });
 
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.Group", b =>

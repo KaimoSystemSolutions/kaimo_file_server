@@ -18,13 +18,14 @@ namespace Kaimo_File_Server.Search;
 /// Storage lives behind <see cref="ISearchIndexRepository"/> (Infrastructure), so this assembly
 /// stays free of EF.
 ///
-/// Differences to Elasticsearch: substring matching via trigram indexes instead of n-grams (content
-/// from three characters on), no typo tolerance, ranking by weighted match counts instead of BM25,
-/// and stored content is capped at <see cref="MaxContentChars"/>.
+/// Differences to Elasticsearch: substring matching via a trigram-indexed word dictionary and a
+/// word index instead of n-grams (content from three characters on, within words), no typo
+/// tolerance, ranking by weighted match counts instead of BM25, and stored content is capped at
+/// <see cref="MaxContentChars"/>.
 /// </summary>
 public sealed partial class LocalIndexSearchService : ISearchService
 {
-    // ponytail: fixed cap on stored text per document to keep the trigram index bounded;
+    // ponytail: fixed cap on stored text per document to keep the index bounded;
     // Elasticsearch stores all of it. Make it a setting if deeper content search is needed.
     internal const int MaxContentChars = 1_000_000;
 

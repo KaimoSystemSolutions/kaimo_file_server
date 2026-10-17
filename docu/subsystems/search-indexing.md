@@ -89,21 +89,31 @@ so the router replaces the `NoOpSearchService` fallback. The Elasticsearch URL d
 
 ## Local index
 
-- Table `search_documents` (migration `AddLocalSearchIndex`) with trigram GIN indexes (`pg_trgm`)
-  on `FileName` and `Content`, and `text_pattern_ops` b-tree indexes for prefix scans. `pg_trgm` is a
-  trusted extension; external PostgreSQL servers need the `contrib` package, and the application's
-  database user needs the `CREATE` privilege on the database. The migration runs for every
-  installation, regardless of the selected engine, so without that privilege the app does not start.
+- Table `search_documents` (migrations `AddLocalSearchIndex`, `AddSearchWordIndex`) with a trigram
+  GIN index (`pg_trgm`) on `FileName`, a GIN index on the word vector `ContentTsv`, and
+  `text_pattern_ops` b-tree indexes for prefix scans; table `search_terms` is the word dictionary
+  (every word any document contains, trigram GIN index). `pg_trgm` is a trusted extension; external
+  PostgreSQL servers need the `contrib` package, and the application's database user needs the
+  `CREATE` privilege on the database. The migration runs for every installation, regardless of the
+  selected engine, so without that privilege the app does not start.
+- Word vector: the distinct words of the content, split and lowercased exactly like the query terms,
+  words under three characters left out, stored as a tsvector without positions
+  (`array_to_tsvector`). It holds at most 1 MB of words; a document with more distinct vocabulary
+  keeps its leading words. The document, its vector and its new dictionary words are written in one
+  statement.
 - Query terms are runs of letters/digits with their combining marks (NFC, lowercased, at least 2
   characters, at most 10). Each term also matches in its spelling variants: decomposed (NFD names
   from macOS clients) and `ß`/`ss`. Each term matches as a case-insensitive substring (`ILIKE`) of
-  the file name and — from three characters on — of the content; terms are OR-combined like the
-  Elasticsearch `match` query. Whether the content matches is one case-insensitive regex alternation
-  over all terms (index-backed by `pg_trgm`, one pass per row); measured, `ILIKE` and `lower()` over
-  whole documents were the dominant cost. Ranking uses the Elasticsearch boosts (name 4, whole word
-  in content 2, content substring 1), the content boosts looking at the first 20,000 characters
-  only. The excerpt is cut in SQL around the first content match (`regexp_instr`), only for the
-  returned page.
+  the file name and — from three characters on — of any content word (within a word, not across
+  word boundaries, like the n-grams); terms are OR-combined like the Elasticsearch `match` query.
+  A content term is resolved to the dictionary words containing it (at most 5,000, shortest first),
+  which are looked up in the word index; the content itself is never scanned. Ranking uses the
+  Elasticsearch boosts (name 4, whole word in content 2, content word containing the term 1) over
+  the whole content. The excerpt is cut in SQL around the first content match (`regexp_instr`),
+  only for the returned page. The search statement runs with `enable_seqscan = off`: the planner
+  underestimates reading the word vectors and otherwise picks a sequential scan on small tables.
+- The dictionary only grows between rebuilds (deletes keep their words; they cost lookups, not
+  results); compaction after a version rebuild rebuilds it from the stored word vectors.
 - Renames and directory moves are a single transaction that rewrites id (`md5()` in SQL), paths and
   share, and marks the moved rows as current, so a reindex running meanwhile does not sweep them;
   subtree deletes are one statement.
@@ -114,14 +124,17 @@ so the router replaces the `NoOpSearchService` fallback. The Elasticsearch URL d
   (`search.local.built-version` in `config_settings`), the indexer starts one whenever local indexing
   becomes active, so a first build interrupted by a restart or an engine switch is restarted instead
   of leaving the index incomplete. The log is followed meanwhile. Such a build first clears all
-  change-detection stamps, so unchanged files are re-extracted too, and compacts the table
-  afterwards (`VACUUM FULL`). Bump the version whenever extraction or the indexed path set changes.
+  change-detection stamps, so unchanged files are re-extracted too, and afterwards rebuilds the word
+  dictionary and compacts the tables (`VACUUM FULL`). Bump the version whenever extraction or the
+  indexed path set changes. After the upgrade to version 5 (word vector), documents of an existing
+  index are found by name only until the rebuild has re-extracted them.
 - If the change log was pruned past an engine's cursor, the cursor only jumps to the head once the
   full rebuild has actually started; otherwise the indexer retries.
 - In read-only demo mode (`KAIMO_DEMO_READONLY`) the local engine writes nothing and refuses a
   reindex; the demo index has to be built beforehand.
 - Deliberate differences to Elasticsearch: no typo tolerance, no BM25 scoring, two-character terms
-  match file names only, and stored content is capped at 1,000,000 characters.
+  match file names only, content terms match within single words, and stored content is capped at
+  1,000,000 characters.
 
 ## Indexing pipeline
 

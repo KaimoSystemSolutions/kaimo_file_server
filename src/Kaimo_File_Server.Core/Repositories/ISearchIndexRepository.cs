@@ -48,8 +48,8 @@ public interface ISearchIndexRepository
 
     /// <summary>
     /// Raw, ranked, UNFILTERED search page. Each token matches as a case-insensitive substring of
-    /// the file name and, from three characters on, of the content; two-character tokens only
-    /// rank when a longer token is present. No excerpt is filled in (see <see cref="GetExcerptsAsync"/>).
+    /// the file name and, from three characters on, of any word of the content (not across word
+    /// boundaries); two-character tokens only rank when a longer token is present. No excerpt is filled in (see <see cref="GetExcerptsAsync"/>).
     /// Recycle-bin documents are left out unless <paramref name="includeRecycleBin"/> is set.
     /// Results must pass the ACL filter before they are exposed.
     /// </summary>
