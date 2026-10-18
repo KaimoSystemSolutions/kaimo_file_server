@@ -5740,8 +5740,8 @@
     <value>Job creator</value>
   </data>
   <data name="Web_Backup_Kit_Template" xml:space="preserve">
-    <value>KAIMO FILES - RECOVERY KIT
-==========================
+    <value>KAIMO FILE SERVER - RECOVERY KIT
+================================
 Keep this file offline and safe (e.g. printed in a safe or in a password manager).
 Anyone holding it can read the backups - without it, NOBODY can restore them.
 

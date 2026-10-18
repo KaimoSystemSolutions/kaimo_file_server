@@ -29,7 +29,7 @@ public sealed class NotificationMailComposer(
         var serverUrl = (await ServerDomainSettings.LoadAsync(config)).DefaultAddress ?? string.Empty;
 
         var smtpSettings = await smtp.GetAsync();
-        var serverName = string.IsNullOrWhiteSpace(smtpSettings.FromName) ? "Kaimo Files" : smtpSettings.FromName;
+        var serverName = string.IsNullOrWhiteSpace(smtpSettings.FromName) ? "Kaimo File Server" : smtpSettings.FromName;
         var language = DefaultMailTemplates.NormalizeLanguage(await config.GetStringAsync("app.language", "de"));
         return new MailEnvironment(layout, serverName, serverUrl, language);
     }

@@ -55,7 +55,7 @@ public sealed record SmtpSettings
     public string? EncryptedPassword { get; set; }
 
     public string FromAddress { get; set; } = string.Empty;
-    public string FromName { get; set; } = "Kaimo Files";
+    public string FromName { get; set; } = "Kaimo File Server";
     public string ReplyTo { get; set; } = string.Empty;
     public int TimeoutSeconds { get; set; } = 30;
 

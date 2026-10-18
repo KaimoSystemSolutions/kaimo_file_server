@@ -189,7 +189,7 @@ public sealed class MailServerSettingsViewModel(
         return string.IsNullOrEmpty(username) ? null : await userContextFactory.CreateByUsernameAsync(username);
     }
 
-    private static string NameOr(string name) => string.IsNullOrWhiteSpace(name) ? "Kaimo Files" : name;
+    private static string NameOr(string name) => string.IsNullOrWhiteSpace(name) ? "Kaimo File Server" : name;
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 }

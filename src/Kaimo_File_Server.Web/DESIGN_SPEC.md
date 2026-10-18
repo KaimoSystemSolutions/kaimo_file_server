@@ -1,4 +1,4 @@
-# Kaimo Files – Design Specification
+# Kaimo File Server – Design Specification
 
 **Status:** Binding visual and conceptual baseline, aligned with the implemented Web UI as of 2026-09-27
 **Scope:** Web UI (`Kaimo_File_Server.Web`) and the Flutter client apps (desktop, iOS, Android)
@@ -7,7 +7,7 @@
 
 ## 1. Summary for AI systems
 
-Build Kaimo Files as a focused, robust file-server workbench with strong orientation and visible functions. The interaction model follows the strengths of classic Windows work surfaces — persistent navigation, clear zones, visible commands, lists, tree views, toolbars, detail panels and status indicators — reinterpreted with modern typography, crisp shapes, clean spacing and accessible interaction. It is not a retro skin.
+Build Kaimo File Server as a focused, robust file-server workbench with strong orientation and visible functions. The interaction model follows the strengths of classic Windows work surfaces — persistent navigation, clear zones, visible commands, lists, tree views, toolbars, detail panels and status indicators — reinterpreted with modern typography, crisp shapes, clean spacing and accessible interaction. It is not a retro skin.
 
 The UI is predominantly neutral, built from several clearly distinguishable neutral layers in both dark and light mode. One accent color — user-selectable, green by default — is used sparingly for primary actions, focus, selection and brand. Shapes are crisp (2–4 px radii). All styling comes from the Kaimo tokens and classes in `app.css` and the shared Blazor components; there is no framework default look anywhere, and Bootstrap is not loaded.
 
@@ -23,7 +23,7 @@ Page specs may extend these rules but must not silently override them.
 
 ### 3.1 Intended impression
 
-Kaimo Files MUST feel like a focused tool that people trust with their data and infrastructure:
+Kaimo File Server MUST feel like a focused tool that people trust with their data and infrastructure:
 
 - clear, direct and dependable;
 - functionally rich without visual clutter;
@@ -349,7 +349,7 @@ For more than two outcomes, compute the tone in code-behind (e.g. a `switch` ove
 
 ## 15. Anti-patterns
 
-Kaimo Files MUST NOT:
+Kaimo File Server MUST NOT:
 
 - tint every interactive or selected surface with the accent;
 - render all icons in the accent color;
@@ -407,7 +407,7 @@ The implementation largely matches this spec. Undefined tokens, hard-coded fallb
 
 ## 19. Reusable master prompt
 
-> Design the requested Kaimo Files screen according to the Kaimo design spec. Treat Kaimo Files as a robust, distinctive file-server workbench. Base the interaction logic on the strengths of classic Windows work surfaces: visible commands, clear zones, toolbars, lists, tree views, list + detail panels and explicit status indicators — without a retro look. Use Plus Jakarta Sans as the typeface (uppercase micro-labels for section and column labels), crisp 2–4 px radii, the 4 px spacing scale and accessible interactions. Build the UI mostly from clearly distinguishable neutral layers, using only the tokens from `app.css`. Use the accent (`var(--accent)` and its variants — user-selectable, green by default) sparingly for primary action, focus, selection and brand; never hard-code it or tint the whole UI. Dark and light mode must each have several high-contrast layers. Reuse `Tabs`, `StatusBadge`, `PrincipalPickerField`, `MultiSelect`, `InfoButton` and the global button, form, list, dialog and banner classes before inventing anything new. Important functions must not live only in context, hover or overflow menus. Define all relevant interaction and system states, and leave no element in a browser default look.
+> Design the requested Kaimo File Server screen according to the Kaimo design spec. Treat Kaimo File Server as a robust, distinctive file-server workbench. Base the interaction logic on the strengths of classic Windows work surfaces: visible commands, clear zones, toolbars, lists, tree views, list + detail panels and explicit status indicators — without a retro look. Use Plus Jakarta Sans as the typeface (uppercase micro-labels for section and column labels), crisp 2–4 px radii, the 4 px spacing scale and accessible interactions. Build the UI mostly from clearly distinguishable neutral layers, using only the tokens from `app.css`. Use the accent (`var(--accent)` and its variants — user-selectable, green by default) sparingly for primary action, focus, selection and brand; never hard-code it or tint the whole UI. Dark and light mode must each have several high-contrast layers. Reuse `Tabs`, `StatusBadge`, `PrincipalPickerField`, `MultiSelect`, `InfoButton` and the global button, form, list, dialog and banner classes before inventing anything new. Important functions must not live only in context, hover or overflow menus. Define all relevant interaction and system states, and leave no element in a browser default look.
 
 ---
 

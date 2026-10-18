@@ -76,7 +76,7 @@ public static class NotificationEventCatalog
     [
         new("recipient.name", "Erika Mustermann"),
         new("recipient.email", "erika@example.com"),
-        new("server.name", "Kaimo Files"),
+        new("server.name", "Kaimo File Server"),
         new("server.url", "https://files.example.com"),
         new("event.time", "2026-09-28 14:05"),
     ];

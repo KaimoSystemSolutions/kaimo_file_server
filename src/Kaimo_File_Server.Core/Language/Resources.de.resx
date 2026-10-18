@@ -5674,8 +5674,8 @@
     <value>Auftragsersteller</value>
   </data>
   <data name="Web_Backup_Kit_Template" xml:space="preserve">
-    <value>KAIMO FILES - WIEDERHERSTELLUNGS-KIT
-====================================
+    <value>KAIMO FILE SERVER - WIEDERHERSTELLUNGS-KIT
+==========================================
 Bewahre diese Datei offline und sicher auf (z. B. ausgedruckt im Tresor oder in einem Passwort-Manager).
 Wer sie besitzt, kann die Sicherungen lesen - ohne sie kann NIEMAND sie wiederherstellen.
 
