@@ -2,8 +2,11 @@
 @using System.Globalization
 @using Kaimo_File_Server.Core.Domain
 @using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Services
+@using Kaimo_File_Server.Infrastructure.Services
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject AssetProvider Icons
+@inject DateFormatService DateFmt
 
 <div class="detail-section">
     <span class="detail-label">@Resources.Web_Settings_Storage_DetailLabel</span>
@@ -39,7 +42,7 @@
                         </div>
                         @if (pool.Available)
                         {
-                            <span class="storage-pool-percent">@Pct(pool.UsedPercent) % belegt</span>
+                            <span class="storage-pool-percent">@string.Format(T("Web_Settings_Storage_UsedPercent", "{0} % used"), Pct(pool.UsedPercent))</span>
                         }
                     </div>
 
@@ -53,6 +56,51 @@
                             <span><strong>@VM.FormatBytes(pool.FreeBytes)</strong> @Resources.Web_Settings_Storage_Free</span>
                             <span><strong>@VM.FormatBytes(pool.TotalBytes)</strong> @Resources.Web_Settings_Storage_Total</span>
                             <span>@Resources.Web_Settings_Storage_Drive <strong>@pool.DriveName</strong></span>
+                        </div>
+
+                        @* Usage by origin: collapsed by default, since opening it walks the pool's files.
+                           What Kaimo stores vs. the rest of the disk; colour is repeated as text in the legend. *@
+                        var originOpen = _openOrigins.Contains(pool.StoragePath);
+                        <div class="storage-origin">
+                            <button class="acl-collapse-toggle storage-origin-toggle" type="button" aria-expanded="@(originOpen ? "true" : "false")"
+                                    @onclick="() => ToggleOrigin(pool.StoragePath)">
+                                @Icons.SVG("chevron_right.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-collapse-chevron" + (originOpen ? " acl-collapse-chevron--open" : "")))
+                                <span>@T("Web_Settings_Storage_Origin_Label", "Usage by origin")</span>
+                            </button>
+                            @if (originOpen && VM.PoolBreakdowns.TryGetValue(pool.StoragePath, out var breakdown) && VM.OutsideKaimoBytes(pool) is not null)
+                            {
+                                var segments = OriginSegments(pool, breakdown);
+                                <div class="storage-origin-bar" role="img"
+                                     aria-label="@string.Join(", ", segments.Select(s => $"{s.Label} {VM.FormatBytes(s.Bytes)}"))">
+                                    @foreach (var segment in segments.Where(s => s.Bytes > 0))
+                                    {
+                                        <span class="@SegmentClass(segment)" style="width: @Width(segment.Bytes, pool.TotalBytes)%;"
+                                              title="@segment.Label: @VM.FormatBytes(segment.Bytes)"></span>
+                                    }
+                                </div>
+                                <ul class="storage-origin-legend">
+                                    @foreach (var segment in segments)
+                                    {
+                                        <li>
+                                            <span class="storage-origin-swatch @SegmentClass(segment)" aria-hidden="true"></span>
+                                            <span>@segment.Label</span>
+                                            <strong>@VM.FormatBytes(segment.Bytes)</strong>
+                                        </li>
+                                    }
+                                </ul>
+                                <span class="settings-hint">
+                                    @T("Web_Settings_Storage_Origin_Hint", "Calculated from the files in the pool.")
+                                    @string.Format(T("Web_Settings_Storage_Origin_CalculatedAt", "Calculated {0}"), DateFmt.FormatDateTime(breakdown.ScannedAtUtc))
+                                </span>
+                            }
+                            else if (originOpen && VM.IsScanningBreakdown)
+                            {
+                                <p class="settings-empty">@T("Web_Settings_Storage_Origin_Calculating", "Calculating usage…")</p>
+                            }
+                            else if (originOpen)
+                            {
+                                <p class="settings-empty">@T("Web_Settings_Storage_Origin_Unavailable", "The breakdown is not available.")</p>
+                            }
                         </div>
                     }
                     else
@@ -87,7 +135,48 @@
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
     private static string Pct(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
-    private void Refresh() { VM.RefreshStorageInfo(); StateHasChanged(); }
+
+    // Pools whose "usage by origin" details are expanded (per visit, not persisted).
+    private readonly HashSet<string> _openOrigins = new();
+
+    // Opening reuses the last scan if there is one; a scan walks every file of the pool.
+    private async Task ToggleOrigin(string poolPath)
+    {
+        if (!_openOrigins.Remove(poolPath))
+        {
+            _openOrigins.Add(poolPath);
+            await VM.RefreshStorageBreakdownAsync();
+        }
+    }
+
+    private async Task Refresh()
+    {
+        VM.RefreshStorageInfo();
+        if (_openOrigins.Count > 0)
+            await VM.RefreshStorageBreakdownAsync(force: true);
+    }
+
+    private sealed record OriginSegment(string Label, long Bytes, TileColor Color);
+
+    private List<OriginSegment> OriginSegments(StorageUsageInfo pool, PoolUsageBreakdown b)
+    {
+        var segments = new List<OriginSegment>
+        {
+            new(T("Web_Settings_Storage_Origin_Files", "Files in shares"), b.FileBytes, TileColor.Folder),
+            new(T("Web_Settings_Storage_Origin_RecycleBins", "Recycle bins"), b.RecycleBinBytes, TileColor.Department),
+            new(T("Web_Settings_Storage_Origin_Versions", "Version history"), b.VersionBytes, TileColor.Info),
+            new(T("Web_Settings_Storage_Origin_OtherServer", "Other Kaimo data"), b.OtherServerBytes, TileColor.Group),
+        };
+        if (VM.OtherPoolsOnDiskBytes(pool) is long otherPools and > 0)
+            segments.Add(new(T("Web_Settings_Storage_Origin_OtherPools", "Other pools on this disk"), otherPools, TileColor.User));
+        segments.Add(new(T("Web_Settings_Storage_Origin_Outside", "Not Kaimo"), VM.OutsideKaimoBytes(pool) ?? 0, TileColor.Neutral));
+        return segments;
+    }
+
+    private static string SegmentClass(OriginSegment segment) => "tile-segment--" + segment.Color.ToString().ToLowerInvariant();
+
+    private static string Width(long bytes, long total)
+        => (total > 0 ? Math.Min(100d, bytes * 100d / total) : 0d).ToString("0.###", CultureInfo.InvariantCulture);
 
     private static string T(string key, string fallback) => Resources.ResourceManager.GetString(key) ?? fallback;
 

@@ -10,7 +10,9 @@ using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Web.Services.Https;
+using Bunit;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
@@ -258,6 +260,151 @@ public class SettingsViewModelSmbTests
         systemInfo.Verify(s => s.GetStorageUsage(), Times.Never);
     }
 
+    // ─────────────────────────── SettingsViewModel: storage origin ───────────────────────────
+
+    private static Mock<ISystemInfoService> SystemInfoWith(params StorageUsageInfo[] pools)
+    {
+        var systemInfo = new Mock<ISystemInfoService>();
+        systemInfo.SetupGet(s => s.HostName).Returns("kaimo");
+        systemInfo.Setup(s => s.GetNetworkAddresses()).Returns([]);
+        systemInfo.Setup(s => s.GetStorageUsage()).Returns(pools.ToList());
+        systemInfo.Setup(s => s.GetMemoryUsage()).Returns(new MemoryUsageInfo(100, 100, 50, 1_000));
+        return systemInfo;
+    }
+
+    private static PoolUsageService FixedPoolUsage(Dictionary<string, long> kaimoBytesByPool)
+        => new((pool, _) => new PoolUsageBreakdown(kaimoBytesByPool[pool], 0, 0, 0, DateTime.UtcNow));
+
+    [Fact]
+    public async Task StorageBreakdown_PoolsOnSameDisk_SubtractEveryPoolFromUsed()
+    {
+        var p1 = new StorageUsageInfo("/data/storage/pool01", "/data/storage/pool01", 10_000, 6_000, 4_000, true) { DeviceId = "8:1" };
+        var p2 = new StorageUsageInfo("/data/storage/pool02", "/data/storage/pool02", 10_000, 6_000, 4_000, true) { DeviceId = "8:1" };
+        var p3 = new StorageUsageInfo("/data/storage/pool03", "/data/storage/pool03", 5_000, 1_000, 4_000, true) { DeviceId = "8:17" };
+        var h = new Harness(false, canManageSettings: true, systemInfo: SystemInfoWith(p1, p2, p3).Object,
+            poolUsage: FixedPoolUsage(new() { [p1.StoragePath] = 1_000, [p2.StoragePath] = 2_000, [p3.StoragePath] = 400 }));
+        await h.Vm.LoadAsync();
+
+        await h.Vm.RefreshStorageBreakdownAsync();
+
+        Assert.Equal(2_000, h.Vm.OtherPoolsOnDiskBytes(p1));
+        Assert.Equal(1_000, h.Vm.OtherPoolsOnDiskBytes(p2));
+        Assert.Equal(3_000, h.Vm.OutsideKaimoBytes(p1));
+        Assert.Equal(3_000, h.Vm.OutsideKaimoBytes(p2));
+        Assert.Equal(0, h.Vm.OtherPoolsOnDiskBytes(p3));
+        Assert.Equal(600, h.Vm.OutsideKaimoBytes(p3));
+    }
+
+    [Fact]
+    public async Task StorageBreakdown_PoolWithoutDeviceId_StandsAlone_AndOutsideIsClampedAtZero()
+    {
+        var p1 = new StorageUsageInfo("/a", "/a", 1_000, 500, 500, true);
+        var p2 = new StorageUsageInfo("/b", "/b", 1_000, 500, 500, true);
+        var h = new Harness(false, canManageSettings: true, systemInfo: SystemInfoWith(p1, p2).Object,
+            poolUsage: FixedPoolUsage(new() { ["/a"] = 900, ["/b"] = 100 }));
+        await h.Vm.LoadAsync();
+
+        await h.Vm.RefreshStorageBreakdownAsync();
+
+        Assert.Equal(0, h.Vm.OtherPoolsOnDiskBytes(p1));
+        Assert.Equal(0, h.Vm.OutsideKaimoBytes(p1));
+        Assert.Equal(400, h.Vm.OutsideKaimoBytes(p2));
+    }
+
+    [Fact]
+    public async Task StorageBreakdown_BeforeScan_IsUnknown_AndCachedResultIsReused()
+    {
+        var p1 = new StorageUsageInfo("/a", "/a", 1_000, 500, 500, true);
+        var calls = 0;
+        var usage = new PoolUsageService((_, _) =>
+            new PoolUsageBreakdown(100 * Interlocked.Increment(ref calls), 0, 0, 0, DateTime.UtcNow));
+        var h = new Harness(false, canManageSettings: true, systemInfo: SystemInfoWith(p1).Object, poolUsage: usage);
+        await h.Vm.LoadAsync();
+
+        Assert.Null(h.Vm.OutsideKaimoBytes(p1));
+
+        await h.Vm.RefreshStorageBreakdownAsync();
+        await h.Vm.RefreshStorageBreakdownAsync();
+        Assert.Equal(1, calls);
+        Assert.Equal(400, h.Vm.OutsideKaimoBytes(p1));
+
+        await h.Vm.RefreshStorageBreakdownAsync(force: true);
+        Assert.Equal(2, calls);
+        Assert.Equal(300, h.Vm.OutsideKaimoBytes(p1));
+    }
+
+    [Fact]
+    public async Task StorageBreakdown_WithoutSettingsPermission_DoesNotScan()
+    {
+        var calls = 0;
+        var usage = new PoolUsageService((_, _) =>
+        {
+            Interlocked.Increment(ref calls);
+            return new PoolUsageBreakdown(0, 0, 0, 0, DateTime.UtcNow);
+        });
+        var h = new Harness(canManageDataServices: true,
+            systemInfo: SystemInfoWith(new StorageUsageInfo("/a", "/a", 1, 1, 0, true)).Object, poolUsage: usage);
+        await h.Vm.LoadAsync();
+
+        await h.Vm.RefreshStorageBreakdownAsync(force: true);
+
+        Assert.Equal(0, calls);
+        Assert.Empty(h.Vm.PoolBreakdowns);
+    }
+
+    [Fact]
+    public async Task StorageSettings_OriginDetails_AreCollapsedByDefault_AndScanOnlyWhenOpened()
+    {
+        var pool = new StorageUsageInfo("/a", "/a", 1_000, 500, 500, true);
+        var calls = 0;
+        var usage = new PoolUsageService((_, _) =>
+        {
+            Interlocked.Increment(ref calls);
+            return new PoolUsageBreakdown(100, 0, 0, 0, DateTime.UtcNow);
+        });
+        var h = new Harness(false, canManageSettings: true, systemInfo: SystemInfoWith(pool).Object, poolUsage: usage);
+        await h.Vm.LoadAsync();
+
+        using var ctx = new Bunit.BunitContext();
+        var env = new Mock<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>();
+        env.SetupGet(e => e.WebRootPath).Returns(MailNotificationTests.FindWebRoot());
+        ctx.Services.AddSingleton(new AssetProvider(env.Object));
+        ctx.Services.AddSingleton(new DateFormatService(h.Config.Object));
+        var cut = ctx.Render<Kaimo_File_Server.Web.Components.Pages.Settings.Components.StorageSettings>(
+            p => p.Add(c => c.VM, h.Vm));
+
+        // Collapsed: no details and no pool walk until the admin asks for them.
+        Assert.Equal("false", cut.Find(".storage-origin-toggle").GetAttribute("aria-expanded"));
+        Assert.Empty(cut.FindAll(".storage-origin-legend"));
+        Assert.Equal(0, calls);
+
+        cut.Find(".storage-origin-toggle").Click();
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".storage-origin-legend")), TimeSpan.FromSeconds(5));
+        Assert.Equal("true", cut.Find(".storage-origin-toggle").GetAttribute("aria-expanded"));
+        Assert.Equal(1, calls);
+
+        cut.Find(".storage-origin-toggle").Click();
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".storage-origin-legend")), TimeSpan.FromSeconds(5));
+        Assert.Equal("false", cut.Find(".storage-origin-toggle").GetAttribute("aria-expanded"));
+        Assert.Equal(1, calls);
+    }
+
+    [Theory]
+    [InlineData("Web_Settings_Storage_UsedPercent")]
+    [InlineData("Web_Settings_Storage_Origin_Label")]
+    [InlineData("Web_Settings_Storage_Origin_Hint")]
+    [InlineData("Web_Settings_Storage_Origin_Files")]
+    [InlineData("Web_Settings_Storage_Origin_RecycleBins")]
+    [InlineData("Web_Settings_Storage_Origin_Versions")]
+    [InlineData("Web_Settings_Storage_Origin_OtherServer")]
+    [InlineData("Web_Settings_Storage_Origin_OtherPools")]
+    [InlineData("Web_Settings_Storage_Origin_Outside")]
+    [InlineData("Web_Settings_Storage_Origin_Calculating")]
+    [InlineData("Web_Settings_Storage_Origin_Unavailable")]
+    [InlineData("Web_Settings_Storage_Origin_CalculatedAt")]
+    public void StorageOriginKeys_ExistInBothCultures(string key)
+        => SettingsMessageKeys_ExistInBothCultures(key);
+
     // ─────────────────────────── SettingsViewModel: save ───────────────────────────
 
     [Fact]
@@ -406,7 +553,8 @@ public class SettingsViewModelSmbTests
             bool canManageDataServices,
             SmbProtocolSettings? storedProtocol = null,
             bool canManageSettings = false,
-            ISystemInfoService? systemInfo = null)
+            ISystemInfoService? systemInfo = null,
+            PoolUsageService? poolUsage = null)
         {
             storedProtocol ??= SmbProtocolSettings.Default();
 
@@ -471,7 +619,8 @@ public class SettingsViewModelSmbTests
                 Mock.Of<Kaimo_File_Server.Infrastructure.Backup.IDatabaseBackupService>(),
                 new Kaimo_File_Server.Web.Services.BackupDownloadTokenService(
                     Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("KaimoTests")),
-                NullLogger<SettingsViewModel>.Instance);
+                NullLogger<SettingsViewModel>.Instance,
+                poolUsage: poolUsage);
         }
 
         private static UserContext MakeActor()

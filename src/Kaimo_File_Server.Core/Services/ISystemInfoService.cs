@@ -39,6 +39,13 @@ public record StorageUsageInfo(
     long FreeBytes,
     bool Available)
 {
+    /// <summary>
+    /// Identifies the filesystem the pool lives on (Linux <c>major:minor</c>, else the volume
+    /// root). Pools with the same id share one disk and therefore one used/free figure.
+    /// <c>null</c> = unknown, the pool is treated as being alone on its disk.
+    /// </summary>
+    public string? DeviceId { get; init; }
+
     public double UsedPercent => TotalBytes > 0 ? (double)UsedBytes / TotalBytes * 100d : 0d;
 }
 

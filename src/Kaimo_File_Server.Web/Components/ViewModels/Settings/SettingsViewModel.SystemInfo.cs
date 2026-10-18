@@ -77,6 +77,75 @@ public partial class SettingsViewModel
         MemoryUsage = _sysInfo.GetMemoryUsage();
     }
 
+    // ── Storage usage by origin ──
+
+    /// <summary>Kaimo's own data per pool path, once scanned.</summary>
+    public Dictionary<string, PoolUsageBreakdown> PoolBreakdowns { get; } = new();
+
+    /// <summary>True while the pool scans for <see cref="PoolBreakdowns"/> run.</summary>
+    public bool IsScanningBreakdown { get; private set; }
+
+    /// <summary>
+    /// Fills <see cref="PoolBreakdowns"/>. Without <paramref name="force"/> a pool's last scan
+    /// (shared across sessions) is reused; a scan walks every file of the pool.
+    /// </summary>
+    public async Task RefreshStorageBreakdownAsync(bool force = false)
+    {
+        if (!CanManageSettings || _poolUsage is null || IsScanningBreakdown) return;
+
+        IsScanningBreakdown = true;
+        try
+        {
+            var pools = StorageUsages.Where(p => p.Available).ToList();
+            var results = await Task.WhenAll(pools.Select(LoadAsync));
+            for (var i = 0; i < pools.Count; i++)
+                if (results[i] is { } breakdown)
+                    PoolBreakdowns[pools[i].StoragePath] = breakdown;
+        }
+        finally
+        {
+            IsScanningBreakdown = false;
+        }
+
+        async Task<PoolUsageBreakdown?> LoadAsync(StorageUsageInfo pool)
+        {
+            try
+            {
+                var cached = force ? null : _poolUsage.GetCached(pool.StoragePath);
+                return cached ?? await _poolUsage.ScanAsync(pool.StoragePath, HomesSharePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Scanning storage pool '{Pool}' for its usage breakdown failed", pool.StoragePath);
+                return null;
+            }
+        }
+    }
+
+    /// <summary>Kaimo data of the other pools on the same disk; <c>null</c> until all are scanned.</summary>
+    public long? OtherPoolsOnDiskBytes(StorageUsageInfo pool) => KaimoBytesOnDisk(pool, includeSelf: false);
+
+    /// <summary>
+    /// Used space on the pool's disk that Kaimo did not write (OS, other services):
+    /// used minus the Kaimo data of every pool on that disk. <c>null</c> until all are scanned.
+    /// </summary>
+    public long? OutsideKaimoBytes(StorageUsageInfo pool)
+        => KaimoBytesOnDisk(pool, includeSelf: true) is { } kaimo ? Math.Max(0, pool.UsedBytes - kaimo) : null;
+
+    private long? KaimoBytesOnDisk(StorageUsageInfo pool, bool includeSelf)
+    {
+        long sum = 0;
+        foreach (var other in StorageUsages)
+        {
+            var self = other.StoragePath == pool.StoragePath;
+            var sameDisk = self || (pool.DeviceId is not null && other.DeviceId == pool.DeviceId);
+            if (!sameDisk || (self && !includeSelf)) continue;
+            if (!PoolBreakdowns.TryGetValue(other.StoragePath, out var breakdown)) return null;
+            sum += breakdown.KaimoBytes;
+        }
+        return sum;
+    }
+
     /// <summary>
     /// Loads the persisted custom pool names and ensures every currently visible
     /// pool has an (at least blank) entry so the editor can bind to it.

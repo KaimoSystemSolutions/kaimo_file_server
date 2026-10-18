@@ -7423,4 +7423,40 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_ShareList_MovePoolHint" xml:space="preserve">
     <value>Während des Verschiebens ist der Share über keinen Zugriffsweg erreichbar.</value>
   </data>
+  <data name="Web_Settings_Storage_UsedPercent" xml:space="preserve">
+    <value>{0} % belegt</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Label" xml:space="preserve">
+    <value>Belegung nach Herkunft</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Hint" xml:space="preserve">
+    <value>Berechnet aus den Dateien im Pool. „Nicht Kaimo“ ist der übrige belegte Platz auf diesem Datenträger, zum Beispiel durch das Betriebssystem oder andere Dienste.</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Files" xml:space="preserve">
+    <value>Dateien in Freigaben</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_RecycleBins" xml:space="preserve">
+    <value>Papierkörbe</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Versions" xml:space="preserve">
+    <value>Versionsverlauf</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_OtherServer" xml:space="preserve">
+    <value>Sonstige Kaimo-Daten</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_OtherPools" xml:space="preserve">
+    <value>Andere Pools auf diesem Datenträger</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Outside" xml:space="preserve">
+    <value>Nicht Kaimo</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Calculating" xml:space="preserve">
+    <value>Belegung wird berechnet…</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Unavailable" xml:space="preserve">
+    <value>Die Aufschlüsselung ist nicht verfügbar.</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_CalculatedAt" xml:space="preserve">
+    <value>Berechnet {0}</value>
+  </data>
 </root>

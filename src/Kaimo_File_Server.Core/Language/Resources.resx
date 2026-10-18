@@ -7423,4 +7423,40 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_ShareList_MovePoolHint" xml:space="preserve">
     <value>The share is unavailable on all access paths while the move runs.</value>
   </data>
+  <data name="Web_Settings_Storage_UsedPercent" xml:space="preserve">
+    <value>{0} % used</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Label" xml:space="preserve">
+    <value>Usage by origin</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Hint" xml:space="preserve">
+    <value>Calculated from the files in the pool. "Not Kaimo" is the rest of the used space on this disk, for example the operating system or other services.</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Files" xml:space="preserve">
+    <value>Files in shares</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_RecycleBins" xml:space="preserve">
+    <value>Recycle bins</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Versions" xml:space="preserve">
+    <value>Version history</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_OtherServer" xml:space="preserve">
+    <value>Other Kaimo data</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_OtherPools" xml:space="preserve">
+    <value>Other pools on this disk</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Outside" xml:space="preserve">
+    <value>Not Kaimo</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Calculating" xml:space="preserve">
+    <value>Calculating usage…</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_Unavailable" xml:space="preserve">
+    <value>The breakdown is not available.</value>
+  </data>
+  <data name="Web_Settings_Storage_Origin_CalculatedAt" xml:space="preserve">
+    <value>Calculated {0}</value>
+  </data>
 </root>

@@ -92,6 +92,7 @@ public class SystemInfoService : ISystemInfoService
 
         try
         {
+            var mounts = ReadMountInfo();
             foreach (string storagePoolPath in _storagePoolPaths) {
 
                 // Fall back to the application's own location when the configured
@@ -119,7 +120,10 @@ public class SystemInfoService : ISystemInfoService
                     TotalBytes: total,
                     UsedBytes: total - free,
                     FreeBytes: free,
-                    Available: true));
+                    Available: true)
+                {
+                    DeviceId = ResolveDeviceId(probe, mounts) ?? Path.GetPathRoot(probe),
+                });
             }
             return result;
         }
@@ -127,6 +131,47 @@ public class SystemInfoService : ISystemInfoService
         {
             return result;
         }
+    }
+
+    private static Dictionary<string, string> ReadMountInfo()
+    {
+        try
+        {
+            return File.Exists("/proc/self/mountinfo")
+                ? ParseMountInfo(File.ReadLines("/proc/self/mountinfo"))
+                : new Dictionary<string, string>();
+        }
+        catch (IOException)
+        {
+            return new Dictionary<string, string>();
+        }
+    }
+
+    /// <summary>
+    /// Maps each mount point in <c>/proc/self/mountinfo</c> to its device id (field 3,
+    /// <c>major:minor</c>; field 5 is the mount point). Bind mounts of one filesystem share the id.
+    /// </summary>
+    internal static Dictionary<string, string> ParseMountInfo(IEnumerable<string> lines)
+    {
+        var mounts = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var line in lines)
+        {
+            var fields = line.Split(' ');
+            if (fields.Length >= 5)
+                mounts[ServiceCollectionExtensions.UnescapeMountPath(fields[4])] = fields[2];
+        }
+        return mounts;
+    }
+
+    /// <summary>Device id of the innermost mount containing <paramref name="path"/>, or <c>null</c>.</summary>
+    internal static string? ResolveDeviceId(string path, IReadOnlyDictionary<string, string> mounts)
+    {
+        var trimmed = path.Length > 1 ? path.TrimEnd('/') : path;
+        return mounts
+            .Where(m => m.Key == "/" || trimmed == m.Key || trimmed.StartsWith(m.Key + "/", StringComparison.Ordinal))
+            .OrderByDescending(m => m.Key.Length)
+            .Select(m => m.Value)
+            .FirstOrDefault();
     }
 
     public MemoryUsageInfo GetMemoryUsage()

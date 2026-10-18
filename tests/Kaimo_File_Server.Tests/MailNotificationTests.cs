@@ -582,7 +582,7 @@ public sealed class MailNotificationTests : DatabaseTestBase
         return ctx;
     }
 
-    private static string FindWebRoot()
+    internal static string FindWebRoot()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
         {
