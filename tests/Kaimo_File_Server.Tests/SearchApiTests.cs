@@ -129,6 +129,17 @@ public sealed class SearchApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Filename_search_lists_folders_before_files()
+    {
+        var service = CreateFilenameSearch();
+        Directory.CreateDirectory(Path.Combine(_root, "share", "sub", "secret-folder"));
+
+        var hits = await service.SearchAsync("secret", NewUser(), "share");
+
+        Assert.Equal(["secret-folder", "secret-inside.txt"], hits.Select(h => h.FileName));
+    }
+
+    [Fact]
     public async Task Filename_search_unreadable_matches_do_not_crowd_out_readable_ones()
     {
         // 300 denied matches exceed one ACL batch; the single readable one must survive.

@@ -348,6 +348,11 @@ public partial class GlobalSearch : IDisposable
     // Web hits are relative to the share (or to the own home), so the share-root rule applies.
     private static bool IsInRecycleBin(FileDocument hit) => ShareEntryPolicy.IsRecycleBinPath(hit.SharePath);
 
+    // The bin root gets the trash icon like in the file browser. Only the root can be named
+    // ".RECYCLE_BIN" here: dot-folders inside it are never indexed (ShareEntryPolicy.IsExcludedFromSearch).
+    private static bool IsRecycleBinRoot(FileDocument hit)
+        => hit.IsDirectory && string.Equals(hit.FileName, ShareEntryPolicy.RecycleBinName, StringComparison.OrdinalIgnoreCase);
+
     private async Task RefocusSearchAsync()
     {
         // Returning focus makes the component "focus-within" again, cancelling the

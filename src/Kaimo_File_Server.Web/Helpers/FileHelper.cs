@@ -205,7 +205,17 @@ public class FileHelper
     
     public static string GetIcon(string fileName)
         => IconMap.GetValueOrDefault(getExt(fileName), "file.svg");
-    
+
+    /// <summary>
+    /// Icon file and colors of a file-browser entry. The global search uses the same mapping,
+    /// so a folder, file or recycle bin looks alike in both.
+    /// </summary>
+    public static (string File, string Color, string Fill) GetEntryIcon(
+        string name, bool isDirectory, bool isRecycleBinRoot)
+        => isRecycleBinRoot ? ("trash.svg", "currentColor", "none")
+         : isDirectory ? ("folder.svg", "var(--folder-stroke)", "var(--folder-fill)")
+         : (GetIcon(name), "var(--text-tertiary)", "none");
+
 
     public static string GetContentType(string fileName)
         => ContentTypeMap.GetValueOrDefault(getExt(fileName), "application/octet-stream");

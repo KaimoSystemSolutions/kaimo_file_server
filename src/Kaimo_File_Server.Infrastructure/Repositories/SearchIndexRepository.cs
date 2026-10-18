@@ -318,7 +318,8 @@ public sealed partial class SearchIndexRepository : ISearchIndexRepository
     /// match query) and scored with the Elasticsearch boosts: name substring 4, whole word in the
     /// content 2, content word containing the token 1. Candidates come from index lookups only
     /// (file-name trigrams, word index), each scoring its content points; they are summed per
-    /// document and the name points added for the final order. Neither matching nor ranking
+    /// document. Folders come first, then name points, then content points, so any file-name match ranks
+    /// above every content-only match (like the name tier in Elasticsearch). Neither matching nor ranking
     /// reads the content; excerpts are fetched by <see cref="GetExcerptsAsync"/> for the shown
     /// hits only. Word parts match within one word, not across word boundaries (like n-grams).
     /// Two-character terms have no trigram, so they cannot use an index: with a longer term
@@ -404,7 +405,7 @@ public sealed partial class SearchIndexRepository : ISearchIndexRepository
             FROM hits h
             JOIN search_documents d ON d."Id" = h."Id"
             {where}
-            ORDER BY h.p + {string.Join(" + ", nameScore)} DESC, d."Id"
+            ORDER BY d."IsDirectory" DESC, {string.Join(" + ", nameScore)} DESC, h.p DESC, d."Id"
             OFFSET {Param(offset)} LIMIT {Param(limit)}
             """;
         return (sql, parameters.ToArray());

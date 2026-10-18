@@ -62,6 +62,29 @@ public sealed class SearchIndexRepositoryPostgresTests : PostgresTestBase
     }
 
     [PostgresFact]
+    public async Task Search_RanksAnyNameMatchAboveContentOnlyMatches_AndMoreNameTermsFirst()
+    {
+        // Content matching every term (3 x 3 points) used to outrank a name matching one (4).
+        await Put("notes.txt", "quarterly budget report, budget report, quarterly");
+        await Put("budget.txt", "nothing relevant");
+        await Put("budget-report.txt", "nothing relevant");
+
+        Assert.Equal(new[] { "budget-report.txt", "budget.txt", "notes.txt" },
+            (await Find("quarterly", "budget", "report")).Select(h => h.FileName));
+    }
+
+    [PostgresFact]
+    public async Task Search_RanksFoldersAboveFiles_EvenWithFewerNameTerms()
+    {
+        await Put("budget-report.txt", "budget report");
+        await Put("archive/budget", dir: true);
+        await Put("notes.txt", "budget report");
+
+        Assert.Equal(new[] { "budget", "budget-report.txt", "notes.txt" },
+            (await Find("budget", "report")).Select(h => h.FileName));
+    }
+
+    [PostgresFact]
     public async Task Search_TwoCharTerm_MatchesNamesOnly()
     {
         await Put("ab-name.txt", "zz");

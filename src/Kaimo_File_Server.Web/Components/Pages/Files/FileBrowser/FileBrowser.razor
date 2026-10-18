@@ -511,18 +511,8 @@ else
                      data-path="@RowKey(entry)"
                      @ondragstart="() => OnDragStart(entry)"
                      @ondragend="OnDragEnd">
-                    @if (IsRecycleBinEntry(entry))
-                    {
-                        @Assets.SVG("trash.svg", new SvgOptions(Width: 20, Height: 20, CssClass: "file-icon"))
-                    }
-                    else if (entry.IsDirectory)
-                    {
-                        @Assets.SVG("folder.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)", CssClass: "file-icon"))
-                    }
-                    else
-                    {
-                        @Assets.SVG(FileHelper.GetIcon(entry.Name), new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)", CssClass: "file-icon"))
-                    }
+                    @{ var icon = FileHelper.GetEntryIcon(entry.Name, entry.IsDirectory, IsRecycleBinEntry(entry)); }
+                    @Assets.SVG(icon.File, new SvgOptions(Width: 20, Height: 20, Color: icon.Color, Fill: icon.Fill, CssClass: "file-icon"))
                     <span>@entry.Name</span>
                     @if (syncMarker is not null)
                     {

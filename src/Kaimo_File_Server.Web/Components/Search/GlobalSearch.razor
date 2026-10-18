@@ -51,7 +51,9 @@
                                 <div class="search-result-item @(fileIndex == _activeIndex ? "active" : "")"
                                      role="option" aria-selected="@(fileIndex == _activeIndex)"
                                      @onmousedown="() => NavigateToFile(result)">
-                                    @Assets.SVG(result.IsDirectory ? "folder.svg" : FileHelper.GetIcon(result.FileName), new SvgOptions())
+                                    @* Same icon and colors as the file browser row. *@
+                                    @{ var icon = FileHelper.GetEntryIcon(result.FileName, result.IsDirectory, IsRecycleBinRoot(result)); }
+                                    @Assets.SVG(icon.File, new SvgOptions(Color: icon.Color, Fill: icon.Fill, CssClass: "search-entry-icon"))
                                     <div class="search-result-info">
                                         <span class="search-result-name">@result.FileName</span>
                                         @if (IsInRecycleBin(result))

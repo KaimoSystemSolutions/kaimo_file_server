@@ -51,7 +51,9 @@ public sealed class FilenameSearchService
         await WalkSlots.WaitAsync(ct);
         try
         {
-            return await CollectVisibleMatchesAsync(searchText, user, shareName, pathPrefix, includeRecycleBin, ct);
+            // Folders first across all shares (stable, so walk order is kept within each group).
+            var hits = await CollectVisibleMatchesAsync(searchText, user, shareName, pathPrefix, includeRecycleBin, ct);
+            return hits.OrderByDescending(h => h.IsDirectory).ToList();
         }
         finally
         {
@@ -136,7 +138,26 @@ public sealed class FilenameSearchService
                     AttributesToSkip = FileAttributes.System | FileAttributes.ReparsePoint
                 };
 
-                // Match files by name...
+                // Match directories by name first, so the hit cap keeps folders (ranked first)...
+                foreach (var absolutePath in Directory.EnumerateDirectories(walkRoot, "*", options))
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    var folderName = Path.GetFileName(absolutePath);
+                    if (folderName.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) < 0)
+                        continue;
+
+                    var relativePath = Path.GetRelativePath(share.Path, absolutePath);
+                    if (IsSkipped(relativePath, share, includeRecycleBin))
+                        continue;
+
+                    if (await AddAsync(CreateDocument(
+                            share, absolutePath, relativePath, folderName, searchText,
+                            isDirectory: true, size: 0)))
+                        return results;
+                }
+
+                // ...then files by name.
                 foreach (var absolutePath in Directory.EnumerateFiles(walkRoot, "*", options))
                 {
                     ct.ThrowIfCancellationRequested();
@@ -156,25 +177,6 @@ public sealed class FilenameSearchService
                     if (await AddAsync(CreateDocument(
                             share, absolutePath, relativePath, fileName, searchText,
                             isDirectory: false, size)))
-                        return results;
-                }
-
-                // ...and directories by name, so folders show up in search too.
-                foreach (var absolutePath in Directory.EnumerateDirectories(walkRoot, "*", options))
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    var folderName = Path.GetFileName(absolutePath);
-                    if (folderName.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) < 0)
-                        continue;
-
-                    var relativePath = Path.GetRelativePath(share.Path, absolutePath);
-                    if (IsSkipped(relativePath, share, includeRecycleBin))
-                        continue;
-
-                    if (await AddAsync(CreateDocument(
-                            share, absolutePath, relativePath, folderName, searchText,
-                            isDirectory: true, size: 0)))
                         return results;
                 }
             }

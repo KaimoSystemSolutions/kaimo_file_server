@@ -95,6 +95,29 @@ public sealed class ElasticSearchAnalyzerTests : IAsyncLifetime
     }
 
     [ElasticsearchFact]
+    public async Task NameMatches_RankAboveContentOnlyMatches()
+    {
+        // Short, term-dense content scores high under BM25 and used to outrank a name hit.
+        Write("notes.txt", "quarterly budget report quarterly budget report");
+        Write("budget.txt", "nothing relevant at all in this rather long file about other things");
+        await _service.ReindexAllAsync(progress: null);
+
+        Assert.Equal(["budget.txt", "notes.txt"],
+            (await Search("quarterly budget report")).Select(d => d.FileName));
+    }
+
+    [ElasticsearchFact]
+    public async Task Folders_RankAboveFiles()
+    {
+        Write("budget-report.txt", "budget report budget report");
+        Directory.CreateDirectory(Path.Combine(_root, "archive", "budget"));
+        await _service.ReindexAllAsync(progress: null);
+
+        Assert.Equal(["budget", "budget-report.txt"],
+            (await Search("budget report")).Select(d => d.FileName));
+    }
+
+    [ElasticsearchFact]
     public async Task CjkSingleCharacters_AreFound()
     {
         Write("東京の地図.txt", "日本語のテキスト");

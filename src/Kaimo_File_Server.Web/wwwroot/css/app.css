@@ -3986,6 +3986,11 @@ a.btn-tinted {
     height: 17px;
 }
 
+/* File/folder hits carry the file browser's own colors; no extra dimming. */
+.global-search .search-result-item svg.search-entry-icon {
+    opacity: 1;
+}
+
 /* One row per result: name on the left, secondary info (path / snippet /
    category) on the right, both truncated — no more stacked second line. */
 .global-search .search-result-info {

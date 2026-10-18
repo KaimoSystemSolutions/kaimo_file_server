@@ -46,6 +46,10 @@ public class ElasticSearchService : ISearchService
     // matching and scripts without spaces, where single characters are words.
     private const string WordAnalyzer = "kaimo_words";
 
+    // Flat score of any file-name match. BM25 content scores stay in the low hundreds even for
+    // long queries, so this keeps name hits first while float precision still resolves the ties.
+    private const float NameTierBoost = 10_000;
+
     private const int NgramMinGram = 2;
     private const int NgramMaxGram = 20;
     private const int ContentMinGram = 3;
@@ -724,6 +728,15 @@ public class ElasticSearchService : ISearchService
                             // produces hits with no visible relation to the query.
                             .Fuzziness(new Fuzziness("AUTO:5,8"))
                             .Boost(2)
+                        ),
+                        // Name tier: a flat bonus far above any BM25 content score, so every
+                        // file-name match ranks above every content-only match; the scored
+                        // clauses above still order the hits within each tier.
+                        sh => sh.ConstantScore(c => c
+                            .Filter(f => f.Bool(nb => nb.Should(
+                                n => n.Match(m => m.Field("fileName").Query(searchText)),
+                                n => n.Match(m => m.Field("fileName.std").Query(searchText)))))
+                            .Boost(NameTierBoost)
                         )
                     )
                     .MinimumShouldMatch(1);
@@ -735,6 +748,10 @@ public class ElasticSearchService : ISearchService
                         b.MustNot(excludeFilters);
                 })
             )
+            // Folders first, then by relevance.
+            .Sort(
+                so => so.Field("isDirectory", f => f.Order(SortOrder.Desc)),
+                so => so.Score(sc => sc.Order(SortOrder.Desc)))
             // Matches are marked with private-use characters that indexed text never holds, so a
             // literal "<mark>" in a file cannot pose as a highlight (see SearchDocuments.ToMarkup).
             .Highlight(h => h
