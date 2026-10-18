@@ -114,8 +114,8 @@ public sealed class ShareLinkService(
 
     /// <summary>
     /// Creates a link after re-checking that the signed-in user may manage links of the requested
-    /// kind on the target share. An upload link additionally requires upload links to be enabled
-    /// in the settings, a folder target, and write access of the creator to that folder (the
+    /// kind on the target share and that links of that kind are enabled in the settings. An upload
+    /// link additionally requires a folder target and write access of the creator to that folder (the
     /// identity uploads run under). Returns null when any check fails.
     /// </summary>
     public async Task<ShareLink?> CreateAsync(CreateShareLinkRequest request)
@@ -126,6 +126,8 @@ public sealed class ShareLinkService(
         var allowed = await mgmtAuth.CanManageShareAsync(
             actor, request.ShareId, PermissionFor(request.Kind));
         if (!allowed) return null;
+
+        if (!(await GetSettingsAsync()).Allows(request.Kind)) return null;
 
         if (request.Kind == ShareLinkKind.Upload
             && !await CanCreateUploadLinkAsync(actor, request))
@@ -215,7 +217,6 @@ public sealed class ShareLinkService(
     private async Task<bool> CanCreateUploadLinkAsync(UserContext actor, CreateShareLinkRequest request)
     {
         if (!request.IsDirectory) return false;
-        if (!(await GetSettingsAsync()).AllowUploadLinks) return false;
         if (shares is null || fileServices is null) return false;
 
         var share = await shares.GetByIdAsync(request.ShareId);

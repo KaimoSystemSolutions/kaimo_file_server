@@ -1,4 +1,4 @@
-.storage-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+﻿.storage-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .storage-toolbar h2 { margin: 0; font-family: var(--font-heading); font-size: 21px; letter-spacing: -.025em; }
 .storage-toolbar .subtitle { max-width: 680px; margin-top: 2px; color: var(--text-secondary); font-size: 12.5px; line-height: 1.45; }
 .storage-toolbar > button { min-height: 34px; flex: 0 0 auto; width: auto; padding-inline: 13px; }
@@ -57,3 +57,7 @@
 
 @media (max-width: 1180px) { .sync-workspace { grid-template-columns: 1fr; overflow: visible; } .storage-editor { min-height: 390px; border-top: 1px solid var(--border); border-left: 0; } }
 @media (max-width: 760px) { .storage-toolbar { align-items: flex-start; flex-wrap: wrap; } .sync-workspace { margin-inline: -16px; border-right: 0; border-left: 0; border-radius: 0; } .sync-list-header { display: none; } .sync-row { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 13px 16px; } .sync-row ::deep .sync-state { grid-row: 2; justify-self: start; } .sync-mode { grid-row: 3; } .storage-editor { padding-inline: 14px; } .storage-editor ::deep .detail-tabs { margin-inline: -14px; } .storage-editor-heading { flex-direction: column; } }
+
+/* "Sync deletions" toggle: switch and label on one line, help text below the label. */
+.storage-form-checkbox { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-1) var(--space-2); margin-top: var(--space-3); cursor: pointer; }
+.storage-form-checkbox small { grid-column: 2; color: var(--text-secondary); }

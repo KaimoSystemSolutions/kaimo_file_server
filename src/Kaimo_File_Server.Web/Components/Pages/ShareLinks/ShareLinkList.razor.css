@@ -1,4 +1,4 @@
-/* Two-pane layout mirroring the external-storage sync list. */
+﻿/* Two-pane layout mirroring the external-storage sync list. */
 .sharelink-workspace {
     display: grid;
     grid-template-columns: minmax(360px, 1fr) minmax(390px, 480px);
@@ -109,7 +109,6 @@
 /* Higher specificity than ".storage-form-grid label" so the checkbox row stays a
    left-aligned horizontal flex instead of a stacked grid. */
 .storage-form-grid label.storage-form-checkbox { display: flex; align-items: center; gap: 8px; }
-.storage-form-checkbox input { flex: 0 0 auto; }
 .storage-wide { grid-column: 1 / -1; }
 
 /* Password field with an inline show/hide toggle. */

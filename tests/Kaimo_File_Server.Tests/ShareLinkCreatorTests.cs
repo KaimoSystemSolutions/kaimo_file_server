@@ -76,6 +76,27 @@ public sealed class ShareLinkCreatorTests
     }
 
     [Fact]
+    public async Task PublicDownload_DownloadLinksDisabled_IsNotFound_WithoutConsumingAccess()
+    {
+        ArrangeCreator(enabled: true);
+        var tickets = new PublicDownloadTicketStore();
+        var shareLinks = new Mock<IShareLinkRepository>();
+        var config = new Mock<IConfigRepository>();
+        config.Setup(c => c.GetAsync(ShareLinkSettings.ConfigKey, It.IsAny<ShareLinkSettings>()))
+            .ReturnsAsync(new ShareLinkSettings { RestrictToDefaultDomain = false, AllowDownloadLinks = false });
+        var controller = new PublicDownloadController(
+            tickets, shareLinks.Object, Mock.Of<IShareRepository>(), Mock.Of<IFileServiceFactory>(),
+            _contexts.Object, config.Object)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+        string ticket = tickets.Issue(new PublicDownloadTicket(_link.Token, ["docs/a.txt"], "a.txt", Zip: false));
+
+        Assert.IsType<NotFoundResult>(await controller.Download(ticket, CancellationToken.None));
+        shareLinks.Verify(r => r.TryConsumeAccessAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
     public void VerifyPassword_LocksAfterTenWrongGuesses_AndCorrectOneResets()
     {
         _passwords.Setup(p => p.VerifyPassword("right", "link-hash")).Returns(true);

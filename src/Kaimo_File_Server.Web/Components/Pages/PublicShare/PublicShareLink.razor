@@ -210,8 +210,10 @@ else if (_state == State.Upload)
             if (await ShareLinks.ResolveCreatorAsync(_link) is null) { _state = State.Unavailable; return; }
             _shareName = share.Name;
 
-            // Upload links honour the global switch (and demo mode) already on the landing page.
+            // Both link kinds honour their global switch (uploads also demo mode) already on the landing page.
             if (_link.Kind == ShareLinkKind.Upload && !await Uploads.IsUploadEnabledAsync())
+            { _state = State.Unavailable; return; }
+            if (_link.Kind == ShareLinkKind.Download && !(await ShareLinks.GetSettingsAsync()).AllowDownloadLinks)
             { _state = State.Unavailable; return; }
 
             if (_link.PasswordHash is not null && !_unlocked) { _state = State.Password; return; }

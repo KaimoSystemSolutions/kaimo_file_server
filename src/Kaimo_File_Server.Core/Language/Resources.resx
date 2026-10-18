@@ -7498,4 +7498,22 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Dept_AssignmentsHint" xml:space="preserve">
     <value>Roles assigned here also apply in all sub-departments. Assignments of parent departments and of Global apply here too.</value>
   </data>
+  <data name="Web_Dept_NameTaken" xml:space="preserve">
+    <value>A department with this name already exists. Please choose a different name.</value>
+  </data>
+  <data name="Web_Settings_AllowDownloadLinks" xml:space="preserve">
+    <value>Enable download links</value>
+  </data>
+  <data name="Web_ShareLinkSettings_DownloadTitle" xml:space="preserve">
+    <value>Download links</value>
+  </data>
+  <data name="Web_ShareLinkSettings_DownloadHint" xml:space="preserve">
+    <value>Download links let anonymous visitors download a file or folder. While disabled, no download link can be created and existing ones do not open.</value>
+  </data>
+  <data name="Web_ShareLink_DownloadDisabled" xml:space="preserve">
+    <value>Download links are disabled. An administrator can enable them under Settings → Share Links.</value>
+  </data>
+  <data name="Web_ShareLinks_DownloadsDisabled" xml:space="preserve">
+    <value>Download links are disabled in the settings; this link currently does not open.</value>
+  </data>
 </root>

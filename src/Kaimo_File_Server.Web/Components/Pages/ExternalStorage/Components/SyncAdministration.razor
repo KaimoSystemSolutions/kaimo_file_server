@@ -1,4 +1,4 @@
-@using Kaimo_File_Server.Core.Domain
+﻿@using Kaimo_File_Server.Core.Domain
 @using Kaimo_File_Server.Core.Helpers
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Services.DataServices
@@ -227,7 +227,7 @@ else
                     @if (_model.Mode == SyncMode.TwoWay || _model.Mode == SyncMode.Pull)
                     {
                         <label class="storage-form-checkbox">
-                            <input type="checkbox" @bind="_model.SyncDeletions" />
+                            <span class="toggle-switch"><input type="checkbox" @bind="_model.SyncDeletions" /><span class="toggle-slider"></span></span>
                             <span>@R("Web_CloudSync_Advanced_SyncDeletions")</span>
                             <small>@(_model.Mode == SyncMode.Pull ? R("Web_CloudSync_Advanced_SyncDeletions_PullHelp") : R("Web_CloudSync_Advanced_SyncDeletions_Help"))</small>
                         </label>

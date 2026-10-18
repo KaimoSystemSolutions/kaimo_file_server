@@ -4390,6 +4390,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die A department with this name already exists. Please choose a different name. ähnelt.
+        /// </summary>
+        public static string Web_Dept_NameTaken {
+            get {
+                return ResourceManager.GetString("Web_Dept_NameTaken", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Create new department ähnelt.
         /// </summary>
         public static string Web_Dept_NewDepartment {

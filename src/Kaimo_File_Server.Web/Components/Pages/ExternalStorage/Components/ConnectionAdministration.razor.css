@@ -1,4 +1,4 @@
-.connection-toolbar {
+﻿.connection-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -233,7 +233,7 @@
     color: var(--text-primary);
 }
 
-.connection-form .storage-check input {
+.connection-form .storage-check > input {
     width: 16px;
     height: 16px;
     margin: 0;

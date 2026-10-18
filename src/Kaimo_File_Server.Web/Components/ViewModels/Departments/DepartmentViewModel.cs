@@ -510,6 +510,14 @@ public class DepartmentViewModel
             IsSaving = true;
             ErrorMessage = null;
 
+            // Checked before anything is changed, so a rejected rename leaves the edit form intact.
+            if (!string.IsNullOrWhiteSpace(EditName)
+                && await IsNameTakenAsync(EditName.Trim(), Selected.Id))
+            {
+                ErrorMessage = Resources.Web_Dept_NameTaken;
+                return;
+            }
+
             // -- Update department entity --
             if (!string.IsNullOrWhiteSpace(EditName))
                 Selected.Name = EditName.Trim();
@@ -637,6 +645,9 @@ public class DepartmentViewModel
                 _actorContext, ManagementPermission.EditDepartment))
         { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
+        if (await IsNameTakenAsync(CreateName.Trim(), exceptId: null))
+        { ErrorMessage = Resources.Web_Dept_NameTaken; return; }
+
         try
         {
             IsSaving = true;
@@ -659,6 +670,11 @@ public class DepartmentViewModel
         }
         finally { IsSaving = false; }
     }
+
+    // Department names are unique (database index); checking first gives a clear message
+    // instead of the generic save error the constraint violation would cause.
+    private async Task<bool> IsNameTakenAsync(string name, Guid? exceptId)
+        => await _departmentRepo.GetByNameAsync(name) is { } existing && existing.Id != exceptId;
 
     // ══════════════════════════════════════════
     //  Delete

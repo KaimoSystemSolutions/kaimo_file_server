@@ -1,4 +1,4 @@
-@using Kaimo_File_Server.Core.Domain
+﻿@using Kaimo_File_Server.Core.Domain
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
@@ -32,10 +32,12 @@
             </div>
 
             <div class="properties-body sharelink-body">
-                @if (IsUpload && !_settings.AllowUploadLinks)
+                @if (!_settings.Allows(_kind))
                 {
                     <div class="error-banner">
-                        @T("Web_ShareLink_UploadDisabled", "Upload links are disabled. An administrator can enable them under Settings → Share Links.")
+                        @(IsUpload
+                            ? T("Web_ShareLink_UploadDisabled", "Upload links are disabled. An administrator can enable them under Settings → Share Links.")
+                            : T("Web_ShareLink_DownloadDisabled", "Download links are disabled. An administrator can enable them under Settings → Share Links."))
                     </div>
                     <div class="sharelink-actions">
                         <button class="btn-primary" @onclick="Close">@Resources.Web_Button_Close</button>

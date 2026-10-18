@@ -7498,4 +7498,22 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Dept_AssignmentsHint" xml:space="preserve">
     <value>Hier zugewiesene Rollen gelten auch in allen Unterabteilungen. Zuweisungen der Elternabteilungen und von Global gelten hier ebenfalls.</value>
   </data>
+  <data name="Web_Dept_NameTaken" xml:space="preserve">
+    <value>Eine Abteilung mit diesem Namen existiert bereits. Bitte wählen Sie einen anderen Namen.</value>
+  </data>
+  <data name="Web_Settings_AllowDownloadLinks" xml:space="preserve">
+    <value>Download-Links aktivieren</value>
+  </data>
+  <data name="Web_ShareLinkSettings_DownloadTitle" xml:space="preserve">
+    <value>Download-Links</value>
+  </data>
+  <data name="Web_ShareLinkSettings_DownloadHint" xml:space="preserve">
+    <value>Mit Download-Links können anonyme Besucher eine Datei oder einen Ordner herunterladen. Solange deaktiviert, können keine Download-Links erstellt werden und bestehende lassen sich nicht öffnen.</value>
+  </data>
+  <data name="Web_ShareLink_DownloadDisabled" xml:space="preserve">
+    <value>Download-Links sind deaktiviert. Ein Administrator kann sie unter Einstellungen → Freigabelinks aktivieren.</value>
+  </data>
+  <data name="Web_ShareLinks_DownloadsDisabled" xml:space="preserve">
+    <value>Download-Links sind in den Einstellungen deaktiviert; dieser Link lässt sich derzeit nicht öffnen.</value>
+  </data>
 </root>

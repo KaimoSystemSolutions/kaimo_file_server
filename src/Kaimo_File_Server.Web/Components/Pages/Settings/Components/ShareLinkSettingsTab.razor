@@ -1,12 +1,12 @@
-@using Kaimo_File_Server.Core.Language
+﻿@using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Kaimo_File_Server.Web.Services
 @inherits AppComponentBase
 @inject ShareLinkService ShareLinks
 
 @*
-    Settings tab for public share links: the default-domain restriction, and the global switch and
-    per-file size ceiling for upload links. The address link URLs are built from lives in the
+    Settings tab for public share links: the default-domain restriction, the global switch for
+    download links, and the global switch and per-file size ceiling for upload links. The address link URLs are built from lives in the
     Domains tab.
 *@
 
@@ -37,15 +37,33 @@
         </label>
     </div>
 
+    <h3>@T("Web_ShareLinkSettings_DownloadTitle", "Download links")</h3>
+    <p class="settings-hint">
+        @T("Web_ShareLinkSettings_DownloadHint", "Download links let anonymous visitors download a file or folder. While disabled, no download link can be created and existing ones do not open.")
+    </p>
+
+    <div class="toggle-row sharelink-toggle-row">
+        <span class="toggle-label-text">@T("Web_Settings_AllowDownloadLinks", "Enable download links")</span>
+        <label class="toggle-switch">
+            <input type="checkbox" @bind="_allowDownloadLinks"
+                   aria-label="@T("Web_Settings_AllowDownloadLinks", "Enable download links")" />
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
+
     <h3>@T("Web_ShareLinkSettings_UploadTitle", "Upload links")</h3>
     <p class="settings-hint">
         @T("Web_ShareLinkSettings_UploadHint", "Upload links let anonymous visitors upload files into a folder. While disabled, no upload link can be created and existing ones accept no files.")
     </p>
 
-    <label class="sharelink-check">
-        <input type="checkbox" @bind="_allowUploadLinks" />
-        <span>@T("Web_Settings_AllowUploadLinks", "Enable upload links")</span>
-    </label>
+    <div class="toggle-row sharelink-toggle-row">
+        <span class="toggle-label-text">@T("Web_Settings_AllowUploadLinks", "Enable upload links")</span>
+        <label class="toggle-switch">
+            <input type="checkbox" @bind="_allowUploadLinks"
+                   aria-label="@T("Web_Settings_AllowUploadLinks", "Enable upload links")" />
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
 
     <label class="sharelink-check">
         <span>@T("Web_ShareLinkSettings_MaxUploadSize", "Max. file size per upload (MB, up to 4096)")</span>
@@ -61,6 +79,7 @@
 @code {
     private ShareLinkSettings _settings = ShareLinkSettings.Default();
     private bool _allowUploadLinks;
+    private bool _allowDownloadLinks = true;
     private bool _restrictToDefaultDomain = true;
     private long _maxUploadMb = ShareLinkSettings.DefaultMaxUploadFileSizeBytes / Mb;
     private bool _saved;
@@ -76,6 +95,7 @@
     {
         _settings = settings;
         _allowUploadLinks = settings.AllowUploadLinks;
+        _allowDownloadLinks = settings.AllowDownloadLinks;
         _restrictToDefaultDomain = settings.RestrictToDefaultDomain;
         _maxUploadMb = settings.MaxUploadFileSizeBytes / Mb;
     }
@@ -88,6 +108,7 @@
             BaseAddresses = _settings.BaseAddresses.ToList(),
             DefaultIndex = _settings.DefaultIndex,
             AllowUploadLinks = _allowUploadLinks,
+            AllowDownloadLinks = _allowDownloadLinks,
             RestrictToDefaultDomain = _restrictToDefaultDomain,
             MaxUploadFileSizeBytes = _maxUploadMb * Mb,
         });

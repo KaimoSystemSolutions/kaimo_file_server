@@ -27,6 +27,16 @@ public sealed class ShareLinkSettings
     public bool AllowUploadLinks { get; set; }
 
     /// <summary>
+    /// Whether download links are enabled at all. On by default (also for settings stored before
+    /// this switch existed): while off, no download link can be created and existing ones do not open.
+    /// </summary>
+    public bool AllowDownloadLinks { get; set; } = true;
+
+    /// <summary>Whether links of <paramref name="kind"/> are globally enabled.</summary>
+    public bool Allows(Kaimo_File_Server.Core.Domain.ShareLinkKind kind)
+        => kind == Kaimo_File_Server.Core.Domain.ShareLinkKind.Upload ? AllowUploadLinks : AllowDownloadLinks;
+
+    /// <summary>
     /// Global ceiling for a single file uploaded through an upload link (a link may only lower
     /// it). Clamped to 1 byte … <see cref="DefaultMaxUploadFileSizeBytes"/>.
     /// </summary>

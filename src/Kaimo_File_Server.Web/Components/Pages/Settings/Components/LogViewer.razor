@@ -13,7 +13,10 @@
         </div>
         <div class="log-viewer-actions">
             <label class="log-live-toggle" title="@Resources.Web_Settings_LogViewer_LiveTitle">
-                <input type="checkbox" checked="@(!Viewer.IsLivePaused)" @onchange="LiveChangedAsync" />
+                <span class="toggle-switch">
+                    <input type="checkbox" checked="@(!Viewer.IsLivePaused)" @onchange="LiveChangedAsync" />
+                    <span class="toggle-slider"></span>
+                </span>
                 <span>@Resources.Web_Settings_LogViewer_Live</span>
             </label>
             <button class="btn-icon log-refresh" title="@Resources.Web_Settings_LogViewer_Refresh" @onclick="RefreshNowAsync" disabled="@Viewer.IsLoading">↻</button>

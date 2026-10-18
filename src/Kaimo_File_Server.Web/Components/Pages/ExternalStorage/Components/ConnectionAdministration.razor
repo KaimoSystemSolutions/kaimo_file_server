@@ -1,4 +1,4 @@
-@using Kaimo_File_Server.Core.Domain
+﻿@using Kaimo_File_Server.Core.Domain
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Repositories
 @using Kaimo_File_Server.Core.Services.ExternalStorage
@@ -695,7 +695,7 @@ else
                 <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_WebDavHelp")</p>
                 @if (IsInsecureWebDavUrl)
                 {
-                    <label class="storage-wide storage-check"><input type="checkbox" @bind="_allowInsecureHttp" /> <span>@R("Web_ExternalStorage_WebDavAllowInsecureHttp")</span></label>
+                    <label class="storage-wide storage-check"><span class="toggle-switch"><input type="checkbox" @bind="_allowInsecureHttp" /><span class="toggle-slider"></span></span> <span>@R("Web_ExternalStorage_WebDavAllowInsecureHttp")</span></label>
                     <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_WebDavAllowInsecureHttpWarning")</p>
                 }
             }
@@ -733,7 +733,7 @@ else
                 else
                 {
                     <section class="storage-wide ssh-setup-card">
-                        <div class="ssh-setup-heading"><div><strong>@R("Web_ExternalStorage_SshKeySetup")</strong><small>@R("Web_ExternalStorage_SshKeySetupHelp")</small></div><label class="storage-check"><input type="checkbox" @bind="_advancedSshSetup" @bind:after="SshModeChangedAsync" /> <span>@R("Web_ExternalStorage_SshAdvancedMode")</span></label></div>
+                        <div class="ssh-setup-heading"><div><strong>@R("Web_ExternalStorage_SshKeySetup")</strong><small>@R("Web_ExternalStorage_SshKeySetupHelp")</small></div><label class="storage-check"><span class="toggle-switch"><input type="checkbox" @bind="_advancedSshSetup" @bind:after="SshModeChangedAsync" /><span class="toggle-slider"></span></span> <span>@R("Web_ExternalStorage_SshAdvancedMode")</span></label></div>
                         @if (!_advancedSshSetup)
                         {
                             <div class="ssh-setup-section">

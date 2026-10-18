@@ -84,7 +84,62 @@ public class DepartmentViewModelDatabaseTests : DatabaseTestBase
         Assert.Empty(await db.Departments.ToListAsync());
     }
 
+    [Fact]
+    public async Task CreateAsync_WithExistingName_ShowsNameTakenMessage()
+    {
+        var actor = SeedUser("admin");
+        SeedDepartment("Engineering");
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+
+        sut.CreateName = " Engineering ";
+        await sut.CreateAsync();
+
+        Assert.Equal(Kaimo_File_Server.Core.Language.Resources.Web_Dept_NameTaken, sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.Single(await db.Departments.Where(d => d.Name == "Engineering").ToListAsync());
+    }
+
     // ─────────────────────── Save: entity fields ───────────────────────
+
+    [Fact]
+    public async Task SaveAsync_RenameToExistingName_ShowsNameTakenMessage()
+    {
+        var actor = SeedUser("admin");
+        SeedDepartment("Sales");
+        var dept = SeedDepartment("Old");
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == dept.Id));
+        await sut.StartEditAsync();
+
+        sut.EditName = "Sales";
+        await sut.SaveAsync();
+
+        Assert.Equal(Kaimo_File_Server.Core.Language.Resources.Web_Dept_NameTaken, sut.ErrorMessage);
+        Assert.True(sut.IsEditing);
+        await using var db = NewContext();
+        Assert.Equal("Old", (await db.Departments.FindAsync(dept.Id))!.Name);
+    }
+
+    [Fact]
+    public async Task SaveAsync_KeepingOwnName_IsNotADuplicate()
+    {
+        var actor = SeedUser("admin");
+        var dept = SeedDepartment("Old");
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == dept.Id));
+        await sut.StartEditAsync();
+
+        sut.EditName = "Old";
+        sut.EditDescription = "changed";
+        await sut.SaveAsync();
+
+        Assert.Null(sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.Equal("changed", (await db.Departments.FindAsync(dept.Id))!.Description);
+    }
 
     [Fact]
     public async Task SaveAsync_PersistsRenamedDepartment()

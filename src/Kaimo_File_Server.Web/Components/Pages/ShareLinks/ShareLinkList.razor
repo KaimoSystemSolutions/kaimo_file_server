@@ -1,4 +1,4 @@
-@page "/share-links"
+﻿@page "/share-links"
 @using Kaimo_File_Server.Core.Domain
 @using Kaimo_File_Server.Core.Helpers
 @using Kaimo_File_Server.Core.Language
@@ -176,7 +176,7 @@ else
                             </span>
                         </label>
                         <label class="storage-form-checkbox storage-wide">
-                            <input type="checkbox" @bind="_clearPassword" />
+                            <span class="toggle-switch"><input type="checkbox" @bind="_clearPassword" /><span class="toggle-slider"></span></span>
                             <span>@T("Web_ShareLinks_ClearPassword", "Remove password")</span>
                         </label>
                     </div>
@@ -220,10 +220,12 @@ else
                         </MoreActions>
                     </DetailHeader>
 
-                    @if (isUpload && !VM.Settings.AllowUploadLinks)
+                    @if (!VM.Settings.Allows(link.Kind))
                     {
                         <div class="detail-alerts">
-                            <div class="warning-banner" role="status">@T("Web_ShareLinks_UploadsDisabled", "Upload links are disabled in the settings; this link currently accepts no files.")</div>
+                            <div class="warning-banner" role="status">@(isUpload
+                                ? T("Web_ShareLinks_UploadsDisabled", "Upload links are disabled in the settings; this link currently accepts no files.")
+                                : T("Web_ShareLinks_DownloadsDisabled", "Download links are disabled in the settings; this link currently does not open."))</div>
                         </div>
                     }
 

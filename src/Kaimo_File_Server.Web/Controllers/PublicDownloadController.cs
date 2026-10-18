@@ -40,6 +40,10 @@ public sealed class PublicDownloadController(
         if (!await ShareLinkSettings.AllowsHostAsync(config, Request.Host.Host))
             return NotFound();
 
+        // Download links switched off globally: an already issued ticket stops working too.
+        if (!(await config.GetAsync(ShareLinkSettings.ConfigKey, ShareLinkSettings.Default())).AllowDownloadLinks)
+            return NotFound();
+
         // Atomic policy gate: enabled + within window + not exhausted, plus one access consumed.
         Core.Domain.ShareLink? link;
         try

@@ -340,6 +340,33 @@ public sealed class PublicUploadLinkTests
         Assert.Null(await service.CreateAsync(Request(isDirectory: true)));   // globally disabled
     }
 
+    [Fact]
+    public async Task Create_DownloadLink_RefusedWhileDownloadLinksDisabled()
+    {
+        _mgmtAuth.Setup(m => m.CanManageShareAsync(_creator, _share.Id, ManagementPermission.ManageShareLinks)).ReturnsAsync(true);
+        _links.Setup(r => r.CreateAsync(It.IsAny<ShareLink>())).ReturnsAsync((ShareLink l) => l);
+        var download = Request(isDirectory: true) with { Kind = ShareLinkKind.Download };
+        var service = LinkService();
+
+        Assert.NotNull(await service.CreateAsync(download));
+
+        _settings.AllowDownloadLinks = false;
+        Assert.Null(await service.CreateAsync(download));
+    }
+
+    [Fact]
+    public void DownloadLinks_EnabledByDefault_AlsoForSettingsStoredBeforeTheSwitch()
+    {
+        Assert.True(ShareLinkSettings.Default().AllowDownloadLinks);
+        var legacy = System.Text.Json.JsonSerializer.Deserialize<ShareLinkSettings>("""{"AllowUploadLinks":true}""")!;
+        Assert.True(legacy.AllowDownloadLinks);
+        Assert.True(legacy.Allows(ShareLinkKind.Download));
+        Assert.True(legacy.Allows(ShareLinkKind.Upload));
+
+        legacy.AllowDownloadLinks = false;
+        Assert.False(legacy.Allows(ShareLinkKind.Download));
+    }
+
     private CreateShareLinkRequest Request(bool isDirectory) => new(
         _share.Id, "inbox", isDirectory, "Inbox", null, null, null, null, null, null,
         Kind: ShareLinkKind.Upload, AllowedExtensions: "pdf, JPG");
