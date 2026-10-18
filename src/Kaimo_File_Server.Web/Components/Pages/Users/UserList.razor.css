@@ -473,24 +473,8 @@
     margin: 16px 5px 0;
 }
 
-/* Read view (DetailHeader + DetailSection skeleton): only the chips, the role hints
-   and the delegated-role rows need styles of their own. */
-
-.entity-detail ::deep .user-role-hint {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-    color: var(--text-tertiary);
-    font-size: 11.5px;
-    line-height: 1.4;
-}
-
-.entity-detail ::deep .user-chip--global-role {
-    border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
-    background: var(--accent-subtle);
-    color: var(--accent);
-}
+/* Read view (DetailHeader + DetailSection skeleton): only the chips and the
+   delegated-role rows need styles of their own. */
 
 .entity-detail ::deep .user-delegated-role-list {
     display: flex;
@@ -511,7 +495,7 @@
     min-width: 0;
     overflow: hidden;
     color: var(--text-primary);
-    font-size: 12px;
+    font-size: 13.5px;
     font-weight: 650;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -526,16 +510,23 @@
 
 .entity-detail ::deep .user-delegated-scope-type {
     color: var(--info);
-    font-size: 9.5px;
+    font-size: 11px;
     font-weight: 750;
     letter-spacing: 0.04em;
     text-transform: uppercase;
 }
 
+.entity-detail ::deep .user-delegated-scope-line {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--space-1);
+}
+
 .entity-detail ::deep .user-delegated-scope-name {
     overflow: hidden;
     color: var(--text-secondary);
-    font-size: 11px;
+    font-size: 12px;
     text-overflow: ellipsis;
     white-space: nowrap;
 }

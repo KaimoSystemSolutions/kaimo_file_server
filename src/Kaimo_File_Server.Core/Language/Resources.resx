@@ -2185,7 +2185,7 @@
     <value>No description</value>
   </data>
   <data name="Web_Admin_ScopedAssignments" xml:space="preserve">
-    <value>Delegated role assignments</value>
+    <value>Role assignments</value>
   </data>
   <data name="Web_Admin_GlobalRoles" xml:space="preserve">
     <value>Global roles</value>
@@ -2194,19 +2194,19 @@
     <value>Applies throughout the system</value>
   </data>
   <data name="Web_Admin_DelegatedRoles_Hint" xml:space="preserve">
-    <value>Limited to a department or share</value>
+    <value>Applies in a department and its sub-departments, or in one share. Global applies system-wide.</value>
   </data>
   <data name="Web_Admin_Delegated" xml:space="preserve">
     <value>Delegated</value>
   </data>
   <data name="Web_Admin_NoDelegatedRoles" xml:space="preserve">
-    <value>No delegated roles</value>
+    <value>No role assignments</value>
   </data>
   <data name="Web_Admin_RoleScopes_InfoLabel" xml:space="preserve">
-    <value>About global and delegated roles</value>
+    <value>About where roles apply</value>
   </data>
   <data name="Web_Admin_RoleScopes_Info" xml:space="preserve">
-    <value>Global roles apply throughout the system. Delegated roles only apply within the displayed department or share. The same role can appear in both sections because its scope is different.</value>
+    <value>A role applies in the department it is assigned in and in all of its sub-departments. Global is the topmost department and stands for the whole system: roles assigned there apply everywhere, including system settings. Permissions from several assignments add up.</value>
   </data>
   <data name="Web_Admin_RemoveAssignment" xml:space="preserve">
     <value>Remove assignment</value>
@@ -2266,7 +2266,7 @@
     <value>Custom role</value>
   </data>
   <data name="Web_Admin_DelegatedAssignments" xml:space="preserve">
-    <value>Delegated assignments</value>
+    <value>Assignments</value>
   </data>
   <data name="Web_Admin_AddAssignment" xml:space="preserve">
     <value>Add assignment</value>
@@ -2305,7 +2305,7 @@
     <value>Share</value>
   </data>
   <data name="Web_Admin_ShareScopeHint" xml:space="preserve">
-    <value>Only permissions that apply to a share take effect at share scope; system- and department-level permissions of the role are ignored here.</value>
+    <value>Only in the chosen share. Only the role's share-related permissions take effect there; system and department permissions are ignored.</value>
   </data>
   <data name="Web_Common_Select" xml:space="preserve">
     <value>— Select —</value>
@@ -2314,7 +2314,7 @@
     <value>Assign</value>
   </data>
   <data name="Web_Admin_NoDelegatedAssignments" xml:space="preserve">
-    <value>No delegated assignments</value>
+    <value>No assignments</value>
   </data>
   <data name="Web_Common_None" xml:space="preserve">
     <value>None</value>
@@ -2359,7 +2359,7 @@
     <value>Parent department</value>
   </data>
   <data name="Web_Dept_NoParent" xml:space="preserve">
-    <value>— None (top level) —</value>
+    <value>— Global (top level) —</value>
   </data>
   <data name="Web_Dept_NoDepartments" xml:space="preserve">
     <value>No departments available.</value>
@@ -2389,7 +2389,7 @@
     <value>Inherits from (parent department)</value>
   </data>
   <data name="Web_Dept_InheritHint" xml:space="preserve">
-    <value>Inherits admin rights and default permissions from the parent department.</value>
+    <value>Inherits admin rights and default permissions from the parent department. Without a parent the department sits directly below Global, which passes on admin rights only.</value>
   </data>
   <data name="Web_Dept_DefaultFilePerm" xml:space="preserve">
     <value>Default file permission</value>
@@ -2404,7 +2404,7 @@
     <value>Inherited from parent department.</value>
   </data>
   <data name="Web_Dept_NoParentNoPerm" xml:space="preserve">
-    <value>No parent department — no default permission.</value>
+    <value>Directly below Global — no inherited default permission.</value>
   </data>
   <data name="Web_Dept_Label_Members" xml:space="preserve">
     <value>Members (users)</value>
@@ -2431,7 +2431,7 @@
     <value>Inherits from</value>
   </data>
   <data name="Web_Dept_NoParentTopLevel" xml:space="preserve">
-    <value>None (top level)</value>
+    <value>Global</value>
   </data>
   <data name="Web_Dept_Label_MembersCount" xml:space="preserve">
     <value>Members ({0})</value>
@@ -7464,5 +7464,38 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   </data>
   <data name="Web_Settings_Storage_Origin_CalculatedAt" xml:space="preserve">
     <value>Calculated {0}</value>
+  </data>
+  <data name="Web_Admin_InheritedFrom" xml:space="preserve">
+    <value>inherited from {0}</value>
+  </data>
+  <data name="Web_Admin_GlobalScopeHint" xml:space="preserve">
+    <value>Everywhere, including system settings. Same as an assignment in the Global department.</value>
+  </data>
+  <data name="Web_Admin_SystemBitsHint" xml:space="preserve">
+    <value>Roles with system-level permissions (e.g. settings, logs, backups, mail) can only be assigned system wide.</value>
+  </data>
+  <data name="Web_Admin_Label_AppliesTo" xml:space="preserve">
+    <value>Applies to</value>
+  </data>
+  <data name="Web_Admin_ScopeChoice_System" xml:space="preserve">
+    <value>System wide</value>
+  </data>
+  <data name="Web_Admin_ScopeInfo_Title" xml:space="preserve">
+    <value>Where does the role apply?</value>
+  </data>
+  <data name="Web_Admin_ScopeInfo_Department" xml:space="preserve">
+    <value>In the chosen department and all of its sub-departments.</value>
+  </data>
+  <data name="Web_Dept_GlobalPlaceholderHint" xml:space="preserve">
+    <value>Global stands for the whole system and contains every department. It only passes on admin rights and has no default file permissions of its own.</value>
+  </data>
+  <data name="Web_Dept_AllUsersImplicit" xml:space="preserve">
+    <value>All users (implicit)</value>
+  </data>
+  <data name="Web_Dept_GlobalAssignmentsHint" xml:space="preserve">
+    <value>Roles assigned here apply to the whole system, including system settings.</value>
+  </data>
+  <data name="Web_Dept_AssignmentsHint" xml:space="preserve">
+    <value>Roles assigned here also apply in all sub-departments. Assignments of parent departments and of Global apply here too.</value>
   </data>
 </root>

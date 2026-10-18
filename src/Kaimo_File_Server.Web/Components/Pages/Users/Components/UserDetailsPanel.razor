@@ -248,9 +248,6 @@
     else
     {
         var user = VM.SelectedUser;
-        var delegatedAssignments = VM.UserScopedAssignments
-            .Where(assignment => assignment.ScopeType != ScopeType.Global)
-            .ToList();
 
         <DetailHeader Title="@DisplayName(user.Name, user.Username)" Subtitle="@("@" + user.Username)">
             <Leading>
@@ -305,46 +302,28 @@
                          Value="@(user.CanChangePassword ? Resources.Web_Admin_PasswordChange_Allowed : Resources.Web_Admin_PasswordChange_Locked)" />
         </DetailSection>
 
-        <DetailSection Title="@Resources.Web_Admin_Label_Roles">
-            <ChildContent>
-                <PropertyRow Label="@Resources.Web_Admin_GlobalRoles">
-                    @if (VM.UserRoles.Any())
-                    {
-                        <span class="user-chip-list">
-                            @foreach (var role in VM.UserRoles)
-                            {
-                                <span class="user-chip user-chip--global-role">@role.Name</span>
-                            }
-                        </span>
-                    }
-                    else
-                    {
-                        <span class="property-empty">@Resources.Web_Common_NoRolesAssigned</span>
-                    }
-                </PropertyRow>
-            </ChildContent>
-            <Body>
-                <p class="user-role-hint">
-                    <span>@Resources.Web_Admin_GlobalRoles_Hint</span>
-                    <InfoButton Text="@Resources.Web_Admin_RoleScopes_Info" AriaLabel="@Resources.Web_Admin_RoleScopes_InfoLabel" />
-                </p>
-            </Body>
-        </DetailSection>
-
-        @* Delegated roles keep their inline removal (decision in plans/detail-view-layout.md §9). *@
+        @* One list for every role assignment; Global (the whole system) is just the topmost
+           department. Rows keep their inline removal (plans/detail-view-layout.md §9). *@
         <DetailSection Title="@Resources.Web_Admin_ScopedAssignments">
+            <TitleInfo>
+                <InfoButton Title="@Resources.Web_Admin_ScopedAssignments" AriaLabel="@Resources.Web_Admin_RoleScopes_InfoLabel" IconSize="16">
+                    <p>@Resources.Web_Admin_DelegatedRoles_Hint</p>
+                    <p>@Resources.Web_Admin_RoleScopes_Info</p>
+                </InfoButton>
+            </TitleInfo>
             <Body>
-                <p class="user-role-hint">@Resources.Web_Admin_DelegatedRoles_Hint</p>
-                @if (delegatedAssignments.Any())
+                @if (VM.UserScopedAssignments.Any())
                 {
                     <div class="user-delegated-role-list">
-                        @foreach (var assignment in delegatedAssignments)
+                        @foreach (var assignment in VM.UserScopedAssignments)
                         {
                             <div class="user-delegated-role-row">
                                 <span class="user-delegated-role-name">@assignment.RoleName</span>
                                 <span class="user-delegated-role-scope">
                                     <span class="user-delegated-scope-type">@FormatScopeType(assignment.ScopeType)</span>
-                                    <span class="user-delegated-scope-name">@assignment.ScopeName</span>
+                                    <span class="user-delegated-scope-line">
+                                        <span class="user-delegated-scope-name">@assignment.ScopeName</span>
+                                    </span>
                                 </span>
                                 @if (VM.CanManageRoles)
                                 {
@@ -366,12 +345,12 @@
 
                 @if (VM.IsAddingAssignment)
                 {
-                    @* Principal is this user; Global roles are edited in the user form, so only delegated scopes here. *@
+                    @* Principal is this user; the scope is a department (Global = the whole system) or a share. *@
                     <ScopedRoleAssignmentForm Roles="VM.AllRoles.ToRoleItems()"
                                               @bind-RoleId="VM.NewAssignmentRoleId"
+                                              RolePermissionsById="VM.AllRoles.ToDictionary(r => r.Id, r => r.ManagementPermissions)"
                                               Departments="VM.AllDepartments.ToDepartmentItems()"
                                               Shares="ShareItems()"
-                                              AllowGlobal="false"
                                               @bind-ScopeType="VM.NewAssignmentScopeType"
                                               @bind-ScopeId="VM.NewAssignmentScopeId"
                                               Error="@VM.ErrorMessage" IsSaving="@VM.IsSaving"
@@ -566,5 +545,6 @@
     private IReadOnlyList<PrincipalPickerItem> ShareItems() =>
         VM.AllShares.Select(s => new PrincipalPickerItem(s.Id, s.Name, PrincipalKind.Share)).ToList();
     private static string DisplayName(string? name, string username) => string.IsNullOrWhiteSpace(name) ? username : name;
-    private static string FormatScopeType(ScopeType type) => type switch { ScopeType.Global => Resources.Web_Admin_ScopeType_Global, ScopeType.Department => Resources.Web_Admin_ScopeType_Department, ScopeType.Share => Resources.Web_Admin_ScopeType_Share, _ => type.ToString() };
+    // Global is shown as what it is to the user: the topmost department.
+    private static string FormatScopeType(ScopeType type) => type switch { ScopeType.Global => R("Web_Admin_ScopeChoice_System"), ScopeType.Department => Resources.Web_Admin_ScopeType_Department, ScopeType.Share => Resources.Web_Admin_ScopeType_Share, _ => type.ToString() };
 }

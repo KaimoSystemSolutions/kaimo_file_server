@@ -350,4 +350,256 @@ public class DepartmentViewModelDatabaseTests : DatabaseTestBase
         await using var db = NewContext();
         Assert.True(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == assignment.Id));
     }
+
+    // ─────────────────────── Global department = system-wide scope ───────────────────────
+
+    private Department SeedGlobal() => SeedDepartment("Global", id: WellKnownGUIDs.DEPARTMENT_GLOBAL);
+
+    private Role SeedAdminRole()
+    {
+        var role = new Role(WellKnownGUIDs.ROLE_ADMIN, "Administrator", ManagementPermission.FullAdmin, true);
+        using var db = NewContext();
+        db.Roles.Add(role);
+        db.SaveChanges();
+        return role;
+    }
+
+    [Fact]
+    public async Task GlobalDepartment_ListsSystemWideAssignmentsAsOwn()
+    {
+        var actor = SeedUser("admin");
+        var global = SeedGlobal();
+        var role = SeedRole("Auditor");
+        var principal = SeedUser("bob");
+        await ScopedRoleRepo().CreateAsync(ScopedRoleAssignment.Global(principal.Id, role.Id));
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == global.Id));
+
+        var item = Assert.Single(sut.RoleAssignments);
+        Assert.Equal("Auditor", item.RoleName);
+        Assert.Null(item.InheritedFrom);
+    }
+
+    [Fact]
+    public async Task CreateAssignmentAsync_OnGlobalDepartment_StoresSystemWideAssignment()
+    {
+        var actor = SeedUser("admin");
+        var global = SeedGlobal();
+        var role = SeedRole("Auditor");
+        var principal = SeedUser("bob");
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == global.Id));
+
+        await sut.StartAddAssignmentAsync();
+        sut.NewAssignmentRoleId = role.Id;
+        sut.NewAssignmentPrincipalId = principal.Id;
+        await sut.CreateAssignmentAsync();
+
+        Assert.Null(sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a => a.PrincipalId == principal.Id
+            && a.ScopeType == ScopeType.Global && a.ScopeId == Guid.Empty));
+        Assert.Contains(sut.RoleAssignments, a => a.RoleName == "Auditor");
+    }
+
+    [Fact]
+    public async Task DeleteAssignmentAsync_OnGlobalDepartment_RemovesSystemWideAssignment()
+    {
+        var actor = SeedUser("admin");
+        var global = SeedGlobal();
+        var role = SeedRole("Auditor");
+        var principal = SeedUser("bob");
+        var assignment = ScopedRoleAssignment.Global(principal.Id, role.Id);
+        await ScopedRoleRepo().CreateAsync(assignment);
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == global.Id));
+
+        await sut.DeleteAssignmentAsync(assignment.Id);
+
+        Assert.Null(sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.False(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == assignment.Id));
+    }
+
+    [Fact]
+    public async Task DeleteAssignmentAsync_OnGlobalDepartment_SoleAdmin_IsBlocked()
+    {
+        var admin = SeedUser("admin");
+        var global = SeedGlobal();
+        var adminRole = SeedAdminRole();
+        var assignment = ScopedRoleAssignment.Global(admin.Id, adminRole.Id);
+        await ScopedRoleRepo().CreateAsync(assignment);
+        var sut = BuildGlobalAdminSut(admin);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == global.Id));
+
+        await sut.DeleteAssignmentAsync(assignment.Id);
+
+        Assert.Equal(Kaimo_File_Server.Core.Language.Resources.Web_Error_LastAdmin, sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == assignment.Id));
+    }
+
+    [Fact]
+    public async Task SubDepartment_ShowsAssignmentsInheritedFromParentAndGlobal()
+    {
+        var actor = SeedUser("admin");
+        SeedGlobal();
+        var parent = SeedDepartment("Engineering");
+        var child = SeedDepartment("Backend", parentId: parent.Id);
+        var role = SeedRole("DeptAdmin");
+        var lead = SeedUser("lead");
+        var auditor = SeedUser("auditor");
+        var dev = SeedUser("dev");
+        await ScopedRoleRepo().CreateAsync(ScopedRoleAssignment.ForDepartment(lead.Id, role.Id, parent.Id));
+        await ScopedRoleRepo().CreateAsync(ScopedRoleAssignment.Global(auditor.Id, role.Id));
+        await ScopedRoleRepo().CreateAsync(ScopedRoleAssignment.ForDepartment(dev.Id, role.Id, child.Id));
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == child.Id));
+
+        Assert.Contains(sut.RoleAssignments, a => a.PrincipalName == dev.Name && a.InheritedFrom is null);
+        Assert.Contains(sut.RoleAssignments, a => a.PrincipalName == lead.Name && a.InheritedFrom == "Engineering");
+        Assert.Contains(sut.RoleAssignments, a => a.PrincipalName == auditor.Name && a.InheritedFrom == "Global");
+    }
+
+    [Fact]
+    public async Task SubDepartment_ListsGlobalAssignmentsFirst()
+    {
+        var actor = SeedUser("admin");
+        SeedGlobal();
+        var dept = SeedDepartment("Engineering");
+        var alpha = SeedRole("Alpha");
+        var zulu = SeedRole("Zulu");
+        var dev = SeedUser("dev");
+        await ScopedRoleRepo().CreateAsync(ScopedRoleAssignment.ForDepartment(dev.Id, alpha.Id, dept.Id));
+        await ScopedRoleRepo().CreateAsync(ScopedRoleAssignment.Global(dev.Id, zulu.Id));
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == dept.Id));
+
+        Assert.Equal(["Zulu", "Alpha"], sut.RoleAssignments.Select(a => a.RoleName));
+    }
+
+    [Fact]
+    public async Task DeleteAssignmentAsync_InheritedFromParent_IsRejected()
+    {
+        var actor = SeedUser("admin");
+        var parent = SeedDepartment("Engineering");
+        var child = SeedDepartment("Backend", parentId: parent.Id);
+        var role = SeedRole("DeptAdmin");
+        var lead = SeedUser("lead");
+        var assignment = ScopedRoleAssignment.ForDepartment(lead.Id, role.Id, parent.Id);
+        await ScopedRoleRepo().CreateAsync(assignment);
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == child.Id));
+
+        await sut.DeleteAssignmentAsync(assignment.Id);
+
+        Assert.NotNull(sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == assignment.Id));
+    }
+
+    [Fact]
+    public async Task ConfirmDeleteAsync_RemovesTheDepartmentsRoleAssignments()
+    {
+        var actor = SeedUser("admin");
+        var dept = SeedDepartment("Doomed");
+        var role = SeedRole("DeptAdmin");
+        var principal = SeedUser("bob");
+        var assignment = ScopedRoleAssignment.ForDepartment(principal.Id, role.Id, dept.Id);
+        await ScopedRoleRepo().CreateAsync(assignment);
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == dept.Id));
+
+        sut.RequestDelete();
+        await sut.ConfirmDeleteAsync();
+
+        await using var db = NewContext();
+        Assert.False(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == assignment.Id));
+    }
+
+    [Fact]
+    public async Task SaveAsync_GlobalDepartment_NeverStoresFileDefaultOrParent()
+    {
+        var actor = SeedUser("admin");
+        var global = SeedGlobal();
+        var other = SeedDepartment("Sales");
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == global.Id));
+        await sut.StartEditAsync();
+
+        sut.EditHasOwnPermission = true;
+        sut.TogglePermFlag(FilePermission.ReadAll, true);
+        sut.EditParentId = other.Id;
+        await sut.SaveAsync();
+
+        await using var db = NewContext();
+        var row = await db.Departments.FindAsync(global.Id);
+        Assert.Null(row!.DefaultFilePermission);
+        Assert.Null(row.ParentDepartmentId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithGlobalAsParent_StoresTopLevelDepartment()
+    {
+        var actor = SeedUser("admin");
+        SeedGlobal();
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+
+        sut.CreateName = "Sales";
+        sut.CreateParentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
+        await sut.CreateAsync();
+
+        await using var db = NewContext();
+        Assert.Null((await db.Departments.SingleAsync(d => d.Name == "Sales")).ParentDepartmentId);
+    }
+
+    [Fact]
+    public async Task StartEditAsync_AvailableParents_ExcludeGlobal()
+    {
+        var actor = SeedUser("admin");
+        SeedGlobal();
+        var dept = SeedDepartment("Sales");
+        SeedDepartment("Marketing");
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == dept.Id));
+
+        await sut.StartEditAsync();
+
+        Assert.DoesNotContain(sut.AvailableParents, d => d.Id == WellKnownGUIDs.DEPARTMENT_GLOBAL);
+        Assert.Contains(sut.AvailableParents, d => d.Name == "Marketing");
+    }
+
+    [Fact]
+    public async Task Tree_TopLevelDepartmentsHangBelowGlobal()
+    {
+        var actor = SeedUser("admin");
+        SeedGlobal();
+        var sales = SeedDepartment("Sales");
+        var emea = SeedDepartment("EMEA", parentId: sales.Id);
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+
+        var tree = sut.GetTreeOrderedDepartments();
+
+        Assert.Equal(WellKnownGUIDs.DEPARTMENT_GLOBAL, tree[0].Department.Id);
+        Assert.Equal(0, tree[0].Depth);
+        Assert.True(tree[0].HasChildren);
+        Assert.Equal(1, tree.Single(n => n.Department.Id == sales.Id).Depth);
+        Assert.Equal(2, tree.Single(n => n.Department.Id == emea.Id).Depth);
+        Assert.Equal(1, sut.GetChildCount(tree[0].Department));
+    }
 }

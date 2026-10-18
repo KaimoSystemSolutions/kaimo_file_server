@@ -4,9 +4,15 @@
     detail (scope fixed). Each part is shown only when its items are supplied; a fixed part is
     left out and its value is set by the caller. Pure presentation: validation and the
     authorization gate stay in the owning ViewModel.
+
+    The scope is picked as one of three categories: "System wide" (the Global department,
+    stored system-wide), a department, or a share. Their explanations sit in an info popover.
+    Roles with system-level permissions only make sense system wide: outside it they are not
+    offered, and a fixed role of that kind locks the scope to "System wide".
 *@
 @inherits AppComponentBase
 @using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Helpers
 @using Kaimo_File_Server.Core.Security
 @using Kaimo_File_Server.Web.DynamicHelpers
 
@@ -16,7 +22,7 @@
         <div class="form-group">
             <label>@Resources.Web_Admin_Label_Role</label>
             <PrincipalPickerField Mode="SelectionMode.Single"
-                                  Items="Roles"
+                                  Items="OfferedRoles(Roles, RolePermissionsById, IsGlobalScope)"
                                   SelectedIds="RoleId.AsSelection()"
                                   SelectedIdsChanged="ids => RoleIdChanged.InvokeAsync(ids.FirstOrNull())"
                                   Title="@Resources.Web_Admin_Label_Role"
@@ -37,33 +43,46 @@
     }
     @if (Departments is not null)
     {
+        @* Three plain categories; "System wide" stores the Global department, which the
+           department picker therefore leaves out. The explanations live in the info popover. *@
         <div class="form-group">
-            <label>@Resources.Web_Admin_Label_Scope</label>
-            <select class="edit-input" value="@ScopeType.ToString()" @onchange="OnScopeTypeChanged">
-                @if (AllowGlobal)
-                {
-                    <option value="Global">@Resources.Web_Admin_Scope_Global</option>
-                }
-                <option value="Department">@Resources.Web_Admin_Scope_Department</option>
+            <div class="label-with-info">
+                <label id="assignment-scope-label">@R("Web_Admin_Label_AppliesTo", "Applies to")</label>
+                <InfoButton Title="@R("Web_Admin_ScopeInfo_Title", "Where does the role apply?")"
+                            AriaLabel="@R("Web_Admin_ScopeInfo_Title", "Where does the role apply?")">
+                    <ul>
+                        <li><strong>@SystemLabel:</strong> @R("Web_Admin_GlobalScopeHint", "Everywhere, including system settings. Same as an assignment in the Global department.")</li>
+                        <li><strong>@Resources.Web_Admin_Scope_Department:</strong> @R("Web_Admin_ScopeInfo_Department", "In the chosen department and all of its sub-departments.")</li>
+                        @if (Shares is not null)
+                        {
+                            <li><strong>@Resources.Web_Admin_Scope_Share:</strong> @Resources.Web_Admin_ShareScopeHint</li>
+                        }
+                    </ul>
+                    <p>@R("Web_Admin_SystemBitsHint", "Roles with system-level permissions (e.g. settings, logs, backups, mail) can only be assigned system wide.")</p>
+                </InfoButton>
+            </div>
+            <div class="toggle-button-group" role="radiogroup" aria-labelledby="assignment-scope-label">
+                @ScopeChoice(ScopeMode.System, SystemLabel)
+                @ScopeChoice(ScopeMode.Department, Resources.Web_Admin_Scope_Department)
                 @if (Shares is not null)
                 {
-                    <option value="Share">@Resources.Web_Admin_Scope_Share</option>
+                    @ScopeChoice(ScopeMode.Share, Resources.Web_Admin_Scope_Share)
                 }
-            </select>
+            </div>
         </div>
-        @if (ScopeType == ScopeType.Department)
+        @if (Mode == ScopeMode.Department)
         {
             <div class="form-group">
                 <label>@Resources.Web_Admin_Label_Department</label>
                 <PrincipalPickerField Mode="SelectionMode.Single"
-                                      Items="Departments"
+                                      Items="Departments.Where(d => d.Id != WellKnownGUIDs.DEPARTMENT_GLOBAL).ToList()"
                                       SelectedIds="ScopeId.AsSelection()"
                                       SelectedIdsChanged="ids => ScopeIdChanged.InvokeAsync(ids.FirstOrNull())"
                                       Title="@Resources.Web_Admin_Label_Department"
                                       Placeholder="@Resources.Web_Common_Select" />
             </div>
         }
-        else if (ScopeType == ScopeType.Share && Shares is not null)
+        else if (Mode == ScopeMode.Share && Shares is not null)
         {
             <div class="form-group">
                 <label>@Resources.Web_Admin_Label_Share</label>
@@ -73,10 +92,6 @@
                                       SelectedIdsChanged="ids => ScopeIdChanged.InvokeAsync(ids.FirstOrNull())"
                                       Title="@Resources.Web_Admin_Label_Share"
                                       Placeholder="@Resources.Web_Common_Select" />
-            </div>
-            <div class="detail-info">
-                @Assets.SVG("circle_info.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)"))
-                <span>@Resources.Web_Admin_ShareScopeHint</span>
             </div>
         }
     }
@@ -109,8 +124,13 @@
     /// <summary>Selectable shares; null hides the Share scope option.</summary>
     [Parameter] public IReadOnlyList<PrincipalPickerItem>? Shares { get; set; }
 
-    /// <summary>Offer the Global scope option.</summary>
-    [Parameter] public bool AllowGlobal { get; set; } = true;
+    /// <summary>Permissions of the role fixed by the caller (<see cref="Roles"/> null). A role with
+    /// system-level permissions locks the scope to "System wide".</summary>
+    [Parameter] public ManagementPermission? RolePermissions { get; set; }
+
+    /// <summary>Permissions per selectable role; roles with system-level permissions are only
+    /// offered while the scope is system wide. Null offers every role.</summary>
+    [Parameter] public IReadOnlyDictionary<Guid, ManagementPermission>? RolePermissionsById { get; set; }
 
     [Parameter] public ScopeType ScopeType { get; set; }
     [Parameter] public EventCallback<ScopeType> ScopeTypeChanged { get; set; }
@@ -122,10 +142,65 @@
     [Parameter] public EventCallback OnSubmit { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
 
-    // Switching the scope type invalidates the chosen scope object.
-    private async Task OnScopeTypeChanged(ChangeEventArgs e)
+    // Permissions that are only evaluated system-wide (settings, logs, backups, mail, ...).
+    // ponytail: hand-picked from the "System / Global Settings" area; it only steers the form,
+    // the authorization engine stays the source of truth.
+    private const ManagementPermission SystemLevelPermissions =
+        ManagementPermission.SystemAdmin | ManagementPermission.ViewSecurityMonitor
+        | ManagementPermission.ManageMailServer | ManagementPermission.ManageNotifications
+        | ManagementPermission.ManageBackupRepositories;
+
+    private bool IsGlobalScope => ScopeType == ScopeType.Global
+        || (ScopeType == ScopeType.Department && ScopeId == WellKnownGUIDs.DEPARTMENT_GLOBAL);
+
+    /// <summary>Whether a role's permissions include system-level ones, which only take effect
+    /// when the role is assigned system wide.</summary>
+    public static bool IsSystemOnly(ManagementPermission permissions) => (permissions & SystemLevelPermissions) != 0;
+
+    /// <summary>The roles that make sense at the chosen scope: all of them system wide, otherwise
+    /// only those without system-level permissions.</summary>
+    public static IReadOnlyList<PrincipalPickerItem> OfferedRoles(IReadOnlyList<PrincipalPickerItem> roles,
+        IReadOnlyDictionary<Guid, ManagementPermission>? permissions, bool systemWide)
+        => systemWide || permissions is null
+            ? roles
+            : roles.Where(r => !(permissions.TryGetValue(r.Id, out var p) && IsSystemOnly(p))).ToList();
+
+    private bool FixedRoleIsSystemOnly => Roles is null && RolePermissions is { } perms && IsSystemOnly(perms);
+
+    // A fixed system-level role leaves only "System wide"; select it right away.
+    protected override async Task OnParametersSetAsync()
     {
-        await ScopeTypeChanged.InvokeAsync(Enum.TryParse<ScopeType>(e.Value?.ToString(), out var st) ? st : ScopeType.Global);
-        await ScopeIdChanged.InvokeAsync(null);
+        if (FixedRoleIsSystemOnly && Departments is not null && Mode != ScopeMode.System)
+            await SelectModeAsync(ScopeMode.System);
+    }
+
+    private static string R(string key, string fallback) => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    private enum ScopeMode { System, Department, Share }
+
+    private ScopeMode Mode => IsGlobalScope ? ScopeMode.System
+        : ScopeType == ScopeType.Share ? ScopeMode.Share : ScopeMode.Department;
+
+    private static string SystemLabel => R("Web_Admin_ScopeChoice_System", "System wide");
+
+    private RenderFragment ScopeChoice(ScopeMode mode, string label) => __builder =>
+    {
+        <button type="button" role="radio" aria-checked="@(Mode == mode ? "true" : "false")"
+                class="toggle-btn @(Mode == mode ? "toggle-btn--active" : null)"
+                disabled="@(IsSaving || (mode != ScopeMode.System && FixedRoleIsSystemOnly))" @onclick="() => SelectModeAsync(mode)">@label</button>
+    };
+
+    // Switching the category invalidates the chosen scope object, and a chosen role that is not
+    // offered at the new scope. "System wide" is the Global department, which the ViewModel
+    // stores as a system-wide assignment.
+    private async Task SelectModeAsync(ScopeMode mode)
+    {
+        if (mode == Mode)
+            return;
+        await ScopeTypeChanged.InvokeAsync(mode == ScopeMode.Share ? ScopeType.Share : ScopeType.Department);
+        await ScopeIdChanged.InvokeAsync(mode == ScopeMode.System ? WellKnownGUIDs.DEPARTMENT_GLOBAL : null);
+        if (mode != ScopeMode.System && Roles is not null && RoleId is { } roleId
+            && OfferedRoles(Roles, RolePermissionsById, systemWide: false).All(r => r.Id != roleId))
+            await RoleIdChanged.InvokeAsync(null);
     }
 }

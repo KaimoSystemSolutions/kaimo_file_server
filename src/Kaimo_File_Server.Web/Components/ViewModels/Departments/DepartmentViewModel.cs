@@ -24,6 +24,7 @@ public class DepartmentViewModel
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<DepartmentViewModel> _logger;
+    private readonly RoleAssignmentService _roleAssignments;
 
     public DepartmentViewModel(
         IDepartmentRepository departmentRepo,
@@ -47,6 +48,7 @@ public class DepartmentViewModel
         _userContextFactory = userContextFactory;
         _authState = authState;
         _logger = logger;
+        _roleAssignments = new RoleAssignmentService(assignmentRepo, roleRepo, userRepo, groupRepo, mgmtAuth);
     }
 
     // ══════════════════════════════════════════
@@ -84,7 +86,10 @@ public class DepartmentViewModel
     public List<ShareDefinition> Shares { get; private set; } = [];
     public EffectivePermissionInfo? PermInfo { get; private set; }
 
-    /// <summary>Role assignments scoped to the selected department.</summary>
+    /// <summary>Role assignments that apply to the selected department: its own (editable) and,
+    /// read-only with <see cref="ScopedAssignmentDisplayItem.InheritedFrom"/> set, those of its
+    /// ancestors and of the Global department. On the Global department these are the
+    /// system-wide assignments.</summary>
     public List<ScopedAssignmentDisplayItem> RoleAssignments { get; private set; } = [];
 
     // -- Add department-scoped role assignment --
@@ -273,23 +278,54 @@ public class DepartmentViewModel
 
     private async Task LoadRoleAssignmentsAsync(Guid departmentId)
     {
-        var assignments = await _assignmentRepo.GetByScopeAsync(ScopeType.Department, departmentId);
         var users = (await _userRepo.GetAllAsync()).ToDictionary(u => u.Id, u => u.Name);
         var groups = (await _groupRepo.GetAllAsync()).ToDictionary(g => g.Id, g => g.Name);
         var roles = (await _roleRepo.GetAllAsync()).ToDictionary(r => r.Id, r => r.Name);
-        var deptName = Departments.FirstOrDefault(d => d.Id == departmentId)?.Name ?? departmentId.ToString();
+        var globalName = (await _departmentRepo.GetByIdAsync(WellKnownGUIDs.DEPARTMENT_GLOBAL))?.Name ?? "Global";
 
-        RoleAssignments = assignments
-            .Select(a => new ScopedAssignmentDisplayItem(
-                a.Id,
-                users.GetValueOrDefault(a.PrincipalId) ?? groups.GetValueOrDefault(a.PrincipalId) ?? a.PrincipalId.ToString(),
-                groups.ContainsKey(a.PrincipalId),
-                roles.GetValueOrDefault(a.RoleId) ?? a.RoleId.ToString(),
-                a.ScopeType,
-                deptName))
-            .OrderBy(i => i.RoleName).ThenBy(i => i.PrincipalName)
+        ScopedAssignmentDisplayItem ToItem(ScopedRoleAssignment a, string scopeName, string? inheritedFrom) => new(
+            a.Id,
+            users.GetValueOrDefault(a.PrincipalId) ?? groups.GetValueOrDefault(a.PrincipalId) ?? a.PrincipalId.ToString(),
+            groups.ContainsKey(a.PrincipalId),
+            roles.GetValueOrDefault(a.RoleId) ?? a.RoleId.ToString(),
+            a.ScopeType,
+            scopeName,
+            inheritedFrom);
+
+        var items = new List<ScopedAssignmentDisplayItem>();
+        if (departmentId == WellKnownGUIDs.DEPARTMENT_GLOBAL)
+        {
+            // The Global department is the system-wide scope.
+            items.AddRange((await _assignmentRepo.GetByScopeAsync(ScopeType.Global, Guid.Empty))
+                .Select(a => ToItem(a, globalName, null)));
+        }
+        else
+        {
+            var deptName = (await _departmentRepo.GetByIdAsync(departmentId))?.Name ?? departmentId.ToString();
+            items.AddRange((await _assignmentRepo.GetByScopeAsync(ScopeType.Department, departmentId))
+                .Select(a => ToItem(a, deptName, null)));
+
+            // Department scope covers descendants, and Global covers everything, so the
+            // assignments of every ancestor and of Global apply here too.
+            foreach (var ancestor in await _departmentRepo.GetAncestorChainAsync(departmentId))
+                items.AddRange((await _assignmentRepo.GetByScopeAsync(ScopeType.Department, ancestor.Id))
+                    .Select(a => ToItem(a, ancestor.Name, ancestor.Name)));
+            items.AddRange((await _assignmentRepo.GetByScopeAsync(ScopeType.Global, Guid.Empty))
+                .Select(a => ToItem(a, globalName, globalName)));
+        }
+
+        // System-wide assignments lead the list, then the department's own, then inherited ones.
+        RoleAssignments = items
+            .OrderBy(i => i.ScopeType != ScopeType.Global).ThenBy(i => i.InheritedFrom is not null).ThenBy(i => i.RoleName).ThenBy(i => i.PrincipalName)
             .ToList();
     }
+
+    /// <summary>Whether <paramref name="assignment"/> is one of the selected department's own
+    /// (editable) assignments; on the Global department those are the system-wide ones.</summary>
+    private bool IsOwnAssignment(ScopedRoleAssignment assignment)
+        => Selected is not null && (Selected.Id == WellKnownGUIDs.DEPARTMENT_GLOBAL
+            ? assignment.ScopeType == ScopeType.Global
+            : assignment.ScopeType == ScopeType.Department && assignment.ScopeId == Selected.Id);
 
     public async Task StartAddAssignmentAsync()
     {
@@ -309,8 +345,8 @@ public class DepartmentViewModel
     }
 
     /// <summary>Assigns the chosen role to the chosen user or group, scoped to the selected
-    /// department. Department scope never touches the global-admin coupling or the last-admin
-    /// guard (both only concern Global scope), so the no-privilege-elevation gate suffices.</summary>
+    /// department. On the Global department this is a system-wide assignment, so the shared
+    /// service also applies the Admins-group mirror.</summary>
     public async Task CreateAssignmentAsync()
     {
         if (Selected is null || _actorContext is null) return;
@@ -321,16 +357,14 @@ public class DepartmentViewModel
         if (NewAssignmentPrincipalId is not { } principalId)
         { ErrorMessage = Resources.Web_Error_SelectUserOrGroup; return; }
 
-        if (!await _mgmtAuth.CanAssignRoleAsync(
-                _actorContext, role.ManagementPermissions, ScopeType.Department, Selected.Id))
-        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
-
         try
         {
             IsSaving = true;
             ErrorMessage = null;
-            await _assignmentRepo.CreateAsync(
-                ScopedRoleAssignment.ForDepartment(principalId, role.Id, Selected.Id));
+            var error = await _roleAssignments.CreateAsync(
+                _actorContext, principalId, role, ScopeType.Department, Selected.Id);
+            if (error is not null) { ErrorMessage = error; return; }
+
             IsAddingAssignment = false;
             await LoadRoleAssignmentsAsync(Selected.Id);
             SuccessMessage = Resources.Web_Assignment_Created;
@@ -343,28 +377,24 @@ public class DepartmentViewModel
         finally { IsSaving = false; }
     }
 
-    /// <summary>Removes an assignment of the selected department. Assignments of any other
-    /// scope are rejected here, so the Global-scope guards in the user management cannot be
-    /// bypassed through this page.</summary>
+    /// <summary>Removes one of the selected department's own assignments. Inherited ones are
+    /// rejected here (they are removed where they are defined); the last-admin guard applies
+    /// through the shared service.</summary>
     public async Task DeleteAssignmentAsync(Guid assignmentId)
     {
         if (Selected is null || _actorContext is null) return;
 
         var assignment = await _assignmentRepo.GetByIdAsync(assignmentId);
-        if (assignment is null || assignment.ScopeType != ScopeType.Department || assignment.ScopeId != Selected.Id)
-        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
-
-        var rolePerms = (await _roleRepo.GetByIdAsync(assignment.RoleId))?.ManagementPermissions
-            ?? ManagementPermission.None;
-        if (!await _mgmtAuth.CanAssignRoleAsync(
-                _actorContext, rolePerms, ScopeType.Department, Selected.Id))
+        if (assignment is null || !IsOwnAssignment(assignment))
         { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
         {
             IsSaving = true;
             ErrorMessage = null;
-            await _assignmentRepo.DeleteAsync(assignmentId);
+            var error = await _roleAssignments.DeleteAsync(_actorContext, assignment);
+            if (error is not null) { ErrorMessage = error; return; }
+
             await LoadRoleAssignmentsAsync(Selected.Id);
             SuccessMessage = Resources.Web_Assignment_Removed;
         }
@@ -434,10 +464,12 @@ public class DepartmentViewModel
         EditUseCustomColor = Selected.Color != null;
         EditColor = Selected.Color ?? DepartmentPalette.AutoHex(Selected.Id);
 
-        // Available parents (exclude self + descendants to prevent cycles)
+        // Available parents (exclude self + descendants to prevent cycles). Global is not a
+        // parent option: "no parent" already means "directly below Global".
         var allDepts = await _departmentRepo.GetAllAsync();
         var descendantIds = await _departmentRepo.GetDescendantIdsAsync(Selected.Id);
         descendantIds.Add(Selected.Id);
+        descendantIds.Add(WellKnownGUIDs.DEPARTMENT_GLOBAL);
         AvailableParents = allDepts
             .Where(d => !descendantIds.Contains(d.Id))
             .OrderByGlobalFirst().ToList();
@@ -482,8 +514,12 @@ public class DepartmentViewModel
             if (!string.IsNullOrWhiteSpace(EditName))
                 Selected.Name = EditName.Trim();
             Selected.Description = string.IsNullOrWhiteSpace(EditDescription) ? null : EditDescription.Trim();
-            Selected.ParentDepartmentId = EditParentId;
-            Selected.DefaultFilePermission = EditHasOwnPermission
+            // The Global department is a pure placeholder for "the whole system": it has no
+            // parent and never carries default file permissions.
+            var isGlobal = IsGlobalDepartment(Selected);
+            Selected.ParentDepartmentId = isGlobal || EditParentId == WellKnownGUIDs.DEPARTMENT_GLOBAL
+                ? null : EditParentId;
+            Selected.DefaultFilePermission = EditHasOwnPermission && !isGlobal
                 ? (long)EditDefaultPermission
                 : null;
             // Normalize guards the trust boundary: this value is emitted into inline CSS.
@@ -607,7 +643,8 @@ public class DepartmentViewModel
             var dept = new Department(
                 CreateName.Trim(),
                 string.IsNullOrWhiteSpace(CreateDescription) ? null : CreateDescription.Trim(),
-                CreateParentId);
+                // "No parent" already means "directly below Global".
+                CreateParentId == WellKnownGUIDs.DEPARTMENT_GLOBAL ? null : CreateParentId);
             await _departmentRepo.CreateAsync(dept);
 
             IsCreating = false;
@@ -667,6 +704,8 @@ public class DepartmentViewModel
             }
 
             await _departmentRepo.DeleteAsync(Selected.Id);
+            // Its role assignments would otherwise be left behind pointing at nothing.
+            await _assignmentRepo.DeleteByScopeAsync(ScopeType.Department, Selected.Id);
 
             Selected = null;
             Members = []; Groups = []; Shares = [];
@@ -703,7 +742,7 @@ public class DepartmentViewModel
 
     public string GetParentName(Guid? parentId)
     {
-        if (!parentId.HasValue) return "— Keine (Oberste Ebene)";
+        if (!parentId.HasValue) return Resources.Web_Dept_NoParentTopLevel;
         var parent = Departments.FirstOrDefault(d => d.Id == parentId.Value);
         return parent?.Name ?? parentId.Value.ToString();
     }
@@ -727,20 +766,33 @@ public class DepartmentViewModel
 
     public void CollapseAll()
     {
-        foreach (var d in Departments.Where(d => Departments.Any(c => c.ParentDepartmentId == d.Id)))
+        foreach (var d in Departments.Where(d => GetChildCount(d) > 0))
             _collapsedIds.Add(d.Id);
     }
+
+    /// <summary>
+    /// The parent a department is shown under: its own parent when that is visible, otherwise
+    /// the Global department, which is drawn as the root of every top-level department.
+    /// </summary>
+    private Guid? TreeParentId(Department dept)
+    {
+        if (IsGlobalDepartment(dept)) return null;
+        if (dept.ParentDepartmentId is { } parentId && Departments.Any(d => d.Id == parentId))
+            return parentId;
+        return Departments.Any(IsGlobalDepartment) ? WellKnownGUIDs.DEPARTMENT_GLOBAL : null;
+    }
+
+    /// <summary>Number of departments shown directly below <paramref name="dept"/> in the tree.</summary>
+    public int GetChildCount(Department dept) => Departments.Count(d => TreeParentId(d) == dept.Id);
 
     public void ExpandAll() => _collapsedIds.Clear();
 
     public List<DepartmentNode> GetTreeOrderedDepartments()
     {
         var result = new List<DepartmentNode>();
-        var deptIds = Departments.Select(d => d.Id).ToHashSet();
 
         var roots = Departments
-            .Where(d => !d.ParentDepartmentId.HasValue
-                        || !deptIds.Contains(d.ParentDepartmentId.Value))
+            .Where(d => TreeParentId(d) is null)
             .OrderBy(d => IsGlobalDepartment(d) ? 0 : 1)
             .ThenBy(d => d.Name)
             .ToList();
@@ -759,7 +811,7 @@ public class DepartmentViewModel
         bool[] ancestorContinues)
     {
         var children = Departments
-            .Where(d => d.ParentDepartmentId == dept.Id)
+            .Where(d => TreeParentId(d) == dept.Id)
             .OrderBy(d => d.Name)
             .ToList();
 

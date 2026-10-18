@@ -124,3 +124,12 @@
         padding-left: 18px;
         line-height: 1.5;
     }
+
+    /* Paragraphs and lists stack with one gap, without the browser's default margins. */
+    .info-btn__pop-body ::deep p {
+        margin: var(--space-2) 0 0;
+    }
+
+    .info-btn__pop-body ::deep > :first-child {
+        margin-top: 0;
+    }

@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Infrastructure.Services;
+﻿using Kaimo_File_Server.Infrastructure.Services;
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
@@ -40,6 +40,7 @@ public class UserListViewModel
     private readonly JwtTokenService? _jwt;
     private readonly IMemoryCache? _cache;
     private readonly INotificationPublisher? _notifications;
+    private readonly RoleAssignmentService _roleAssignments;
 
     public UserListViewModel(
         IUserRepository userRepo,
@@ -81,6 +82,7 @@ public class UserListViewModel
         _logger = logger;
         _shareRepo = shareRepo;
         _config = config;
+        _roleAssignments = new RoleAssignmentService(assignmentRepo, roleRepo, userRepo, groupRepo, mgmtAuth);
     }
 
     /// <summary>
@@ -253,7 +255,6 @@ public class UserListViewModel
     /// </summary>
     public bool CanManageHomes { get; private set; }
     public List<CheckboxItem<Group>> EditUserGroups { get; private set; } = [];
-    public List<CheckboxItem<Role>> EditUserRoles { get; private set; } = [];
     public List<CheckboxItem<Department>> EditUserDepartments { get; private set; } = [];
 
     // -- Profile picture edit (shared by admin full-edit and self-service) --
@@ -342,7 +343,7 @@ public class UserListViewModel
 
     // -- Scoped Assignment Creation --
     public bool IsAddingAssignment { get; set; }
-    public ScopeType NewAssignmentScopeType { get; set; } = ScopeType.Global;
+    public ScopeType NewAssignmentScopeType { get; set; } = ScopeType.Department;
     public Guid? NewAssignmentScopeId { get; set; }
     public Guid? NewAssignmentPrincipalId { get; set; }
     public bool NewAssignmentPrincipalIsGroup { get; set; }
@@ -613,7 +614,9 @@ public class UserListViewModel
 
         var assignResult = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
             _actorContext, ManagementPermission.EditDepartment);
-        AuthorizedDepartmentsForAssign = await LoadDepartmentsFromScopeResultAsync(assignResult);
+        // Every user implicitly belongs to the Global department, so it is not offered here.
+        AuthorizedDepartmentsForAssign = (await LoadDepartmentsFromScopeResultAsync(assignResult))
+            .Where(d => d.Id != WellKnownGUIDs.DEPARTMENT_GLOBAL).ToList();
         CanAssignDepartments = AuthorizedDepartmentsForAssign.Count > 0;
     }
 
@@ -782,11 +785,6 @@ public class UserListViewModel
         var userGroupIds = userGroups.Select(g => g.Id).ToHashSet();
         EditUserGroups = allGroups.Select(g => new CheckboxItem<Group>(g, userGroupIds.Contains(g.Id))).ToList();
 
-        var allRoles = (await _roleRepo.GetAllAsync()).OrderBy(r => r.Name).ToList();
-        var userRoles = await _userRepo.GetRolesForUserAsync(SelectedUser.Id);
-        var userRoleIds = userRoles.Select(r => r.Id).ToHashSet();
-        EditUserRoles = allRoles.Select(r => new CheckboxItem<Role>(r, userRoleIds.Contains(r.Id))).ToList();
-
         // Departments the actor may manage; pre-checked where the user is already a member.
         // Memberships in departments outside this authorized set stay untouched on save.
         EditUserDepartments = AuthorizedDepartmentsForAssign
@@ -807,15 +805,21 @@ public class UserListViewModel
             return;
         }
 
+        // Roles are assigned through the scoped role assignments, not in this form. The only
+        // admin switch here is the Admins group, which mirrors the system-wide admin role.
+        var wasInAdminsGroup = UserGroups.Any(g => g.Id == WellKnownGUIDs.GROUP_ADMINS);
+        var leavesAdminsGroup = wasInAdminsGroup
+            && EditUserGroups.Any(g => g.Item.Id == WellKnownGUIDs.GROUP_ADMINS && !g.IsChecked);
+
         // Last-admin protection: if this user is currently the SOLE enabled global admin,
-        // the save must not strip that — neither by disabling the account nor by unchecking
-        // the Administrator role (group-inherited admin survives a role uncheck).
+        // the save must not strip that — neither by disabling the account nor by leaving
+        // the Admins group (admin inherited through another group survives that).
         var adminUserIds = await GetEnabledGlobalAdminUserIdsAsync();
         if (adminUserIds.Contains(SelectedUser.Id) && !adminUserIds.Any(id => id != SelectedUser.Id))
         {
-            var keepsAdminRole = EditUserRoles.Any(r => r.IsChecked && IsAdminRole(r.Item));
             var willBeAdmin = EditUserIsEnabled
-                && (keepsAdminRole || await UserInheritsGlobalAdminFromGroupAsync(SelectedUser.Id));
+                && (!leavesAdminsGroup
+                    || await UserInheritsGlobalAdminFromGroupAsync(SelectedUser.Id, WellKnownGUIDs.GROUP_ADMINS));
             if (!willBeAdmin) { ErrorMessage = Resources.Web_Error_LastAdmin; return; }
         }
 
@@ -896,17 +900,12 @@ public class UserListViewModel
             if (await _mgmtAuth.CanManageUserAsync(_actorContext, SelectedUser.Id, ManagementPermission.AssignGroups))
                 await _userRepo.SetGroupsForUserAsync(SelectedUser.Id, selectedGroupIds);
 
-            var selectedRoleIds = EditUserRoles.Where(r => r.IsChecked).Select(r => r.Item.Id).ToList();
-            if (await _mgmtAuth.CanManageUserAsync(_actorContext, SelectedUser.Id, ManagementPermission.AssignRoles))
-                await _userRepo.SetRolesForUserAsync(SelectedUser.Id, selectedRoleIds);
-
-            // Admin role <-> Admins group are mirrored. Derive the intended admin state
-            // from what was actually persisted (each list respects its own permission
-            // gate above), then reconcile both representations.
-            var hasAdminRole = (await _userRepo.GetRolesForUserAsync(SelectedUser.Id)).Any(IsAdminRole);
+            // Admin role <-> Admins group are mirrored. Joining or leaving the group (as it was
+            // actually persisted under its permission gate above) grants or revokes the role.
             var inAdminsGroup = (await _userRepo.GetGroupsForUserAsync(SelectedUser.Id))
                 .Any(g => g.Id == WellKnownGUIDs.GROUP_ADMINS);
-            await ReconcileAdminCouplingAsync(SelectedUser.Id, hasAdminRole || inAdminsGroup);
+            if (inAdminsGroup != wasInAdminsGroup)
+                await ReconcileAdminCouplingAsync(SelectedUser.Id, inAdminsGroup);
 
             await LoadTabDataAsync();
             SelectedUser = Users.FirstOrDefault(u => u.Id == SelectedUser.Id);
@@ -1247,7 +1246,7 @@ public class UserListViewModel
     public void StartAddAssignment()
     {
         IsAddingAssignment = true;
-        NewAssignmentScopeType = ScopeType.Global;
+        NewAssignmentScopeType = ScopeType.Department;
         NewAssignmentScopeId = null;
         NewAssignmentPrincipalId = null;
         NewAssignmentPrincipalIsGroup = false;
@@ -1284,26 +1283,16 @@ public class UserListViewModel
         var scopeId = NewAssignmentScopeType == ScopeType.Global
             ? Guid.Empty : NewAssignmentScopeId!.Value;
 
-        // No-privilege-elevation gate: the actor must hold AssignRoles AT the chosen scope
-        // and may not grant a role carrying any permission the actor lacks there. This blocks
-        // the escalation where a narrowly-scoped delegate assigns e.g. Administrator globally.
-        if (!await _mgmtAuth.CanAssignRoleAsync(
-                _actorContext, role.ManagementPermissions, NewAssignmentScopeType, scopeId))
-        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
-
         try
         {
             IsSaving = true;
             ErrorMessage = null;
 
-            await _assignmentRepo.CreateAsync(new ScopedRoleAssignment(
-                NewAssignmentPrincipalId.Value, role.Id, NewAssignmentScopeType, scopeId));
-
-            // Granting the global admin role to a USER also puts them in the Admins group.
-            // (A group principal keeps the existing group-inheritance path, untouched.)
-            if (NewAssignmentScopeType == ScopeType.Global && IsAdminRole(role)
-                && await _userRepo.GetByIdAsync(NewAssignmentPrincipalId.Value) is not null)
-                await ReconcileAdminCouplingAsync(NewAssignmentPrincipalId.Value, true);
+            // The shared service applies the no-privilege-elevation gate, maps the Global
+            // department onto the system-wide scope and keeps the Admins group in sync.
+            var error = await _roleAssignments.CreateAsync(
+                _actorContext, NewAssignmentPrincipalId.Value, role, NewAssignmentScopeType, scopeId);
+            if (error is not null) { ErrorMessage = error; return; }
 
             IsAddingAssignment = false;
             if (SelectedRole is not null) await LoadRoleScopedAssignmentsAsync(SelectedRole.Id);
@@ -1322,35 +1311,17 @@ public class UserListViewModel
     {
         if (_actorContext is null) return;
 
-        // Removing an assignment is bounded by the same authority as creating one: the actor
-        // must be able to assign that role at that scope. Otherwise any AssignRoles holder
-        // could strip arbitrary assignments (e.g. remove the sole global admin).
         var assignment = await _assignmentRepo.GetByIdAsync(assignmentId);
         if (assignment is null) { ErrorMessage = Resources.Web_Error_NoPermission; return; }
-
-        var role = await _roleRepo.GetByIdAsync(assignment.RoleId);
-        var rolePerms = role?.ManagementPermissions ?? ManagementPermission.None;
-
-        if (!await _mgmtAuth.CanAssignRoleAsync(
-                _actorContext, rolePerms, assignment.ScopeType, assignment.ScopeId))
-        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
-
-        // Last-admin protection: never remove the global assignment that is the sole
-        // remaining source of an enabled global administrator.
-        if (assignment.ScopeType == ScopeType.Global && role is not null && IsAdminRole(role)
-            && (await GetEnabledGlobalAdminUserIdsAsync(excludeAssignmentId: assignmentId)).Count == 0)
-        { ErrorMessage = Resources.Web_Error_LastAdmin; return; }
 
         try
         {
             IsSaving = true;
             ErrorMessage = null;
-            await _assignmentRepo.DeleteAsync(assignmentId);
 
-            // Full-mirror: removing a user's global admin role also removes them from Admins.
-            if (assignment.ScopeType == ScopeType.Global && role is not null && IsAdminRole(role)
-                && await _userRepo.GetByIdAsync(assignment.PrincipalId) is not null)
-                await ReconcileAdminCouplingAsync(assignment.PrincipalId, false);
+            // Elevation gate, last-admin guard and the Admins-group mirror live in the shared service.
+            var error = await _roleAssignments.DeleteAsync(_actorContext, assignment);
+            if (error is not null) { ErrorMessage = error; return; }
 
             if (SelectedRole is not null) await LoadRoleScopedAssignmentsAsync(SelectedRole.Id);
             if (SelectedUser is not null) await LoadUserScopedAssignmentsAsync(SelectedUser.Id);
@@ -1414,7 +1385,9 @@ public class UserListViewModel
                 isEnabled: CreateUserIsEnabled, canChangePassword: CreateUserCanChangePassword);
 
             await _userRepo.CreateAsync(user);
-            await _departmentRepo.AddUserAsync(CreateUserDepartmentId.Value, user.Id);
+            // Membership in the Global department is implicit for every user, so it is never stored.
+            if (CreateUserDepartmentId.Value != WellKnownGUIDs.DEPARTMENT_GLOBAL)
+                await _departmentRepo.AddUserAsync(CreateUserDepartmentId.Value, user.Id);
             // Every user is a member of the global Everyone group.
             await _groupRepo.AddMemberAsync(WellKnownGUIDs.GROUP_EVERYONE, user.Id);
             await EnsureHomeQuietlyAsync(user);
@@ -1763,7 +1736,9 @@ public class UserListViewModel
                 a.Id, principalName, isGroup, roleName, a.ScopeType, scopeName));
         }
 
-        return items.OrderBy(i => i.PrincipalName).ToList();
+        // System-wide assignments carry the most weight, so they lead the list.
+        return items.OrderBy(i => i.ScopeType != ScopeType.Global)
+            .ThenBy(i => i.PrincipalName).ThenBy(i => i.RoleName).ToList();
     }
 
     // ══════════════════════════════════════════
@@ -1772,55 +1747,25 @@ public class UserListViewModel
 
     /// <summary>A role that carries the complete <see cref="ManagementPermission.FullAdmin"/>
     /// mask — the same definition the page uses for <c>IsGlobalAdmin</c>.</summary>
-    private static bool IsAdminRole(Role role)
-        => (role.ManagementPermissions & ManagementPermission.FullAdmin) == ManagementPermission.FullAdmin;
+    private static bool IsAdminRole(Role role) => RoleAssignmentService.IsAdminRole(role);
 
     /// <summary>
     /// The set of ENABLED users who effectively hold a global FullAdmin role, either
-    /// directly or inherited through group membership. This is the authoritative
-    /// "who can still administer the system" set that the last-admin guards protect:
-    /// no operation may reduce it to empty, or the whole management UI becomes
-    /// permanently unreachable.
+    /// directly or inherited through group membership. No operation may reduce it to empty,
+    /// or the whole management UI becomes permanently unreachable.
     /// </summary>
-    // The guards live in this ViewModel because all write paths that can strip global
-    // admin (role uncheck, assignment delete, user delete, user disable) are here; the
-    // lookup itself is shared with the mail-notification recipient resolver.
     private Task<HashSet<Guid>> GetEnabledGlobalAdminUserIdsAsync(Guid? excludeAssignmentId = null)
-        => ManagementAuthService.GetGlobalPermissionHolderUserIdsAsync(
-            _assignmentRepo, _roleRepo, _userRepo, _groupRepo, IsAdminRole, excludeAssignmentId);
+        => _roleAssignments.GetEnabledGlobalAdminUserIdsAsync(excludeAssignmentId);
 
-    /// <summary>
-    /// Keeps the two admin representations of a user in lockstep (full mirror): a direct
-    /// global <see cref="WellKnownGUIDs.ROLE_ADMIN"/> assignment and membership in the
-    /// Admins group (<see cref="WellKnownGUIDs.GROUP_ADMINS"/>). Both are ensured when
-    /// <paramref name="shouldBeAdmin"/> is true and both are removed when false. Idempotent.
-    /// Callers are responsible for the last-admin guard before revoking.
-    /// </summary>
-    private async Task ReconcileAdminCouplingAsync(Guid userId, bool shouldBeAdmin)
-    {
-        var globalAssignments = await _assignmentRepo.GetByPrincipalAndScopeAsync(
-            userId, ScopeType.Global, Guid.Empty);
-        var adminAssignment = globalAssignments.FirstOrDefault(a => a.RoleId == WellKnownGUIDs.ROLE_ADMIN);
-
-        if (shouldBeAdmin)
-        {
-            if (adminAssignment is null)
-                await _assignmentRepo.CreateAsync(
-                    ScopedRoleAssignment.Global(userId, WellKnownGUIDs.ROLE_ADMIN));
-            await _groupRepo.AddMemberAsync(WellKnownGUIDs.GROUP_ADMINS, userId);
-        }
-        else
-        {
-            if (adminAssignment is not null)
-                await _assignmentRepo.DeleteAsync(adminAssignment.Id);
-            await _groupRepo.RemoveMemberAsync(WellKnownGUIDs.GROUP_ADMINS, userId);
-        }
-    }
+    /// <summary>Keeps the admin role and the Admins group of a user in lockstep (full mirror).
+    /// Callers are responsible for the last-admin guard before revoking.</summary>
+    private Task ReconcileAdminCouplingAsync(Guid userId, bool shouldBeAdmin)
+        => _roleAssignments.ReconcileAdminCouplingAsync(userId, shouldBeAdmin);
 
     /// <summary>Whether <paramref name="userId"/> inherits a global FullAdmin role through
     /// any group it belongs to. Used to tell whether unchecking the user's OWN admin role
     /// still leaves it an admin (group-inherited authority is untouched by that edit).</summary>
-    private async Task<bool> UserInheritsGlobalAdminFromGroupAsync(Guid userId)
+    private async Task<bool> UserInheritsGlobalAdminFromGroupAsync(Guid userId, Guid? ignoreGroupId = null)
     {
         var globalAssignments = await _assignmentRepo.GetByScopeAsync(ScopeType.Global, Guid.Empty);
         var roles = (await _roleRepo.GetAllAsync()).ToDictionary(r => r.Id);
@@ -1828,7 +1773,7 @@ public class UserListViewModel
 
         foreach (var a in globalAssignments)
         {
-            if (!groupIds.Contains(a.PrincipalId)) continue;
+            if (!groupIds.Contains(a.PrincipalId) || a.PrincipalId == ignoreGroupId) continue;
             if (!roles.TryGetValue(a.RoleId, out var role) || !IsAdminRole(role)) continue;
             if ((await _groupRepo.GetMembersAsync(a.PrincipalId)).Any(m => m.Id == userId))
                 return true;

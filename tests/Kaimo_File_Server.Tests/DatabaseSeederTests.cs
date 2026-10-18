@@ -257,6 +257,85 @@ public class DatabaseSeederTests : IDisposable
         Assert.False(await db.ScopedRoleAssignments.AnyAsync(a => a.RoleId == userRoleId));      // its assignment gone
     }
 
+    // ─────────────── Global department = system-wide scope ───────────────
+
+    private async Task<(Guid DeptAssignee, Guid DuplicateAssignee, Guid RoleId, Guid ChildId)>
+        SeedLegacyGlobalDepartmentModelAsync()
+    {
+        // A pre-unification install: the Global department carries a file default and a real
+        // member, a department hangs below it, and roles were assigned "at department Global"
+        // (once alongside an equivalent system-wide row).
+        const string pw = "Passw0rd!";
+        var role = new Role(Guid.NewGuid(), "Reviewer", ManagementPermission.ViewDepartment, false);
+        var deptAssignee = new User(Guid.NewGuid(), "A", "assignee-a", _passwords.HashPassword(pw), "nt",
+            description: "", email: "", isEnabled: true, canChangePassword: true);
+        var duplicateAssignee = new User(Guid.NewGuid(), "B", "assignee-b", _passwords.HashPassword(pw), "nt",
+            description: "", email: "", isEnabled: true, canChangePassword: true);
+        var global = new Kaimo_File_Server.Core.Domain.Department.Department("Global")
+        {
+            Id = WellKnownGUIDs.DEPARTMENT_GLOBAL,
+            DefaultFilePermission = 1,
+        };
+        var child = new Kaimo_File_Server.Core.Domain.Department.Department(
+            "Sales", parentDepartmentId: WellKnownGUIDs.DEPARTMENT_GLOBAL);
+
+        _db.Roles.Add(role);
+        _db.Users.AddRange(deptAssignee, duplicateAssignee);
+        _db.Departments.AddRange(global, child);
+        _db.DepartmentUsers.Add(new Kaimo_File_Server.Core.Domain.Department.DepartmentUser(
+            WellKnownGUIDs.DEPARTMENT_GLOBAL, deptAssignee.Id));
+        _db.ScopedRoleAssignments.AddRange(
+            ScopedRoleAssignment.ForDepartment(deptAssignee.Id, role.Id, WellKnownGUIDs.DEPARTMENT_GLOBAL),
+            ScopedRoleAssignment.ForDepartment(duplicateAssignee.Id, role.Id, WellKnownGUIDs.DEPARTMENT_GLOBAL),
+            ScopedRoleAssignment.Global(duplicateAssignee.Id, role.Id));
+        await _db.SaveChangesAsync();
+
+        return (deptAssignee.Id, duplicateAssignee.Id, role.Id, child.Id);
+    }
+
+    [Fact]
+    public async Task SeedAsync_GlobalDepartmentAssignments_BecomeSystemWide()
+    {
+        var seeded = await SeedLegacyGlobalDepartmentModelAsync();
+
+        await SeedAsync(("Seed:DemoData", "false"));
+
+        using var db = _dbFactory.CreateDbContext();
+        Assert.False(await db.ScopedRoleAssignments.AnyAsync(a =>
+            a.ScopeType == ScopeType.Department && a.ScopeId == WellKnownGUIDs.DEPARTMENT_GLOBAL));
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a =>
+            a.PrincipalId == seeded.DeptAssignee && a.RoleId == seeded.RoleId && a.ScopeType == ScopeType.Global));
+        // The duplicate collapses into the already existing system-wide row.
+        Assert.Equal(1, await db.ScopedRoleAssignments.CountAsync(a =>
+            a.PrincipalId == seeded.DuplicateAssignee && a.RoleId == seeded.RoleId));
+    }
+
+    [Fact]
+    public async Task SeedAsync_GlobalDepartment_IsPurePlaceholder()
+    {
+        var seeded = await SeedLegacyGlobalDepartmentModelAsync();
+
+        await SeedAsync(("Seed:DemoData", "false"));
+
+        using var db = _dbFactory.CreateDbContext();
+        var global = await db.Departments.SingleAsync(d => d.Id == WellKnownGUIDs.DEPARTMENT_GLOBAL);
+        Assert.Null(global.DefaultFilePermission);                                        // no file defaults
+        Assert.False(await db.DepartmentUsers.AnyAsync(du => du.DepartmentId == WellKnownGUIDs.DEPARTMENT_GLOBAL)); // membership is implicit
+        Assert.Null((await db.Departments.SingleAsync(d => d.Id == seeded.ChildId)).ParentDepartmentId); // "below Global" = top level
+    }
+
+    [Fact]
+    public async Task SeedAsync_GlobalDepartmentNormalization_IsIdempotent()
+    {
+        await SeedLegacyGlobalDepartmentModelAsync();
+
+        await SeedAsync(("Seed:DemoData", "false"));
+        var countAfterFirst = await _db.ScopedRoleAssignments.CountAsync();
+        await SeedAsync(("Seed:DemoData", "false"));
+
+        Assert.Equal(countAfterFirst, await _db.ScopedRoleAssignments.CountAsync());
+    }
+
     // ─────────────── Mail notification permissions ───────────────
 
     [Fact]

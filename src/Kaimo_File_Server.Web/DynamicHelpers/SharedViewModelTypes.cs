@@ -9,13 +9,16 @@ public class CheckboxItem<T>
     public CheckboxItem(T item, bool isChecked) { Item = item; IsChecked = isChecked; }
 }
 
+/// <param name="InheritedFrom">Set when the assignment is defined on an ancestor department or
+/// on Global and only applies to the shown department by inheritance (read-only there).</param>
 public record ScopedAssignmentDisplayItem(
     Guid AssignmentId,
     string PrincipalName,
     bool IsGroup,
     string RoleName,
     ScopeType ScopeType,
-    string ScopeName);
+    string ScopeName,
+    string? InheritedFrom = null);
 
 public record PermissionGroup(string Label, List<PermissionFlag> Flags);
 public record PermissionFlag(ManagementPermission Flag, string Label);

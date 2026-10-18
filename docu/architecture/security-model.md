@@ -155,6 +155,10 @@ evaluated by `AccessRestrictionService`).
 - Roles carry a `ManagementPermission` set and are assigned through `ScopedRoleAssignment` with scope
   `Global`, `Department` or `Share`. `ManagementAuthService` and `DepartmentPermissionService`
   (`src/Kaimo_File_Server.Core/Services/`) resolve the effective permission for a scope.
+- The UI has no separate "Global" scope: assigning a role in the Global department stores
+  `ScopeType.Global` (see [domain model](domain-model.md#the-global-department)). A department
+  scope covers that department and its descendants; Global covers everything. Permissions of all
+  matching assignments are combined (union, no deny).
 
 ## Secrets and key material
 

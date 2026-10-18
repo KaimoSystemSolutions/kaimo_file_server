@@ -67,6 +67,7 @@ public class DatabaseSeeder
     {
         await CleanupDuplicatesAsync();
         await SeedGlobalDepartmentAsync();
+        await NormalizeGlobalDepartmentAsync();
         await SeedSystemGroupsAsync();
         await SeedSystemRolesAsync();
         await RetireUserRoleAsync();
@@ -195,6 +196,60 @@ public class DatabaseSeeder
 
         _logger.LogDebug(LogEvents.SeedGlobalDepartmentCreated, LogMessages.SeedGlobalDepartmentCreated,
             WellKnownGUIDs.DEPARTMENT_GLOBAL);
+    }
+
+    /// <summary>
+    /// The Global department stands for the whole system and is a pure placeholder: a role
+    /// assigned "at department Global" is a system-wide (<see cref="ScopeType.Global"/>)
+    /// assignment, every department without a parent hangs below it, and it carries no file
+    /// defaults and no explicit members. Converges installs that predate this meaning;
+    /// idempotent, runs on every startup.
+    /// </summary>
+    private async Task NormalizeGlobalDepartmentAsync()
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var globalId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
+
+        var deptScoped = await db.ScopedRoleAssignments
+            .Where(a => a.ScopeType == ScopeType.Department && a.ScopeId == globalId)
+            .ToListAsync();
+        foreach (var a in deptScoped)
+        {
+            var hasGlobalTwin = await db.ScopedRoleAssignments.AnyAsync(x =>
+                x.PrincipalId == a.PrincipalId && x.RoleId == a.RoleId
+                && x.ScopeType == ScopeType.Global && x.ScopeId == Guid.Empty);
+            if (hasGlobalTwin)
+            {
+                db.ScopedRoleAssignments.Remove(a);
+            }
+            else
+            {
+                a.ScopeType = ScopeType.Global;
+                a.ScopeId = Guid.Empty;
+            }
+        }
+
+        var children = await db.Departments.Where(d => d.ParentDepartmentId == globalId).ToListAsync();
+        foreach (var d in children)
+            d.ParentDepartmentId = null;
+
+        var global = await db.Departments.FindAsync(globalId);
+        var clearedDefault = global?.DefaultFilePermission is not null;
+        if (clearedDefault)
+            global!.DefaultFilePermission = null;
+
+        var members = await db.DepartmentUsers.Where(du => du.DepartmentId == globalId).ToListAsync();
+        db.DepartmentUsers.RemoveRange(members);
+
+        if (deptScoped.Count == 0 && children.Count == 0 && !clearedDefault && members.Count == 0)
+            return;
+
+        await db.SaveChangesAsync();
+        _logger.LogInformation(
+            "Normalized the Global department: {Assignments} assignment(s) made system-wide, " +
+            "{Children} department(s) moved to the top level, file default cleared: {Cleared}, " +
+            "{Members} explicit membership(s) removed.",
+            deptScoped.Count, children.Count, clearedDefault, members.Count);
     }
 
     // ══════════════════════════════════════════

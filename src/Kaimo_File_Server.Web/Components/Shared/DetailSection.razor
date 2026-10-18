@@ -2,6 +2,9 @@
     Titled group of properties in a detail pane (shared UI library, see DESIGN_SPEC §9.2).
     Holds <PropertyRow> children (rendered as a <dl>).
 
+    `TitleInfo` puts an explanation (usually an <InfoButton>) into the title band; clicks on it
+    never toggle the section.
+
     `Body` takes free content that is no label/value pair (a list with its own actions,
     a log excerpt, collapsible error lists); it renders below the property rows.
 
@@ -12,7 +15,13 @@
 *@
 
 <details class="detail-section-group @Class" open="@(!InitiallyCollapsed)">
-    <summary class="detail-section-title"><h4 class="detail-section-heading">@Title</h4></summary>
+    <summary class="detail-section-title">
+        <h4 class="detail-section-heading">@Title</h4>
+        @if (TitleInfo is not null)
+        {
+            <span class="detail-section-info" @onclick:preventDefault="true">@TitleInfo</span>
+        }
+    </summary>
     @if (ChildContent is not null)
     {
         <dl class="property-list">@ChildContent</dl>
@@ -31,6 +40,9 @@
 
     /// <summary><see cref="PropertyRow"/> children.</summary>
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Explanation next to the title, e.g. an <c>InfoButton</c>.</summary>
+    [Parameter] public RenderFragment? TitleInfo { get; set; }
 
     /// <summary>Free content below the property rows.</summary>
     [Parameter] public RenderFragment? Body { get; set; }

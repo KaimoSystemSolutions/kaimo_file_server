@@ -2185,7 +2185,7 @@
     <value>Keine Beschreibung</value>
   </data>
   <data name="Web_Admin_ScopedAssignments" xml:space="preserve">
-    <value>Delegierte Rollenzuweisungen</value>
+    <value>Rollenzuweisungen</value>
   </data>
   <data name="Web_Admin_GlobalRoles" xml:space="preserve">
     <value>Globale Rollen</value>
@@ -2194,19 +2194,19 @@
     <value>Gilt im gesamten System</value>
   </data>
   <data name="Web_Admin_DelegatedRoles_Hint" xml:space="preserve">
-    <value>Auf eine Abteilung oder einen Share begrenzt</value>
+    <value>Gilt in einer Abteilung samt Unterabteilungen oder in einem Share. Global gilt systemweit.</value>
   </data>
   <data name="Web_Admin_Delegated" xml:space="preserve">
     <value>Delegiert</value>
   </data>
   <data name="Web_Admin_NoDelegatedRoles" xml:space="preserve">
-    <value>Keine delegierten Rollen</value>
+    <value>Keine Rollenzuweisungen</value>
   </data>
   <data name="Web_Admin_RoleScopes_InfoLabel" xml:space="preserve">
-    <value>Informationen zu globalen und delegierten Rollen</value>
+    <value>Informationen zum Geltungsbereich von Rollen</value>
   </data>
   <data name="Web_Admin_RoleScopes_Info" xml:space="preserve">
-    <value>Globale Rollen gelten im gesamten System. Delegierte Rollen gelten nur innerhalb der angezeigten Abteilung oder des Shares. Dieselbe Rolle kann in beiden Bereichen erscheinen, weil ihr Geltungsbereich unterschiedlich ist.</value>
+    <value>Eine Rolle gilt in der Abteilung, in der sie zugewiesen ist, und in allen ihren Unterabteilungen. Global ist die oberste Abteilung und steht für das gesamte System: Dort zugewiesene Rollen gelten überall, auch für Systemeinstellungen. Rechte aus mehreren Zuweisungen addieren sich.</value>
   </data>
   <data name="Web_Admin_RemoveAssignment" xml:space="preserve">
     <value>Zuweisung entfernen</value>
@@ -2266,7 +2266,7 @@
     <value>Benutzerdefinierte Rolle</value>
   </data>
   <data name="Web_Admin_DelegatedAssignments" xml:space="preserve">
-    <value>Delegierte Zuweisungen</value>
+    <value>Zuweisungen</value>
   </data>
   <data name="Web_Admin_AddAssignment" xml:space="preserve">
     <value>Zuweisung hinzufügen</value>
@@ -2305,7 +2305,7 @@
     <value>Freigabe</value>
   </data>
   <data name="Web_Admin_ShareScopeHint" xml:space="preserve">
-    <value>Im Freigabe-Geltungsbereich wirken nur Berechtigungen, die auf eine Freigabe anwendbar sind; system- und abteilungsbezogene Berechtigungen der Rolle bleiben hier ohne Wirkung.</value>
+    <value>Nur in der gewählten Freigabe. Dort wirken nur die freigabebezogenen Rechte der Rolle; System- und Abteilungsrechte bleiben ohne Wirkung.</value>
   </data>
   <data name="Web_Common_Select" xml:space="preserve">
     <value>— Auswählen —</value>
@@ -2314,7 +2314,7 @@
     <value>Zuweisen</value>
   </data>
   <data name="Web_Admin_NoDelegatedAssignments" xml:space="preserve">
-    <value>Keine delegierten Zuweisungen</value>
+    <value>Keine Zuweisungen</value>
   </data>
   <data name="Web_Common_None" xml:space="preserve">
     <value>Keine</value>
@@ -2359,7 +2359,7 @@
     <value>Elternabteilung</value>
   </data>
   <data name="Web_Dept_NoParent" xml:space="preserve">
-    <value>— Keine (Oberste Ebene) —</value>
+    <value>— Global (oberste Ebene) —</value>
   </data>
   <data name="Web_Dept_NoDepartments" xml:space="preserve">
     <value>Keine Abteilungen vorhanden.</value>
@@ -2389,7 +2389,7 @@
     <value>Erbt von (Elternabteilung)</value>
   </data>
   <data name="Web_Dept_InheritHint" xml:space="preserve">
-    <value>Erbt Admin-Rechte und Default-Berechtigungen von der Elternabteilung.</value>
+    <value>Erbt Admin-Rechte und Default-Berechtigungen von der Elternabteilung. Ohne Elternabteilung liegt die Abteilung direkt unter Global, das nur Admin-Rechte weitergibt.</value>
   </data>
   <data name="Web_Dept_DefaultFilePerm" xml:space="preserve">
     <value>Standard-Dateiberechtigung</value>
@@ -2404,7 +2404,7 @@
     <value>Wird von Elternabteilung geerbt.</value>
   </data>
   <data name="Web_Dept_NoParentNoPerm" xml:space="preserve">
-    <value>Keine Elternabteilung — keine Default-Berechtigung.</value>
+    <value>Direkt unter Global — keine geerbte Default-Berechtigung.</value>
   </data>
   <data name="Web_Dept_Label_Members" xml:space="preserve">
     <value>Mitglieder (Benutzer)</value>
@@ -2431,7 +2431,7 @@
     <value>Erbt von</value>
   </data>
   <data name="Web_Dept_NoParentTopLevel" xml:space="preserve">
-    <value>Keine (Oberste Ebene)</value>
+    <value>Global</value>
   </data>
   <data name="Web_Dept_Label_MembersCount" xml:space="preserve">
     <value>Mitglieder ({0})</value>
@@ -7464,5 +7464,38 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   </data>
   <data name="Web_Settings_Storage_Origin_CalculatedAt" xml:space="preserve">
     <value>Berechnet {0}</value>
+  </data>
+  <data name="Web_Admin_InheritedFrom" xml:space="preserve">
+    <value>geerbt von {0}</value>
+  </data>
+  <data name="Web_Admin_GlobalScopeHint" xml:space="preserve">
+    <value>Überall, auch für Systemeinstellungen. Entspricht einer Zuweisung in der Abteilung Global.</value>
+  </data>
+  <data name="Web_Admin_SystemBitsHint" xml:space="preserve">
+    <value>Rollen mit systemweiten Rechten (z. B. Einstellungen, Logs, Backups, Mail) können nur systemweit zugewiesen werden.</value>
+  </data>
+  <data name="Web_Admin_Label_AppliesTo" xml:space="preserve">
+    <value>Gilt für</value>
+  </data>
+  <data name="Web_Admin_ScopeChoice_System" xml:space="preserve">
+    <value>Systemweit</value>
+  </data>
+  <data name="Web_Admin_ScopeInfo_Title" xml:space="preserve">
+    <value>Wo gilt die Rolle?</value>
+  </data>
+  <data name="Web_Admin_ScopeInfo_Department" xml:space="preserve">
+    <value>In der gewählten Abteilung und allen ihren Unterabteilungen.</value>
+  </data>
+  <data name="Web_Dept_GlobalPlaceholderHint" xml:space="preserve">
+    <value>Global steht für das gesamte System und umfasst alle Abteilungen. Es gibt nur Admin-Rechte weiter und hat keine eigenen Default-Dateiberechtigungen.</value>
+  </data>
+  <data name="Web_Dept_AllUsersImplicit" xml:space="preserve">
+    <value>Alle Benutzer (implizit)</value>
+  </data>
+  <data name="Web_Dept_GlobalAssignmentsHint" xml:space="preserve">
+    <value>Hier zugewiesene Rollen gelten im gesamten System, auch für Systemeinstellungen.</value>
+  </data>
+  <data name="Web_Dept_AssignmentsHint" xml:space="preserve">
+    <value>Hier zugewiesene Rollen gelten auch in allen Unterabteilungen. Zuweisungen der Elternabteilungen und von Global gelten hier ebenfalls.</value>
   </data>
 </root>

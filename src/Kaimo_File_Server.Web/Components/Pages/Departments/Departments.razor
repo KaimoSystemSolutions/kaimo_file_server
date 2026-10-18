@@ -65,7 +65,7 @@ else
                 <div class="form-group">
                     <label>@Resources.Web_Dept_Label_Parent</label>
                     <PrincipalPickerField Mode="SelectionMode.Single"
-                                          Items="VM.Departments.ToDepartmentItems()"
+                                          Items="VM.Departments.Where(d => !VM.IsGlobalDepartment(d)).ToDepartmentItems()"
                                           SelectedIds="VM.CreateParentId.AsSelection()"
                                           SelectedIdsChanged="ids => VM.CreateParentId = ids.FirstOrNull()"
                                           Title="@Resources.Web_Dept_Label_Parent"
@@ -300,10 +300,27 @@ else
 
                     <DetailSection Title="@Resources.Web_Admin_EditTab_General">
                         <PropertyRow Label="@Resources.Web_Admin_Label_Description" Value="@dept.Description" />
-                        <PropertyRow Label="@Resources.Web_Dept_Label_InheritsFromView"
-                                     Value="@(dept.ParentDepartmentId.HasValue ? VM.GetParentName(dept.ParentDepartmentId) : Resources.Web_Dept_NoParentTopLevel)" Entity="@dept.ParentDepartmentId.HasValue" />
+                        @if (!isGlobal)
+                        {
+                            @* No parent means "directly below Global", the root of every department. *@
+                            <PropertyRow Label="@Resources.Web_Dept_Label_InheritsFromView"
+                                         Value="@VM.GetParentName(dept.ParentDepartmentId)" Entity />
+                        }
                     </DetailSection>
 
+                    @if (isGlobal)
+                    {
+                        <DetailSection Title="@Resources.Web_Admin_Label_Permissions">
+                            <Body>
+                                <div class="detail-info">
+                                    @Assets.SVG("circle_info.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)"))
+                                    <span>@R("Web_Dept_GlobalPlaceholderHint")</span>
+                                </div>
+                            </Body>
+                        </DetailSection>
+                    }
+                    else
+                    {
                     <DetailSection Title="@Resources.Web_Admin_Label_Permissions">
                         <PropertyRow Label="@Resources.Web_Dept_DefaultFilePerm">
                             @if (VM.PermInfo is null || VM.PermInfo.HasNoDefault)
@@ -328,8 +345,15 @@ else
                             <PropertyRow Label="@Resources.Web_Dept_Label_InheritsFromView" Value="@inheritedFrom" Entity />
                         }
                     </DetailSection>
+                    }
 
                     <DetailSection Title="@Resources.Web_Admin_EditTab_Assignment">
+                        @if (isGlobal)
+                        {
+                            <PropertyRow Label="@Resources.Web_Dept_Label_Members" Value="@R("Web_Dept_AllUsersImplicit")" />
+                        }
+                        else
+                        {
                         <PropertyRow Label="@($"{Resources.Web_Dept_Label_Members} ({VM.Members.Count})")">
                             @if (VM.Members.Any())
                             {
@@ -345,6 +369,7 @@ else
                                 <span class="property-empty">@Resources.Web_Common_NoMembers</span>
                             }
                         </PropertyRow>
+                        }
                         <PropertyRow Label="@($"{Resources.Web_Dept_Label_AssignedGroups} ({VM.Groups.Count})")">
                             @if (VM.Groups.Any())
                             {
@@ -378,6 +403,12 @@ else
                     </DetailSection>
 
                     <DetailSection Title="@Resources.Web_Admin_ScopedAssignments">
+                        <TitleInfo>
+                            <InfoButton Title="@Resources.Web_Admin_ScopedAssignments" AriaLabel="@Resources.Web_Admin_RoleScopes_InfoLabel" IconSize="16">
+                                <p>@(isGlobal ? R("Web_Dept_GlobalAssignmentsHint") : R("Web_Dept_AssignmentsHint"))</p>
+                                <p>@Resources.Web_Admin_RoleScopes_Info</p>
+                            </InfoButton>
+                        </TitleInfo>
                         <Body>
                             @if (VM.RoleAssignments.Any())
                             {
@@ -387,9 +418,16 @@ else
                                         <div class="scoped-assignment-row">
                                             <div class="scoped-assignment-info">
                                                 <span class="scoped-assignment-principal">@a.PrincipalName</span>
-                                                <span class="scoped-assignment-scope">@a.RoleName</span>
+                                                <span class="scoped-assignment-scope">
+                                                    @a.RoleName
+                                                    @if (a.InheritedFrom is { } origin)
+                                                    {
+                                                        <StatusBadge Tone="StatusTone.Neutral" ShowDot="false" Class="scoped-assignment-badge"
+                                                                     Label="@string.Format(R("Web_Admin_InheritedFrom"), origin)" />
+                                                    }
+                                                </span>
                                             </div>
-                                            @if (VM.CanAssignRoles)
+                                            @if (VM.CanAssignRoles && a.InheritedFrom is null)
                                             {
                                                 <button class="btn-icon btn-icon--small" type="button" title="@Resources.Web_Admin_RemoveAssignment"
                                                         aria-label="@Resources.Web_Admin_RemoveAssignment" disabled="@VM.IsSaving"
@@ -411,6 +449,8 @@ else
                                 @* Scope is this department; pick role and assignee. *@
                                 <ScopedRoleAssignmentForm Roles="VM.AllRoles.ToRoleItems()"
                                                           @bind-RoleId="VM.NewAssignmentRoleId"
+                                                          RolePermissionsById="VM.AllRoles.ToDictionary(r => r.Id, r => r.ManagementPermissions)"
+                                                          ScopeType="ScopeType.Department" ScopeId="@dept.Id"
                                                           Principals="VM.AllUsers.ToAssigneeItems(VM.AllGroups)"
                                                           @bind-PrincipalId="VM.NewAssignmentPrincipalId"
                                                           Error="@VM.ErrorMessage" IsSaving="@VM.IsSaving"

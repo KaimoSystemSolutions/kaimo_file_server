@@ -46,6 +46,29 @@ Groups and shares belong to exactly one department (`DepartmentId`). The system 
 cannot be deleted. Every user is a member of Everyone; membership in Admins mirrors the global
 administrator role.
 
+### The Global department
+
+"Global" has exactly one meaning: the Global department (`WellKnownGUIDs.DEPARTMENT_GLOBAL`) stands
+for the whole system.
+
+- **Root of the hierarchy.** Every department without a `ParentDepartmentId` sits directly below
+  Global; the UI draws Global as the tree root and offers it as "no parent". No department stores
+  Global as its parent.
+- **Role scope.** A role assigned "at department Global" is stored as `ScopeType.Global` with
+  `ScopeId = Guid.Empty` (`RoleAssignmentService.Normalize`). It applies everywhere, including the
+  system-level permissions, role ACL entries, the Admins mirror and the last-admin guard. A
+  `ScopeType.Department` row never points at Global.
+- **Placeholder only.** Global passes on admin rights only: it has no `DefaultFilePermission` and no
+  explicit members. Every user belongs to it implicitly; groups and shares without a department
+  default to it.
+- **Convergence.** `DatabaseSeeder.NormalizeGlobalDepartmentAsync` rewrites older data on every
+  startup (department-scoped rows on Global, children of Global, a Global file default, Global
+  memberships).
+
+All writes of scoped role assignments go through `RoleAssignmentService`
+(`src/Kaimo_File_Server.Core/Services/`), which also applies the no-elevation gate, the Admins mirror
+and the last-admin guard. The user, role and department pages share it.
+
 ## Sharing and external storage
 
 ```mermaid

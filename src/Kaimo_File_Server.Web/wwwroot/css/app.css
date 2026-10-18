@@ -3374,7 +3374,7 @@ a.btn-tinted {
 }
 
 .scoped-assignment-principal {
-    font-size: 13px;
+    font-size: 13.5px;
     font-weight: 600;
     color: var(--text-primary);
     display: flex;
@@ -3385,11 +3385,16 @@ a.btn-tinted {
 }
 
 .scoped-assignment-scope {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--text-tertiary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.scoped-assignment-badge {
+    margin-left: var(--space-1);
+    vertical-align: middle;
 }
 
 .scoped-assignment-role {
@@ -3413,11 +3418,11 @@ a.btn-tinted {
 
 .toggle-btn {
     flex: 1;
-    padding: 6px 12px;
+    padding: 7px var(--space-3);
     border: none;
     background: transparent;
-    color: var(--text-tertiary);
-    font-size: 12px;
+    color: var(--text-secondary);
+    font-size: 13px;
     font-weight: 600;
     border-radius: var(--radius-control);
     cursor: pointer;
@@ -3433,11 +3438,17 @@ a.btn-tinted {
 .toggle-btn--active {
     background: var(--bg-secondary);
     color: var(--accent);
+    box-shadow: 0 0 0 1px var(--border);
 }
 
     .toggle-btn--active:hover {
         background: var(--bg-secondary);
         color: var(--accent);
+    }
+
+    .toggle-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 
 /* ══════════════════════════════════════════════════════════
@@ -6117,6 +6128,15 @@ input[type="radio"] {
         border-bottom: 1.5px solid currentColor;
         transform: rotate(-45deg);
         transition: transform 120ms ease;
+    }
+
+    /* Info next to the title: keeps its own typography instead of the band's micro-label look. */
+    .detail-section-info {
+        display: inline-flex;
+        align-items: center;
+        font-weight: 400;
+        letter-spacing: normal;
+        text-transform: none;
     }
 
     .detail-section-group[open] > .detail-section-title::before {

@@ -332,23 +332,59 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
     }
 
     [Fact]
-    public async Task SaveUserAsync_AssignsCheckedRoles()
+    public async Task SaveUserAsync_KeepsSystemWideRoleAssignments()
     {
+        // Roles are no longer edited in the user form; a profile save must leave the
+        // user's system-wide (Global department) assignments untouched.
         var actor = SeedUser("admin");
         var target = SeedUser("bob");
         var role = SeedRole("Reviewer");
+        var assignment = SeedGlobalAssignment(target.Id, role.Id);
         var sut = BuildGlobalAdminSut(actor);
         await sut.LoadAsync();
         await sut.SelectUserAsync(sut.Users.Single(u => u.Id == target.Id));
         await sut.StartEditUserAsync();
 
-        foreach (var r in sut.EditUserRoles)
-            r.IsChecked = r.Item.Id == role.Id;
+        sut.EditUserDescription = "changed";
         await sut.SaveUserAsync();
 
         await using var db = NewContext();
-        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a =>
-            a.PrincipalId == target.Id && a.RoleId == role.Id && a.ScopeType == ScopeType.Global));
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == assignment.Id));
+    }
+
+    [Fact]
+    public async Task CreateAssignmentAsync_GlobalDepartmentScope_IsStoredSystemWideAndListedAsGlobal()
+    {
+        var actor = SeedUser("admin");
+        var role = SeedRole("Delegate");
+        var target = SeedUser("bob");
+        SeedDepartment("Global", id: WellKnownGUIDs.DEPARTMENT_GLOBAL);
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectUserAsync(sut.Users.Single(u => u.Id == target.Id));
+
+        sut.StartAddAssignment();
+        sut.NewAssignmentRoleId = role.Id;
+        sut.NewAssignmentPrincipalId = target.Id;
+        sut.NewAssignmentScopeType = ScopeType.Department;
+        sut.NewAssignmentScopeId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
+        await sut.CreateAssignmentAsync();
+
+        Assert.Null(sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a => a.RoleId == role.Id
+            && a.PrincipalId == target.Id && a.ScopeType == ScopeType.Global));
+        Assert.Contains(sut.UserScopedAssignments, a => a.RoleName == "Delegate" && a.ScopeName == "Global");
+    }
+
+    [Fact]
+    public void StartAddAssignment_DefaultsToDepartmentScope()
+    {
+        var sut = BuildGlobalAdminSut(SeedUser("admin"));
+
+        sut.StartAddAssignment();
+
+        Assert.Equal(ScopeType.Department, sut.NewAssignmentScopeType);
     }
 
     // ═══════════════════ Save group ═══════════════════
@@ -391,6 +427,45 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
 
         await using var db = NewContext();
         Assert.Equal("Renamed Team", (await db.Groups.FindAsync(group.Id))!.Name);
+    }
+
+    // ═══════════════════ Assignment ordering ═══════════════════
+
+    [Fact]
+    public async Task RoleScopedAssignments_ListGlobalAssignmentsFirst()
+    {
+        var actor = SeedUser("admin");
+        var role = SeedRole("Delegate");
+        var aaron = SeedUser("aaron");
+        var zoe = SeedUser("zoe");
+        var dept = SeedDepartment("Engineering");
+        await ScopedRoleRepo().CreateAsync(ScopedRoleAssignment.ForDepartment(aaron.Id, role.Id, dept.Id));
+        await ScopedRoleRepo().CreateAsync(ScopedRoleAssignment.Global(zoe.Id, role.Id));
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SwitchTabAsync(AdminTab.Roles);
+
+        await sut.SelectRoleAsync(sut.Roles.Single(r => r.Id == role.Id));
+
+        Assert.Equal([zoe.Name, aaron.Name], sut.RoleScopedAssignments.Select(a => a.PrincipalName));
+    }
+
+    [Fact]
+    public async Task UserScopedAssignments_ListGlobalAssignmentsFirst()
+    {
+        var actor = SeedUser("admin");
+        var alpha = SeedRole("Alpha");
+        var zulu = SeedRole("Zulu");
+        var target = SeedUser("bob");
+        var dept = SeedDepartment("Engineering");
+        await ScopedRoleRepo().CreateAsync(ScopedRoleAssignment.ForDepartment(target.Id, alpha.Id, dept.Id));
+        await ScopedRoleRepo().CreateAsync(ScopedRoleAssignment.Global(target.Id, zulu.Id));
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+
+        await sut.SelectUserAsync(sut.Users.Single(u => u.Id == target.Id));
+
+        Assert.Equal(["Zulu", "Alpha"], sut.UserScopedAssignments.Select(a => a.RoleName));
     }
 
     // ═══════════════════ Save role ═══════════════════
@@ -647,18 +722,22 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
     }
 
     [Fact]
-    public async Task SaveUserAsync_SoleAdminUnchecksOwnAdminRole_IsBlocked()
+    public async Task SaveUserAsync_SoleAdminLeavesAdminsGroup_IsBlocked()
     {
+        // The Admins group membership is the admin switch of the user form (it mirrors the
+        // system-wide Administrator role), so leaving it as the last admin must be refused.
         var admin = SeedUser("admin");
-        var adminRole = SeedAdminRole();
+        var adminRole = SeedWellKnownAdminRole();
+        SeedGroupWithId(WellKnownGUIDs.GROUP_ADMINS, "Admins");
         var assignment = SeedGlobalAssignment(admin.Id, adminRole.Id);
+        SeedGroupMember(WellKnownGUIDs.GROUP_ADMINS, admin.Id);
 
         var sut = BuildGlobalAdminSut(admin);
         await sut.LoadAsync();
         await sut.SelectUserAsync(sut.Users.Single(u => u.Id == admin.Id));
         await sut.StartEditUserAsync();
 
-        foreach (var r in sut.EditUserRoles) r.IsChecked = false; // drop the admin role
+        foreach (var g in sut.EditUserGroups) g.IsChecked = false;
         await sut.SaveUserAsync();
 
         Assert.Equal(Resources.Web_Error_LastAdmin, sut.ErrorMessage);
@@ -667,20 +746,23 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
     }
 
     [Fact]
-    public async Task SaveUserAsync_SecondAdminExists_CanUncheckOwnAdminRole()
+    public async Task SaveUserAsync_SecondAdminExists_LeavingAdminsGroupRevokesAdminRole()
     {
         var admin = SeedUser("admin");
         var admin2 = SeedUser("admin2");
-        var adminRole = SeedAdminRole();
+        var adminRole = SeedWellKnownAdminRole();
+        SeedGroupWithId(WellKnownGUIDs.GROUP_ADMINS, "Admins");
         var ownAssignment = SeedGlobalAssignment(admin.Id, adminRole.Id);
+        SeedGroupMember(WellKnownGUIDs.GROUP_ADMINS, admin.Id);
         SeedGlobalAssignment(admin2.Id, adminRole.Id);
+        SeedGroupMember(WellKnownGUIDs.GROUP_ADMINS, admin2.Id);
 
         var sut = BuildGlobalAdminSut(admin);
         await sut.LoadAsync();
         await sut.SelectUserAsync(sut.Users.Single(u => u.Id == admin.Id));
         await sut.StartEditUserAsync();
 
-        foreach (var r in sut.EditUserRoles) r.IsChecked = false;
+        foreach (var g in sut.EditUserGroups) g.IsChecked = false;
         await sut.SaveUserAsync();
 
         Assert.NotEqual(Resources.Web_Error_LastAdmin, sut.ErrorMessage);
@@ -767,10 +849,10 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
     }
 
     [Fact]
-    public async Task SaveUserAsync_AdminInheritedFromGroup_UncheckingOwnRolesIsAllowed()
+    public async Task SaveUserAsync_AdminInheritedFromGroup_PlainSaveIsAllowed()
     {
-        // The user is a global admin ONLY through group membership. Unchecking their own
-        // (empty) direct roles must NOT be blocked — the group-inherited admin survives.
+        // The user is a global admin ONLY through group membership. A plain profile save
+        // must NOT be blocked — the group-inherited admin survives.
         var admin = SeedUser("admin");
         var adminRole = SeedAdminRole();
         var adminGroup = SeedGroup("Admins");
@@ -782,7 +864,7 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
         await sut.SelectUserAsync(sut.Users.Single(u => u.Id == admin.Id));
         await sut.StartEditUserAsync();
 
-        foreach (var r in sut.EditUserRoles) r.IsChecked = false;
+        sut.EditUserDescription = "changed";
         await sut.SaveUserAsync();
 
         Assert.NotEqual(Resources.Web_Error_LastAdmin, sut.ErrorMessage);
@@ -810,7 +892,7 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
     }
 
     [Fact]
-    public async Task SaveUserAsync_GrantAdminRole_AddsUserToAdminsGroup()
+    public async Task SaveUserAsync_JoinAdminsGroup_GrantsAdminRole()
     {
         var actor = SeedUser("admin");
         var adminRole = SeedWellKnownAdminRole();
@@ -821,12 +903,12 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
         await sut.LoadAsync();
         await sut.SelectUserAsync(sut.Users.Single(u => u.Id == target.Id));
         await sut.StartEditUserAsync();
-        foreach (var r in sut.EditUserRoles) r.IsChecked = r.Item.Id == adminRole.Id;
+        foreach (var g in sut.EditUserGroups) g.IsChecked = g.Item.Id == WellKnownGUIDs.GROUP_ADMINS;
         await sut.SaveUserAsync();
 
         await using var db = NewContext();
-        Assert.True(await db.UserGroups.AnyAsync(
-            ug => ug.UserId == target.Id && ug.GroupId == WellKnownGUIDs.GROUP_ADMINS));
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a => a.PrincipalId == target.Id
+            && a.RoleId == adminRole.Id && a.ScopeType == ScopeType.Global));
     }
 
     [Fact]

@@ -133,6 +133,7 @@
                                     {
                                         <ScopedRoleAssignmentForm Principals="VM.AllUsers.ToAssigneeItems(VM.AllGroups)"
                                                                   @bind-PrincipalId="VM.NewAssignmentPrincipalId"
+                                                                  RolePermissions="@role.ManagementPermissions"
                                                                   Departments="VM.AllDepartments.ToDepartmentItems()"
                                                                   Shares="ShareItems()"
                                                                   @bind-ScopeType="VM.NewAssignmentScopeType"
@@ -149,7 +150,9 @@
                                                 <div class="scoped-assignment-row">
                                                     <div class="scoped-assignment-info">
                                                         <span class="scoped-assignment-principal">@a.PrincipalName</span>
-                                                        <span class="scoped-assignment-scope">@FormatScopeType(a.ScopeType): @a.ScopeName</span>
+                                                        <span class="scoped-assignment-scope">
+                                                            @FormatScopeType(a.ScopeType): @a.ScopeName
+                                                        </span>
                                                     </div>
                                                     @if (VM.CanManageRoles)
                                                     {
@@ -211,5 +214,8 @@
     private async Task StartAddAssignment() { VM.StartAddAssignment(); await VM.LoadAssignmentFormDataAsync(); StateHasChanged(); }
     private async Task CreateAssignment() { await VM.CreateAssignmentAsync(); StateHasChanged(); }
     private async Task DeleteAssignment(Guid id) { await VM.DeleteAssignmentAsync(id); StateHasChanged(); }
-    private static string FormatScopeType(ScopeType type) => type switch { ScopeType.Global => Resources.Web_Admin_ScopeType_Global, ScopeType.Department => Resources.Web_Admin_ScopeType_Department, ScopeType.Share => Resources.Web_Admin_ScopeType_Share, _ => type.ToString() };
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
+    // Global is shown as what it is to the user: the topmost department.
+    private static string FormatScopeType(ScopeType type) => type switch { ScopeType.Global => R("Web_Admin_ScopeChoice_System"), ScopeType.Department => Resources.Web_Admin_ScopeType_Department, ScopeType.Share => Resources.Web_Admin_ScopeType_Share, _ => type.ToString() };
 }

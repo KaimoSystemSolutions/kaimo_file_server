@@ -82,7 +82,7 @@
 
                                 @if (node.HasChildren)
                                 {
-                                    var childCount = VM.Departments.Count(d => d.ParentDepartmentId == dept.Id);
+                                    var childCount = VM.GetChildCount(dept);
                                     <span class="dept-tree-badge" title="@string.Format(Resources.Web_Dept_SubdepartmentCount, childCount)">@childCount</span>
                                 }
                             </div>
