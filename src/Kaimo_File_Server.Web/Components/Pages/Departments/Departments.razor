@@ -377,6 +377,57 @@ else
                         </PropertyRow>
                     </DetailSection>
 
+                    <DetailSection Title="@Resources.Web_Admin_ScopedAssignments">
+                        <Body>
+                            @if (VM.RoleAssignments.Any())
+                            {
+                                <div class="scoped-assignments-list">
+                                    @foreach (var a in VM.RoleAssignments)
+                                    {
+                                        <div class="scoped-assignment-row">
+                                            <div class="scoped-assignment-info">
+                                                <span class="scoped-assignment-principal">@a.PrincipalName</span>
+                                                <span class="scoped-assignment-scope">@a.RoleName</span>
+                                            </div>
+                                            @if (VM.CanAssignRoles)
+                                            {
+                                                <button class="btn-icon btn-icon--small" type="button" title="@Resources.Web_Admin_RemoveAssignment"
+                                                        aria-label="@Resources.Web_Admin_RemoveAssignment" disabled="@VM.IsSaving"
+                                                        @onclick="() => DeleteAssignment(a.AssignmentId)">
+                                                    @Assets.SVG("cross.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--danger)", StrokeWidth: 2f))
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else if (!VM.IsAddingAssignment)
+                            {
+                                <span class="property-empty">@Resources.Web_Admin_NoDelegatedAssignments</span>
+                            }
+
+                            @if (VM.IsAddingAssignment)
+                            {
+                                @* Scope is this department; pick role and assignee. *@
+                                <ScopedRoleAssignmentForm Roles="VM.AllRoles.ToRoleItems()"
+                                                          @bind-RoleId="VM.NewAssignmentRoleId"
+                                                          Principals="VM.AllUsers.ToAssigneeItems(VM.AllGroups)"
+                                                          @bind-PrincipalId="VM.NewAssignmentPrincipalId"
+                                                          Error="@VM.ErrorMessage" IsSaving="@VM.IsSaving"
+                                                          OnSubmit="CreateAssignment" OnCancel="CancelAddAssignment" />
+                            }
+                            else if (VM.CanAssignRoles)
+                            {
+                                <div>
+                                    <button class="btn-secondary btn-secondary--sm" type="button" @onclick="StartAddAssignment">
+                                        @Assets.SVG("plus.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2f))
+                                        <span>@Resources.Web_Admin_AddAssignment</span>
+                                    </button>
+                                </div>
+                            }
+                        </Body>
+                    </DetailSection>
+
                     @if (VM.IsConfirmingDelete && VM.CanDelete && !isGlobal)
                     {
                         <div class="modal-backdrop" @onclick="() => VM.IsConfirmingDelete = false">

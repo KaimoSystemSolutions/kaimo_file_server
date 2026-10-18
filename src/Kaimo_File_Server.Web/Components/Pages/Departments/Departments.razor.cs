@@ -16,6 +16,10 @@ public partial class Departments
     private void ToggleCollapse(Guid id) { VM.ToggleCollapse(id); StateHasChanged(); }
     private async Task HandleCreateKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await Create(); }
     private void SwitchTab(DepartmentDetailTab tab) { _activeTab = tab; }
+    private async Task StartAddAssignment() { await VM.StartAddAssignmentAsync(); StateHasChanged(); }
+    private void CancelAddAssignment() { VM.CancelAddAssignment(); StateHasChanged(); }
+    private async Task CreateAssignment() { await VM.CreateAssignmentAsync(); StateHasChanged(); }
+    private async Task DeleteAssignment(Guid id) { await VM.DeleteAssignmentAsync(id); StateHasChanged(); }
 }
 
 internal enum DepartmentDetailTab

@@ -1,0 +1,131 @@
+@*
+    Inline form for adding a scoped role assignment ("principal X gets role Y within scope Z").
+    Used on the role detail (role fixed), the user detail (principal fixed) and the department
+    detail (scope fixed). Each part is shown only when its items are supplied; a fixed part is
+    left out and its value is set by the caller. Pure presentation: validation and the
+    authorization gate stay in the owning ViewModel.
+*@
+@inherits AppComponentBase
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Security
+@using Kaimo_File_Server.Web.DynamicHelpers
+
+<div class="assignment-form">
+    @if (Roles is not null)
+    {
+        <div class="form-group">
+            <label>@Resources.Web_Admin_Label_Role</label>
+            <PrincipalPickerField Mode="SelectionMode.Single"
+                                  Items="Roles"
+                                  SelectedIds="RoleId.AsSelection()"
+                                  SelectedIdsChanged="ids => RoleIdChanged.InvokeAsync(ids.FirstOrNull())"
+                                  Title="@Resources.Web_Admin_Label_Role"
+                                  Placeholder="@Resources.Web_Common_Select" />
+        </div>
+    }
+    @if (Principals is not null)
+    {
+        <div class="form-group">
+            <label>@Resources.Web_Admin_AssignTo</label>
+            <PrincipalPickerField Mode="SelectionMode.Single"
+                                  Items="Principals"
+                                  SelectedIds="PrincipalId.AsSelection()"
+                                  SelectedIdsChanged="ids => PrincipalIdChanged.InvokeAsync(ids.FirstOrNull())"
+                                  Title="@Resources.Web_Admin_AssignTo"
+                                  Placeholder="@Resources.Web_Common_Select" />
+        </div>
+    }
+    @if (Departments is not null)
+    {
+        <div class="form-group">
+            <label>@Resources.Web_Admin_Label_Scope</label>
+            <select class="edit-input" value="@ScopeType.ToString()" @onchange="OnScopeTypeChanged">
+                @if (AllowGlobal)
+                {
+                    <option value="Global">@Resources.Web_Admin_Scope_Global</option>
+                }
+                <option value="Department">@Resources.Web_Admin_Scope_Department</option>
+                @if (Shares is not null)
+                {
+                    <option value="Share">@Resources.Web_Admin_Scope_Share</option>
+                }
+            </select>
+        </div>
+        @if (ScopeType == ScopeType.Department)
+        {
+            <div class="form-group">
+                <label>@Resources.Web_Admin_Label_Department</label>
+                <PrincipalPickerField Mode="SelectionMode.Single"
+                                      Items="Departments"
+                                      SelectedIds="ScopeId.AsSelection()"
+                                      SelectedIdsChanged="ids => ScopeIdChanged.InvokeAsync(ids.FirstOrNull())"
+                                      Title="@Resources.Web_Admin_Label_Department"
+                                      Placeholder="@Resources.Web_Common_Select" />
+            </div>
+        }
+        else if (ScopeType == ScopeType.Share && Shares is not null)
+        {
+            <div class="form-group">
+                <label>@Resources.Web_Admin_Label_Share</label>
+                <PrincipalPickerField Mode="SelectionMode.Single"
+                                      Items="Shares"
+                                      SelectedIds="ScopeId.AsSelection()"
+                                      SelectedIdsChanged="ids => ScopeIdChanged.InvokeAsync(ids.FirstOrNull())"
+                                      Title="@Resources.Web_Admin_Label_Share"
+                                      Placeholder="@Resources.Web_Common_Select" />
+            </div>
+            <div class="detail-info">
+                @Assets.SVG("circle_info.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)"))
+                <span>@Resources.Web_Admin_ShareScopeHint</span>
+            </div>
+        }
+    }
+    @if (Error is not null)
+    {
+        <div class="error-banner">@Error</div>
+    }
+    <div class="create-form-actions">
+        <button class="btn-primary" type="button" @onclick="OnSubmit" disabled="@IsSaving">
+            @(IsSaving ? Resources.Web_Common_Saving : Resources.Web_Common_Assign)
+        </button>
+        <button class="btn-secondary" type="button" @onclick="OnCancel" disabled="@IsSaving">@Resources.Web_Common_Cancel</button>
+    </div>
+</div>
+
+@code {
+    /// <summary>Selectable roles; null when the role is fixed by the caller.</summary>
+    [Parameter] public IReadOnlyList<PrincipalPickerItem>? Roles { get; set; }
+    [Parameter] public Guid? RoleId { get; set; }
+    [Parameter] public EventCallback<Guid?> RoleIdChanged { get; set; }
+
+    /// <summary>Selectable users and groups; null when the principal is fixed by the caller.</summary>
+    [Parameter] public IReadOnlyList<PrincipalPickerItem>? Principals { get; set; }
+    [Parameter] public Guid? PrincipalId { get; set; }
+    [Parameter] public EventCallback<Guid?> PrincipalIdChanged { get; set; }
+
+    /// <summary>Selectable departments; null hides the whole scope part (scope fixed by the caller).</summary>
+    [Parameter] public IReadOnlyList<PrincipalPickerItem>? Departments { get; set; }
+
+    /// <summary>Selectable shares; null hides the Share scope option.</summary>
+    [Parameter] public IReadOnlyList<PrincipalPickerItem>? Shares { get; set; }
+
+    /// <summary>Offer the Global scope option.</summary>
+    [Parameter] public bool AllowGlobal { get; set; } = true;
+
+    [Parameter] public ScopeType ScopeType { get; set; }
+    [Parameter] public EventCallback<ScopeType> ScopeTypeChanged { get; set; }
+    [Parameter] public Guid? ScopeId { get; set; }
+    [Parameter] public EventCallback<Guid?> ScopeIdChanged { get; set; }
+
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public EventCallback OnSubmit { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    // Switching the scope type invalidates the chosen scope object.
+    private async Task OnScopeTypeChanged(ChangeEventArgs e)
+    {
+        await ScopeTypeChanged.InvokeAsync(Enum.TryParse<ScopeType>(e.Value?.ToString(), out var st) ? st : ScopeType.Global);
+        await ScopeIdChanged.InvokeAsync(null);
+    }
+}

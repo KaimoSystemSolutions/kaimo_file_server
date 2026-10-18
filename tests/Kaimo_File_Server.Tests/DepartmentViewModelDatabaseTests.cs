@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Domain.Department;
+﻿using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
@@ -36,8 +36,14 @@ public class DepartmentViewModelDatabaseTests : DatabaseTestBase
                 It.IsAny<UserContext>(), It.IsAny<Guid>(), ManagementPermission.EditDepartment))
             .ReturnsAsync(true);
 
+        _mgmtAuth.Setup(m => m.HasAnyPermissionAsync(It.IsAny<UserContext>(), ManagementPermission.AssignRoles))
+            .ReturnsAsync(true);
+        _mgmtAuth.Setup(m => m.CanAssignRoleAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>(),
+                It.IsAny<ScopeType>(), It.IsAny<Guid>()))
+            .ReturnsAsync(true);
+
         return new DepartmentViewModel(
-            DepartmentRepo(), UserRepo(), GroupRepo(), ShareRepo(), RoleRepo(),
+            DepartmentRepo(), UserRepo(), GroupRepo(), ShareRepo(), RoleRepo(), ScopedRoleRepo(),
             _mgmtAuth.Object,
             UserContextFactoryFor((actor.Username, ctx)).Object,
             AuthStateFor(actor.Username),
@@ -225,5 +231,123 @@ public class DepartmentViewModelDatabaseTests : DatabaseTestBase
         Assert.NotNull(sut.ErrorMessage);
         await using var db = NewContext();
         Assert.True(await db.Departments.AnyAsync(d => d.Id == WellKnownGUIDs.DEPARTMENT_GLOBAL));
+    }
+    // ─────────────────────── Department-scoped role assignments ───────────────────────
+
+    private Role SeedRole(string name, ManagementPermission perms = ManagementPermission.None)
+    {
+        var role = new Role(Guid.NewGuid(), name, perms, false);
+        using var db = NewContext();
+        db.Roles.Add(role);
+        db.SaveChanges();
+        return role;
+    }
+
+    [Fact]
+    public async Task CreateAssignmentAsync_PersistsDepartmentScopedAssignmentAndListsIt()
+    {
+        var actor = SeedUser("admin");
+        var dept = SeedDepartment("Engineering");
+        var role = SeedRole("DeptAdmin");
+        var principal = SeedUser("bob");
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == dept.Id));
+
+        await sut.StartAddAssignmentAsync();
+        sut.NewAssignmentRoleId = role.Id;
+        sut.NewAssignmentPrincipalId = principal.Id;
+        await sut.CreateAssignmentAsync();
+
+        Assert.Null(sut.ErrorMessage);
+        Assert.False(sut.IsAddingAssignment);
+        await using var db = NewContext();
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a => a.RoleId == role.Id
+            && a.PrincipalId == principal.Id && a.ScopeType == ScopeType.Department && a.ScopeId == dept.Id));
+        Assert.Contains(sut.RoleAssignments, a => a.RoleName == "DeptAdmin" && a.PrincipalName == principal.Name);
+    }
+
+    [Fact]
+    public async Task CreateAssignmentAsync_WithoutAssignAuthorityAtDepartment_IsBlocked()
+    {
+        var actor = SeedUser("admin");
+        var dept = SeedDepartment("Engineering");
+        var role = SeedRole("DeptAdmin");
+        var principal = SeedUser("bob");
+        var sut = BuildGlobalAdminSut(actor);
+        _mgmtAuth.Setup(m => m.CanAssignRoleAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>(),
+                ScopeType.Department, dept.Id))
+            .ReturnsAsync(false);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == dept.Id));
+
+        await sut.StartAddAssignmentAsync();
+        sut.NewAssignmentRoleId = role.Id;
+        sut.NewAssignmentPrincipalId = principal.Id;
+        await sut.CreateAssignmentAsync();
+
+        Assert.NotNull(sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.False(await db.ScopedRoleAssignments.AnyAsync(a => a.PrincipalId == principal.Id));
+    }
+
+    [Fact]
+    public async Task CreateAssignmentAsync_MissingRoleOrPrincipal_SetsError()
+    {
+        var actor = SeedUser("admin");
+        var dept = SeedDepartment("Engineering");
+        var principal = SeedUser("bob");
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == dept.Id));
+
+        await sut.StartAddAssignmentAsync();
+        sut.NewAssignmentPrincipalId = principal.Id;
+        await sut.CreateAssignmentAsync();
+        Assert.NotNull(sut.ErrorMessage);
+
+        await using var db = NewContext();
+        Assert.False(await db.ScopedRoleAssignments.AnyAsync(a => a.PrincipalId == principal.Id));
+    }
+
+    [Fact]
+    public async Task DeleteAssignmentAsync_RemovesDepartmentAssignment()
+    {
+        var actor = SeedUser("admin");
+        var dept = SeedDepartment("Engineering");
+        var role = SeedRole("DeptAdmin");
+        var principal = SeedUser("bob");
+        var assignment = ScopedRoleAssignment.ForDepartment(principal.Id, role.Id, dept.Id);
+        await ScopedRoleRepo().CreateAsync(assignment);
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == dept.Id));
+        Assert.Single(sut.RoleAssignments);
+
+        await sut.DeleteAssignmentAsync(assignment.Id);
+
+        Assert.Empty(sut.RoleAssignments);
+        await using var db = NewContext();
+        Assert.False(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == assignment.Id));
+    }
+
+    [Fact]
+    public async Task DeleteAssignmentAsync_AssignmentOfOtherScope_IsRejected()
+    {
+        var actor = SeedUser("admin");
+        var dept = SeedDepartment("Engineering");
+        var role = SeedRole("Global");
+        var principal = SeedUser("bob");
+        var assignment = ScopedRoleAssignment.Global(principal.Id, role.Id);
+        await ScopedRoleRepo().CreateAsync(assignment);
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectAsync(sut.Departments.Single(d => d.Id == dept.Id));
+
+        await sut.DeleteAssignmentAsync(assignment.Id);
+
+        Assert.NotNull(sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == assignment.Id));
     }
 }

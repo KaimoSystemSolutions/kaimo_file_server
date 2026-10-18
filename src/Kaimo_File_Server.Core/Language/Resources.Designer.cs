@@ -826,6 +826,24 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Role ähnelt.
+        /// </summary>
+        public static string Web_Admin_Label_Role {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Role", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Please select a role. ähnelt.
+        /// </summary>
+        public static string Web_Error_SelectRole {
+            get {
+                return ResourceManager.GetString("Web_Error_SelectRole", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Assign to ähnelt.
         /// </summary>
         public static string Web_Admin_AssignTo {

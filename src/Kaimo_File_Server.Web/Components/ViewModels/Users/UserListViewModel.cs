@@ -346,6 +346,11 @@ public class UserListViewModel
     public Guid? NewAssignmentScopeId { get; set; }
     public Guid? NewAssignmentPrincipalId { get; set; }
     public bool NewAssignmentPrincipalIsGroup { get; set; }
+
+    /// <summary>The role to assign. Preset to the selected role on the role detail; chosen
+    /// in the form when the assignment is started from a user profile.</summary>
+    public Guid? NewAssignmentRoleId { get; set; }
+    public List<Role> AllRoles { get; private set; } = [];
     public List<User> AllUsers { get; private set; } = [];
     public List<Group> AllGroups { get; private set; } = [];
 
@@ -1246,6 +1251,7 @@ public class UserListViewModel
         NewAssignmentScopeId = null;
         NewAssignmentPrincipalId = null;
         NewAssignmentPrincipalIsGroup = false;
+        NewAssignmentRoleId = SelectedRole?.Id;
         ErrorMessage = null;
     }
 
@@ -1257,6 +1263,7 @@ public class UserListViewModel
 
     public async Task LoadAssignmentFormDataAsync()
     {
+        AllRoles = (await _roleRepo.GetAllAsync()).OrderBy(r => r.Name).ToList();
         AllUsers = (await _userRepo.GetAllAsync()).OrderBy(u => u.Name).ToList();
         AllGroups = (await _groupRepo.GetAllAsync()).OrderBy(g => g.Name).ToList();
         AllShares = (await _shareRepo.GetAllAsync()).OrderBy(s => s.Name).ToList();
@@ -1264,8 +1271,11 @@ public class UserListViewModel
 
     public async Task CreateAssignmentAsync()
     {
-        if (SelectedRole is null || _actorContext is null) return;
+        if (_actorContext is null) return;
 
+        var role = NewAssignmentRoleId is { } roleId ? await _roleRepo.GetByIdAsync(roleId) : null;
+        if (role is null)
+        { ErrorMessage = Resources.Web_Error_SelectRole; return; }
         if (NewAssignmentPrincipalId is null)
         { ErrorMessage = Resources.Web_Error_SelectUserOrGroup; return; }
         if (NewAssignmentScopeType != ScopeType.Global && NewAssignmentScopeId is null)
@@ -1278,7 +1288,7 @@ public class UserListViewModel
         // and may not grant a role carrying any permission the actor lacks there. This blocks
         // the escalation where a narrowly-scoped delegate assigns e.g. Administrator globally.
         if (!await _mgmtAuth.CanAssignRoleAsync(
-                _actorContext, SelectedRole.ManagementPermissions, NewAssignmentScopeType, scopeId))
+                _actorContext, role.ManagementPermissions, NewAssignmentScopeType, scopeId))
         { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
@@ -1287,16 +1297,17 @@ public class UserListViewModel
             ErrorMessage = null;
 
             await _assignmentRepo.CreateAsync(new ScopedRoleAssignment(
-                NewAssignmentPrincipalId.Value, SelectedRole.Id, NewAssignmentScopeType, scopeId));
+                NewAssignmentPrincipalId.Value, role.Id, NewAssignmentScopeType, scopeId));
 
             // Granting the global admin role to a USER also puts them in the Admins group.
             // (A group principal keeps the existing group-inheritance path, untouched.)
-            if (NewAssignmentScopeType == ScopeType.Global && IsAdminRole(SelectedRole)
+            if (NewAssignmentScopeType == ScopeType.Global && IsAdminRole(role)
                 && await _userRepo.GetByIdAsync(NewAssignmentPrincipalId.Value) is not null)
                 await ReconcileAdminCouplingAsync(NewAssignmentPrincipalId.Value, true);
 
             IsAddingAssignment = false;
-            await LoadRoleScopedAssignmentsAsync(SelectedRole.Id);
+            if (SelectedRole is not null) await LoadRoleScopedAssignmentsAsync(SelectedRole.Id);
+            if (SelectedUser is not null) await LoadUserScopedAssignmentsAsync(SelectedUser.Id);
             SuccessMessage = Resources.Web_Assignment_Created;
         }
         catch (Exception ex)

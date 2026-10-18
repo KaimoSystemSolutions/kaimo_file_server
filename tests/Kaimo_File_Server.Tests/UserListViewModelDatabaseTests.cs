@@ -511,6 +511,67 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
         Assert.False(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == assignment.Id));
     }
 
+    [Fact]
+    public async Task CreateAssignmentAsync_FromUserProfile_PersistsChosenRoleAndRefreshesList()
+    {
+        var actor = SeedUser("admin");
+        var role = SeedRole("Delegate");
+        var target = SeedUser("bob");
+        var dept = SeedDepartment("Engineering");
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectUserAsync(sut.Users.Single(u => u.Id == target.Id));
+
+        sut.StartAddAssignment();
+        sut.NewAssignmentRoleId = role.Id;
+        sut.NewAssignmentPrincipalId = target.Id;
+        sut.NewAssignmentScopeType = ScopeType.Department;
+        sut.NewAssignmentScopeId = dept.Id;
+        await sut.CreateAssignmentAsync();
+
+        Assert.Null(sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a => a.RoleId == role.Id
+            && a.PrincipalId == target.Id && a.ScopeType == ScopeType.Department && a.ScopeId == dept.Id));
+        Assert.Contains(sut.UserScopedAssignments, a => a.RoleName == "Delegate" && a.ScopeName == "Engineering");
+    }
+
+    [Fact]
+    public async Task CreateAssignmentAsync_NoRoleSelectedOrSelectable_SetsErrorAndPersistsNothing()
+    {
+        var actor = SeedUser("admin");
+        var target = SeedUser("bob");
+        var dept = SeedDepartment("Engineering");
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectUserAsync(sut.Users.Single(u => u.Id == target.Id));
+
+        sut.StartAddAssignment();
+        sut.NewAssignmentPrincipalId = target.Id;
+        sut.NewAssignmentScopeType = ScopeType.Department;
+        sut.NewAssignmentScopeId = dept.Id;
+        await sut.CreateAssignmentAsync();
+
+        Assert.Equal(Kaimo_File_Server.Core.Language.Resources.Web_Error_SelectRole, sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.False(await db.ScopedRoleAssignments.AnyAsync(a => a.PrincipalId == target.Id));
+    }
+
+    [Fact]
+    public async Task StartAddAssignment_OnRoleDetail_PreselectsThatRole()
+    {
+        var actor = SeedUser("admin");
+        var role = SeedRole("Delegate");
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SwitchTabAsync(AdminTab.Roles);
+        await sut.SelectRoleAsync(sut.Roles.Single(r => r.Id == role.Id));
+
+        sut.StartAddAssignment();
+
+        Assert.Equal(role.Id, sut.NewAssignmentRoleId);
+    }
+
     // ═══════════════════ Group list scope filtering ═══════════════════
 
     [Fact]

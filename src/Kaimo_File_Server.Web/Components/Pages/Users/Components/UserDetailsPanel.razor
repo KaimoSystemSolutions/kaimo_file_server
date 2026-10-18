@@ -359,9 +359,32 @@
                         }
                     </div>
                 }
-                else
+                else if (!VM.IsAddingAssignment)
                 {
                     <span class="property-empty">@Resources.Web_Admin_NoDelegatedRoles</span>
+                }
+
+                @if (VM.IsAddingAssignment)
+                {
+                    @* Principal is this user; Global roles are edited in the user form, so only delegated scopes here. *@
+                    <ScopedRoleAssignmentForm Roles="VM.AllRoles.ToRoleItems()"
+                                              @bind-RoleId="VM.NewAssignmentRoleId"
+                                              Departments="VM.AllDepartments.ToDepartmentItems()"
+                                              Shares="ShareItems()"
+                                              AllowGlobal="false"
+                                              @bind-ScopeType="VM.NewAssignmentScopeType"
+                                              @bind-ScopeId="VM.NewAssignmentScopeId"
+                                              Error="@VM.ErrorMessage" IsSaving="@VM.IsSaving"
+                                              OnSubmit="CreateAssignment" OnCancel="() => VM.CancelAddAssignment()" />
+                }
+                else if (VM.CanManageRoles)
+                {
+                    <div>
+                        <button class="btn-secondary btn-secondary--sm" type="button" @onclick="StartAddAssignment">
+                            @Icons.SVG("plus.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2f))
+                            <span>@Resources.Web_Admin_AddAssignment</span>
+                        </button>
+                    </div>
                 }
             </Body>
         </DetailSection>
@@ -531,6 +554,17 @@
     private void CancelEdit() { VM.CancelEdit(); StateHasChanged(); }
     private async Task ConfirmDeleteUser() { await VM.ConfirmDeleteUserAsync(); await OnChanged.InvokeAsync(); }
     private async Task DeleteAssignment(Guid id) { await VM.DeleteAssignmentAsync(id); StateHasChanged(); }
+    private async Task StartAddAssignment()
+    {
+        VM.StartAddAssignment();
+        VM.NewAssignmentPrincipalId = VM.SelectedUser?.Id;
+        VM.NewAssignmentScopeType = ScopeType.Department;
+        await VM.LoadAssignmentFormDataAsync();
+        StateHasChanged();
+    }
+    private async Task CreateAssignment() { await VM.CreateAssignmentAsync(); StateHasChanged(); }
+    private IReadOnlyList<PrincipalPickerItem> ShareItems() =>
+        VM.AllShares.Select(s => new PrincipalPickerItem(s.Id, s.Name, PrincipalKind.Share)).ToList();
     private static string DisplayName(string? name, string username) => string.IsNullOrWhiteSpace(name) ? username : name;
     private static string FormatScopeType(ScopeType type) => type switch { ScopeType.Global => Resources.Web_Admin_ScopeType_Global, ScopeType.Department => Resources.Web_Admin_ScopeType_Department, ScopeType.Share => Resources.Web_Admin_ScopeType_Share, _ => type.ToString() };
 }

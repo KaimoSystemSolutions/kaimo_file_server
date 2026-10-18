@@ -131,63 +131,14 @@
                                 <Body>
                                     @if (VM.IsAddingAssignment)
                                     {
-                                        <div class="assignment-form">
-                                            <div class="form-group">
-                                                <label>@Resources.Web_Admin_AssignTo</label>
-                                                <PrincipalPickerField Mode="SelectionMode.Single"
-                                                                      Items="AssigneeItems()"
-                                                                      SelectedIds="VM.NewAssignmentPrincipalId.AsSelection()"
-                                                                      SelectedIdsChanged="OnAssigneePicked"
-                                                                      Title="@Resources.Web_Admin_AssignTo"
-                                                                      Placeholder="@Resources.Web_Common_Select" />
-                                            </div>
-                                            <div class="form-group">
-                                                <label>@Resources.Web_Admin_Label_Scope</label>
-                                                <select class="edit-input" @bind="SelectedScopeTypeString">
-                                                    <option value="Global">@Resources.Web_Admin_Scope_Global</option>
-                                                    <option value="Department">@Resources.Web_Admin_Scope_Department</option>
-                                                    <option value="Share">@Resources.Web_Admin_Scope_Share</option>
-                                                </select>
-                                            </div>
-                                            @if (VM.NewAssignmentScopeType == ScopeType.Department)
-                                            {
-                                                <div class="form-group">
-                                                    <label>@Resources.Web_Admin_Label_Department</label>
-                                                    <PrincipalPickerField Mode="SelectionMode.Single"
-                                                                          Items="VM.AllDepartments.ToDepartmentItems()"
-                                                                          SelectedIds="VM.NewAssignmentScopeId.AsSelection()"
-                                                                          SelectedIdsChanged="ids => VM.NewAssignmentScopeId = ids.FirstOrNull()"
-                                                                          Title="@Resources.Web_Admin_Label_Department"
-                                                                          Placeholder="@Resources.Web_Common_Select" />
-                                                </div>
-                                            }
-                                            else if (VM.NewAssignmentScopeType == ScopeType.Share)
-                                            {
-                                                <div class="form-group">
-                                                    <label>@Resources.Web_Admin_Label_Share</label>
-                                                    <PrincipalPickerField Mode="SelectionMode.Single"
-                                                                          Items="ShareItems()"
-                                                                          SelectedIds="VM.NewAssignmentScopeId.AsSelection()"
-                                                                          SelectedIdsChanged="ids => VM.NewAssignmentScopeId = ids.FirstOrNull()"
-                                                                          Title="@Resources.Web_Admin_Label_Share"
-                                                                          Placeholder="@Resources.Web_Common_Select" />
-                                                </div>
-                                                <div class="detail-info">
-                                                    @Icons.SVG("circle_info.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)"))
-                                                    <span>@Resources.Web_Admin_ShareScopeHint</span>
-                                                </div>
-                                            }
-                                            @if (VM.ErrorMessage is not null)
-                                            {
-                                                <div class="error-banner">@VM.ErrorMessage</div>
-                                            }
-                                            <div class="create-form-actions">
-                                                <button class="btn-primary" @onclick="CreateAssignment" disabled="@VM.IsSaving">
-                                                    @(VM.IsSaving ? Resources.Web_Common_Saving : Resources.Web_Common_Assign)
-                                                </button>
-                                                <button class="btn-secondary" @onclick="() => VM.CancelAddAssignment()">@Resources.Web_Common_Cancel</button>
-                                            </div>
-                                        </div>
+                                        <ScopedRoleAssignmentForm Principals="VM.AllUsers.ToAssigneeItems(VM.AllGroups)"
+                                                                  @bind-PrincipalId="VM.NewAssignmentPrincipalId"
+                                                                  Departments="VM.AllDepartments.ToDepartmentItems()"
+                                                                  Shares="ShareItems()"
+                                                                  @bind-ScopeType="VM.NewAssignmentScopeType"
+                                                                  @bind-ScopeId="VM.NewAssignmentScopeId"
+                                                                  Error="@VM.ErrorMessage" IsSaving="@VM.IsSaving"
+                                                                  OnSubmit="CreateAssignment" OnCancel="() => VM.CancelAddAssignment()" />
                                     }
 
                                     @if (VM.RoleScopedAssignments.Any())
@@ -249,24 +200,10 @@
 @code {
     [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
     [Parameter] public EventCallback OnChanged { get; set; }
-    private string SelectedScopeTypeString { get => VM.NewAssignmentScopeType.ToString(); set { VM.NewAssignmentScopeType = Enum.TryParse<ScopeType>(value, out var st) ? st : ScopeType.Global; VM.NewAssignmentScopeId = null; } }
-
-    // Assignee (user or group) via the shared picker's own tabs; the chosen item's kind sets the group flag.
-    private IReadOnlyList<PrincipalPickerItem> AssigneeItems() =>
-        VM.AllUsers.Select(u => new PrincipalPickerItem(u.Id, u.Name, PrincipalKind.User, u.Username))
-            .Concat(VM.AllGroups.Select(g => new PrincipalPickerItem(g.Id, g.Name, PrincipalKind.Group)))
-            .ToList();
 
     private IReadOnlyList<PrincipalPickerItem> ShareItems() =>
         VM.AllShares.Select(s => new PrincipalPickerItem(s.Id, s.Name, PrincipalKind.Share)).ToList();
 
-    private void OnAssigneePicked(IReadOnlyList<Guid> ids)
-    {
-        var id = ids.Count > 0 ? ids[0] : (Guid?)null;
-        VM.NewAssignmentPrincipalId = id;
-        if (id is { } gid)
-            VM.NewAssignmentPrincipalIsGroup = VM.AllGroups.Any(g => g.Id == gid);
-    }
     private async Task EditRole() { await VM.StartEditRoleAsync(); StateHasChanged(); }
     private async Task SaveRole() { await VM.SaveRoleAsync(); await OnChanged.InvokeAsync(); }
     private void CancelEdit() { VM.CancelEdit(); StateHasChanged(); }

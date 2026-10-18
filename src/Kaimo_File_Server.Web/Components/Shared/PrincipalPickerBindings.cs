@@ -48,6 +48,15 @@ public static class PrincipalPickerBindings
     public static IReadOnlyList<PrincipalPickerItem> ToDepartmentItems(this IEnumerable<Department> depts) =>
         depts.Select(d => new PrincipalPickerItem(d.Id, d.Name, PrincipalKind.Department, Color: d.Color)).ToList();
 
+    public static IReadOnlyList<PrincipalPickerItem> ToRoleItems(this IEnumerable<Role> roles) =>
+        roles.Select(r => new PrincipalPickerItem(r.Id, r.Name, PrincipalKind.Role)).ToList();
+
+    /// <summary>Users and groups as one picker list (role assignees); the picker's own tabs separate them.</summary>
+    public static IReadOnlyList<PrincipalPickerItem> ToAssigneeItems(this IEnumerable<User> users, IEnumerable<Group> groups) =>
+        users.Select(u => new PrincipalPickerItem(u.Id, u.Name, PrincipalKind.User, u.Username))
+            .Concat(groups.Select(g => new PrincipalPickerItem(g.Id, g.Name, PrincipalKind.Group)))
+            .ToList();
+
     /// <summary>Wraps an optional id as a single-element selection (empty when null).</summary>
     public static IReadOnlyCollection<Guid> AsSelection(this Guid? id) =>
         id is { } g ? new[] { g } : Array.Empty<Guid>();

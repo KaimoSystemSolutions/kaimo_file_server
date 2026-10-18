@@ -2271,6 +2271,12 @@
   <data name="Web_Admin_AddAssignment" xml:space="preserve">
     <value>Add assignment</value>
   </data>
+  <data name="Web_Admin_Label_Role" xml:space="preserve">
+    <value>Role</value>
+  </data>
+  <data name="Web_Error_SelectRole" xml:space="preserve">
+    <value>Please select a role.</value>
+  </data>
   <data name="Web_Admin_AssignTo" xml:space="preserve">
     <value>Assign to</value>
   </data>

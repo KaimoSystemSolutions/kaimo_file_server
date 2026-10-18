@@ -19,6 +19,7 @@ public class DepartmentViewModel
     private readonly IGroupRepository _groupRepo;
     private readonly IShareRepository _shareRepo;
     private readonly IRoleRepository _roleRepo;
+    private readonly IScopedRoleAssignmentRepository _assignmentRepo;
     private readonly IManagementAuthService _mgmtAuth;
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authState;
@@ -30,6 +31,7 @@ public class DepartmentViewModel
         IGroupRepository groupRepo,
         IShareRepository shareRepo,
         IRoleRepository roleRepo,
+        IScopedRoleAssignmentRepository assignmentRepo,
         IManagementAuthService mgmtAuth,
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authState,
@@ -40,6 +42,7 @@ public class DepartmentViewModel
         _groupRepo = groupRepo;
         _shareRepo = shareRepo;
         _roleRepo = roleRepo;
+        _assignmentRepo = assignmentRepo;
         _mgmtAuth = mgmtAuth;
         _userContextFactory = userContextFactory;
         _authState = authState;
@@ -66,6 +69,11 @@ public class DepartmentViewModel
     public bool CanEdit { get; private set; }
     public bool CanDelete { get; private set; }
 
+    /// <summary>Whether the actor may assign roles somewhere; gates the add/remove controls of
+    /// the department's role assignments. The per-assignment limit is enforced by
+    /// <see cref="IManagementAuthService.CanAssignRoleAsync"/>.</summary>
+    public bool CanAssignRoles { get; private set; }
+
     // -- Lists --
     public List<Department> Departments { get; private set; } = [];
 
@@ -75,6 +83,17 @@ public class DepartmentViewModel
     public List<Group> Groups { get; private set; } = [];
     public List<ShareDefinition> Shares { get; private set; } = [];
     public EffectivePermissionInfo? PermInfo { get; private set; }
+
+    /// <summary>Role assignments scoped to the selected department.</summary>
+    public List<ScopedAssignmentDisplayItem> RoleAssignments { get; private set; } = [];
+
+    // -- Add department-scoped role assignment --
+    public bool IsAddingAssignment { get; private set; }
+    public Guid? NewAssignmentRoleId { get; set; }
+    public Guid? NewAssignmentPrincipalId { get; set; }
+    public List<Role> AllRoles { get; private set; } = [];
+    public List<User> AllUsers { get; private set; } = [];
+    public List<Group> AllGroups { get; private set; } = [];
 
     // -- Create --
     public string CreateName { get; set; } = "";
@@ -180,6 +199,9 @@ public class DepartmentViewModel
 
         CanDelete = IsGlobalAdmin;
 
+        CanAssignRoles = await _mgmtAuth.HasAnyPermissionAsync(
+            _actorContext, ManagementPermission.AssignRoles);
+
         CanAccessPage = canView || CanEdit || IsGlobalAdmin;
     }
 
@@ -213,13 +235,13 @@ public class DepartmentViewModel
 
     public async Task SelectAsync(Department dept)
     {
-        CancelEdit(); CancelCreate();
+        CancelEdit(); CancelCreate(); CancelAddAssignment();
         SuccessMessage = null;
 
         if (Selected?.Id == dept.Id)
         {
             Selected = null;
-            Members = []; Groups = []; Shares = [];
+            Members = []; Groups = []; Shares = []; RoleAssignments = [];
             PermInfo = null;
             return;
         }
@@ -242,6 +264,116 @@ public class DepartmentViewModel
             .OrderBy(s => s.Name).ToList();
 
         PermInfo = await ResolveEffectivePermissionAsync(dept.Id);
+        await LoadRoleAssignmentsAsync(dept.Id);
+    }
+
+    // ══════════════════════════════════════════
+    //  Department-scoped role assignments
+    // ══════════════════════════════════════════
+
+    private async Task LoadRoleAssignmentsAsync(Guid departmentId)
+    {
+        var assignments = await _assignmentRepo.GetByScopeAsync(ScopeType.Department, departmentId);
+        var users = (await _userRepo.GetAllAsync()).ToDictionary(u => u.Id, u => u.Name);
+        var groups = (await _groupRepo.GetAllAsync()).ToDictionary(g => g.Id, g => g.Name);
+        var roles = (await _roleRepo.GetAllAsync()).ToDictionary(r => r.Id, r => r.Name);
+        var deptName = Departments.FirstOrDefault(d => d.Id == departmentId)?.Name ?? departmentId.ToString();
+
+        RoleAssignments = assignments
+            .Select(a => new ScopedAssignmentDisplayItem(
+                a.Id,
+                users.GetValueOrDefault(a.PrincipalId) ?? groups.GetValueOrDefault(a.PrincipalId) ?? a.PrincipalId.ToString(),
+                groups.ContainsKey(a.PrincipalId),
+                roles.GetValueOrDefault(a.RoleId) ?? a.RoleId.ToString(),
+                a.ScopeType,
+                deptName))
+            .OrderBy(i => i.RoleName).ThenBy(i => i.PrincipalName)
+            .ToList();
+    }
+
+    public async Task StartAddAssignmentAsync()
+    {
+        IsAddingAssignment = true;
+        NewAssignmentRoleId = null;
+        NewAssignmentPrincipalId = null;
+        ErrorMessage = null;
+        AllRoles = (await _roleRepo.GetAllAsync()).OrderBy(r => r.Name).ToList();
+        AllUsers = (await _userRepo.GetAllAsync()).OrderBy(u => u.Name).ToList();
+        AllGroups = (await _groupRepo.GetAllAsync()).OrderBy(g => g.Name).ToList();
+    }
+
+    public void CancelAddAssignment()
+    {
+        IsAddingAssignment = false;
+        ErrorMessage = null;
+    }
+
+    /// <summary>Assigns the chosen role to the chosen user or group, scoped to the selected
+    /// department. Department scope never touches the global-admin coupling or the last-admin
+    /// guard (both only concern Global scope), so the no-privilege-elevation gate suffices.</summary>
+    public async Task CreateAssignmentAsync()
+    {
+        if (Selected is null || _actorContext is null) return;
+
+        var role = NewAssignmentRoleId is { } roleId ? await _roleRepo.GetByIdAsync(roleId) : null;
+        if (role is null)
+        { ErrorMessage = Resources.Web_Error_SelectRole; return; }
+        if (NewAssignmentPrincipalId is not { } principalId)
+        { ErrorMessage = Resources.Web_Error_SelectUserOrGroup; return; }
+
+        if (!await _mgmtAuth.CanAssignRoleAsync(
+                _actorContext, role.ManagementPermissions, ScopeType.Department, Selected.Id))
+        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
+
+        try
+        {
+            IsSaving = true;
+            ErrorMessage = null;
+            await _assignmentRepo.CreateAsync(
+                ScopedRoleAssignment.ForDepartment(principalId, role.Id, Selected.Id));
+            IsAddingAssignment = false;
+            await LoadRoleAssignmentsAsync(Selected.Id);
+            SuccessMessage = Resources.Web_Assignment_Created;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating the department role assignment");
+            ErrorMessage = Resources.Web_Error_CreateAssignmentFailed;
+        }
+        finally { IsSaving = false; }
+    }
+
+    /// <summary>Removes an assignment of the selected department. Assignments of any other
+    /// scope are rejected here, so the Global-scope guards in the user management cannot be
+    /// bypassed through this page.</summary>
+    public async Task DeleteAssignmentAsync(Guid assignmentId)
+    {
+        if (Selected is null || _actorContext is null) return;
+
+        var assignment = await _assignmentRepo.GetByIdAsync(assignmentId);
+        if (assignment is null || assignment.ScopeType != ScopeType.Department || assignment.ScopeId != Selected.Id)
+        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
+
+        var rolePerms = (await _roleRepo.GetByIdAsync(assignment.RoleId))?.ManagementPermissions
+            ?? ManagementPermission.None;
+        if (!await _mgmtAuth.CanAssignRoleAsync(
+                _actorContext, rolePerms, ScopeType.Department, Selected.Id))
+        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
+
+        try
+        {
+            IsSaving = true;
+            ErrorMessage = null;
+            await _assignmentRepo.DeleteAsync(assignmentId);
+            await LoadRoleAssignmentsAsync(Selected.Id);
+            SuccessMessage = Resources.Web_Assignment_Removed;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting department role assignment {Id}", assignmentId);
+            ErrorMessage = Resources.Web_Error_DeleteAssignmentFailed;
+        }
+        finally { IsSaving = false; }
     }
 
     // ══════════════════════════════════════════
