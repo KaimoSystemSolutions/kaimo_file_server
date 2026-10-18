@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 using System.Xml.Linq;
@@ -186,11 +186,13 @@ public sealed class WebDavController : ControllerBase
 
         return await GuardAsync(async () =>
         {
+            var current = await FindAsync(target.Fs, target.Path, target.User);
+            if (current is null && !IsCreatableName(target.Path))
+                return new StatusCodeResult(StatusCodes.Status400BadRequest);
+
             // The parent collection must exist (WebDAV: 409 otherwise).
             if (!await ParentExistsAsync(target.Fs, target.Path, target.User))
                 return new StatusCodeResult(StatusCodes.Status409Conflict);
-
-            var current = await FindAsync(target.Fs, target.Path, target.User);
 
             var ifNoneMatch = Request.Headers[HeaderNames.IfNoneMatch].ToString();
             var ifMatch = Request.Headers[HeaderNames.IfMatch].ToString();
@@ -230,6 +232,9 @@ public sealed class WebDavController : ControllerBase
                 Response.Headers[HeaderNames.Allow] = AllowedMethods;
                 return new StatusCodeResult(StatusCodes.Status405MethodNotAllowed);
             }
+
+            if (!IsCreatableName(target.Path))
+                return new StatusCodeResult(StatusCodes.Status400BadRequest);
 
             if (!await ParentExistsAsync(target.Fs, target.Path, target.User))
                 return new StatusCodeResult(StatusCodes.Status409Conflict);
@@ -297,6 +302,8 @@ public sealed class WebDavController : ControllerBase
         return await GuardAsync(async () =>
         {
             var destExisted = await FindAsync(destFs, destPath, source.User) is not null;
+            if (!destExisted && !IsCreatableName(destPath))
+                return new StatusCodeResult(StatusCodes.Status400BadRequest);
             if (destExisted && !overwrite)
                 return new StatusCodeResult(StatusCodes.Status412PreconditionFailed);
 
@@ -457,6 +464,14 @@ public sealed class WebDavController : ControllerBase
         var context = await _userContextFactory.CreateByUserIdAsync(userId);
         return context is { User.IsEnabled: true } ? context : null;
     }
+
+    /// <summary>
+    /// A new resource must get a name Windows can use. Unlike the REST API, WebDAV does not
+    /// rename: clients read the resource back at the URL they wrote. Existing entries with such
+    /// names stay readable, writable and deletable.
+    /// </summary>
+    private static bool IsCreatableName(string path)
+        => WindowsFileNameHelper.IsValid(ShareRelativePath.GetFileName(path));
 
     /// <summary>A share addressable over WebDAV: enabled and known. Hidden shares stay reachable by direct URL.</summary>
     private async Task<ShareDefinition?> GetVisibleShareAsync(string name)

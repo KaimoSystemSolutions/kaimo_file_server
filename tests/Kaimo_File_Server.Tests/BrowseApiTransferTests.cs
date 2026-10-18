@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -591,5 +591,67 @@ public sealed class BrowseApiTransferTests : IDisposable
             .ReturnsAsync(false);
 
         Assert.Equal(403, Status(await _sut.Size(_a.Id, "f")));
+    }
+
+    // ─────────────────── Windows-invalid target names ───────────────────
+
+    private string? FinalPathHeader()
+        => _sut.HttpContext.Response.Headers[BrowseApiController.FinalPathHeader].FirstOrDefault();
+
+    [Fact]
+    public async Task Upload_invalid_name_is_stored_renamed_and_reported()
+    {
+        _sut.HttpContext.Request.Body = new MemoryStream([1, 2, 3]);
+
+        var result = await _sut.Upload(_a.Id, "new:dir/x?.txt", CancellationToken.None);
+
+        var dto = Assert.IsType<FileEntryDto>(Assert.IsType<OkObjectResult>(result).Value);
+        Assert.Equal("new_dir/x_.txt", dto.Path);
+        Assert.True(File.Exists(P(_a, "new_dir/x_.txt")));
+        Assert.Equal("new_dir/x_.txt", FinalPathHeader());
+    }
+
+    [Fact]
+    public async Task Upload_valid_name_sets_no_final_path_header()
+    {
+        _sut.HttpContext.Request.Body = new MemoryStream([1]);
+
+        await _sut.Upload(_a.Id, "plain.txt", CancellationToken.None);
+
+        Assert.Null(FinalPathHeader());
+    }
+
+    [Fact]
+    public async Task CreateDirectory_invalid_name_is_renamed()
+    {
+        var result = await _sut.CreateDirectory(_a.Id, "CON");
+
+        Assert.Equal(204, Status(result));
+        Assert.True(Directory.Exists(P(_a, "CON_")));
+        Assert.Equal("CON_", FinalPathHeader());
+    }
+
+    [Fact]
+    public async Task Rename_to_invalid_name_renames_target()
+    {
+        Put(_a, "f.txt", "x");
+
+        var result = await _sut.Rename(_a.Id, new RenameRequest("f.txt", "a|b.txt"));
+
+        Assert.Equal(204, Status(result));
+        Assert.True(File.Exists(P(_a, "a_b.txt")));
+        Assert.Equal("a_b.txt", FinalPathHeader());
+    }
+
+    [Fact]
+    public async Task Copy_to_invalid_name_renames_target()
+    {
+        Put(_a, "f.txt", "x");
+
+        var result = await _sut.Copy(Req(_a, "f.txt", _b, "f*.txt"));
+
+        Assert.Equal(201, Status(result));
+        Assert.True(File.Exists(P(_b, "f_.txt")));
+        Assert.Equal("f_.txt", FinalPathHeader());
     }
 }

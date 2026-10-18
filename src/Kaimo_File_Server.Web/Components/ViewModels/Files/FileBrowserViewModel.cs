@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
@@ -1437,11 +1437,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         if (string.IsNullOrWhiteSpace(fileName))
             return OperationResult.Fail(Resources.Web_FileName_Missing);
 
-        if (!WindowsFileNameHelper.IsValid(fileName))
-        {
-            var errors = WindowsFileNameHelper.GetValidationErrors(fileName);
-            return OperationResult.Fail(Resources.Web_FileName_InvalidChars + string.Join(", ", errors));
-        }
+        // Names from Linux/macOS clients are stored under a Windows-valid name ("a:b" → "a_b").
+        fileName = WindowsFileNameHelper.Sanitize(fileName);
 
         var userContext = await GetCurrentUserContextAsync();
         if (userContext is null)
@@ -1603,8 +1600,11 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     public async Task<UploadResult> UploadWithConflictHandlingAsync(
         string fileName, Stream stream, CancellationToken ct = default, string? relativeDir = null)
     {
-        if (_fileService is null || CurrentShare is null || !WindowsFileNameHelper.IsValid(fileName))
+        if (_fileService is null || CurrentShare is null || string.IsNullOrWhiteSpace(fileName))
             return UploadResult.Failed;
+
+        // Sanitize before the collision probe so a conflict is detected on the stored name.
+        fileName = WindowsFileNameHelper.Sanitize(fileName);
 
         var user = await GetCurrentUserContextAsync();
         if (user is null) return UploadResult.Failed;

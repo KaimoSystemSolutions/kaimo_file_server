@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Domain;
+﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
@@ -270,6 +270,18 @@ public sealed class AuthzGrpcServiceRenameTests : IDisposable
 
         Assert.False(reply.Allow);
         Assert.Contains("reserved Kaimo namespace", reply.Reason);
+        _acl.VerifyNoOtherCalls();
+    }
+
+    [Theory]
+    [InlineData("archive/re:port.txt")]
+    [InlineData("archive/CON.txt")]
+    public async Task AuthorizeRename_ToWindowsInvalidName_IsDeniedBeforeAclChecks(string destination)
+    {
+        var reply = await AuthorizeAsync("docs/report.txt", destination, sourceIsDirectory: false);
+
+        Assert.False(reply.Allow);
+        Assert.Contains("not valid on Windows", reply.Reason);
         _acl.VerifyNoOtherCalls();
     }
 

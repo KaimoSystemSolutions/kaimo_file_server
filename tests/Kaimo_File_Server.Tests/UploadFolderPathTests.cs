@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Web.Helpers;
+﻿using Kaimo_File_Server.Web.Helpers;
 using Xunit;
 
 namespace Kaimo_File_Server.Tests;
@@ -28,12 +28,29 @@ public class UploadFolderPathTests
     [InlineData("../x")]
     [InlineData("a/../../b")]
     [InlineData("a/./b")]
-    [InlineData("a/b:c")]
-    [InlineData("a/b*")]
-    [InlineData("ends-with-dot.")]
-    [InlineData("ends-with-space ")]
-    public void TryNormalize_RejectsTraversalAndInvalidNames(string raw)
+    public void TryNormalize_RejectsTraversal(string raw)
         => Assert.False(UploadFolderPath.TryNormalize(raw, out _));
+
+    // Names from Linux/macOS clients are renamed to Windows-valid ones instead of failing.
+    [Theory]
+    [InlineData("a/b:c", "a/b_c")]
+    [InlineData("a/b*", "a/b_")]
+    [InlineData("ends-with-dot.", "ends-with-dot")]
+    [InlineData("ends-with-space ", "ends-with-space")]
+    [InlineData("CON/x", "CON_/x")]
+    public void TryNormalize_SanitizesWindowsInvalidNames(string raw, string expected)
+    {
+        Assert.True(UploadFolderPath.TryNormalize(raw, out var dir, out var renamed));
+        Assert.Equal(expected, dir);
+        Assert.True(renamed);
+    }
+
+    [Fact]
+    public void TryNormalize_ValidFolder_IsNotReportedAsRenamed()
+    {
+        Assert.True(UploadFolderPath.TryNormalize("Photos/2024", out _, out var renamed));
+        Assert.False(renamed);
+    }
 
     [Fact]
     public void TryNormalize_RejectsTooDeepPaths()

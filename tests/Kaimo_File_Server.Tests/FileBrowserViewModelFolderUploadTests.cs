@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
@@ -176,5 +176,50 @@ public sealed class FileBrowserViewModelFolderUploadTests : IDisposable
         // Clean up the staged temp file.
         await _sut.ResolveConflictAsync(conflict.Id, FileBrowserViewModel.UploadConflictAction.Discard, applyToAll: false);
         Assert.Empty(_sut.PendingConflicts);
+    }
+
+    // ═══════════════════ Windows-invalid names ═══════════════════
+
+    [Fact]
+    public async Task UploadWithConflictHandlingAsync_InvalidName_IsRenamed()
+    {
+        await _sut.LoadShareAsync("share");
+
+        var outcome = await _sut.UploadWithConflictHandlingAsync(
+            "a:b?.txt", new MemoryStream([1, 2, 3]), relativeDir: "Photos");
+
+        Assert.Equal(FileBrowserViewModel.UploadResult.Uploaded, outcome);
+        _fileService.Verify(s => s.WriteFileAsync(
+            "Photos/a_b_.txt", It.IsAny<Stream>(), It.IsAny<UserContext>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadWithConflictHandlingAsync_SanitizedName_CollidesLikeAnyOther()
+    {
+        await _sut.LoadShareAsync("share");
+        _fileService
+            .Setup(s => s.ReadFileAsync("CON_.txt", It.IsAny<UserContext>()))
+            .ReturnsAsync(() => new MemoryStream([9, 9, 9]));
+
+        var outcome = await _sut.UploadWithConflictHandlingAsync("CON.txt", new MemoryStream([1, 2, 3]));
+
+        Assert.Equal(FileBrowserViewModel.UploadResult.Held, outcome);
+        var conflict = Assert.Single(_sut.PendingConflicts);
+        Assert.Equal("CON_.txt", conflict.TargetRelativePath);
+        await _sut.ResolveConflictAsync(conflict.Id, FileBrowserViewModel.UploadConflictAction.Discard, applyToAll: false);
+    }
+
+    [Fact]
+    public async Task UploadFileAsync_InvalidName_IsRenamed()
+    {
+        await _sut.LoadShareAsync("share");
+
+        var result = await _sut.UploadFileAsync("x|y.txt", new MemoryStream([1]));
+
+        Assert.True(result.Success);
+        _fileService.Verify(s => s.WriteFileAsync(
+            "x_y.txt", It.IsAny<Stream>(), It.IsAny<UserContext>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }

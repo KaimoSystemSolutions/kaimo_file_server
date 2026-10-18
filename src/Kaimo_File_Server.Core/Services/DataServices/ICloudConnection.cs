@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Domain;
+﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Services;
@@ -256,6 +256,41 @@ public interface ICloudConnection
         return difference > TimeSpan.Zero ? 1 : -1;
     }
     /// <summary>
+    /// Keys a remote listing by the local name of each item. Names Windows cannot use are
+    /// stored locally renamed ("a:b" → "a_b"), so keying by that name pairs the two sides on
+    /// every run instead of re-pulling, pushing back a twin or deleting the local copy. A local
+    /// entry that already has the original name (created before this rule) keeps it. When a
+    /// renamed item collides with another remote item, the exact name wins and the renamed one
+    /// is reported and skipped. Duplicate exact names still throw, as before.
+    /// </summary>
+    private static Dictionary<string, CloudItemMeta> KeyByLocalName(
+        IEnumerable<CloudItemMeta> remoteListing,
+        IReadOnlyDictionary<string, FileMetadata> localItems,
+        string remoteDir,
+        ICollection<SyncFailure>? failures)
+    {
+        var items = new Dictionary<string, CloudItemMeta>(StringComparer.OrdinalIgnoreCase);
+        var renamed = new List<CloudItemMeta>();
+        foreach (var item in remoteListing)
+        {
+            if (WindowsFileNameHelper.IsValid(item.Name) || localItems.ContainsKey(item.Name))
+                items.Add(item.Name, item);
+            else
+                renamed.Add(item);
+        }
+
+        foreach (var item in renamed)
+        {
+            var localName = WindowsFileNameHelper.Sanitize(item.Name);
+            if (!items.TryAdd(localName, item))
+                failures?.Add(new SyncFailure($"{remoteDir}/{item.Name}", SyncFailureOperation.Download,
+                    $"'{item.Name}' is not valid on Windows and its replacement name '{localName}' is already used by another remote item."));
+        }
+
+        return items;
+    }
+
+    /// <summary>
     /// Recursively reconciles one directory level according to the selected sync
     /// mode and checks cancellation before each child is processed.
     /// </summary>
@@ -303,15 +338,16 @@ public interface ICloudConnection
             // so this directory is not fetched from the provider a second time.
             // A cache miss (e.g. a subtree created remotely mid-run) falls back to
             // a live listing so nothing is skipped.
-            remoteItems = (remoteListings.TryGetValue(remoteDir, out var cachedRemote)
-                    ? cachedRemote
-                    : await Guard(SyncEndpoint.Remote,
-                        () => ListAsync(remoteDir, cancellationToken)))
-                .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+            var remoteListing = remoteListings.TryGetValue(remoteDir, out var cachedRemote)
+                ? cachedRemote
+                : await Guard(SyncEndpoint.Remote,
+                    () => ListAsync(remoteDir, cancellationToken));
 
             localItems = (await Guard(SyncEndpoint.Local,
                     () => fileService.ListAsync(localDir, user)))
                 .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+
+            remoteItems = KeyByLocalName(remoteListing, localItems, remoteDir, failures);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -353,7 +389,8 @@ public interface ICloudConnection
                 || (remoteExists && !remote!.IsDirectory && options.ShouldSkip(remote.Name, remote.Size)))
                 continue;
 
-            string remoteChild = $"{remoteDir}/{name}";
+            // name is the local name; a renamed remote item keeps its original name remotely.
+            string remoteChild = $"{remoteDir}/{remote?.Name ?? name}";
             string localChild = $"{localDir}/{name}";
 
             // The recycle bin and internal Kaimo namespaces are share bookkeeping,

@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Kaimo_File_Server.Core.Domain;
@@ -40,6 +40,12 @@ public sealed class BrowseApiController : ApiControllerBase
     /// file's last-access time is left unchanged.
     /// </summary>
     public const string PreserveAccessTimeHeader = "X-Kaimo-Preserve-Access-Time";
+
+    /// <summary>
+    /// Response header with the path actually written when the requested target had to be
+    /// renamed to a Windows-valid name ("a:b.txt" → "a_b.txt"). Absent when nothing was renamed.
+    /// </summary>
+    public const string FinalPathHeader = "X-Kaimo-Path";
 
     private readonly IUserContextFactory _userContextFactory;
     private readonly IShareRepository _shares;
@@ -182,6 +188,7 @@ public sealed class BrowseApiController : ApiControllerBase
 
         if (string.IsNullOrEmpty(resolved!.Path))
             return ApiBadRequest("invalid_path", "A file path is required.");
+        var target = SanitizeTarget(resolved.Fs, resolved.Path);
 
         // The body is the raw file content. A form content-type makes MVC's form value provider
         // read and drain Request.Body during model binding, so WriteFileAsync would persist an
@@ -212,15 +219,15 @@ public sealed class BrowseApiController : ApiControllerBase
 
             if (createOnly || !string.IsNullOrWhiteSpace(ifMatch))
             {
-                var current = await TryGetMetadataAsync(resolved.Fs, resolved.Path, resolved.User);
+                var current = await TryGetMetadataAsync(resolved.Fs, target, resolved.User);
                 if (createOnly && current is not null)
                     return ApiPreconditionFailed("The file already exists.");
                 if (!string.IsNullOrWhiteSpace(ifMatch) && (current is null || !ItemTag.Matches(ifMatch, current)))
                     return ApiPreconditionFailed();
             }
 
-            await resolved.Fs.WriteFileAsync(resolved.Path, Request.Body, resolved.User, modifiedAtUtc, createdAtUtc, ct);
-            var meta = await resolved.Fs.GetMetadataAsync(resolved.Path, resolved.User);
+            await resolved.Fs.WriteFileAsync(target, Request.Body, resolved.User, modifiedAtUtc, createdAtUtc, ct);
+            var meta = await resolved.Fs.GetMetadataAsync(target, resolved.User);
             Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
             return Ok(FileEntryDto.From(meta));
         }));
@@ -256,6 +263,19 @@ public sealed class BrowseApiController : ApiControllerBase
             Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
             return Ok(FileEntryDto.From(meta));
         });
+    }
+
+    /// <summary>
+    /// Renames the new segments of a write target that Windows cannot use ("a:b" → "a_b";
+    /// existing entries keep their name) and reports the final path in <see cref="FinalPathHeader"/>.
+    /// The idempotency fingerprint stays on the requested path; the mapping is deterministic.
+    /// </summary>
+    private string SanitizeTarget(IFileService fs, string path)
+    {
+        var target = WindowsFileNameHelper.SanitizeNewSegments(path, p => Path.Exists(fs.ToAbsolutePath(p)));
+        if (target != path)
+            Response.Headers[FinalPathHeader] = target;
+        return target;
     }
 
     /// <summary>
@@ -296,17 +316,18 @@ public sealed class BrowseApiController : ApiControllerBase
 
         if (string.IsNullOrEmpty(resolved!.Path))
             return ApiBadRequest("invalid_path", "A directory path is required.");
+        var target = SanitizeTarget(resolved.Fs, resolved.Path);
 
         var fingerprint = RequestFingerprint.Compute("POST", $"{shareId}/{resolved.Path}", "mkdir");
 
         return await ExecuteIdempotentAsync(resolved.User.User.Id, fingerprint, () => GuardAsync(async () =>
         {
             // Already there (as a directory)? Nothing to do — keep creation idempotent.
-            var current = await TryGetMetadataAsync(resolved.Fs, resolved.Path, resolved.User);
+            var current = await TryGetMetadataAsync(resolved.Fs, target, resolved.User);
             if (current is { IsDirectory: true })
                 return NoContent();
 
-            await resolved.Fs.CreateDirectoryAsync(resolved.Path, resolved.User);
+            await resolved.Fs.CreateDirectoryAsync(target, resolved.User);
             return NoContent();
         }));
     }
@@ -333,6 +354,7 @@ public sealed class BrowseApiController : ApiControllerBase
 
         var fs = _fileServiceFactory.CreateForShare(share);
         var fingerprint = RequestFingerprint.Compute("POST", $"{shareId}/rename", from, to);
+        to = SanitizeTarget(fs, to);
 
         return await ExecuteIdempotentAsync(user.User.Id, fingerprint, () => GuardAsync(async () =>
         {
@@ -402,6 +424,7 @@ public sealed class BrowseApiController : ApiControllerBase
         var fingerprint = RequestFingerprint.Compute(
             "POST", isMove ? "move" : "copy", $"{source.Id}/{from}", $"{target.Id}/{to}",
             request.Overwrite ? "overwrite" : null);
+        to = SanitizeTarget(targetFs, to);
 
         // ponytail: runs inside the request; add a job endpoint if proxies time out on huge folders.
         return await ExecuteIdempotentAsync(user.User.Id, fingerprint, () => GuardAsync(async () =>

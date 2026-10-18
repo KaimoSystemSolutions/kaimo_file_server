@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
 
 /// <summary>
@@ -38,17 +40,8 @@ public static class WindowsFileNameHelper
     ];
 
     /// <summary>
-    /// Reserved device names under Windows (case-insensitive).
-    /// </summary>
-    private static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "CON", "PRN", "AUX", "NUL",
-        "COM0", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-        "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
-    };
-
-    /// <summary>
-    /// Maximum length of a single file/folder name under Windows.
+    /// Maximum length of a single file/folder name: 255 UTF-8 bytes, the stricter of the
+    /// Windows (255 UTF-16 units) and ext4 (255 bytes) limits.
     /// </summary>
     public const int MaxNameLength = 255;
 
@@ -110,8 +103,9 @@ public static class WindowsFileNameHelper
             return errors;
         }
 
-        if (name.Length > MaxNameLength)
-            errors.Add(string.Format(Resources.Web_Validation_NameTooLong, MaxNameLength, name.Length));
+        var byteCount = Encoding.UTF8.GetByteCount(name);
+        if (byteCount > MaxNameLength)
+            errors.Add(string.Format(Resources.Web_Validation_NameTooLong, MaxNameLength, byteCount));
 
         var found = name.Where(c => InvalidFileNameChars.Contains(c)).Distinct().ToList();
         if (found.Count > 0)
@@ -126,9 +120,9 @@ public static class WindowsFileNameHelper
         if (name.EndsWith(' '))
             errors.Add(Resources.Web_Validation_NameEndsWithSpace);
 
-        var baseName = Path.GetFileNameWithoutExtension(name);
-        if (ReservedNames.Contains(baseName))
-            errors.Add(string.Format(Resources.Web_Validation_ReservedName, baseName));
+        // Windows reserves device names regardless of extension ("con.txt", "CON.tar.gz").
+        if (SambaName.IsReservedDeviceName(name))
+            errors.Add(string.Format(Resources.Web_Validation_ReservedName, name.Split('.', 2)[0]));
 
         return errors;
     }
@@ -160,23 +154,86 @@ public static class WindowsFileNameHelper
         // Remove trailing dots and spaces
         sanitized = sanitized.TrimEnd('.', ' ');
 
-        // Handle reserved names by appending an underscore
-        var baseName = Path.GetFileNameWithoutExtension(sanitized);
-        if (ReservedNames.Contains(baseName))
+        // Reserved device names: suffix the part before the first dot ("CON.txt" -> "CON_.txt")
+        if (SambaName.IsReservedDeviceName(sanitized))
         {
-            var ext = Path.GetExtension(sanitized);
-            sanitized = baseName + "_" + ext;
+            var dot = sanitized.IndexOf('.');
+            sanitized = dot < 0 ? sanitized + "_" : sanitized[..dot] + "_" + sanitized[dot..];
         }
 
-        // Truncate to the maximum length (keeping the extension)
-        if (sanitized.Length > maxLength)
+        // Truncate to the maximum byte length, keeping the extension
+        if (Encoding.UTF8.GetByteCount(sanitized) > maxLength)
         {
             var ext = Path.GetExtension(sanitized);
-            var maxBase = maxLength - ext.Length;
-            sanitized = sanitized.Substring(0, Math.Max(1, maxBase)) + ext;
+            if (Encoding.UTF8.GetByteCount(ext) > maxLength / 2)
+                ext = "";
+            var stem = sanitized[..^ext.Length];
+            sanitized = TruncateUtf8(stem, maxLength - Encoding.UTF8.GetByteCount(ext)).TrimEnd('.', ' ') + ext;
         }
 
         return string.IsNullOrWhiteSpace(sanitized) ? "_" : sanitized;
+    }
+
+    /// <summary>
+    /// Sanitizes every segment of a share-relative path ("bad:dir/file?.txt" ->
+    /// "bad_dir/file_.txt"). "" stays "".
+    /// </summary>
+    public static string SanitizeRelativePath(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return path;
+        return string.Join('/', path.Split('/').Select(segment => Sanitize(segment)));
+    }
+
+    /// <summary>
+    /// Like <see cref="SanitizeRelativePath"/>, but a segment that already exists keeps its name:
+    /// entries created before this rule (or on disk directly) are still addressable, and only
+    /// what a write would newly create is renamed. <paramref name="exists"/> receives the
+    /// share-relative path of an invalid segment as it would be kept.
+    /// </summary>
+    public static string SanitizeNewSegments(string path, Func<string, bool> exists)
+    {
+        if (string.IsNullOrEmpty(path))
+            return path;
+
+        var result = "";
+        foreach (var segment in path.Split('/'))
+        {
+            var prefix = result.Length == 0 ? "" : result + "/";
+            result = IsValid(segment) || exists(prefix + segment)
+                ? prefix + segment
+                : prefix + Sanitize(segment);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Windows-Explorer-style alternatives for a name that is taken:
+    /// "a.txt" -> "a (2).txt", "a (3).txt", ...
+    /// </summary>
+    public static IEnumerable<string> NumberedVariants(string name)
+    {
+        var stem = Path.GetFileNameWithoutExtension(name);
+        var ext = Path.GetExtension(name);
+        for (var n = 2; ; n++)
+            yield return $"{stem} ({n}){ext}";
+    }
+
+    // Longest prefix of value that fits into maxBytes UTF-8 bytes, never splitting a surrogate pair.
+    private static string TruncateUtf8(string value, int maxBytes)
+    {
+        var bytes = 0;
+        var i = 0;
+        while (i < value.Length)
+        {
+            var width = char.IsHighSurrogate(value[i]) && i + 1 < value.Length ? 2 : 1;
+            var size = Encoding.UTF8.GetByteCount(value.AsSpan(i, width));
+            if (bytes + size > maxBytes)
+                break;
+            bytes += size;
+            i += width;
+        }
+        return value[..i];
     }
 
     /// <summary>

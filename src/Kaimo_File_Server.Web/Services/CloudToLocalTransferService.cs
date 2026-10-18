@@ -1,4 +1,4 @@
-using System.IO.Pipelines;
+﻿using System.IO.Pipelines;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
@@ -79,8 +79,10 @@ public sealed class CloudToLocalTransferService(
             {
                 if (!ShareRelativePath.TryNormalizeStrict(item.Path, out var relative, allowRoot: false))
                     throw new UnauthorizedAccessException("An invalid remote item path was supplied.");
+                // Remote names Windows cannot use are stored renamed ("a:b" → "a_b").
                 await CopyItemAsync(remote, remoteShare, local, actor, relative,
-                    ShareRelativePath.Combine(destination, item.Name), item.IsDirectory, cancellationToken);
+                    ShareRelativePath.Combine(destination, WindowsFileNameHelper.Sanitize(item.Name)),
+                    item.IsDirectory, cancellationToken);
             }
             return new(true);
         }
@@ -121,7 +123,8 @@ public sealed class CloudToLocalTransferService(
             {
                 var childRelative = StripRemoteRoot(remoteShare.RemoteRootPath, child.Path);
                 await CopyItemAsync(remote, remoteShare, local, actor, childRelative,
-                    ShareRelativePath.Combine(localRelativePath, child.Name), child.IsDirectory, cancellationToken);
+                    ShareRelativePath.Combine(localRelativePath, WindowsFileNameHelper.Sanitize(child.Name)),
+                    child.IsDirectory, cancellationToken);
             }
             return;
         }

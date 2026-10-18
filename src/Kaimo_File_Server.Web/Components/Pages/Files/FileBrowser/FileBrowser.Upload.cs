@@ -1,4 +1,4 @@
-
+﻿
 using System.Collections;
 using System.Diagnostics;
 using Kaimo_File_Server.Core.Domain;
@@ -109,10 +109,17 @@ public partial class FileBrowser
 
             // The folder of each file below the drop target ("" = the target itself), or
             // null when the client sent an invalid one (the file then fails).
+            // Names Windows cannot use are renamed on the way in; count them for the summary.
             var fileDirs = new string?[files.Count];
+            var renamedCount = 0;
             for (var i = 0; i < files.Count; i++)
+            {
+                var dirRenamed = false;
                 fileDirs[i] = !folderUpload ? ""
-                    : pending!.Dirs[i] is { } raw && UploadFolderPath.TryNormalize(raw, out var dir) ? dir : null;
+                    : pending!.Dirs[i] is { } raw && UploadFolderPath.TryNormalize(raw, out var dir, out dirRenamed) ? dir : null;
+                if (dirRenamed || (VM is FileBrowserViewModel && !WindowsFileNameHelper.IsValid(files[i].Name)))
+                    renamedCount++;
+            }
 
         // Name-collision handling is a local-share feature; remote/cloud browsers keep
         // their own overwrite semantics and fall back to the plain upload call below.
@@ -317,6 +324,8 @@ public partial class FileBrowser
             notes.Add(string.Format(T("Web_Upload_SkippedIdentical"), skippedCount));
         if (heldCount > 0)
             notes.Add(string.Format(T("Web_Upload_ConflictsPending"), heldCount));
+        if (renamedCount > 0)
+            notes.Add(string.Format(T("Web_Upload_RenamedForWindows"), renamedCount));
         var suffix = notes.Count > 0 ? " " + string.Join(" ", notes) : "";
 
         if (job.CancellationToken.IsCancellationRequested)

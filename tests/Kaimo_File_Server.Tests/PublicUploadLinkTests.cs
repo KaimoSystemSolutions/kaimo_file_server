@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
@@ -203,8 +203,6 @@ public sealed class PublicUploadLinkTests
     [InlineData("../outside")]
     [InlineData("a/../../b")]
     [InlineData("a/./b")]
-    [InlineData("bad:name")]
-    [InlineData("trailing.")]
     [InlineData("1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17")]
     public async Task Upload_InvalidSubFolder_IsRejectedWithoutReservingOrWriting(string relativeDir)
     {
@@ -214,6 +212,21 @@ public sealed class PublicUploadLinkTests
         _links.Verify(r => r.TryReserveUploadAsync(It.IsAny<string>(), It.IsAny<long>()), Times.Never);
         _fs.Verify(f => f.CreateDirectoryAsync(It.IsAny<string>(), It.IsAny<UserContext>()), Times.Never);
         _fs.Verify(f => f.WriteFileAsync(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<UserContext>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // Visitors on Linux/macOS may send names Windows cannot use; they are renamed, not refused.
+    [Fact]
+    public async Task Upload_WindowsInvalidNames_AreRenamed()
+    {
+        using var disk = UseDisk();
+        _fs.Setup(f => f.ListAsync("inbox/bad_dir/trailing", _creator)).ReturnsAsync([]);
+
+        var result = await Uploader().UploadAsync(
+            _link, "a:b.txt", 1, _ => new MemoryStream(new byte[1]), relativeDir: "bad:dir/trailing.");
+
+        Assert.Equal(PublicUploadStatus.Uploaded, result.Status);
+        Assert.Equal("bad_dir/trailing/a_b.txt", result.StoredName);
+        _fs.Verify(f => f.WriteFileAsync("inbox/bad_dir/trailing/a_b.txt", It.IsAny<Stream>(), _creator, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

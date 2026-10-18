@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Domain;
+﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
@@ -229,6 +229,32 @@ public sealed class AuthzGrpcServiceAccessMaskTests : IDisposable
         Assert.False(reply.Allow);
         Assert.Contains("reserved Kaimo namespace", reply.Reason);
         _acl.VerifyNoOtherCalls();
+    }
+
+    // SMB clients keep a handle on the name they created, so a name Windows cannot use is
+    // refused rather than renamed behind their back.
+    [Theory]
+    [InlineData("docs/x?.txt", false, 0x00000002u)]
+    [InlineData("docs/a:b", false, 0x00000002u)]
+    [InlineData("docs/CON", true, 0x00000004u)]
+    [InlineData("docs/trailing.", true, 0x00000004u)]
+    public async Task AuthorizeOpen_CreateWithWindowsInvalidName_IsDeniedBeforeAcl(
+        string path, bool createDirectory, uint accessMask)
+    {
+        var reply = await AuthorizeAsync(
+            accessMask, path, wantsCreate: true, createDirectory: createDirectory);
+
+        Assert.False(reply.Allow);
+        Assert.Contains("not valid on Windows", reply.Reason);
+        _acl.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task AuthorizeOpen_WithoutCreate_DoesNotCheckWindowsName()
+    {
+        var reply = await AuthorizeAsync(0x00000001u, "docs/x?.txt");
+
+        Assert.DoesNotContain("not valid on Windows", reply.Reason ?? "");
     }
 
     [Fact]

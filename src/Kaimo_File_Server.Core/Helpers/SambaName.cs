@@ -68,7 +68,7 @@ public static class SambaName
         IsAsciiAlphaNumeric(value) || value is '.' or '_' or '-';
 
     // Windows reserves these names regardless of extension ("con.txt").
-    private static bool IsReservedDeviceName(string value)
+    internal static bool IsReservedDeviceName(string value)
     {
         string baseName = value.Split('.', 2)[0].ToUpperInvariant();
         return baseName is "CON" or "PRN" or "AUX" or "NUL"

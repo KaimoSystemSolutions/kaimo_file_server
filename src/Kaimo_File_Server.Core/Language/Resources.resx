@@ -2589,6 +2589,9 @@
   <data name="Web_Upload_BatchProcessing" xml:space="preserve">
     <value>Processing file {0} of {1}: {2}</value>
   </data>
+  <data name="Web_Upload_RenamedForWindows" xml:space="preserve">
+    <value>{0} item(s) renamed for Windows compatibility.</value>
+  </data>
   <data name="Web_Upload_SkippedIdentical" xml:space="preserve">
     <value>{0} identical file(s) skipped.</value>
   </data>

@@ -72,11 +72,14 @@ public sealed class PublicUploadService(
             return new(PublicUploadStatus.Unavailable);
 
         // Only the leaf name of fileName counts. A visitor can choose a sub-path only through
-        // relativeDir, whose every segment must be a valid folder name — so it always stays
-        // inside the link folder.
-        var name = Path.GetFileName((fileName ?? string.Empty).Replace('\\', '/')).Trim();
-        if (name.Length == 0 || name is "." or ".." || !WindowsFileNameHelper.IsValid(name))
+        // relativeDir, which rejects "." and ".." — so it always stays inside the link folder.
+        // Names Windows cannot use are renamed ("a:b" → "a_b").
+        // Not Path.GetFileName: on Windows it treats "a:" in "a:b.txt" as a drive and drops it.
+        var rawName = (fileName ?? string.Empty).Replace('\\', '/');
+        var name = rawName[(rawName.LastIndexOf('/') + 1)..].Trim();
+        if (name.Length == 0 || name is "." or "..")
             return new(PublicUploadStatus.InvalidName);
+        name = WindowsFileNameHelper.Sanitize(name);
         if (!UploadFolderPath.TryNormalize(relativeDir, out var subDir, MaxFolderDepth))
             return new(PublicUploadStatus.InvalidName);
 

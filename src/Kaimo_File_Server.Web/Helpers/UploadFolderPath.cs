@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Domain.Identity;
+﻿using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Services.File;
 
@@ -7,8 +7,8 @@ namespace Kaimo_File_Server.Web.Helpers;
 /// <summary>
 /// The folder part of a browser folder upload ("Photos/2024" for "Photos/2024/a.jpg").
 /// It comes from the client, so it is validated segment by segment before it is ever
-/// combined with a share path: every segment must be a valid single Windows name, which
-/// also rules out "." and ".." and therefore any traversal out of the upload target.
+/// combined with a share path: "." and ".." are rejected (no traversal out of the upload
+/// target) and every other segment is renamed to a valid Windows name ("b:c" → "b_c").
 /// </summary>
 public static class UploadFolderPath
 {
@@ -17,11 +17,17 @@ public static class UploadFolderPath
 
     /// <summary>
     /// Normalizes <paramref name="raw"/> to "a/b/c" ("" = no sub-folder, upload into the
-    /// target itself). Returns false when the path is too deep or long, or a segment is invalid.
+    /// target itself). Returns false when the path is too deep or long, or contains "." or "..".
     /// </summary>
     public static bool TryNormalize(string? raw, out string relativeDir, int maxDepth = DefaultMaxDepth)
+        => TryNormalize(raw, out relativeDir, out _, maxDepth);
+
+    /// <inheritdoc cref="TryNormalize(string?, out string, int)"/>
+    /// <param name="renamed">True when a segment had to be renamed to be valid on Windows.</param>
+    public static bool TryNormalize(string? raw, out string relativeDir, out bool renamed, int maxDepth = DefaultMaxDepth)
     {
         relativeDir = "";
+        renamed = false;
         if (string.IsNullOrWhiteSpace(raw))
             return true;
 
@@ -30,10 +36,13 @@ public static class UploadFolderPath
         if (segments.Length > maxDepth)
             return false;
 
-        foreach (var segment in segments)
+        for (var i = 0; i < segments.Length; i++)
         {
-            if (segment is "." or ".." || !WindowsFileNameHelper.IsValid(segment))
+            if (segments[i] is "." or "..")
                 return false;
+            var sanitized = WindowsFileNameHelper.Sanitize(segments[i]);
+            renamed |= sanitized != segments[i];
+            segments[i] = sanitized;
         }
 
         var joined = string.Join('/', segments);

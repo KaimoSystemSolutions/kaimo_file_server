@@ -1,4 +1,4 @@
-using Grpc.Core;
+﻿using Grpc.Core;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
@@ -188,6 +188,11 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
              (specific & UserContentMutationAccess) != 0))
             return Deny(
                 $"open denied: '{normalized}' is a reserved Kaimo namespace");
+
+        // SMB clients keep a handle on the name they created, so a new entry Windows could not
+        // use is refused (as a Windows server would) instead of being renamed later.
+        if (!exists && request.WantsCreate && !IsWindowsValidLeaf(normalized))
+            return Deny($"create denied: '{normalized}' is not valid on Windows");
 
         string? traversalDeny = await CheckTraversalAsync(
             user, share.Id, normalized, cancellationToken);
@@ -480,6 +485,9 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
              destinationIsDirectory != request.DestinationIsDirectory))
             return Deny("rename destination no longer matches the native request");
 
+        if (!destinationExists && !IsWindowsValidLeaf(destination))
+            return Deny($"rename denied: '{destination}' is not valid on Windows");
+
         if (request.DestinationExists != request.ReplaceIntent)
             return Deny("rename replacement intent does not match destination state");
         if (!request.DestinationExists && request.DestinationIsDirectory)
@@ -556,6 +564,9 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         return (false, "none",
             $"delete denied: target '{normalized}' lacks Delete and parent '{parent}' lacks DeleteSubItems");
     }
+
+    private static bool IsWindowsValidLeaf(string path) =>
+        WindowsFileNameHelper.IsValid(ShareRelativePath.GetFileName(path));
 
     private AuthorizeReply Deny(string reason)
     {

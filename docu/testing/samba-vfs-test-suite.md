@@ -292,6 +292,35 @@ Both defects found while writing the suite are fixed; their tests now pass witho
 When a fix lands, the corresponding test starts passing, `strict=True` turns that into a failure,
 and the `xfail` marker must be removed in the same change.
 
+### Known environment issues
+
+**SMB `mkdir` reports `NT_STATUS_OBJECT_NAME_NOT_FOUND` on Docker Desktop bind mounts, although
+the directory is created.** This affects only pools that are Windows host paths bind-mounted into
+the container (`./data/storage/pool01` → `/data/storage/pool01`, filesystem type `v9fs`,
+`aname=drvfs`). It is not caused by the VFS module and does not occur on Linux filesystems.
+
+- *Mechanism:* Samba 4.22 `mkdir_internal()` (`source3/smbd/open.c`) creates the directory as
+  `.::TMPNAME:D:<id>:<name>`, opens it, applies ACL/DOS attributes and renames it into place with
+  `renameat2(RENAME_NOREPLACE)`. drvfs rejects that flag with `EINVAL`, so Samba falls back to
+  `mkdirat(<name>, 0)` + plain `renameat()`, which succeeds. `open_directory()` then calls
+  `vfs_stat_fsp()`, i.e. `fstat()` on the descriptor opened before the rename, and drvfs returns
+  `ENOENT` for it. That error becomes the create reply (`smb2_create.c:393`). The `full_audit`
+  trace shows exactly this: `mkdirat ok TMPNAME`, `renameat fail (Invalid argument)`,
+  `mkdirat ok <name>`, `renameat ok`, `close ok`, then the error.
+- *Evidence (2026-10-18):* a syscall probe (mkdir, open `O_DIRECTORY`, `renameat2` with
+  `RENAME_NOREPLACE`, fallback rename, `fstat` on the old descriptor) gives `EINVAL` + `ENOENT` on
+  the 9p pool and succeeds on overlayfs and on a Docker named volume (ext4). Stock Samba with
+  `vfs objects =` (no `kaimo_bridge`) fails identically on a 9p share and succeeds on an overlayfs
+  share. `kaimo_renameat`/`kaimo_mkdirat` pass `TMPNAME` operations through unchanged, and
+  `kaimo_fstat` only adds the birth time after a successful `SMB_VFS_NEXT_FSTAT`.
+- *Impact:* SMB clients (smbclient, Windows Explorer "New folder") show an error for every new
+  directory in the Docker Desktop development stack; the directory exists afterwards. Web, REST and
+  WebDAV are not affected because they do not go through smbd.
+- *Workaround for local testing:* place test pools on a Docker named volume, or set
+  `net conf setparm <share> "vfs mkdir use tmp name" no` (verified on the `test` share with the
+  module loaded; revert with `net conf delparm`). Do not ship that setting: it makes the new
+  directory visible to other clients before its ACL and DOS attributes are applied.
+
 ## Known gaps
 
 - **`supervise-samba.sh` runs without kcov** (`KCOV_EXCLUDE` in `run-suite.sh`). Its test sends
