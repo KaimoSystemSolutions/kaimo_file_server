@@ -16,6 +16,11 @@ html, body, #app {
     -webkit-font-smoothing: antialiased;
 }
 
+/* Form controls do not inherit the page font by default. */
+button, input, select, textarea {
+    font: inherit;
+}
+
 h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
 }

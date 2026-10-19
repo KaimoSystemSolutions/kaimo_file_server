@@ -139,7 +139,7 @@ Semantic backgrounds are tinted (`*-subtle`); solid fills are reserved for badge
 
 ## 6. Typography
 
-- **Typeface:** Plus Jakarta Sans (self-hosted variable font, `wwwroot/fonts/`) is the Kaimo typeface. It is exposed as `--font-heading` and used for headings, brand text and micro-labels. Body text and controls SHOULD use it as well (see §18 #1 for the current gap).
+- **Typeface:** Plus Jakarta Sans (self-hosted variable font, `wwwroot/fonts/`) is the Kaimo typeface. It is used for body text, controls, headings, brand text and micro-labels, exposed as `--font-body` and `--font-heading`. Form controls inherit the page font via the `font: inherit` reset in `base.css`.
 - Base: `14px`, `line-height: 1.5`, antialiased.
 
 | Role | Size / weight | Notes |
@@ -399,11 +399,10 @@ The implementation largely matches this spec. Undefined tokens, hard-coded fallb
 
 | # | Location | Deviation | Fix |
 |---|---|---|---|
-| 1 | `app.css` `--font-body` | Headings, brand and micro-labels render in Plus Jakarta Sans, but `--font-body` (body text) points to `'Inter'`, whose font file does not exist in `wwwroot/fonts/`, so body text falls back to the system font (Segoe UI on Windows). Buttons, inputs and selects additionally do not inherit the page font (no `font: inherit` reset), so they always use the browser's system font. | Set `--font-body` to `'Plus Jakarta Sans'`, drop the Inter `@font-face`, and add `button, input, select, textarea { font: inherit; }` to the reset. |
-| 2 | `UserList.razor` (`.admin-tabs entity-tabs`) | Only remaining use of the old segmented tab control (Users/Groups/Roles switcher), restyled locally. | Optional: migrate to `<Tabs>` if it should look like the other tab strips. |
-| 3 | `LogViewer` `.log-exclude-chip`, `ClientDeviceSettings` `.pill`, `MainLayout` `.demo-banner`, `UserList` (2×) | Fully rounded pill shapes (`border-radius: 999px`), which §7.1 reserves for small round indicators. | Optional: `--radius-control`, if they should match the crisp look. |
-| 4 | `wwwroot/lib/bootstrap` | 8.4 MB of unused files. | May be deleted. |
-| 5 | Notification rule editor (`notif-rule-summary`) | Last user of `.workspace-dl`. All read views (Backup, External Storage, Users/Groups/Roles, Departments, Share links, notification log, Homes) were migrated to the detail view skeleton on 2026-10-13 (`plans/detail-view-layout.md`). | Optional: replace the summary with `PropertyRow`s, then remove `.workspace-dl`. |
+| 1 | `UserList.razor` (`.admin-tabs entity-tabs`) | Only remaining use of the old segmented tab control (Users/Groups/Roles switcher), restyled locally. | Optional: migrate to `<Tabs>` if it should look like the other tab strips. |
+| 2 | `LogViewer` `.log-exclude-chip`, `ClientDeviceSettings` `.pill`, `MainLayout` `.demo-banner`, `UserList` (2×) | Fully rounded pill shapes (`border-radius: 999px`), which §7.1 reserves for small round indicators. | Optional: `--radius-control`, if they should match the crisp look. |
+| 3 | `wwwroot/lib/bootstrap` | 8.4 MB of unused files. | May be deleted. |
+| 4 | Notification rule editor (`notif-rule-summary`) | Last user of `.workspace-dl`. All read views (Backup, External Storage, Users/Groups/Roles, Departments, Share links, notification log, Homes) were migrated to the detail view skeleton on 2026-10-13 (`plans/detail-view-layout.md`). | Optional: replace the summary with `PropertyRow`s, then remove `.workspace-dl`. |
 
 ## 19. Reusable master prompt
 
