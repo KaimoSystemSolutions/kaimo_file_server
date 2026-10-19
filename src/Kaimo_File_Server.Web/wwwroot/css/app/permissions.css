@@ -1,0 +1,216 @@
+﻿/* ══════════════════════════════════════════════════════════
+   Permission Presets (Schnellauswahl-Chips)
+   ══════════════════════════════════════════════════════════ */
+
+.preset-chip {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+    .preset-chip:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+
+.preset-chip--active {
+    background: var(--accent-subtle);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* ══════════════════════════════════════════════════════════
+   Permission Groups (Gruppierte Checkboxen)
+   ══════════════════════════════════════════════════════════ */
+
+.permission-flags {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 12px;
+}
+
+.permission-flag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.1s;
+}
+
+    .permission-flag:hover {
+        color: var(--text-primary);
+    }
+
+    .permission-flag input[type="checkbox"] {
+        accent-color: var(--accent);
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        cursor: pointer;
+    }
+
+/* ══════════════════════════════════════════════════════════
+   Scoped Assignments List
+   ══════════════════════════════════════════════════════════ */
+
+.scoped-assignments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.scoped-assignment-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    transition: background 0.1s;
+}
+
+    .scoped-assignment-row:hover {
+        background: var(--bg-hover);
+    }
+
+.scoped-assignment-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+.scoped-assignment-principal {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.scoped-assignment-scope {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.scoped-assignment-badge {
+    margin-left: var(--space-1);
+    vertical-align: middle;
+}
+
+/* ══════════════════════════════════════════════════════════
+   Toggle Button Group (User / Group selection)
+   ══════════════════════════════════════════════════════════ */
+
+.toggle-button-group {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-control);
+    padding: 2px;
+    border: 1px solid var(--border);
+}
+
+.toggle-btn {
+    flex: 1;
+    padding: 7px var(--space-3);
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+}
+
+    .toggle-btn:hover {
+        color: var(--text-primary);
+        background: var(--bg-hover);
+    }
+
+.toggle-btn--active {
+    background: var(--bg-secondary);
+    color: var(--accent);
+    box-shadow: 0 0 0 1px var(--border);
+}
+
+    .toggle-btn--active:hover {
+        background: var(--bg-secondary);
+        color: var(--accent);
+    }
+
+    .toggle-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+/* ══════════════════════════════════════════════════════════
+   Assignment Form (Inline-Formular im Role Detail)
+   ══════════════════════════════════════════════════════════ */
+
+.assignment-form {
+    margin-top: 8px;
+    padding: 14px;
+    border: 2px solid var(--accent);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    box-shadow: 0 0 0 3px var(--accent-subtle);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+    /* Select elements — one consistent look for every dropdown: custom SVG
+       chevron instead of the native OS arrow. Covers the canonical
+       select.edit-input plus the former outliers (modal selects and bare
+       selects inside a .form-group). */
+    .assignment-form select.edit-input,
+    select.edit-input,
+    select.modal-input,
+    .form-group select {
+        padding: 9px 12px;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-strong, var(--border));
+        border-radius: var(--radius-control);
+        color: var(--text-primary);
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+        width: 100%;
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236e7788' stroke-width='2' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        padding-right: 32px;
+    }
+
+        .assignment-form select.edit-input:focus,
+        select.edit-input:focus,
+        select.modal-input:focus,
+        .form-group select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-subtle);
+        }
+

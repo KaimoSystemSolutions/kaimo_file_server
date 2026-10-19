@@ -5,9 +5,10 @@
 
 /*
  * Pure validation for the @GMT snapshot data path of vfs_kaimo_bridge.c:
- * the SNAPSHOT_RESOLVE reply, the cache-relative path it names, the lease
- * scope derived from that path, and the read-only open flags. Free of Samba
- * types; unit tested in tests/test-snapshot-access.cpp.
+ * the @GMT label, the read-only create/access contract, the SNAPSHOT_RESOLVE
+ * reply, the cache-relative path it names, the lease scope derived from that
+ * path, and the read-only open flags. Free of Samba types; unit tested in
+ * tests/test-snapshot-access.cpp.
  */
 
 #include "local_protocol.h"
@@ -18,6 +19,80 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
+
+/* Samba access-mask and create values used below. vfs_kaimo_bridge.c fails
+ * the build with _Static_assert if the pinned Samba ever disagrees. */
+#define KAIMO_FILE_GENERIC_READ 0x00120089U
+#define KAIMO_FILE_GENERIC_EXECUTE 0x001200a0U
+#define KAIMO_GENERIC_READ_ACCESS 0x80000000U
+#define KAIMO_GENERIC_EXECUTE_ACCESS 0x20000000U
+#define KAIMO_MAXIMUM_ALLOWED_ACCESS 0x02000000U
+#define KAIMO_FILE_OPEN 1U
+#define KAIMO_FILE_DELETE_ON_CLOSE 0x00001000U
+
+/* Snapshot handles may read data/EA/attributes, traverse/execute, read their
+ * security descriptor, and synchronize. Every right that can mutate the
+ * object or its namespace is excluded. MAXIMUM_ALLOWED is accepted as a
+ * request form, but the control-plane result is clamped to this mask. */
+#define KAIMO_SNAPSHOT_ALLOWED_ACCESS \
+	(KAIMO_FILE_GENERIC_READ | KAIMO_FILE_GENERIC_EXECUTE)
+/* FILE_WRITE_DATA | FILE_APPEND_DATA | FILE_WRITE_EA | FILE_WRITE_ATTRIBUTES |
+ * FILE_DELETE_CHILD | DELETE_ACCESS | WRITE_DAC_ACCESS | WRITE_OWNER_ACCESS |
+ * GENERIC_WRITE_ACCESS | GENERIC_ALL_ACCESS */
+#define KAIMO_SNAPSHOT_MUTATING_ACCESS 0x500d0156U
+
+/* Converts a Unix time to the Windows label "@GMT-YYYY.MM.DD-HH.MM.SS"
+ * (24 chars). out must hold >= 25 bytes. */
+static inline bool kaimo_snapshot_gmt_label(time_t t, char *out, size_t out_sz)
+{
+	struct tm tmv;
+	if (gmtime_r(&t, &tmv) == NULL) return false;
+	return strftime(out, out_sz, "@GMT-%Y.%m.%d-%H.%M.%S", &tmv) == 24;
+}
+
+/*
+ * Samba may populate allocation/security/EA arguments while opening an
+ * existing object even when the SMB request uses FILE_OPEN. They are create
+ * metadata, not mutation intent in that disposition, so only the access mask,
+ * disposition and options decide. The actual data-path open is independently
+ * forced to O_RDONLY without create/truncate/append, cache objects are POSIX
+ * read-only, and every namespace mutation hook rejects a timewarp path.
+ * Returns false with EROFS on any write intent.
+ */
+static inline bool kaimo_snapshot_create_readonly(
+	uint32_t access_mask, uint32_t create_disposition,
+	uint32_t create_options)
+{
+	if ((access_mask & KAIMO_SNAPSHOT_MUTATING_ACCESS) != 0 ||
+	    create_disposition != KAIMO_FILE_OPEN ||
+	    (create_options & KAIMO_FILE_DELETE_ON_CLOSE) != 0) {
+		errno = EROFS;
+		return false;
+	}
+	return true;
+}
+
+static inline uint32_t kaimo_snapshot_granted_access(
+	uint32_t requested, uint32_t granted)
+{
+	uint32_t expanded = requested;
+
+	if ((expanded & KAIMO_GENERIC_READ_ACCESS) != 0) {
+		expanded &= ~KAIMO_GENERIC_READ_ACCESS;
+		expanded |= KAIMO_FILE_GENERIC_READ;
+	}
+	if ((expanded & KAIMO_GENERIC_EXECUTE_ACCESS) != 0) {
+		expanded &= ~KAIMO_GENERIC_EXECUTE_ACCESS;
+		expanded |= KAIMO_FILE_GENERIC_EXECUTE;
+	}
+	if ((expanded & KAIMO_MAXIMUM_ALLOWED_ACCESS) != 0)
+		expanded |= KAIMO_SNAPSHOT_ALLOWED_ACCESS;
+
+	/* Never add a right merely because the control plane returned a broader
+	 * mask than requested, and never retain a mutating snapshot right. */
+	return granted & expanded & KAIMO_SNAPSHOT_ALLOWED_ACCESS;
+}
 
 /*
  * The bridge response crosses an unauthenticated control-plane boundary, so

@@ -1,0 +1,303 @@
+﻿/* -- Design Tokens (theme-independent) --
+   Central knobs for the overall look. Radius base = "crisp" (2/3/4px).
+   Switch the whole UI to fully square by setting all three radii to 0,
+   or to "mixed" with control 4px + surface 1px. */
+
+:root {
+    --radius-control: 2px;   /* buttons, inputs, selects, chips, badges, nav items */
+    --radius-surface: 3px;   /* cards, panels, table wrappers, dropdowns, menus */
+    --radius-modal: 4px;     /* modal dialogs */
+    /* 50% (avatars/dots) stays literal. */
+
+    /* Shared height for the top-bar controls (search bar, scope select, job
+       menu) so they line up flush regardless of their own content. */
+    --topbar-control-h: 40px;
+
+    /* Spacing scale (4px base) — applied to the shared primitives. */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+
+    /* Typography — Inter for body/UI, Plus Jakarta Sans for headings/labels. */
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --font-heading: 'Plus Jakarta Sans', var(--font-body);
+    --label-spacing: 0.08em;
+
+    /* External-storage provider identification colors (fixed, theme-independent). */
+    --provider-smb: #5b7fa4;
+    --provider-rsync: #6a9a5b;
+    --provider-sftp: #8b6baf;
+    --provider-webdav: #2e8b57;
+    --provider-onedrive: #0078d4;
+    --provider-google: #e67c35;
+    --provider-dropbox: #0061ff;
+}
+
+/* -- Theme Variables -- */
+
+[data-theme="dark"] {
+    --color-canvas: #151816;
+    --color-surface: #1e221f;
+    --color-surface-raised: #272c28;
+    --color-surface-sunken: #111411;
+    --color-surface-hover: #303630;
+    --color-border: #3b433c;
+    --color-border-strong: #59625b;
+    --color-text: #f0f3f0;
+    --color-text-strong: #ffffff;
+    --color-text-secondary: #bcc3bd;
+    --color-text-muted: #929b94;
+    --color-accent-brand: #4aad0a;
+    --color-accent-action: #3f9e00;
+    --color-accent-hover: #57bd12;
+    --color-accent-active: #338000;
+    --color-accent-soft: #1d3311;
+    --color-accent-border: #3d7a1e;
+
+    /* Profile-picture ring: light green on the dark theme. */
+    --avatar-ring: #86efac;
+
+    --bg-primary: var(--color-canvas);
+    --bg-secondary: var(--color-surface);
+    --bg-tertiary: var(--color-surface-raised);
+    --bg-sunken: var(--color-surface-sunken);
+    --bg-hover: var(--color-surface-hover);
+    --bg-active: #384039;
+    --text-primary: var(--color-text);
+    --text-strong: var(--color-text-strong);
+    --text-secondary: var(--color-text-secondary);
+    --text-tertiary: var(--color-text-muted);
+    --border: var(--color-border);
+    --border-light: #465047;
+    --border-strong: var(--color-border-strong);
+    --accent-brand: var(--color-accent-brand);
+    --accent: var(--color-accent-action);
+    --accent-hover: var(--color-accent-hover);
+    --accent-strong: #6fce30;
+    --accent-subtle: var(--color-accent-soft);
+    --accent-selected: #223f13;
+    --accent-border: var(--color-accent-border);
+    --accent-rgb: 63, 158, 0;
+    --text-on-accent: #ffffff;
+    --danger: #f87171;
+    --danger-hover: #fca5a5;
+    --danger-subtle: rgba(248, 113, 113, 0.14);
+    --success: #4ade80;
+    --success-subtle: rgba(74, 222, 128, 0.14);
+    --warning: #fbbf24;
+    --warning-subtle: rgba(251, 191, 36, 0.14);
+    --info: #7bb7e8;
+    --entity-user: #77bce8;
+    --entity-user-soft: rgba(58, 137, 190, 0.18);
+    --entity-group: #b59ae7;
+    --entity-group-soft: rgba(139, 105, 203, 0.18);
+    --entity-role: #e2b769;
+    --entity-role-soft: rgba(185, 126, 32, 0.18);
+    --entity-department: #e28a84;
+    --entity-department-soft: rgba(190, 80, 73, 0.17);
+    --folder-fill: rgba(214, 158, 46, 0.16);
+    --folder-stroke: #ddb765;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] {
+    --color-canvas: #e7eae5;
+    --color-surface: #ffffff;
+    --color-surface-raised: #f3f6f1;
+    --color-surface-sunken: #dbdfda;
+    --color-surface-hover: #e5eae3;
+    --color-border: #bbc2ba;
+    --color-border-strong: #8c948d;
+    --color-text: #1b201c;
+    --color-text-strong: #0b0e0c;
+    --color-text-secondary: #505852;
+    --color-text-muted: #707872;
+    --color-accent-brand: #3d9400;
+    --color-accent-action: #338000;
+    --color-accent-hover: #2b6d00;
+    --color-accent-active: #235a00;
+    --color-accent-soft: #e3f3d1;
+    --color-accent-border: #a3ce7a;
+
+    /* Profile-picture ring: dark green on the light theme. */
+    --avatar-ring: #166534;
+
+    --bg-primary: var(--color-canvas);
+    --bg-secondary: var(--color-surface);
+    --bg-tertiary: var(--color-surface-raised);
+    --bg-sunken: var(--color-surface-sunken);
+    --bg-hover: var(--color-surface-hover);
+    --bg-active: #d2d7d1;
+    --text-primary: var(--color-text);
+    --text-strong: var(--color-text-strong);
+    --text-secondary: var(--color-text-secondary);
+    --text-tertiary: var(--color-text-muted);
+    --border: var(--color-border);
+    --border-light: #ccd1cb;
+    --border-strong: var(--color-border-strong);
+    --accent-brand: var(--color-accent-brand);
+    --accent: var(--color-accent-action);
+    --accent-hover: var(--color-accent-hover);
+    --accent-strong: #235a00;
+    --accent-subtle: var(--color-accent-soft);
+    --accent-selected: #d5ecbd;
+    --accent-border: var(--color-accent-border);
+    --accent-rgb: 51, 128, 0;
+    --text-on-accent: #ffffff;
+    --danger: #dc2626;
+    --danger-hover: #b91c1c;
+    --danger-subtle: rgba(220, 38, 38, 0.08);
+    --success: #16a34a;
+    --success-subtle: rgba(22, 163, 74, 0.08);
+    --warning: #b45309;
+    --warning-subtle: rgba(180, 83, 9, 0.10);
+    --info: #256b9b;
+    --entity-user: #236f9f;
+    --entity-user-soft: #e0f0fa;
+    --entity-group: #6f4eaa;
+    --entity-group-soft: #eee7f8;
+    --entity-role: #986313;
+    --entity-role-soft: #f8ecd4;
+    --entity-department: #a3453f;
+    --entity-department-soft: #f8e4e2;
+    --folder-fill: rgba(183, 121, 31, 0.12);
+    --folder-stroke: #9a6700;
+    --shadow: 0 2px 8px rgba(27, 32, 28, 0.08);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* -- Accent Color Variants --
+   User-selectable accent, applied via a data-accent attribute that sits next to
+   data-theme (set by ThemeService + the App.razor head script). Only the 11
+   accent tokens are overridden per color/theme; everything else in the UI derives
+   from them. "green" is the default and needs no block (the base [data-theme=...]
+   values are already green). Switching is a pure attribute flip, so it is instant
+   and immune to CSS caching. */
+
+/* Magenta / Purple */
+[data-theme="dark"][data-accent="magenta"] {
+    --color-accent-brand: #c026a8; --color-accent-action: #b01e98;
+    --color-accent-hover: #cf3cb4; --color-accent-active: #8f1a7c;
+    --color-accent-soft: #33112b; --color-accent-border: #7a1e6a;
+    --avatar-ring: #f0aede;
+    --accent-strong: #e04fc6; --accent-selected: #3f1337;
+    --accent-rgb: 176, 30, 152; --text-on-accent: #ffffff;
+}
+[data-theme="light"][data-accent="magenta"] {
+    --color-accent-brand: #b01e98; --color-accent-action: #a01a89;
+    --color-accent-hover: #86156f; --color-accent-active: #6e105c;
+    --color-accent-soft: #f9e2f3; --color-accent-border: #d98fce;
+    --avatar-ring: #6e105c;
+    --accent-strong: #6e105c; --accent-selected: #f2ccec;
+    --accent-rgb: 160, 26, 137; --text-on-accent: #ffffff;
+}
+
+/* Orange */
+[data-theme="dark"][data-accent="orange"] {
+    --color-accent-brand: #e0780f; --color-accent-action: #d9700a;
+    --color-accent-hover: #ec8420; --color-accent-active: #b25a00;
+    --color-accent-soft: #33220f; --color-accent-border: #8a5417;
+    --avatar-ring: #fbc98a;
+    --accent-strong: #f5923a; --accent-selected: #3f2a12;
+    --accent-rgb: 217, 112, 10; --text-on-accent: #ffffff;
+}
+[data-theme="light"][data-accent="orange"] {
+    --color-accent-brand: #c76500; --color-accent-action: #b85c00;
+    --color-accent-hover: #9a4c00; --color-accent-active: #7e3e00;
+    --color-accent-soft: #fbe8d1; --color-accent-border: #e0a86a;
+    --avatar-ring: #7e3e00;
+    --accent-strong: #7e3e00; --accent-selected: #f7dcbd;
+    --accent-rgb: 184, 92, 0; --text-on-accent: #ffffff;
+}
+
+/* Red */
+[data-theme="dark"][data-accent="red"] {
+    --color-accent-brand: #dc4444; --color-accent-action: #d63a3a;
+    --color-accent-hover: #e85555; --color-accent-active: #b02a2a;
+    --color-accent-soft: #331515; --color-accent-border: #8a2f2f;
+    --avatar-ring: #f5a3a3;
+    --accent-strong: #f56a6a; --accent-selected: #3f1a1a;
+    --accent-rgb: 214, 58, 58; --text-on-accent: #ffffff;
+}
+[data-theme="light"][data-accent="red"] {
+    --color-accent-brand: #c73030; --color-accent-action: #bd2b2b;
+    --color-accent-hover: #9e2020; --color-accent-active: #831a1a;
+    --color-accent-soft: #fbdcdc; --color-accent-border: #e09a9a;
+    --avatar-ring: #831a1a;
+    --accent-strong: #831a1a; --accent-selected: #f7c9c9;
+    --accent-rgb: 189, 43, 43; --text-on-accent: #ffffff;
+}
+
+/* Blue */
+[data-theme="dark"][data-accent="blue"] {
+    --color-accent-brand: #3a86e8; --color-accent-action: #2f7fe0;
+    --color-accent-hover: #4f97ec; --color-accent-active: #2265b8;
+    --color-accent-soft: #111f33; --color-accent-border: #2a568a;
+    --avatar-ring: #a3c8f5;
+    --accent-strong: #5aa0f5; --accent-selected: #14243f;
+    --accent-rgb: 47, 127, 224; --text-on-accent: #ffffff;
+}
+[data-theme="light"][data-accent="blue"] {
+    --color-accent-brand: #1f66c2; --color-accent-action: #1a5cb8;
+    --color-accent-hover: #124a9a; --color-accent-active: #0e3d80;
+    --color-accent-soft: #d9e6fb; --color-accent-border: #8fb5e0;
+    --avatar-ring: #0e3d80;
+    --accent-strong: #0e3d80; --accent-selected: #c9dcf7;
+    --accent-rgb: 26, 92, 184; --text-on-accent: #ffffff;
+}
+
+/* Yellow — always dark text-on-accent for contrast. */
+[data-theme="dark"][data-accent="yellow"] {
+    --color-accent-brand: #e6ba00; --color-accent-action: #e0b400;
+    --color-accent-hover: #f5cc1a; --color-accent-active: #b89200;
+    --color-accent-soft: #332a08; --color-accent-border: #8a7017;
+    --avatar-ring: #f5e08a;
+    --accent-strong: #ffd633; --accent-selected: #3f3312;
+    --accent-rgb: 224, 180, 0; --text-on-accent: #241d00;
+}
+[data-theme="light"][data-accent="yellow"] {
+    --color-accent-brand: #c29200; --color-accent-action: #b88a00;
+    --color-accent-hover: #9a7300; --color-accent-active: #7e5e00;
+    --color-accent-soft: #fbf1cf; --color-accent-border: #e0cd6a;
+    --avatar-ring: #6b5200;
+    --accent-strong: #7e5e00; --accent-selected: #f7ecbd;
+    --accent-rgb: 184, 138, 0; --text-on-accent: #241d00;
+}
+
+/* Turquoise / Teal */
+[data-theme="dark"][data-accent="turquoise"] {
+    --color-accent-brand: #14b8a6; --color-accent-action: #10a898;
+    --color-accent-hover: #1ccbb8; --color-accent-active: #0c8578;
+    --color-accent-soft: #0f2f2b; --color-accent-border: #177a6f;
+    --avatar-ring: #8af0e3;
+    --accent-strong: #33e0cd; --accent-selected: #123f39;
+    --accent-rgb: 16, 168, 152; --text-on-accent: #04211d;
+}
+[data-theme="light"][data-accent="turquoise"] {
+    --color-accent-brand: #0d8f80; --color-accent-action: #0b8073;
+    --color-accent-hover: #086a5f; --color-accent-active: #06544b;
+    --color-accent-soft: #d1f3ee; --color-accent-border: #7accc2;
+    --avatar-ring: #06544b;
+    --accent-strong: #06544b; --accent-selected: #bdeee7;
+    --accent-rgb: 11, 128, 115; --text-on-accent: #ffffff;
+}
+
+
+@font-face {
+    font-family: 'Plus Jakarta Sans';
+    src: url('../../fonts/PlusJakartaSans-VariableFont_wght.ttf') format('truetype');
+    font-weight: 100 800;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Inter';
+    src: url('../../fonts/Inter-VariableFont.ttf') format('truetype');
+    font-weight: 100 900;
+    font-display: swap;
+}
+

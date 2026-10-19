@@ -1,0 +1,77 @@
+.property-row {
+    display: grid;
+    grid-template-columns: minmax(110px, 36%) minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: baseline;
+    padding: 7px var(--space-3);
+}
+
+.property-row:nth-child(even) {
+    background: var(--bg-hover);
+}
+
+[data-theme="dark"] .property-row:nth-child(odd) {
+    background: var(--bg-hover);
+}
+
+[data-theme="dark"] .property-row:nth-child(even) {
+    background: none;
+}
+
+.property-row:hover,
+[data-theme="dark"] .property-row:hover {
+    background: var(--bg-active);
+}
+
+.property-row ::deep dt {
+    /* Brighter (dark) / darker (light) than --text-secondary for readability on the zebra rows. */
+    color: color-mix(in srgb, var(--text-primary) 60%, var(--text-secondary));
+    font-size: 12.5px;
+    line-height: 22px;
+}
+
+.property-row ::deep dd {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    min-height: 22px;
+    margin: 0;
+    color: var(--text-strong);
+    font-size: 13.5px;
+    font-weight: 400;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.property-value-text {
+    min-width: 0;
+}
+
+.property-row dd:has(.property-copy) {
+    flex-wrap: nowrap;
+}
+
+.property-value--mono .property-value-text {
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: 12.5px;
+    font-weight: 400;
+}
+
+.property-row dd.property-value--entity {
+    font-weight: 600;
+}
+
+.property-row .property-copy {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+}
+
+@media (max-width: 760px) {
+    .property-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 2px;
+    }
+}

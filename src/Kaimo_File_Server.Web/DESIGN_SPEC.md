@@ -342,7 +342,7 @@ For more than two outcomes, compute the tone in code-behind (e.g. a `switch` ove
 
 ## 14. Framework policy
 
-- The Web UI is plain Blazor + hand-written CSS: `app.css` (global tokens and primitives) plus scoped `*.razor.css` per component. There is no CSS bundler.
+- The Web UI is plain Blazor + hand-written CSS: `app.css` (global tokens and primitives) plus scoped `*.razor.css` per component. There is no CSS bundler. `app.css` itself is only an ordered list of `@import`s of the area files in `wwwroot/css/app/` (`tokens.css` first); the import order is the cascade order, so new global rules go into the matching area file, not at the end of `app.css`.
 - **Bootstrap is not loaded** (`App.razor` references only `app.css` and the scoped bundle). The files under `wwwroot/lib/bootstrap` are unused leftovers. Bootstrap class names (`card`, `form-control`, `table`, `alert`, `nav-tabs`, `badge`, `row`/`col-*`, …) MUST NOT be relied on for styling; they render unstyled.
 - Native controls (`<button>`, `<select>`, `<input>`, checkbox, file input) MUST always carry a Kaimo class or sit inside a styled Kaimo container — a raw browser control is never finished UI.
 - Scoped CSS reaches child components' elements via `::deep`. Styles used by more than one page move to `app.css` or a shared component, not copy-paste.

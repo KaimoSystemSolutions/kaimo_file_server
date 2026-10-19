@@ -1,0 +1,392 @@
+﻿/* -- search bar -- */
+
+/* GlobalSearch: the search input (full width) with one scope dropdown to its
+   right. It is the growing flex child of .search-bar-container; the job menu
+   stays right-aligned beside it. */
+.global-search {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Holds the bar + its absolutely-positioned results dropdown. */
+.search-area {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Mini "where am I searching" hint inside the bar, right of the input. */
+.search-scope-hint {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    opacity: 0.9;
+}
+
+.search-scope-select {
+    flex: 0 0 auto;
+    height: var(--topbar-control-h);
+    max-width: 200px;
+    padding: 0 30px 0 10px;
+    font-size: 13px;
+    line-height: normal;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+    /* Custom chevron: vertically centered, inset from the edge, with room before it. */
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236e7788' stroke-width='2' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+}
+
+.search-scope-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
+}
+
+/* Info button for the active share selection: shows the count, tooltip lists how
+   many are selected, click reopens the picker dialog. */
+.search-scope-badge {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 26px;
+    padding: 0 7px;
+    border-radius: 999px;
+    border: 1px solid var(--accent);
+    background: var(--accent-subtle);
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.search-scope-badge:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+/* Compact result rows: lower height, still legible. */
+.global-search .search-result-item {
+    padding: 5px 12px;
+    gap: 9px;
+}
+
+.global-search .search-result-item svg {
+    width: 17px;
+    height: 17px;
+}
+
+/* File/folder hits carry the file browser's own colors; no extra dimming. */
+.global-search .search-result-item svg.search-entry-icon {
+    opacity: 1;
+}
+
+/* One row per result: name on the left, secondary info (path / snippet /
+   category) on the right, both truncated — no more stacked second line. */
+.global-search .search-result-info {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.global-search .search-result-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+
+.global-search .search-result-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: auto;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.global-search .search-result-meta mark {
+    background: rgba(var(--accent-rgb), 0.25);
+    color: var(--text-primary);
+    border-radius: var(--radius-control);
+    padding: 0 2px;
+}
+
+/* Hairline between results so it reads as separate rows, and breathing room
+   under the last one. */
+.global-search .search-result-item:not(:last-child) {
+    border-bottom: 1px solid var(--border);
+}
+
+/* No double line at a section boundary: drop the item's hairline when the next
+   row is a group header (which already draws its own top separator). */
+.global-search .search-result-item:has(+ .search-group-header) {
+    border-bottom: none;
+}
+
+.global-search .search-dropdown {
+    padding-bottom: 6px;
+}
+
+.global-search .search-group-header {
+    padding: 6px 12px 2px;
+}
+
+.search-bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: var(--topbar-control-h);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    padding: 0 14px;
+    flex: 1;
+    min-width: 0;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Inside GlobalSearch the bar must not stretch vertically in the column layout. */
+.global-search .search-bar {
+    flex: 0 0 auto;
+    width: 100%;
+}
+
+.search-bar:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
+}
+
+.search-bar.has-results:focus-within {
+    border-radius: var(--radius-surface) var(--radius-surface) 0 0;
+}
+
+.search-bar svg {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    opacity: 0.7;
+}
+
+.search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    min-width: 0;
+}
+
+.search-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+.search-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: var(--radius-control);
+    font-size: 0.8rem;
+    line-height: 1;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.search-clear:hover {
+    background: var(--border);
+    color: var(--text-primary);
+}
+
+/* -- google drive account cloud display -- */
+
+.share-help-text {
+    align-self: center;
+}
+
+/* Dropdown */
+.search-dropdown {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: -1px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent);
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--radius-surface) var(--radius-surface);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    max-height: 360px;
+    overflow-y: auto;
+    z-index: 101;
+    
+   
+    margin-left: -1px;
+    margin-right: -1px;
+}
+
+.search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.search-result-item:hover,
+.search-result-item.active {
+    background: var(--bg-hover, rgba(var(--accent-rgb), 0.08));
+}
+
+.search-result-item svg {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    opacity: 0.75;
+}
+
+.search-result-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.search-result-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.search-result-item.searching,
+.search-result-item.no-results {
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: default;
+    padding: 16px;
+}
+
+.search-result-item.searching:hover,
+.search-result-item.no-results:hover {
+    background: transparent;
+}
+.search-group-header {
+    padding: 8px 14px 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    user-select: none;
+}
+
+.search-group-header:not(:first-child) {
+    margin-top: 4px;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+}
+
+.entity-page-search {
+    width: 240px;
+    max-width: 100%;
+}
+
+.entity-list-department-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 14px 6px;
+    border: none;
+    border-top: 1px solid var(--border);
+    background: none;
+    text-align: left;
+    cursor: pointer;
+}
+
+.entity-list-department-chevron {
+    flex-shrink: 0;
+    color: var(--text-tertiary);
+    transition: transform 0.2s;
+}
+
+.entity-list-department-chevron--open {
+    transform: rotate(90deg);
+}
+
+/* -- Running jobs menu -- */
+.job-menu {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+/* When a count first appears (class flips off --empty), ease it in with a soft
+   accent halo instead of a hard pop, so a new background job is noticeable but
+   not jarring. Plays once; a changing count doesn't retrigger it because the
+   class string stays the same across those re-renders. */
+
+@keyframes job-count-appear {
+    from {
+        opacity: 0;
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    55% {
+        opacity: 1;
+        box-shadow: 0 0 9px 3px color-mix(in srgb, var(--accent) 50%, transparent);
+    }
+    to {
+        opacity: 1;
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);
+    }
+}
+
+/* Keeps the reserved slot but hides it when no jobs are running. */
+
+.job-progress {
+    height: 5px;
+    overflow: hidden;
+    margin: 10px 0 6px;
+    border-radius: var(--radius-control);
+    background: var(--bg-sunken);
+}
+
+.job-progress-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent);
+    transition: width .2s ease;
+}
+

@@ -1,0 +1,155 @@
+.job-menu-toggle {
+    display: flex;
+    height: var(--topbar-control-h);
+    align-items: center;
+    gap: 7px;
+    padding: 0 11px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.job-menu-toggle:hover,
+.job-menu-toggle--open {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.job-menu-count {
+    display: inline-flex;
+    min-width: 26px; /* fits a two-digit count so the badge never resizes */
+    height: 19px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    border-radius: var(--radius-surface);
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.job-menu-count:not(.job-menu-count--empty) {
+    animation: job-count-appear .7s ease-out;
+}
+
+.job-menu-count--empty {
+    visibility: hidden;
+}
+
+.job-menu-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: min(390px, calc(100vw - 32px));
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow-lg);
+}
+
+.job-menu-header,
+.job-menu-meta,
+.job-menu-item-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.job-menu-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.job-menu-header ::deep strong {
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.job-menu-header ::deep span,
+.job-menu-meta {
+    color: var(--text-tertiary);
+    font-size: 11px;
+}
+
+.job-menu-empty {
+    padding: 28px 18px;
+    color: var(--text-tertiary);
+    font-size: 13px;
+    text-align: center;
+}
+
+.job-menu-list {
+    max-height: min(440px, calc(100vh - 150px));
+    overflow-y: auto;
+}
+
+.job-menu-item {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.job-menu-item:last-child {
+    border-bottom: 0;
+}
+
+.job-menu-item-heading > div {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.job-menu-item-heading ::deep strong,
+.job-menu-item-heading ::deep small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.job-menu-item-heading ::deep strong {
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.job-menu-item-heading ::deep small {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.job-cancel {
+    display: inline-flex;
+    width: 27px;
+    height: 27px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.job-cancel:hover:not(:disabled) {
+    border-color: var(--danger);
+    background: var(--danger-subtle);
+    color: var(--danger);
+}
+
+.job-cancel:disabled {
+    opacity: .45;
+    cursor: default;
+}
+
+@media (max-width: 700px) {
+    .job-menu-toggle > span:not(.job-menu-count) {
+        display: none;
+    }
+}

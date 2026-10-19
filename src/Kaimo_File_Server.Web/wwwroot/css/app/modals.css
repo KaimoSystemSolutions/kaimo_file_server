@@ -1,0 +1,511 @@
+﻿/* -- Dialog -- */
+
+.principal-picker-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 540px;
+    max-width: 92vw;
+    max-height: 82vh;
+    padding: 18px;
+    overflow: hidden;
+}
+
+.principal-picker-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+    .principal-picker-header .modal-title {
+        margin: 0;
+    }
+
+.principal-picker-tabs {
+    display: flex;
+    gap: 2px;
+    margin-top: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.principal-picker-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 11px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text-secondary);
+    cursor: pointer;
+    margin-bottom: -1px;
+}
+
+    .principal-picker-tab:hover {
+        color: var(--text-primary);
+    }
+
+    .principal-picker-tab.is-active {
+        color: var(--text-primary);
+        font-weight: 500;
+        border-bottom-color: var(--accent);
+    }
+
+.principal-picker-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 0 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+    .principal-picker-search:focus-within {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-subtle);
+    }
+
+.principal-picker-search-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    line-height: 0;
+    color: var(--text-tertiary);
+    pointer-events: none;
+}
+
+/* The icon is a flex sibling, not an overlay, so page-level input padding can't push text under it. */
+.principal-picker-search .modal-input {
+    flex: 1;
+    min-width: 0;
+    height: 34px;
+    border: none;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+}
+
+    .principal-picker-search .modal-input:focus {
+        border: none;
+        box-shadow: none;
+    }
+
+.principal-picker-list {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 190px;
+    margin-top: 10px;
+    padding: 2px;
+}
+
+.principal-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 7px 10px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-control);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+    .principal-picker-row:hover {
+        background: var(--bg-hover);
+    }
+
+    .principal-picker-row.is-selected {
+        background: var(--accent-selected);
+    }
+
+    .principal-picker-row.has-divider {
+        border-top: 1px solid var(--border-light);
+        margin-top: 3px;
+        padding-top: 10px;
+    }
+
+.principal-picker-check {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 2px;
+    background: transparent;
+    box-sizing: border-box;
+    /* Flex centring keeps the mark on whole pixels (a 2px border leaves a 12px
+       content box, so even-sized marks stay crisp and centred). */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Filled box with a check mark – same control for single- and multi-select. */
+.principal-picker-check.is-checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+    .principal-picker-check.is-checked::after {
+        content: "";
+        width: 4px;
+        height: 8px;
+        border: solid var(--text-on-accent);
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+    }
+
+.principal-picker-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: var(--radius-control);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.principal-picker-avatar--round {
+    border-radius: 50%;
+}
+
+.principal-picker-row-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.principal-picker-name {
+    display: block;
+    font-size: 13px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.principal-picker-hint {
+    display: block;
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+.principal-picker-empty {
+    padding: 26px 12px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-tertiary);
+}
+
+/* Per-department (bucket) header in a grouped list; color + soft fill set inline. */
+.principal-picker-group-header {
+    display: flex;
+    align-items: center;
+    margin: 9px 4px 3px;
+    padding: 3px 9px;
+    border-radius: var(--radius-control);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--label-spacing);
+}
+
+    .principal-picker-group-header:first-child {
+        margin-top: 2px;
+    }
+
+.principal-picker-selectedbar {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+}
+
+.principal-picker-selectedbar-label {
+    margin-bottom: 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: var(--label-spacing);
+    color: var(--text-tertiary);
+}
+
+/* -- Create Form Card (User/Group Creation) -- */
+
+.create-form-card {
+    background: var(--bg-secondary);
+    border: 2px solid var(--accent);
+    border-radius: var(--radius-surface);
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+    .create-form-card h3 {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--accent);
+        margin-bottom: 16px;
+    }
+
+.create-form-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.create-form-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+/* -- Delete Confirmation -- */
+
+.confirm-delete {
+    padding: 12px 14px;
+    background: var(--danger-subtle);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-control);
+}
+
+    .confirm-delete p {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--danger);
+        margin-bottom: 10px;
+    }
+
+/* ══════════════════════════════════════════════════════════
+   Modal Dialogs (Create folder, Delete, Rename)
+   ══════════════════════════════════════════════════════════ */
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.15s ease-out;
+}
+
+.modal-dialog {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-modal);
+    padding: 24px;
+    min-width: 340px;
+    max-width: 480px;
+    box-shadow: var(--shadow-lg);
+    animation: scaleIn 0.15s ease-out;
+}
+
+.modal-title {
+    margin: 0 0 16px 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.modal-text {
+    margin: 0 0 16px 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.modal-warning {
+    color: var(--danger);
+    font-size: 12px;
+}
+
+.modal-input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-sizing: border-box;
+}
+
+    .modal-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-subtle);
+    }
+
+.modal-error {
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: var(--danger-subtle);
+    border-radius: var(--radius-control);
+    color: var(--danger);
+    font-size: 12px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+/* ══════════════════════════════════════════════════════════
+   Context Menu (Rechtsklick)
+   ══════════════════════════════════════════════════════════ */
+
+.context-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+}
+
+.context-menu {
+    position: fixed;
+    z-index: 910;
+    min-width: 180px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    padding: 4px;
+    box-shadow: var(--shadow-lg);
+    animation: scaleIn 0.12s ease-out;
+    /* Never taller than the viewport: JS nudges the menu up when it overflows,
+       and this fallback lets an extreme menu scroll instead of clipping. */
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 10px;
+    border: none;
+    background: none;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+    border-radius: var(--radius-control);
+    transition: background 0.1s;
+    text-align: left;
+}
+
+    .context-menu-item:hover {
+        background: var(--bg-hover);
+    }
+
+.context-menu-item--danger {
+    color: var(--danger);
+}
+
+    .context-menu-item--danger:hover {
+        background: var(--danger-subtle);
+    }
+
+.context-menu-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 3px 6px;
+}
+
+/* ══════════════════════════════════════════════════════════
+   Properties Dialog (Eigenschaften)
+   Compact, Explorer-style metadata panel with General/Security tabs.
+   ══════════════════════════════════════════════════════════ */
+
+.properties-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 420px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 64px);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-modal);
+    box-shadow: var(--shadow-lg);
+    animation: scaleIn 0.15s ease-out;
+    overflow: hidden;
+}
+
+.properties-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.properties-header-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+.properties-header-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.properties-body {
+    padding: 16px;
+    overflow-y: auto;
+}
+
+/* Two-column definition list: label (left) / value (right). */
+
+/* Full-width hairline between logical groups of rows. */
+
+.properties-mono {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px !important;
+    color: var(--text-secondary) !important;
+}
+
+/* Create-hash dialog */
+
+.hash-field-label {
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+.hash-field-label:not(:first-child) {
+    margin-top: 10px;
+}
+
+.hash-value-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.hash-value {
+    flex: 1;
+    resize: none;
+    word-break: break-all;
+    cursor: text;
+}
+
+.hash-copy {
+    flex-shrink: 0;
+}
+

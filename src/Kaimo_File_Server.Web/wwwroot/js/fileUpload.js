@@ -147,6 +147,11 @@ window.kaimoUpload = (() => {
         }
     }
 
+    // Opens the browser's file dialog of the layout's active hidden InputFile.
+    function openFilePicker(inputId = 'global-file-input') {
+        document.getElementById(inputId)?.click();
+    }
+
     // Opens the browser's folder dialog. Files keep their folder in webkitRelativePath.
     function pickFolder(dotNetRef, inputId = 'global-file-input', maxFiles = MAX_FILES) {
         const picker = document.createElement('input');
@@ -195,7 +200,7 @@ window.kaimoUpload = (() => {
         });
     }
 
-    return { MAX_FILES, snapshotDrop, handleDrop, pickFolder, initPublicDrop };
+    return { MAX_FILES, snapshotDrop, handleDrop, openFilePicker, pickFolder, initPublicDrop };
 })();
 
 function initFileUpload(elementSelector, dotNetRef) {

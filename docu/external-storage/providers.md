@@ -74,7 +74,7 @@ Protocol providers live in `src/Kaimo_File_Server.Infrastructure/ExternalStorage
 settings are stored in `StorageConnection.SettingsJson`; passwords and private keys in the protected
 credential payload.
 
-### SMB (`MountedProtocolProviders.cs`)
+### SMB (`SmbStorageConnectionProvider.cs`, `SmbCommandRemoteFileStore.cs`)
 
 - Executes `smbclient` through `ProtocolCommandRunner` with a private, short-lived authentication
   file (`-A`) instead of command-line credentials; supports domain, port and a minimum protocol

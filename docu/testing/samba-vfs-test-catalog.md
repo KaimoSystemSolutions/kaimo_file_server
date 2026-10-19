@@ -272,6 +272,7 @@ Run in the build gate (optimized) and in the full suite (ASan/UBSan + coverage).
 
 | Test | Header | Covers |
 |---|---|---|
+| `test-authd-client.cpp` | `authd_client.h` | Request buffer, one deadline-bounded roundtrip against a scripted fake authd: payload copy, generic error replies, operation mismatch, payload above capacity, bad header, truncated payload, peer close, timeout, missing socket, over-long socket path |
 | `test-authz-reply.cpp` | `authz_reply.h` | Response header acceptance, OPEN and DELETE reply decoding, empty `ALLOW` and other statuses, complete fail-mode policy, truncating create dispositions require `FILE_WRITE_DATA` |
 | `test-close-capture.cpp` | `close_capture.h` | Capture ID randomness, source stability check, exact content publish, cleanup on every rejection, copy errors |
 | `test-decision-cache.cpp` | `decision_cache.h` | LRU eviction, byte budget, oversize entries skipped, expiry and statistics |
@@ -279,8 +280,8 @@ Run in the build gate (optimized) and in the full suite (ASan/UBSan + coverage).
 | `test-local-protocol.cpp`, `test-local-protocol-edges.cpp` | `local_protocol.h` | Binary fields, identity bounds, UTF-8 validation, fragmented reads, builder overflow, embedded NUL, trailing fields, every header rejection, EOF semantics, send/receive deadlines |
 | `test-recycle-move.cpp` | `recycle_move.h` | Path boundaries, collisions, symlinked destination, home recycle roots, checked rename fallback |
 | `test-rename-event.cpp` | `rename_event.h` | Directory flag derived from the file mode |
-| `test-share-path.cpp` | `share_path.h` | Share-relative path normalization (redundant slashes, `.` components) |
-| `test-snapshot-access.cpp` | `snapshot_access.h` | Cache-relative path validation, lease scope, read-only open flags, resolve decoding |
+| `test-share-path.cpp` | `share_path.h` | Share-relative path normalization (redundant slashes, `.` components), reserved `.kaimo-*` namespace at the share root |
+| `test-snapshot-access.cpp` | `snapshot_access.h` | `@GMT` label formatting, read-only create contract, snapshot access-mask clamping, cache-relative path validation, lease scope, read-only open flags, resolve decoding |
 | `test-snapshot-enumeration.cpp` | `snapshot_enumeration.h` | Enumeration payload validation and size limits |
 | `test-sync-json.cpp` | `sync_json.h` | Username, share-name and path validators |
 | `test-vfs-env.cpp` | `vfs_env.h` | Deadline parsing (range, invalid values) and kill switches |

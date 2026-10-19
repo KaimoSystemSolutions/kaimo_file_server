@@ -1,0 +1,242 @@
+﻿/* -- Reset & Base -- */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body, #app {
+    height: 100%;
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background: var(--bg-primary);
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+}
+
+/* Micro-label treatment — the uppercase section/column/group labels get the
+   heading font and consistent tracking for a deliberate, designed feel.
+   (Form field labels are intentionally excluded to stay legible in dense forms.) */
+.file-list-header,
+.detail-label,
+.ui-label {
+    font-family: var(--font-heading);
+    letter-spacing: var(--label-spacing);
+    text-transform: uppercase;
+}
+
+.ui-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+}
+
+/* Reconnect dialog shown when an Interactive Server circuit loses its connection.
+   App.razor provides an element with id #components-reconnect-modal, so blazor.web.js
+   drives this themed light-DOM markup (toggling the state classes below) instead of
+   its built-in dialog, which renders in a shadow root our theme cannot style. */
+#components-reconnect-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+/* Blazor toggles these state classes on the element; any active state shows the overlay. */
+#components-reconnect-modal.components-reconnect-show,
+#components-reconnect-modal.components-reconnect-retrying,
+#components-reconnect-modal.components-reconnect-paused,
+#components-reconnect-modal.components-reconnect-failed,
+#components-reconnect-modal.components-reconnect-resume-failed,
+#components-reconnect-modal.components-reconnect-rejected {
+    display: flex;
+}
+
+.reconnect-dialog {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: min(22rem, 100%);
+    padding: 1.75rem 2rem;
+    text-align: center;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-surface);
+    box-shadow: var(--shadow-lg);
+}
+
+.reconnect-spinner {
+    width: 34px;
+    height: 34px;
+    border: 3px solid var(--border-strong);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.reconnect-text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+.reconnect-attempt {
+    color: var(--text-tertiary);
+    white-space: nowrap;
+}
+
+/* "Reconnecting" is the default state. The framework swaps classes for the others,
+   so reveal the matching message (and the reload button) purely via those classes. */
+.reconnect-text--paused,
+.reconnect-text--failed,
+.reconnect-text--rejected,
+.reconnect-reload {
+    display: none;
+}
+
+#components-reconnect-modal.components-reconnect-paused .reconnect-text--reconnecting,
+#components-reconnect-modal.components-reconnect-failed .reconnect-text--reconnecting,
+#components-reconnect-modal.components-reconnect-resume-failed .reconnect-text--reconnecting,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-text--reconnecting,
+#components-reconnect-modal.components-reconnect-paused .reconnect-spinner,
+#components-reconnect-modal.components-reconnect-failed .reconnect-spinner,
+#components-reconnect-modal.components-reconnect-resume-failed .reconnect-spinner,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-spinner {
+    display: none;
+}
+
+#components-reconnect-modal.components-reconnect-paused .reconnect-text--paused,
+#components-reconnect-modal.components-reconnect-failed .reconnect-text--failed,
+#components-reconnect-modal.components-reconnect-resume-failed .reconnect-text--failed,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-text--rejected {
+    display: block;
+}
+
+#components-reconnect-modal.components-reconnect-paused .reconnect-reload,
+#components-reconnect-modal.components-reconnect-failed .reconnect-reload,
+#components-reconnect-modal.components-reconnect-resume-failed .reconnect-reload,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-reload {
+    display: inline-flex;
+}
+
+.reconnect-reload {
+    align-items: center;
+    min-height: 34px;
+    padding: 0 16px;
+    color: #fff;
+    background: var(--accent);
+    border: 0;
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.reconnect-reload:hover {
+    background: var(--accent-strong, var(--accent));
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}
+
+/* -- Icon Buttons -- */
+
+.btn-icon {
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-control);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+}
+
+    .btn-icon:hover {
+        background: var(--accent-subtle);
+        color: var(--accent);
+        border-color: var(--accent);
+    }
+
+.btn-icon--small {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    transition: all 0.15s;
+}
+
+    .btn-icon--small:hover {
+        background: var(--bg-hover);
+        border-color: var(--border-light);
+        color: var(--text-primary);
+    }
+
+.btn-icon--danger:hover svg {
+    stroke: var(--danger) !important;
+}
+
+/* -- Main Content -- */
+
+.main {
+    flex: 1;
+    overflow-y: auto;
+    /* No top padding: the sticky search bar is the first child and should sit
+       flush against the top of the page. Sides/bottom keep their spacing. */
+    padding: 0 32px 24px;
+    min-width: 0;
+}
+
+/* -- Page Header -- */
+
+.page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+    .page-header h1 {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.02em;
+    }
+
+.subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+

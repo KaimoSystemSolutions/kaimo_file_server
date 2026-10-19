@@ -343,12 +343,15 @@ Both changes behave exactly as before in production.
   | Header | Logic |
   |---|---|
   | `authz_reply.h` | Which response frames are acceptable, how an authorization reply decodes, final allow/deny per verdict and fail mode, whether a truncating create disposition is covered by the granted mask |
-  | `snapshot_access.h` | `SNAPSHOT_RESOLVE` reply decoding, cache-relative path validation, lease scope, read-only open flags |
+  | `authd_client.h` | Request buffer and the deadline-bounded request/response roundtrip to `kaimo_authd` (connect, frame validation before reading into caller storage) |
+  | `share_path.h` | Share-relative path canonicalization and the reserved `.kaimo-*` namespace |
+  | `snapshot_access.h` | `@GMT` label, read-only create contract and access-mask clamping, `SNAPSHOT_RESOLVE` reply decoding, cache-relative path validation, lease scope, read-only open flags |
   | `close_capture.h` | Capture ID, stable-source check, chunked copy, atomic no-replace publish |
   | `vfs_env.h` | Parsing of deadline values and kill switches from the environment |
 
-  In addition, a `_Static_assert` fails the build if the pinned Samba's `FILE_GENERIC_ALL` ever
-  differs from the access-mask contract (`KAIMO_SAMBA_SPECIFIC_ACCESS`), and the module logs a build
+  In addition, `_Static_assert`s fail the build if the pinned Samba's `FILE_GENERIC_ALL` ever
+  differs from the access-mask contract (`KAIMO_SAMBA_SPECIFIC_ACCESS`) or its access/create
+  constants differ from the snapshot contract in `snapshot_access.h`, and the module logs a build
   marker (`kaimo_bridge build [...] loaded`) that the build gate and the live tests check, so a
   stale module cannot go unnoticed.
 - **`entrypoint.vfs.sh`** – the helper script directory, the number and interval of initial

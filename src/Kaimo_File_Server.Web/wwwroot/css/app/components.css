@@ -1,0 +1,362 @@
+﻿/* ══════════════════════════════════════════════════════════
+   Design-spec rollout: shared component finish
+   ══════════════════════════════════════════════════════════ */
+
+.page-header h1 {
+    font-family: var(--font-heading);
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-danger-outline,
+.btn-icon,
+.btn-icon--small {
+    border-radius: var(--radius-control);
+}
+
+.btn-icon:hover,
+.btn-icon--small:hover {
+    border-color: var(--border-strong);
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.btn-primary:active:not(:disabled) {
+    background: var(--color-accent-active);
+}
+
+.btn-secondary {
+    background: var(--bg-secondary);
+}
+
+.btn-secondary:active:not(:disabled) {
+    background: var(--bg-active);
+}
+
+.form-group label,
+.settings-field-label {
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    font-weight: 650;
+}
+
+.form-group input,
+.form-group select,
+.edit-input,
+.modal-input,
+.multi-select-display,
+textarea {
+    min-height: 36px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 13px;
+    box-shadow: none;
+}
+
+.form-group input:hover,
+.form-group select:hover,
+.edit-input:hover,
+.modal-input:hover,
+.multi-select-display:hover,
+textarea:hover {
+    border-color: color-mix(in srgb, var(--border-strong) 78%, var(--text-primary));
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.edit-input:focus,
+.modal-input:focus,
+.multi-select.open .multi-select-display,
+textarea:focus {
+    border-color: var(--accent);
+    outline: 0;
+    box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+    accent-color: var(--accent);
+}
+
+/* Compact field density for admin create/edit panels. Opt-in via the
+   `admin-compact` class on the panel/card so shared cards elsewhere
+   (e.g. the CloudSync create card) keep the default size. Replaces the
+   dense blocks that were duplicated in the Users/Departments scoped CSS. */
+.admin-compact .edit-input,
+.admin-compact .form-group input,
+.admin-compact .multi-select-display {
+    min-height: 28px;
+    padding: 5px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.admin-compact select.edit-input {
+    padding: 5px 32px 5px 10px;
+}
+
+.admin-compact .multi-select-text {
+    font-size: 12px;
+}
+
+.error-banner,
+.success-banner {
+    border-radius: var(--radius-control);
+    font-weight: 550;
+}
+
+.success-banner {
+    border: 1px solid color-mix(in srgb, var(--success) 34%, var(--border));
+}
+
+.loading-state,
+.empty-state {
+    min-height: 220px;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-surface);
+    background: var(--bg-sunken);
+}
+
+.spinner {
+    border-color: var(--border-strong);
+    border-top-color: var(--accent);
+}
+
+.create-form-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-tertiary);
+    box-shadow: none;
+}
+
+.create-form-card {
+    margin-bottom: 14px;
+}
+
+.admin-detail {
+    border-radius: var(--radius-surface);
+    box-shadow: none;
+}
+
+.detail-header h3 {
+    font-family: var(--font-heading);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+}
+
+.detail-label {
+    color: var(--text-secondary);
+}
+
+.detail-field-value,
+.info-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-tertiary);
+}
+
+.detail-actions {
+    gap: 7px;
+}
+
+.multi-select-dropdown {
+    border-color: var(--border-strong);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow-lg);
+}
+
+.multi-select-option:hover {
+    background: var(--bg-hover);
+}
+
+.toggle-slider {
+    border: 1px solid var(--border-strong);
+    background: var(--bg-active);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    border-color: var(--accent);
+    background: var(--accent);
+}
+
+/* The real input is invisible, so keyboard focus and the disabled state show on the track. */
+.toggle-switch input:focus-visible + .toggle-slider {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.toggle-switch input:disabled + .toggle-slider {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.modal-backdrop {
+    background: rgba(10, 14, 11, 0.62);
+}
+
+.modal-dialog,
+.properties-dialog,
+.preview-dialog {
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow-lg);
+}
+
+.modal-title,
+.properties-header-name,
+.preview-title {
+    font-family: var(--font-heading);
+    letter-spacing: -0.015em;
+}
+
+.context-menu {
+    border-color: var(--border-strong);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow-lg);
+}
+
+.context-menu-item {
+    border-radius: var(--radius-control);
+}
+
+.context-menu-item:hover {
+    background: var(--bg-hover);
+}
+
+.acl-panel {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-tertiary);
+    box-shadow: none;
+}
+
+.acl-entry {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+    box-shadow: none;
+}
+
+.acl-entry--allow {
+    border-left: 3px solid var(--success);
+}
+
+.acl-entry--deny {
+    border-left: 3px solid var(--danger);
+}
+
+.acl-entry--inherited {
+    background: var(--bg-sunken);
+}
+
+.acl-add-form {
+    border-color: var(--border-strong);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+    box-shadow: none;
+}
+
+.acl-type-tabs {
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-tertiary);
+}
+
+.acl-type-tab {
+    border-radius: var(--radius-control);
+}
+
+.acl-type-tab.active {
+    border-color: var(--accent-border);
+    background: var(--accent-subtle);
+    color: var(--text-primary);
+}
+
+.acl-shortcut,
+.preset-chip,
+.permission-tag,
+.info-badge {
+    border-radius: var(--radius-control);
+}
+
+.acl-shortcut--active,
+.preset-chip--active {
+    border-color: var(--accent-border);
+    background: var(--accent-subtle);
+    color: var(--accent-strong);
+}
+
+.breadcrumb-bar {
+    min-height: 34px;
+    padding: 6px 9px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+}
+
+.breadcrumb-link {
+    color: var(--text-secondary);
+}
+
+.breadcrumb-link:hover {
+    color: var(--accent-strong);
+}
+
+.search-dropdown {
+    border-color: var(--border-strong);
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow-lg);
+}
+
+@media (max-width: 620px) {
+    .page-header {
+        flex-direction: column;
+    }
+
+    .modal-dialog {
+        width: calc(100vw - 24px);
+        min-width: 0;
+        max-width: none;
+    }
+
+    .modal-actions {
+        flex-wrap: wrap;
+    }
+
+    /* File preview uses the whole phone screen instead of an 85vw frame. */
+    .preview-dialog {
+        width: 100vw;
+        height: 100dvh;
+        border: 0;
+        border-radius: 0;
+    }
+
+    /* Toasts span the width instead of overflowing the left edge (max-width 380px). */
+
+    .toast {
+        max-width: none;
+    }
+}
+
+/* A dialog taller than the viewport (small phones, open on-screen keyboard) scrolls
+   inside the backdrop instead of being clipped at top and bottom by the centering. */
+.modal-backdrop {
+    overflow-y: auto;
+}
+
+    .modal-backdrop > * {
+        margin: auto;
+    }
+

@@ -1,0 +1,237 @@
+﻿/* -- Buttons -- */
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s, filter 0.15s;
+}
+
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+.btn-primary {
+    padding: 8px 16px;
+    background: var(--accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, filter 0.15s;
+}
+
+    .btn-primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+.btn-secondary {
+    padding: 8px 16px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+    .btn-secondary:hover:not(:disabled) {
+        background: var(--bg-hover);
+        border-color: var(--border-light);
+    }
+
+    .btn-secondary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+.btn-danger {
+    padding: 8px 16px;
+    background: var(--danger);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, filter 0.15s;
+}
+
+    .btn-danger:hover:not(:disabled) {
+        background: var(--danger-hover);
+    }
+
+    .btn-danger:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+.btn-danger-outline {
+    padding: 8px 16px;
+    background: var(--danger-subtle);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+    .btn-danger-outline:hover:not(:disabled) {
+        background: var(--danger);
+        color: #fff;
+    }
+
+    .btn-danger-outline:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+/* Quiet coloured action (e.g. DetailHeader buttons): tinted surface, toned text.
+   Accent by default; --info / --danger switch the tone. */
+.btn-tinted {
+    --btn-tone: var(--accent);
+    --btn-tone-text: var(--accent-strong, var(--accent));
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: color-mix(in srgb, var(--btn-tone) 10%, var(--bg-secondary));
+    color: var(--btn-tone-text);
+    border: 1px solid color-mix(in srgb, var(--btn-tone) 32%, var(--border));
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+    .btn-tinted:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--btn-tone) 18%, var(--bg-secondary));
+        border-color: color-mix(in srgb, var(--btn-tone) 50%, var(--border));
+    }
+
+    .btn-tinted:active:not(:disabled) {
+        background: color-mix(in srgb, var(--btn-tone) 26%, var(--bg-secondary));
+    }
+
+    .btn-tinted:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+.btn-tinted--info {
+    --btn-tone: var(--info);
+    --btn-tone-text: var(--info);
+}
+
+.btn-tinted--danger {
+    --btn-tone: var(--danger);
+    --btn-tone-text: var(--danger);
+}
+
+.btn-secondary--sm {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+/* An anchor styled as a button (navigates to another page or settings tab, usually with a
+   leading arrow_right icon): icon and label in one row, never the browser link underline. */
+a.btn-secondary,
+a.btn-tinted {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+/* -- Banners -- */
+
+.error-banner {
+    padding: 10px 14px;
+    background: var(--danger-subtle);
+    color: var(--danger);
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
+    margin-bottom: 16px;
+}
+
+.success-banner {
+    padding: 10px 14px;
+    background: var(--success-subtle);
+    color: var(--success);
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid color-mix(in srgb, var(--success) 30%, var(--border));
+    margin-bottom: 16px;
+}
+
+.warning-banner {
+    padding: 10px 14px;
+    background: var(--warning-subtle);
+    color: var(--warning);
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid color-mix(in srgb, var(--warning) 34%, var(--border));
+    margin-bottom: 16px;
+}
+
+/* -- Loading & Empty State -- */
+
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 0;
+    gap: 12px;
+    color: var(--text-tertiary);
+    font-size: 13px;
+}
+
+.spinner {
+    width: 28px;
+    height: 28px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 0;
+    gap: 12px;
+    color: var(--text-tertiary);
+    font-size: 13px;
+}
+

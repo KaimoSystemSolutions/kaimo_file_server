@@ -1,0 +1,71 @@
+﻿/* ══════════════════════════════════════════════════════════
+   Responsive Adjustments
+   ══════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+    .user-cell-username {
+        display: none;
+    }
+
+    .user-cell-status {
+        width: 90px;
+    }
+
+    .permission-flags {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* -- Form hint text (below dropdowns/inputs) -- */
+.form-hint {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+/* -- Label with inline info button (e.g. password requirements) -- */
+.label-with-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* -- Permission tags (reused from role detail) -- */
+.permission-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.permission-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    border-radius: var(--radius-control);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-light);
+}
+
+.file-row-dir.file-row--drop-target {
+    background: var(--accent-subtle);
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
+}
+
+/* -- Toggle row (used in edit forms) -- */
+.toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+}
+
+.toggle-label-text {
+    font-size: 13px;
+    color: var(--text-primary);
+}
+

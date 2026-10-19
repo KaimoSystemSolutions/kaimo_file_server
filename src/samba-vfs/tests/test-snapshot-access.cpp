@@ -147,6 +147,82 @@ void test_resolve_decode()
 		     sizeof(cache), lease, 0) == -1);
 }
 
+void test_gmt_label()
+{
+	char label[32];
+	CHECK(kaimo_snapshot_gmt_label(0, label, sizeof(label)));
+	CHECK(std::string(label) == "@GMT-1970.01.01-00.00.00");
+	CHECK(kaimo_snapshot_gmt_label(1704164645, label, sizeof(label)));
+	CHECK(std::string(label) == "@GMT-2024.01.02-03.04.05");
+
+	/* 24 characters plus the terminating NUL must fit. */
+	char exact[25];
+	CHECK(kaimo_snapshot_gmt_label(1704164645, exact, sizeof(exact)));
+	char small[24];
+	CHECK(!kaimo_snapshot_gmt_label(1704164645, small, sizeof(small)));
+
+	/* Five-digit years do not form a valid 24-character token. */
+	CHECK(!kaimo_snapshot_gmt_label(253402300800LL, label, sizeof(label)));
+}
+
+void test_granted_access()
+{
+	const uint32_t read = KAIMO_FILE_GENERIC_READ;
+	const uint32_t execute = KAIMO_FILE_GENERIC_EXECUTE;
+	const uint32_t allowed = KAIMO_SNAPSHOT_ALLOWED_ACCESS;
+
+	CHECK(allowed == (read | execute));
+	CHECK((allowed & KAIMO_SNAPSHOT_MUTATING_ACCESS) == 0);
+
+	/* Generic bits expand to their specific read/execute masks. */
+	CHECK(kaimo_snapshot_granted_access(KAIMO_GENERIC_READ_ACCESS,
+					    allowed) == read);
+	CHECK(kaimo_snapshot_granted_access(KAIMO_GENERIC_EXECUTE_ACCESS,
+					    allowed) == execute);
+	CHECK(kaimo_snapshot_granted_access(KAIMO_MAXIMUM_ALLOWED_ACCESS,
+					    allowed) == allowed);
+
+	/* Never broader than requested, never broader than granted. */
+	CHECK(kaimo_snapshot_granted_access(0x1U, allowed) == 0x1U);
+	CHECK(kaimo_snapshot_granted_access(read, 0x1U) == 0x1U);
+	CHECK(kaimo_snapshot_granted_access(0, allowed) == 0);
+
+	/* Mutating rights are dropped even when requested and granted. */
+	CHECK(kaimo_snapshot_granted_access(
+		      KAIMO_SNAPSHOT_MUTATING_ACCESS | read, 0xffffffffU) == read);
+	CHECK(kaimo_snapshot_granted_access(0xffffffffU, 0xffffffffU) ==
+	      allowed);
+}
+
+void test_create_readonly()
+{
+	CHECK(kaimo_snapshot_create_readonly(KAIMO_FILE_GENERIC_READ,
+					     KAIMO_FILE_OPEN, 0));
+	CHECK(kaimo_snapshot_create_readonly(KAIMO_MAXIMUM_ALLOWED_ACCESS,
+					     KAIMO_FILE_OPEN, 0x40U));
+
+	for (uint32_t bit = 0; bit < 32; ++bit) {
+		uint32_t mask = 1U << bit;
+		if ((mask & KAIMO_SNAPSHOT_MUTATING_ACCESS) == 0)
+			continue;
+		errno = 0;
+		CHECK(!kaimo_snapshot_create_readonly(mask, KAIMO_FILE_OPEN, 0));
+		CHECK(errno == EROFS);
+	}
+	/* Every disposition other than FILE_OPEN may create or truncate. */
+	for (uint32_t disposition : {0U, 2U, 3U, 4U, 5U}) {
+		errno = 0;
+		CHECK(!kaimo_snapshot_create_readonly(KAIMO_FILE_GENERIC_READ,
+						      disposition, 0));
+		CHECK(errno == EROFS);
+	}
+	errno = 0;
+	CHECK(!kaimo_snapshot_create_readonly(KAIMO_FILE_GENERIC_READ,
+					      KAIMO_FILE_OPEN,
+					      KAIMO_FILE_DELETE_ON_CLOSE));
+	CHECK(errno == EROFS);
+}
+
 }  // namespace
 
 int main()
@@ -155,6 +231,9 @@ int main()
 	test_lease_scope();
 	test_open_flags();
 	test_resolve_decode();
+	test_gmt_label();
+	test_granted_access();
+	test_create_readonly();
 	std::cout << "snapshot access tests passed" << std::endl;
 	return 0;
 }

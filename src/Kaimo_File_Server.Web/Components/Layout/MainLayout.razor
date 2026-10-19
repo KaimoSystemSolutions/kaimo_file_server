@@ -280,8 +280,14 @@
         });
     private async void TriggerFileDialog()
     {
-        // Click the hidden input to open the file dialog
-        await JS.InvokeVoidAsync("document.getElementById('global-file-input').click");
+        // Click the hidden input to open the file dialog. async void: an escaping exception
+        // would terminate the circuit, so a failed or disconnected call is swallowed.
+        try
+        {
+            await JS.InvokeVoidAsync("kaimoUpload.openFilePicker");
+        }
+        catch (JSException) { }
+        catch (JSDisconnectedException) { }
     }
 
     private async Task OnSlotChanged(UploadSlot slot, InputFileChangeEventArgs e)

@@ -108,7 +108,7 @@ ASan/UBSan), wraps every shell script with kcov, then runs:
 
 | Suite | What it drives |
 |---|---|
-| `tests/test-*.cpp` | header libraries incl. the decision logic extracted from the module (`authz_reply.h`, `snapshot_access.h`, `close_capture.h`, `vfs_env.h`) |
+| `tests/test-*.cpp` | header libraries incl. the decision logic extracted from the module (`authd_client.h`, `authz_reply.h`, `share_path.h`, `snapshot_access.h`, `close_capture.h`, `vfs_env.h`) |
 | `tests/live/test_vfs_*.py` | real smbd + `kaimo_bridge` against a scriptable fake authd ([`kaimo_testlib.py`](tests/kaimo_testlib.py)): allow/deny, every malformed reply, fail-open/closed, listing filter, reserved namespace, recycle bin, rename TOCTOU, close capture, snapshots, kill switches, deadlines |
 | `tests/live/test_authd_bridge.py`, `test_sidecar_sync.py` | the real `kaimo_authd` and `kaimo_*sync` binaries over mTLS against a fake gRPC bridge ([`kaimo_fakebridge.py`](tests/kaimo_fakebridge.py)) |
 | `tests/live/test_standalone_runtime.py` | the self-contained `test-authd-*.py` scripts |

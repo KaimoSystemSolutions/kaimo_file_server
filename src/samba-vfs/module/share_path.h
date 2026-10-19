@@ -55,4 +55,18 @@ static inline const char *kaimo_share_path_canonical(
 	return path;
 }
 
+/*
+ * Every internal .kaimo-* namespace at the share root is permanently reserved.
+ * This blocks direct client access to old snapshot materializations and to
+ * immutable close captures while authd is retrying their lifecycle events.
+ */
+static inline bool kaimo_share_path_reserved(
+	const char *connectpath, const char *path)
+{
+	const char *logical = kaimo_share_path_canonical(connectpath, path);
+	while (logical[0] == '.' && logical[1] == '/') logical += 2;
+	while (logical[0] == '/') logical++;
+	return strncmp(logical, ".kaimo-", 7) == 0;
+}
+
 #endif

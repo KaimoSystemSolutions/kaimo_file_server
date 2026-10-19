@@ -1,0 +1,416 @@
+﻿/* ══════════════════════════════════════════════════════════
+   Detail view skeleton (DESIGN_SPEC §9.2): DetailHeader → .detail-alerts →
+   .fact-tiles (FactTile) → DetailSection with PropertyRow children.
+   ══════════════════════════════════════════════════════════ */
+
+.detail-head {
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border);
+}
+
+.detail-head-top {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.detail-head-icon {
+    display: flex;
+    flex: 0 0 36px;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+    /* Avatar variant (DetailHeader `Leading`): photo or initials fill the round tile. */
+    .detail-head-icon--round {
+        overflow: hidden;
+        border: 2px solid var(--avatar-ring);
+        border-radius: 50%;
+        background: var(--accent-subtle);
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 750;
+        letter-spacing: .02em;
+    }
+
+        .detail-head-icon--round img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+.detail-head-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.detail-head-title {
+    margin: 0;
+    overflow: hidden;
+    color: var(--text-primary);
+    font-family: var(--font-heading);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -.015em;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detail-head-sub {
+    display: block;
+    margin-top: 1px;
+    color: var(--text-tertiary);
+    font-size: 12px;
+}
+
+.detail-head-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+}
+
+    .detail-head-actions > .btn-primary,
+    .detail-head-actions > .btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .detail-head-actions .detail-head-more {
+        margin-left: auto;
+    }
+
+.detail-head-menu {
+    min-width: 200px;
+}
+
+.context-menu-item:disabled {
+    cursor: not-allowed;
+    opacity: .5;
+}
+
+    .context-menu-item:disabled:hover {
+        background: none;
+    }
+
+.detail-alerts {
+    display: grid;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+    .detail-alerts > .error-banner,
+    .detail-alerts > .warning-banner,
+    .detail-alerts > .success-banner {
+        margin: 0;
+    }
+
+.fact-tiles {
+    display: grid;
+    /* 2×2 in the standard detail pane, one row of four in wide panes. */
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+}
+
+.fact-tile {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 3px;
+    min-width: 0;
+    padding: var(--space-2) var(--space-3);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+}
+
+.fact-tile-label {
+    padding-right: 26px;
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .045em;
+    text-transform: uppercase;
+}
+
+.fact-tile-value {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--text-primary);
+    font-size: 14.5px;
+    font-weight: 650;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.fact-tile-dot {
+    flex: 0 0 7px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.fact-tile--positive .fact-tile-value { color: var(--success); }
+.fact-tile--negative .fact-tile-value { color: var(--danger); }
+.fact-tile--warning .fact-tile-value { color: var(--warning); }
+.fact-tile--neutral .fact-tile-value { color: var(--text-secondary); }
+
+.fact-tile--compact .fact-tile-value {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.fact-tile-hint {
+    color: var(--text-tertiary);
+    font-size: 11.5px;
+}
+
+.fact-tile-body {
+    display: contents;
+}
+
+/* Icon variant (`Icon`): neutral icon tile on the left, label/value/hint stacked beside it. */
+.fact-tile--with-icon {
+    grid-template-columns: 36px minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-3);
+}
+
+    .fact-tile--with-icon .fact-tile-body {
+        display: grid;
+        gap: 3px;
+        min-width: 0;
+    }
+
+/* Distribution bar (`Segments`): spans the whole tile, the legend repeats it as text. */
+.fact-tile-bar {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 2px;
+    height: 6px;
+    margin-top: var(--space-1);
+    overflow: hidden;
+    border-radius: var(--radius-control);
+    background: var(--bg-tertiary);
+}
+
+.fact-tile-legend {
+    grid-column: 1 / -1;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+/* ── Tile icon + colour palette (TileColor), shared by FactTile and ActionTile ── */
+
+.tile-icon {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+}
+
+.tile-icon--neutral { border-color: var(--border); background: var(--bg-tertiary); color: var(--text-secondary); }
+.tile-icon--folder { background: var(--folder-fill); color: var(--folder-stroke); }
+.tile-icon--user { background: var(--entity-user-soft); color: var(--entity-user); }
+.tile-icon--group { background: var(--entity-group-soft); color: var(--entity-group); }
+.tile-icon--role { background: var(--entity-role-soft); color: var(--entity-role); }
+.tile-icon--department { background: var(--entity-department-soft); color: var(--entity-department); }
+.tile-icon--info { background: color-mix(in srgb, var(--info) 16%, transparent); color: var(--info); }
+.tile-icon--accent { background: var(--accent-subtle); color: var(--accent-strong); }
+.tile-icon--success { background: var(--success-subtle); color: var(--success); }
+.tile-icon--warning { background: var(--warning-subtle); color: var(--warning); }
+.tile-icon--danger { background: var(--danger-subtle); color: var(--danger); }
+
+.tile-segment--neutral { background: var(--border-strong); }
+.tile-segment--folder { background: var(--folder-stroke); }
+.tile-segment--user { background: var(--entity-user); }
+.tile-segment--group { background: var(--entity-group); }
+.tile-segment--role { background: var(--entity-role); }
+.tile-segment--department { background: var(--entity-department); }
+.tile-segment--info { background: var(--info); }
+.tile-segment--accent { background: var(--accent); }
+.tile-segment--success { background: var(--success); }
+.tile-segment--warning { background: var(--warning); }
+.tile-segment--danger { background: var(--danger); }
+
+.fact-tile .fact-tile-link {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 24px;
+    height: 24px;
+}
+
+/* Each category is one card: the band on top, its rows on a surface below it, so even a
+   single row clearly belongs to its band. No overflow:hidden, so pickers in a Body are not clipped. */
+.detail-section-group {
+    margin-top: var(--space-4);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+}
+
+/* Category band: a slightly sunken full-width bar that separates the property groups. */
+.detail-section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 30px;
+    margin: 0;
+    padding: 6px var(--space-3);
+    border-radius: calc(var(--radius-control) - 2px);
+    background: color-mix(in srgb, var(--bg-sunken) 55%, var(--bg-tertiary));
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .045em;
+    text-transform: uppercase;
+    cursor: pointer;
+    list-style: none;
+}
+
+    .detail-section-title::-webkit-details-marker {
+        display: none;
+    }
+
+    /* The heading keeps the band's look; it is only there for heading navigation. */
+    .detail-section-heading {
+        margin: 0;
+        font: inherit;
+        letter-spacing: inherit;
+    }
+
+    /* Chevron: points right when closed, down when open. */
+    .detail-section-title::before {
+        content: "";
+        flex: 0 0 auto;
+        width: 5px;
+        height: 5px;
+        margin: 0 2px;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: rotate(-45deg);
+        transition: transform 120ms ease;
+    }
+
+    /* Info next to the title: keeps its own typography instead of the band's micro-label look. */
+    .detail-section-info {
+        display: inline-flex;
+        align-items: center;
+        font-weight: 400;
+        letter-spacing: normal;
+        text-transform: none;
+    }
+
+    .detail-section-group[open] > .detail-section-title::before {
+        transform: rotate(45deg);
+    }
+
+    .detail-section-group[open] > .detail-section-title {
+        border-bottom: 2px solid var(--border);
+        border-radius: calc(var(--radius-control) - 2px) calc(var(--radius-control) - 2px) 0 0;
+    }
+
+    .detail-section-title:hover {
+        background: color-mix(in srgb, var(--bg-sunken) 80%, var(--bg-tertiary));
+        color: var(--text-primary);
+    }
+
+    .detail-section-title:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: -2px;
+    }
+
+.property-list {
+    margin: 0;
+    padding: 0;
+}
+
+/* Free section content (lists, logs) below the property rows. */
+.detail-section-body {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+    .property-list + .detail-section-body {
+        border-top: 1px solid var(--border-light);
+    }
+
+/* Alternating rows (zebra) and a hover band keep similar rows apart and guide the eye
+   from label to value. The rows span the full card width; the text lines up with the band label. */
+
+    /* Not --bg-tertiary: that is the detail pane itself, so the stripe would read as a gap in the card. */
+
+    /* Dark theme: the band is dark, so the first row starts light to mark where the band ends. */
+
+    .property-list:last-child > .property-row:last-child {
+        border-radius: 0 0 calc(var(--radius-control) - 2px) calc(var(--radius-control) - 2px);
+    }
+
+    /* Keep the copy button beside a long value (hash, path) instead of wrapping under it. */
+
+/* PropertyRow Entity: the value names a real object (department, share …). */
+
+.property-empty {
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
+
+@media (max-width: 1180px) {
+    .workspace,
+    .workspace--wide-detail {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .workspace-detail {
+        border-top: 1px solid var(--border);
+        border-left: 0;
+    }
+}
+
+@media (max-width: 760px) {
+    .workspace {
+        margin-inline: calc(-1 * var(--space-4));
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+    }
+
+    .workspace-detail {
+        padding-inline: var(--space-3);
+    }
+
+    .workspace-heading {
+        flex-direction: column;
+    }
+
+    .workspace-dl {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 3px;
+    }
+
+        .workspace-dl dd {
+            margin-bottom: var(--space-2);
+        }
+}
