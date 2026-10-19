@@ -59,7 +59,7 @@ public class JwtAuthenticationStateProviderTests
         repo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>()))
             .Returns(() => _dbThrows
                 ? throw new InvalidOperationException("db down")
-                : Task.FromResult(_dbUser));
+                : Task.FromResult<User?>(_dbUser));
 
         var services = new ServiceCollection();
         services.AddScoped(_ => repo.Object);

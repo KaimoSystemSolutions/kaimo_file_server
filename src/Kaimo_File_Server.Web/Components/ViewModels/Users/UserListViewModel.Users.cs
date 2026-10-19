@@ -224,9 +224,9 @@ public partial class UserListViewModel
                     _passwordService.HashPassword(NewPassword),
                     _ntHashProtector.Protect(_passwordService.ComputeNtHash(NewPassword)));
                 await PublishAsync(NotificationEvents.PasswordReset(
-                    SelectedUser.Id, SelectedUser.Name, SelectedUser.Username, _actorContext?.User.Id));
+                    SelectedUser.Id, SelectedUser.Name, SelectedUser.Username, _actorContext.User.Id));
                 // An admin resetting their own password keeps this session (others end).
-                if (SelectedUser.Id == _actorContext?.User.Id)
+                if (SelectedUser.Id == _actorContext.User.Id)
                     await RenewOwnSessionAsync(SelectedUser.Id);
             }
 

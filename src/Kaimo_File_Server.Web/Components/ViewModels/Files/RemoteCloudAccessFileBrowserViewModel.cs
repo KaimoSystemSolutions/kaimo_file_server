@@ -285,7 +285,7 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
 
     private async Task<OperationResult> RunWriteAsync(Func<IRemoteFileStore, Task> action, string userError)
     {
-        if (!_shareWritable || _remoteFiles is null)
+        if (!_shareWritable || _remoteFiles is null || _share is null)
             return OperationResult.Fail(R("Web_CloudAccess_Error_ReadOnly"));
         try
         {

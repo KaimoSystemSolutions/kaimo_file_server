@@ -138,7 +138,7 @@ public sealed partial class WebDavController : ControllerBase
     public async Task<IActionResult> Get()
     {
         var (target, error) = await ResolveAsync();
-        if (error is not null) return error;
+        if (target is null) return error!;
 
         return await GuardAsync(async () =>
         {
@@ -165,7 +165,7 @@ public sealed partial class WebDavController : ControllerBase
     public async Task<IActionResult> Put(CancellationToken ct)
     {
         var (target, error) = await ResolveAsync(allowRoot: false);
-        if (error is not null) return error;
+        if (target is null) return error!;
 
         if (IsLockedByOther(target!))
             return Locked();
@@ -209,7 +209,7 @@ public sealed partial class WebDavController : ControllerBase
     public async Task<IActionResult> MkCol()
     {
         var (target, error) = await ResolveAsync(allowRoot: false);
-        if (error is not null) return error;
+        if (target is null) return error!;
 
         // MKCOL takes no request body.
         if ((Request.ContentLength ?? 0) > 0)
@@ -243,7 +243,7 @@ public sealed partial class WebDavController : ControllerBase
     public async Task<IActionResult> Delete()
     {
         var (target, error) = await ResolveAsync(allowRoot: false);
-        if (error is not null) return error;
+        if (target is null) return error!;
 
         if (IsLockedByOther(target!))
             return Locked();
@@ -269,7 +269,7 @@ public sealed partial class WebDavController : ControllerBase
     private async Task<IActionResult> MoveOrCopyAsync(bool isMove)
     {
         var (source, error) = await ResolveAsync(allowRoot: false);
-        if (error is not null) return error;
+        if (source is null) return error!;
 
         var outcome = WebDavPathResolver.TryResolveDestination(
             Request.Headers["Destination"].ToString(), Request.Host.Value ?? string.Empty,
@@ -329,7 +329,7 @@ public sealed partial class WebDavController : ControllerBase
     public async Task<IActionResult> PropPatch()
     {
         var (target, error) = await ResolveAsync(allowRoot: false);
-        if (error is not null) return error;
+        if (target is null) return error!;
 
         if (IsLockedByOther(target!))
             return Locked();

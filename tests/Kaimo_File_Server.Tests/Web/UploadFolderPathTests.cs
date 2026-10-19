@@ -69,6 +69,6 @@ public class UploadFolderPathTests
     [Fact]
     public void Unpack_ExpandsOneFolderPerFile_AndRejectsBadIndices()
         => Assert.Equal(
-            ["a", "", "a", null, null],
+            new string?[] { "a", "", "a", null, null },
             UploadFolderPath.Unpack(["a", ""], [0, 1, 0, 2, -1]));
 }

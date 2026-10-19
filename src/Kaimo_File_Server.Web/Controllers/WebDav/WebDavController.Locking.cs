@@ -11,7 +11,7 @@ public partial class WebDavController
     public async Task<IActionResult> Lock()
     {
         var (target, error) = await ResolveAsync(allowRoot: false);
-        if (error is not null) return error;
+        if (target is null) return error!;
 
         var settings = await _options.GetAsync();
         var timeout = ParseTimeout(settings.LockTimeoutSeconds);
@@ -44,7 +44,7 @@ public partial class WebDavController
     public async Task<IActionResult> Unlock()
     {
         var (target, error) = await ResolveAsync(allowRoot: false);
-        if (error is not null) return error;
+        if (target is null) return error!;
 
         var token = Request.Headers["Lock-Token"].ToString().Trim().Trim('<', '>');
         if (token.Length == 0)
