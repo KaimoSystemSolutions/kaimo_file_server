@@ -47,11 +47,13 @@ FileVersionSnapshotFailed	1001	Versioning failed while closing {Path}.
 FileSearchHookFailed	1002	Search index hook failed for {Path}.
 FileOwnerRecordFailed	1003	Failed to record owner for {Path}.
 FileWriteVersionFailed	1004	Versioning failed after writing {Path}.
+FileTimesApplied	1005	Times applied to {Path}: created {Created}, modified {Modified}, accessed {Accessed}.
 # -- FileVersionService 1100-1199 --
 FileVersionCreated	1101	Created version {Version} for {Path} ({OriginalBytes} -> {CompressedBytes} bytes, {Ratio} ratio).
 # ============================ Infrastructure (2000-2999) ============================
 # -- storage 2000-2099 --
 StorageAclLoadFailed	2001	ACL load failed for {Path}.
+StorageCreatedTimeNotStored	2002	Creation time of {Path} not stored: the file system rejects user xattrs.
 # -- database init 2200-2299 --
 DatabaseReady	2201	Database ready.
 DatabaseNotReadyRetry	2202	Database not ready, retrying in 3s ({RemainingAttempts} attempts left).
@@ -88,6 +90,7 @@ SearchElasticFailed	3202	Elasticsearch search failed, falling back to filename s
 SearchElasticUnreachable	3203	Elasticsearch not reachable, search running in filename mode.
 SearchElasticDisabled	3204	Elasticsearch disabled, search running in filename mode.
 SearchReindexFailed	3205	Reindex failed.
+SearchLocalFailed	3206	Local index search failed, falling back to filename search.
 # ============================ Web (5000-5999) ============================
 # -- AclEditor 5600-5699 --
 AclEditorLoadData	5601	AclEditor.LoadDataAsync Path='{Path}', ShareId={ShareId}

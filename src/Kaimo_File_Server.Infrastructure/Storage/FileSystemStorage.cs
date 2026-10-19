@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Domain;
+﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Security;
@@ -165,6 +165,26 @@ public partial class FileSystemStorage : IStorageEngine
 
         FileBirthTime.PinBeforeTimeChange(new FileInfo(fullTargetPath));
         File.SetLastWriteTimeUtc(fullTargetPath, utc);
+        File.SetLastAccessTimeUtc(fullTargetPath, utc);
+        return Task.CompletedTask;
+    }
+
+    public Task SetAccessedDateAsync(string path, DateTime time)
+    {
+        var fullTargetPath = ToAbsolutePath(path);
+        var utc = time.ToUniversalTime();
+
+        if (Directory.Exists(fullTargetPath))
+        {
+            FileBirthTime.PinBeforeTimeChange(new DirectoryInfo(fullTargetPath));
+            Directory.SetLastAccessTimeUtc(fullTargetPath, utc);
+            return Task.CompletedTask;
+        }
+
+        if (!File.Exists(fullTargetPath))
+            throw new IOException($"File does not exist: '{path}'");
+
+        FileBirthTime.PinBeforeTimeChange(new FileInfo(fullTargetPath));
         File.SetLastAccessTimeUtc(fullTargetPath, utc);
         return Task.CompletedTask;
     }

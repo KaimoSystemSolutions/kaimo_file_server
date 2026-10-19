@@ -39,10 +39,11 @@ public sealed record UpdateSyncProfileRequest(
     string? RelativePath, string? LocalPath, SyncMode Mode, bool Enabled);
 
 /// <summary>One entry in a delta enumeration.</summary>
-public sealed record SyncEntryDto(string Path, bool IsDirectory, long Size, DateTime ModifiedAtUtc, DateTime CreatedAtUtc)
+public sealed record SyncEntryDto(
+    string Path, bool IsDirectory, long Size, DateTime ModifiedAtUtc, DateTime CreatedAtUtc, DateTime? AccessedAtUtc = null)
 {
     public static SyncEntryDto From(SyncEntry e) =>
-        new(e.Path, e.IsDirectory, e.Size, e.ModifiedAtUtc, e.CreatedAtUtc);
+        new(e.Path, e.IsDirectory, e.Size, e.ModifiedAtUtc, e.CreatedAtUtc, e.AccessedAtUtc);
 }
 
 /// <summary>

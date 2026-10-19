@@ -131,6 +131,33 @@ public partial class FileSystemStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task SetAccessedDateAsync_StampsFilesAndDirectories_KeepingTheModifiedTime()
+    {
+        Directory.CreateDirectory(Path.Combine(_testRoot, "dir"));
+        var file = Path.Combine(_testRoot, "dir", "f.txt");
+        File.WriteAllBytes(file, [1]);
+        var modified = new DateTime(2010, 6, 7, 8, 9, 10, DateTimeKind.Utc);
+        var accessed = new DateTime(2012, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+        await _sut.SetModifiedDateAsync("dir/f.txt", modified);
+        await _sut.SetModifiedDateAsync("dir", modified);
+
+        await _sut.SetAccessedDateAsync("dir/f.txt", accessed);
+        await _sut.SetAccessedDateAsync("dir", accessed);
+
+        Assert.Equal(modified, File.GetLastWriteTimeUtc(file));
+        Assert.Equal(accessed, File.GetLastAccessTimeUtc(file));
+        Assert.Equal(modified, Directory.GetLastWriteTimeUtc(Path.Combine(_testRoot, "dir")));
+        Assert.Equal(accessed, Directory.GetLastAccessTimeUtc(Path.Combine(_testRoot, "dir")));
+    }
+
+    [Fact]
+    public async Task SetAccessedDateAsync_MissingItem_Throws()
+    {
+        await Assert.ThrowsAsync<IOException>(
+            () => _sut.SetAccessedDateAsync("missing.txt", DateTime.UtcNow));
+    }
+
+    [Fact]
     public async Task WriteAsync_CreatesSubdirectories()
     {
         await _sut.WriteAsync("deep/nested/file.txt", new MemoryStream([42]));

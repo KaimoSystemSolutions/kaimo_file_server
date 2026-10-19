@@ -46,6 +46,12 @@ namespace Kaimo_File_Server.Core.Storage
         /// Engines that cannot store a creation time keep the default no-op.
         /// </summary>
         Task SetCreatedDateAsync(string path, DateTime time) => Task.CompletedTask;
+        /// <summary>
+        /// Stamps a source last-access time on a file or directory without touching its
+        /// modification time. Throws <see cref="IOException"/> when the item does not exist.
+        /// Engines without access times keep the default no-op.
+        /// </summary>
+        Task SetAccessedDateAsync(string path, DateTime time) => Task.CompletedTask;
         public string ToAbsolutePath(string shareRelativePath);
         /// <summary>
         /// Calculates the total size of all files within a directory (recursive).

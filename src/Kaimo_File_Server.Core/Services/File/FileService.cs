@@ -159,7 +159,10 @@ public partial class FileService : IFileService
     public Task SetModifiedAtAsync(string path, UserContext user, DateTime time)
         => SetModifiedAtAsync(path, user, time, createdAtUtc: null);
 
-    public async Task SetModifiedAtAsync(string path, UserContext user, DateTime? modifiedAtUtc, DateTime? createdAtUtc)
+    public Task SetModifiedAtAsync(string path, UserContext user, DateTime? modifiedAtUtc, DateTime? createdAtUtc)
+        => SetTimesAsync(path, user, new FileTimes(createdAtUtc, modifiedAtUtc, null));
+
+    public async Task SetTimesAsync(string path, UserContext user, FileTimes times)
     {
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
@@ -170,10 +173,15 @@ public partial class FileService : IFileService
         if (!await _storage.ExistsAsync(normalized))
             throw new FileNotFoundException($"'{normalized}' does not exist.", normalized);
 
-        if (createdAtUtc is { } created)
+        // Order matters: stamping the mtime also sets the atime, so an explicit access time goes last.
+        if (times.Created is { } created)
             await _storage.SetCreatedDateAsync(normalized, created);
-        if (modifiedAtUtc is { } modified)
+        if (times.LastWritten is { } modified)
             await _storage.SetModifiedDateAsync(normalized, modified);
+        if (times.LastAccessed is { } accessed)
+            await _storage.SetAccessedDateAsync(normalized, accessed);
+        _logger.LogDebug(LogEvents.FileTimesApplied, LogMessages.FileTimesApplied,
+            normalized, times.Created, times.LastWritten, times.LastAccessed);
 
         // The mtime is part of the item tag: log it so feed-based clients rebuild a current tag.
         await AppendFileUpsertAsync(FileChangeType.Modified, normalized);
@@ -185,8 +193,12 @@ public partial class FileService : IFileService
     public Task WriteFileAsync(string path, Stream data, UserContext user, DateTime? modifiedAtUtc, CancellationToken cancellationToken = default)
         => WriteFileAsync(path, data, user, modifiedAtUtc, createdAtUtc: null, cancellationToken);
 
-    public async Task WriteFileAsync(string path, Stream data, UserContext user, DateTime? modifiedAtUtc, DateTime? createdAtUtc, CancellationToken cancellationToken = default)
+    public Task WriteFileAsync(string path, Stream data, UserContext user, DateTime? modifiedAtUtc, DateTime? createdAtUtc, CancellationToken cancellationToken = default)
+        => WriteFileAsync(path, data, user, new FileTimes(createdAtUtc, modifiedAtUtc, null), cancellationToken);
+
+    public async Task WriteFileAsync(string path, Stream data, UserContext user, FileTimes sourceTimes, CancellationToken cancellationToken = default)
     {
+        var (createdAtUtc, modifiedAtUtc, accessedAtUtc) = sourceTimes;
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
 
@@ -200,7 +212,7 @@ public partial class FileService : IFileService
         // stored time then never goes backwards (other devices decide "newest wins" on it),
         // and every overwrite changes the size:mtime item tag, so If-Match and listing ETags
         // still detect it.
-        var previous = (modifiedAtUtc is not null || createdAtUtc is not null) && existedBefore
+        var previous = (modifiedAtUtc is not null || createdAtUtc is not null || accessedAtUtc is not null) && existedBefore
             ? await _storage.GetMetadataAsync(normalized)
             : null;
         DateTime? previousModifiedAt = previous?.ModifiedAt.ToUniversalTime();
@@ -209,15 +221,38 @@ public partial class FileService : IFileService
 
         // Stamp the source mtime before the change-log append, so the feed entry (which stats
         // the file) carries the preserved time instead of the write time.
+        // The times actually stored (null = kept), for the FileTimesApplied trace below.
+        DateTime? appliedCreated = null, appliedModified = null, appliedAccessed = null;
         if (modifiedAtUtc is { } sourceModifiedAt
             && (previousModifiedAt is null || sourceModifiedAt.ToUniversalTime() > previousModifiedAt))
+        {
             await _storage.SetModifiedDateAsync(normalized, sourceModifiedAt);
+            appliedModified = sourceModifiedAt;
+        }
 
         // The creation time only ever moves back: an older source time means the item existed
         // earlier on the other side, so both sides converge on the earliest one.
         if (createdAtUtc is { } sourceCreatedAt
             && (previous is null || sourceCreatedAt.ToUniversalTime() < previous.CreatedAt.ToUniversalTime()))
+        {
             await _storage.SetCreatedDateAsync(normalized, sourceCreatedAt);
+            appliedCreated = sourceCreatedAt;
+        }
+
+        // The access time goes last (the mtime stamp above also sets it) and, like the mtime,
+        // only moves forward on an overwrite.
+        if (accessedAtUtc is { } sourceAccessedAt)
+        {
+            var previousAccessedAt = previous?.LastAccessedAt?.ToUniversalTime();
+            appliedAccessed = previousAccessedAt > sourceAccessedAt.ToUniversalTime()
+                ? previousAccessedAt.Value
+                : sourceAccessedAt;
+            await _storage.SetAccessedDateAsync(normalized, appliedAccessed.Value);
+        }
+
+        if (createdAtUtc is not null || modifiedAtUtc is not null || accessedAtUtc is not null)
+            _logger.LogDebug(LogEvents.FileTimesApplied, LogMessages.FileTimesApplied,
+                normalized, appliedCreated, appliedModified, appliedAccessed);
 
         if (!existedBefore)
             await RecordOwnerAsync(normalized, isDirectory: false, user);

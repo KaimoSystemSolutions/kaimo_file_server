@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Storage;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 
@@ -32,6 +33,9 @@ public partial class BrowseApiController
                 meta.ModifiedAt.ToUniversalTime().ToString("R");
             Response.Headers[CreatedAtHeader] = new DateTimeOffset(meta.CreatedAt.ToUniversalTime())
                 .ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture);
+            if (meta.LastAccessedAt is { } accessed)
+                Response.Headers[AccessedAtHeader] = new DateTimeOffset(accessed.ToUniversalTime())
+                    .ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture);
             // enableRangeProcessing lets clients resume/segment large downloads.
             return File(stream, "application/octet-stream",
                 fileDownloadName: meta.Name,
@@ -50,7 +54,10 @@ public partial class BrowseApiController
     /// one; otherwise, and without the header, the file keeps its write time. A stamped time
     /// is also used as the last-access time (the copy was not opened since). An optional
     /// <c>X-Kaimo-Created-At</c> header sets the creation time of a new file; an overwrite adopts
-    /// it only when it is older, and otherwise keeps the creation time of the replaced file.
+    /// it only when it is older, and otherwise keeps the creation time of the replaced file; without
+    /// it, a new file takes the <c>X-Kaimo-Modified-At</c> time as creation time. An
+    /// optional <c>X-Kaimo-Accessed-At</c> header replaces that last-access time with the source one
+    /// (an overwrite never moves it back).
     /// </summary>
     [HttpPut("{shareId:guid}/content")]
     public async Task<IActionResult> Upload(Guid shareId, [FromQuery] string? path, CancellationToken ct)
@@ -75,6 +82,8 @@ public partial class BrowseApiController
             return InvalidModifiedAt();
         if (!TryReadTimeHeader(CreatedAtHeader, out var createdAtUtc, out var rawCreatedAt))
             return InvalidCreatedAt();
+        if (!TryReadTimeHeader(AccessedAtHeader, out var accessedAtUtc, out var rawAccessedAt))
+            return InvalidAccessedAt();
 
         // The times are part of the fingerprint (reusing a key with a different time is a
         // different request, not a replay); without them the fingerprint stays as before.
@@ -82,7 +91,8 @@ public partial class BrowseApiController
             "PUT", $"{shareId}/{resolved.Path}",
             "len:" + (Request.ContentLength?.ToString() ?? "?")
             + (modifiedAtUtc is null ? "" : ";mtime:" + rawModifiedAt.Trim())
-            + (createdAtUtc is null ? "" : ";ctime:" + rawCreatedAt.Trim()));
+            + (createdAtUtc is null ? "" : ";ctime:" + rawCreatedAt.Trim())
+            + (accessedAtUtc is null ? "" : ";atime:" + rawAccessedAt.Trim()));
 
         return await ExecuteIdempotentAsync(resolved.User.User.Id, fingerprint, () => GuardAsync(async () =>
         {
@@ -98,7 +108,15 @@ public partial class BrowseApiController
                     return ApiPreconditionFailed();
             }
 
-            await resolved.Fs.WriteFileAsync(target, Request.Body, resolved.User, modifiedAtUtc, createdAtUtc, ct);
+            // A source without a creation time (e.g. a Linux client) gives a new file its
+            // modification time as creation time; an overwrite keeps the stored one.
+            var sourceCreatedAt = createdAtUtc;
+            if (sourceCreatedAt is null && modifiedAtUtc is not null
+                && await TryGetMetadataAsync(resolved.Fs, target, resolved.User) is null)
+                sourceCreatedAt = modifiedAtUtc;
+
+            await resolved.Fs.WriteFileAsync(target, Request.Body, resolved.User,
+                new FileTimes(sourceCreatedAt, modifiedAtUtc, accessedAtUtc), ct);
             var meta = await resolved.Fs.GetMetadataAsync(target, resolved.User);
             Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
             return Ok(FileEntryDto.From(meta));
@@ -107,8 +125,9 @@ public partial class BrowseApiController
 
     /// <summary>
     /// Stamps the modification time (and, like an upload, the last-access time) of an existing
-    /// file or directory from the <c>X-Kaimo-Modified-At</c> header and/or its creation time from
-    /// <c>X-Kaimo-Created-At</c>; at least one is required. Sync clients use it to give a folder the
+    /// file or directory from the <c>X-Kaimo-Modified-At</c> header, its creation time from
+    /// <c>X-Kaimo-Created-At</c> and/or its last-access time from <c>X-Kaimo-Accessed-At</c> (applied
+    /// last); at least one is required. Sync clients use it to give a folder the
     /// source times after writing its content. Retries are safe: the same time yields the same item
     /// tag, though each call appends another <c>Modified</c> feed entry.
     /// </summary>
@@ -125,12 +144,16 @@ public partial class BrowseApiController
             return InvalidModifiedAt();
         if (!TryReadTimeHeader(CreatedAtHeader, out var createdAtUtc, out _))
             return InvalidCreatedAt();
-        if (modifiedAtUtc is null && createdAtUtc is null)
-            return ApiBadRequest("missing_time_header", $"{ModifiedAtHeader} or {CreatedAtHeader} is required.");
+        if (!TryReadTimeHeader(AccessedAtHeader, out var accessedAtUtc, out _))
+            return InvalidAccessedAt();
+        if (modifiedAtUtc is null && createdAtUtc is null && accessedAtUtc is null)
+            return ApiBadRequest("missing_time_header",
+                $"{ModifiedAtHeader}, {CreatedAtHeader} or {AccessedAtHeader} is required.");
 
         return await GuardAsync(async () =>
         {
-            await resolved.Fs.SetModifiedAtAsync(resolved.Path, resolved.User, modifiedAtUtc, createdAtUtc);
+            await resolved.Fs.SetTimesAsync(resolved.Path, resolved.User,
+                new FileTimes(createdAtUtc, modifiedAtUtc, accessedAtUtc));
             var meta = await resolved.Fs.GetMetadataAsync(resolved.Path, resolved.User);
             Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
             return Ok(FileEntryDto.From(meta));
@@ -152,7 +175,7 @@ public partial class BrowseApiController
 
     /// <summary>
     /// Parses an optional epoch-milliseconds time header (<c>X-Kaimo-Modified-At</c>,
-    /// <c>X-Kaimo-Created-At</c>). Returns false only for a present but invalid value; an absent
+    /// <c>X-Kaimo-Created-At</c>, <c>X-Kaimo-Accessed-At</c>). Returns false only for a present but invalid value; an absent
     /// header yields true with a null time.
     /// </summary>
     private bool TryReadTimeHeader(string header, out DateTime? utc, out string raw)
@@ -175,4 +198,7 @@ public partial class BrowseApiController
 
     private IActionResult InvalidCreatedAt()
         => ApiBadRequest("invalid_created_at", $"{CreatedAtHeader} must be Unix epoch milliseconds (UTC).");
+
+    private IActionResult InvalidAccessedAt()
+        => ApiBadRequest("invalid_accessed_at", $"{AccessedAtHeader} must be Unix epoch milliseconds (UTC).");
 }

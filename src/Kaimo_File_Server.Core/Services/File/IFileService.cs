@@ -43,6 +43,11 @@ namespace Kaimo_File_Server.Core.Services.File
         // Implementations without creation-time support fall back to the overload above.
         Task WriteFileAsync(string path, Stream data, UserContext user, DateTime? modifiedAtUtc, DateTime? createdAtUtc, CancellationToken cancellationToken = default)
             => WriteFileAsync(path, data, user, modifiedAtUtc, cancellationToken);
+        // Same as above with all three source times (null = unknown). Created only ever moves back,
+        // Modified and Accessed only move forward on an overwrite; without an access time the file
+        // gets its stamped modification time as last access (see docu/external-access/rest-api.md).
+        Task WriteFileAsync(string path, Stream data, UserContext user, FileTimes sourceTimes, CancellationToken cancellationToken = default)
+            => WriteFileAsync(path, data, user, sourceTimes.LastWritten, sourceTimes.Created, cancellationToken);
         Task CreateFileAsync(string path, UserContext user);
         Task CreateDirectoryAsync(string path, UserContext user);
         Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled);
@@ -80,6 +85,9 @@ namespace Kaimo_File_Server.Core.Services.File
         // Stamps a modification and/or creation time (null = leave unchanged) on an existing item.
         Task SetModifiedAtAsync(string path, UserContext user, DateTime? modifiedAtUtc, DateTime? createdAtUtc)
             => modifiedAtUtc is { } time ? SetModifiedAtAsync(path, user, time) : Task.CompletedTask;
+        // Same as above, plus the last-access time, applied after the modification time.
+        Task SetTimesAsync(string path, UserContext user, FileTimes times)
+            => SetModifiedAtAsync(path, user, times.LastWritten, times.Created);
         // ------------ Hooks ------------
 
         Task OnFileCreated(string absolutePath, Task<Stream> fileData);

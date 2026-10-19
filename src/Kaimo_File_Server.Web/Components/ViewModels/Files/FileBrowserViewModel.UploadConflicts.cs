@@ -2,6 +2,7 @@
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Storage;
 using System.Security.Cryptography;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
@@ -30,6 +31,8 @@ public partial class FileBrowserViewModel
         public required string StagedTempPath { get; init; }
         public required long IncomingSize { get; init; }
         public required DateTime IncomingModifiedUtc { get; init; }
+        // The browser's File.lastModified, stamped on the written file; null when unknown.
+        public DateTime? SourceModifiedUtc { get; init; }
         // The existing on-disk item at stage time (null when the collision is only with
         // another in-flight upload that has not yet landed on disk).
         public FileMetadata? Existing { get; init; }
@@ -89,7 +92,8 @@ public partial class FileBrowserViewModel
     /// session's sticky choice, or hold it for the user. Always consumes <paramref name="stream"/>.
     /// </summary>
     public async Task<UploadResult> UploadWithConflictHandlingAsync(
-        string fileName, Stream stream, CancellationToken ct = default, string? relativeDir = null)
+        string fileName, Stream stream, CancellationToken ct = default, string? relativeDir = null,
+        DateTime? lastModifiedUtc = null)
     {
         if (_fileService is null || CurrentShare is null || string.IsNullOrWhiteSpace(fileName))
             return UploadResult.Failed;
@@ -103,13 +107,14 @@ public partial class FileBrowserViewModel
         var target = ShareRelativePath.Normalize(GetCurrentPath(fileName, relativeDir));
 
         // Probe for an existing item; the read stream doubles as the source for the
-        // identical-content check when the caller may read it.
+        // identical-content check when the caller may read it. Not a user access, so the
+        // existing file keeps its last-access time.
         Stream? existingContent = null;
         bool existsOnDisk;
         bool existingReadable;
         try
         {
-            existingContent = await _fileService.ReadFileAsync(target, user);
+            existingContent = await _fileService.ReadFileAsync(target, user, preserveAccessTime: true);
             existsOnDisk = true;
             existingReadable = true;
         }
@@ -130,7 +135,7 @@ public partial class FileBrowserViewModel
             existingContent?.Dispose();
             try
             {
-                var r = await UploadFileAsync(fileName, stream, ct, relativeDir);
+                var r = await UploadFileAsync(fileName, stream, ct, relativeDir, lastModifiedUtc);
                 return r.Success ? UploadResult.Uploaded : UploadResult.Failed;
             }
             finally
@@ -186,7 +191,8 @@ public partial class FileBrowserViewModel
             TargetRelativePath = target,
             StagedTempPath = tempPath,
             IncomingSize = incomingSize,
-            IncomingModifiedUtc = DateTime.UtcNow,
+            IncomingModifiedUtc = lastModifiedUtc ?? DateTime.UtcNow,
+            SourceModifiedUtc = lastModifiedUtc,
             Existing = existingMeta,
             FileService = _fileService,
         };
@@ -247,11 +253,14 @@ public partial class FileBrowserViewModel
                 case UploadConflictAction.Discard:
                     return;
                 case UploadConflictAction.Overwrite:
-                    await WriteStagedAsync(c.StagedTempPath, c.TargetRelativePath, user, c.FileService);
+                    // The replaced file keeps its own creation time.
+                    await WriteStagedAsync(c.StagedTempPath, c.TargetRelativePath, user, c.FileService,
+                        c.SourceModifiedUtc is { } m ? new FileTimes(null, m, null) : null);
                     break;
                 case UploadConflictAction.Rename:
                     var renamed = await NextAvailableNameAsync(c.TargetRelativePath, user, c.FileService);
-                    await WriteStagedAsync(c.StagedTempPath, renamed, user, c.FileService);
+                    await WriteStagedAsync(c.StagedTempPath, renamed, user, c.FileService,
+                        c.SourceModifiedUtc is { } r ? new FileTimes(r, r, null) : null);
                     break;
             }
         }
@@ -267,12 +276,12 @@ public partial class FileBrowserViewModel
     }
 
     private static async Task WriteStagedAsync(
-        string tempPath, string targetRelativePath, UserContext user, IFileService fileService)
+        string tempPath, string targetRelativePath, UserContext user, IFileService fileService, FileTimes? sourceTimes)
     {
         await using var fs = new FileStream(
             tempPath, FileMode.Open, FileAccess.Read, FileShare.Read,
             81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
-        await fileService.WriteFileAsync(targetRelativePath, fs, user);
+        await WriteWithSourceTimesAsync(fileService, targetRelativePath, fs, user, sourceTimes);
     }
 
     /// <summary>Windows-Explorer-style "name (2).ext" collision-free variant of a path.</summary>
@@ -305,7 +314,7 @@ public partial class FileBrowserViewModel
     private static async Task<bool> FileExistsAsync(
         string relativePath, UserContext user, IFileService fileService)
     {
-        try { await using var s = await fileService.ReadFileAsync(relativePath, user); return true; }
+        try { await using var s = await fileService.ReadFileAsync(relativePath, user, preserveAccessTime: true); return true; }
         catch (FileNotFoundException) { return false; }
         catch (DirectoryNotFoundException) { return false; }
         catch { return true; } // exists but not readable as a file

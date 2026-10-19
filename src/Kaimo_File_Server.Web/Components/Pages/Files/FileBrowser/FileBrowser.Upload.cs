@@ -269,7 +269,8 @@ public partial class FileBrowser
                     if (local is not null)
                     {
                         var outcome = await local.UploadWithConflictHandlingAsync(
-                            file.Name, progressStream, job.CancellationToken, relativeDir);
+                            file.Name, progressStream, job.CancellationToken, relativeDir,
+                            file.LastModified.UtcDateTime);
                         switch (outcome)
                         {
                             case FileBrowserViewModel.UploadResult.SkippedIdentical:

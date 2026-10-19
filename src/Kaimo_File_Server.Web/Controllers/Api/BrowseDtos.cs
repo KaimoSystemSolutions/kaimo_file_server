@@ -17,10 +17,11 @@ public sealed record FileEntryDto(
     bool IsDirectory,
     long Size,
     DateTime CreatedAtUtc,
-    DateTime ModifiedAtUtc)
+    DateTime ModifiedAtUtc,
+    DateTime? AccessedAtUtc = null)
 {
     public static FileEntryDto From(FileMetadata m) => new(
-        m.Path, m.Name, m.IsDirectory, m.Size, m.CreatedAt, m.ModifiedAt);
+        m.Path, m.Name, m.IsDirectory, m.Size, m.CreatedAt, m.ModifiedAt, m.LastAccessedAt);
 }
 
 /// <summary>Source and destination for a rename/move.</summary>

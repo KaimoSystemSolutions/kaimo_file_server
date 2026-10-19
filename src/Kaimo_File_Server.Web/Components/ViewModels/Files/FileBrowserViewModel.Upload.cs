@@ -1,4 +1,7 @@
-﻿using Kaimo_File_Server.Core.Services;
+﻿using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Web.Helpers;
 using Kaimo_File_Server.Core.Language;
 
@@ -8,8 +11,16 @@ public partial class FileBrowserViewModel
 {
     private long MaxUploadSizeBytes => 1100L * 1024 * 1024; // 1.1 GB
 
+    Task<OperationResult> IFileBrowserViewModel.UploadFileAsync(string fileName, Stream fileStream,
+        CancellationToken cancellationToken, string? relativeDir)
+        => UploadFileAsync(fileName, fileStream, cancellationToken, relativeDir);
+
+    /// <summary>
+    /// Uploads one file. <paramref name="lastModifiedUtc"/> is the browser's <c>File.lastModified</c>;
+    /// browsers report no creation time, so a new file gets that time as creation time too.
+    /// </summary>
     public async Task<OperationResult> UploadFileAsync(string fileName, Stream fileStream,
-        CancellationToken cancellationToken = default, string? relativeDir = null)
+        CancellationToken cancellationToken = default, string? relativeDir = null, DateTime? lastModifiedUtc = null)
     {
         if (_fileService is null || CurrentShare is null)
             return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
@@ -28,7 +39,8 @@ public partial class FileBrowserViewModel
 
         try
         {
-            await _fileService.WriteFileAsync(targetPath, fileStream, userContext, cancellationToken);
+            await WriteWithSourceTimesAsync(_fileService, targetPath, fileStream, userContext,
+                lastModifiedUtc is { } lm ? new FileTimes(lm, lm, null) : null, cancellationToken);
             
             _logger.LogInformation("File uploaded: '{Path}' by {User}",
                 targetPath, userContext.User.Username);
@@ -54,6 +66,12 @@ public partial class FileBrowserViewModel
             };
         }
     }
+
+    private static Task WriteWithSourceTimesAsync(IFileService fileService, string path, Stream data,
+        UserContext user, FileTimes? sourceTimes, CancellationToken ct = default)
+        => sourceTimes is { } times
+            ? fileService.WriteFileAsync(path, data, user, times, ct)
+            : fileService.WriteFileAsync(path, data, user, ct);
 
     public async Task<OperationResult> EnsureFolderAsync(string relativeDir,
         CancellationToken cancellationToken = default)

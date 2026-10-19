@@ -93,6 +93,8 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
         => Invoke("SetModifiedDateAsync", path, time);
     public Task SetCreatedDateAsync(string path, DateTime time)
         => Invoke("SetCreatedDateAsync", path, time);
+    public Task SetAccessedDateAsync(string path, DateTime time)
+        => Invoke("SetAccessedDateAsync", path, time);
 
     
     // -- Helpers that unwrap TargetInvocationException from reflection --

@@ -459,6 +459,36 @@ public sealed class BrowseApiTransferTests : IDisposable
     }
 
     [Fact]
+    public async Task Upload_without_created_header_gives_a_new_file_its_modified_time_as_creation_time()
+    {
+        var mtime = new DateTime(2008, 8, 8, 8, 8, 8, DateTimeKind.Utc);
+        _sut.HttpContext.Request.Body = new MemoryStream(new byte[] { 1, 2, 3 });
+        _sut.HttpContext.Request.Headers[BrowseApiController.ModifiedAtHeader] = Ms(mtime).ToString();
+
+        var r = await _sut.Upload(_a.Id, "up.txt", default);
+
+        Assert.Equal(200, Status(r));
+        Assert.Equal(mtime, Created(P(_a, "up.txt")));
+        Assert.Equal(mtime, Assert.IsType<FileEntryDto>(((ObjectResult)r).Value).CreatedAtUtc);
+    }
+
+    [Fact]
+    public async Task Overwrite_without_created_header_keeps_the_creation_time()
+    {
+        var created = new DateTime(2004, 4, 4, 4, 4, 4, DateTimeKind.Utc);
+        Put(_a, "o.txt", "old");
+        SetCreated(P(_a, "o.txt"), created);
+        _sut.HttpContext.Request.Body = new MemoryStream(new byte[] { 1, 2, 3 });
+        // Older than the stored creation time: a fallback would wrongly move it back.
+        _sut.HttpContext.Request.Headers[BrowseApiController.ModifiedAtHeader] =
+            Ms(new DateTime(2003, 3, 3, 0, 0, 0, DateTimeKind.Utc)).ToString();
+
+        Assert.Equal(200, Status(await _sut.Upload(_a.Id, "o.txt", default)));
+
+        Assert.Equal(created, Created(P(_a, "o.txt")));
+    }
+
+    [Fact]
     public async Task Upload_with_invalid_created_header_is_400()
     {
         _sut.HttpContext.Request.Body = new MemoryStream(new byte[] { 1 });
@@ -506,6 +536,111 @@ public sealed class BrowseApiTransferTests : IDisposable
         Assert.IsType<FileStreamResult>(r);
         ((FileStreamResult)r).FileStream.Dispose();
         Assert.Equal(Ms(created).ToString(), _sut.Response.Headers[BrowseApiController.CreatedAtHeader].ToString());
+    }
+
+    // ─────────────────── access time headers ───────────────────
+
+    [Fact]
+    public async Task Upload_with_accessed_header_keeps_the_source_access_time()
+    {
+        var mtime = new DateTime(2010, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var atime = new DateTime(2012, 2, 2, 2, 2, 2, DateTimeKind.Utc);
+        _sut.HttpContext.Request.Body = new MemoryStream(new byte[] { 1, 2, 3 });
+        _sut.HttpContext.Request.Headers[BrowseApiController.ModifiedAtHeader] = Ms(mtime).ToString();
+        _sut.HttpContext.Request.Headers[BrowseApiController.AccessedAtHeader] = Ms(atime).ToString();
+
+        var r = await _sut.Upload(_a.Id, "up.txt", default);
+
+        Assert.Equal(200, Status(r));
+        Assert.Equal(mtime, File.GetLastWriteTimeUtc(P(_a, "up.txt")));
+        Assert.Equal(atime, File.GetLastAccessTimeUtc(P(_a, "up.txt")));
+        Assert.Equal(atime, Assert.IsType<FileEntryDto>(((ObjectResult)r).Value).AccessedAtUtc);
+    }
+
+    [Fact]
+    public async Task Upload_without_accessed_header_uses_the_modified_time_as_access_time()
+    {
+        var mtime = new DateTime(2010, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        _sut.HttpContext.Request.Body = new MemoryStream(new byte[] { 1, 2, 3 });
+        _sut.HttpContext.Request.Headers[BrowseApiController.ModifiedAtHeader] = Ms(mtime).ToString();
+
+        Assert.Equal(200, Status(await _sut.Upload(_a.Id, "up.txt", default)));
+
+        Assert.Equal(mtime, File.GetLastAccessTimeUtc(P(_a, "up.txt")));
+    }
+
+    [Fact]
+    public async Task Overwrite_never_moves_the_access_time_back()
+    {
+        Put(_a, "o.txt", "old");
+        var stored = new DateTime(2015, 5, 5, 5, 5, 5, DateTimeKind.Utc);
+        File.SetLastAccessTimeUtc(P(_a, "o.txt"), stored);
+        _sut.HttpContext.Request.Body = new MemoryStream(new byte[] { 1, 2, 3 });
+        _sut.HttpContext.Request.Headers[BrowseApiController.ModifiedAtHeader] =
+            Ms(DateTime.UtcNow.AddDays(1)).ToString();
+        _sut.HttpContext.Request.Headers[BrowseApiController.AccessedAtHeader] =
+            Ms(new DateTime(2012, 2, 2, 0, 0, 0, DateTimeKind.Utc)).ToString();
+
+        Assert.Equal(200, Status(await _sut.Upload(_a.Id, "o.txt", default)));
+
+        Assert.Equal(stored, File.GetLastAccessTimeUtc(P(_a, "o.txt")));
+    }
+
+    [Fact]
+    public async Task Upload_with_invalid_accessed_header_is_400()
+    {
+        _sut.HttpContext.Request.Body = new MemoryStream(new byte[] { 1 });
+        _sut.HttpContext.Request.Headers[BrowseApiController.AccessedAtHeader] = "soon";
+
+        var r = await _sut.Upload(_a.Id, "up.txt", default);
+
+        Assert.Equal(400, Status(r));
+        Assert.Equal("invalid_accessed_at", Code(r));
+    }
+
+    [Fact]
+    public async Task SetModifiedAt_stamps_the_access_time_of_a_folder_after_its_modified_time()
+    {
+        var mtime = new DateTime(2011, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var atime = new DateTime(2013, 3, 3, 3, 3, 3, DateTimeKind.Utc);
+        Put(_a, "f/x.txt", "1");
+        _sut.HttpContext.Request.Headers[BrowseApiController.ModifiedAtHeader] = Ms(mtime).ToString();
+        _sut.HttpContext.Request.Headers[BrowseApiController.AccessedAtHeader] = Ms(atime).ToString();
+
+        Assert.Equal(200, Status(await _sut.SetModifiedAt(_a.Id, "f")));
+
+        Assert.Equal(mtime, Directory.GetLastWriteTimeUtc(P(_a, "f")));
+        Assert.Equal(atime, Directory.GetLastAccessTimeUtc(P(_a, "f")));
+    }
+
+    [Fact]
+    public async Task SetModifiedAt_accepts_an_access_time_alone()
+    {
+        var atime = new DateTime(2013, 3, 3, 3, 3, 3, DateTimeKind.Utc);
+        // Whole seconds: .NET re-writes the mtime along with the atime, and 9p (drvfs) dev pools
+        // store a written time at second precision only.
+        var mtime = new DateTime(2011, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        Put(_a, "x.txt", "1", mtime);
+        _sut.HttpContext.Request.Headers[BrowseApiController.AccessedAtHeader] = Ms(atime).ToString();
+
+        Assert.Equal(200, Status(await _sut.SetModifiedAt(_a.Id, "x.txt")));
+
+        Assert.Equal(atime, File.GetLastAccessTimeUtc(P(_a, "x.txt")));
+        Assert.Equal(mtime, File.GetLastWriteTimeUtc(P(_a, "x.txt")));
+    }
+
+    [Fact]
+    public async Task Download_reports_the_access_time_header()
+    {
+        var atime = new DateTime(2006, 6, 6, 6, 6, 6, DateTimeKind.Utc);
+        Put(_a, "d.txt", "1");
+        File.SetLastAccessTimeUtc(P(_a, "d.txt"), atime);
+
+        var r = await _sut.Download(_a.Id, "d.txt");
+
+        Assert.IsType<FileStreamResult>(r);
+        ((FileStreamResult)r).FileStream.Dispose();
+        Assert.Equal(Ms(atime).ToString(), _sut.Response.Headers[BrowseApiController.AccessedAtHeader].ToString());
     }
 
     // ─────────────────── size ───────────────────

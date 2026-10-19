@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.ViewModels;
@@ -51,6 +52,9 @@ public sealed class FileBrowserViewModelFolderUploadTests : IDisposable
         // Nothing exists unless a test says otherwise.
         _fileService
             .Setup(s => s.ReadFileAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ThrowsAsync(new FileNotFoundException());
+        _fileService
+            .Setup(s => s.ReadFileAsync(It.IsAny<string>(), It.IsAny<UserContext>(), It.IsAny<bool>()))
             .ThrowsAsync(new FileNotFoundException());
         // Like the real FileService: a missing path is reported as a file, never as missing.
         _fileService
@@ -162,7 +166,7 @@ public sealed class FileBrowserViewModelFolderUploadTests : IDisposable
     {
         await _sut.LoadShareAsync("share");
         _fileService
-            .Setup(s => s.ReadFileAsync("Photos/a.txt", It.IsAny<UserContext>()))
+            .Setup(s => s.ReadFileAsync("Photos/a.txt", It.IsAny<UserContext>(), true))
             .ReturnsAsync(() => new MemoryStream([9, 9, 9]));
 
         var outcome = await _sut.UploadWithConflictHandlingAsync(
@@ -176,6 +180,65 @@ public sealed class FileBrowserViewModelFolderUploadTests : IDisposable
         // Clean up the staged temp file.
         await _sut.ResolveConflictAsync(conflict.Id, FileBrowserViewModel.UploadConflictAction.Discard, applyToAll: false);
         Assert.Empty(_sut.PendingConflicts);
+    }
+
+    // ═══════════════════ Source times from the browser ═══════════════════
+
+    [Fact]
+    public async Task UploadWithConflictHandlingAsync_WithLastModified_StampsItAsModifiedAndCreated()
+    {
+        await _sut.LoadShareAsync("share");
+        var lastModified = new DateTime(2024, 10, 12, 9, 0, 0, DateTimeKind.Utc);
+
+        var outcome = await _sut.UploadWithConflictHandlingAsync(
+            "a.txt", new MemoryStream([1, 2, 3]), lastModifiedUtc: lastModified);
+
+        Assert.Equal(FileBrowserViewModel.UploadResult.Uploaded, outcome);
+        // The browser reports no creation time; it falls back to the modification time.
+        _fileService.Verify(s => s.WriteFileAsync(
+            "a.txt", It.IsAny<Stream>(), It.IsAny<UserContext>(),
+            new FileTimes(lastModified, lastModified, null), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ResolveConflict_Overwrite_WithLastModified_StampsOnlyTheModifiedTime()
+    {
+        await _sut.LoadShareAsync("share");
+        _fileService
+            .Setup(s => s.ReadFileAsync("a.txt", It.IsAny<UserContext>(), true))
+            .ReturnsAsync(() => new MemoryStream([9, 9, 9]));
+        var lastModified = new DateTime(2024, 10, 12, 9, 0, 0, DateTimeKind.Utc);
+
+        await _sut.UploadWithConflictHandlingAsync(
+            "a.txt", new MemoryStream([1, 2, 3]), lastModifiedUtc: lastModified);
+        var conflict = Assert.Single(_sut.PendingConflicts);
+        Assert.Equal(lastModified, conflict.IncomingModifiedUtc);
+        await _sut.ResolveConflictAsync(conflict.Id, FileBrowserViewModel.UploadConflictAction.Overwrite, applyToAll: false);
+
+        // The replaced file keeps its own creation time.
+        _fileService.Verify(s => s.WriteFileAsync(
+            "a.txt", It.IsAny<Stream>(), It.IsAny<UserContext>(),
+            new FileTimes(null, lastModified, null), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadWithConflictHandlingAsync_CollisionProbe_DoesNotCountAsAnAccess()
+    {
+        await _sut.LoadShareAsync("share");
+        _fileService
+            .Setup(s => s.ReadFileAsync("a.txt", It.IsAny<UserContext>(), true))
+            .ReturnsAsync(() => new MemoryStream([9, 9, 9]));
+
+        await _sut.UploadWithConflictHandlingAsync("a.txt", new MemoryStream([1, 2, 3]));
+        var conflict = Assert.Single(_sut.PendingConflicts);
+        await _sut.ResolveConflictAsync(conflict.Id, FileBrowserViewModel.UploadConflictAction.Rename, applyToAll: false);
+
+        // Probing the existing file and the free rename target reads with the access time kept.
+        _fileService.Verify(s => s.ReadFileAsync(It.IsAny<string>(), It.IsAny<UserContext>()), Times.Never);
+        _fileService.Verify(s => s.ReadFileAsync(It.IsAny<string>(), It.IsAny<UserContext>(), false), Times.Never);
+        _fileService.Verify(s => s.ReadFileAsync("a (2).txt", It.IsAny<UserContext>(), true), Times.Once);
     }
 
     // ═══════════════════ Windows-invalid names ═══════════════════
@@ -199,7 +262,7 @@ public sealed class FileBrowserViewModelFolderUploadTests : IDisposable
     {
         await _sut.LoadShareAsync("share");
         _fileService
-            .Setup(s => s.ReadFileAsync("CON_.txt", It.IsAny<UserContext>()))
+            .Setup(s => s.ReadFileAsync("CON_.txt", It.IsAny<UserContext>(), true))
             .ReturnsAsync(() => new MemoryStream([9, 9, 9]));
 
         var outcome = await _sut.UploadWithConflictHandlingAsync("CON.txt", new MemoryStream([1, 2, 3]));

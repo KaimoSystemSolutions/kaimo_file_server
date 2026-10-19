@@ -107,10 +107,10 @@ All browse endpoints are ACL-checked per call.
 | `GET /api/v1/browse/shares` | Shares the caller may browse. | — |
 | `GET /api/v1/browse/{shareId}/list?path=` | Directory children (+ `ETag`). | `If-None-Match` → 304 |
 | `GET /api/v1/browse/{shareId}/metadata?path=` | One item's metadata (+ item-tag `ETag`). | — |
-| `GET /api/v1/browse/{shareId}/content?path=` | Download; supports `Range` (+ item-tag `ETag`, `X-Kaimo-Created-At`). Optional `X-Kaimo-Preserve-Access-Time: true` for sync reads. | — |
-| `PUT /api/v1/browse/{shareId}/content?path=` | Upload/overwrite (body = bytes). Optional `X-Kaimo-Modified-At` / `X-Kaimo-Created-At` preserve the source times. | `If-Match`, `If-None-Match: *`, `Idempotency-Key` |
+| `GET /api/v1/browse/{shareId}/content?path=` | Download; supports `Range` (+ item-tag `ETag`, `X-Kaimo-Created-At`, `X-Kaimo-Accessed-At`). Optional `X-Kaimo-Preserve-Access-Time: true` for sync reads. | — |
+| `PUT /api/v1/browse/{shareId}/content?path=` | Upload/overwrite (body = bytes). Optional `X-Kaimo-Modified-At` / `X-Kaimo-Created-At` / `X-Kaimo-Accessed-At` preserve the source times. | `If-Match`, `If-None-Match: *`, `Idempotency-Key` |
 | `POST /api/v1/browse/{shareId}/directory?path=` | Create a directory. | `Idempotency-Key` |
-| `PUT /api/v1/browse/{shareId}/modified-at?path=` | Stamp the mtime (and atime) and/or the creation time of an existing file or directory from `X-Kaimo-Modified-At` / `X-Kaimo-Created-At` (at least one required); returns the item (+ item-tag `ETag`). `404` if missing. | — (safe to retry: same time → same item tag; each call still appends a `Modified` feed entry) |
+| `PUT /api/v1/browse/{shareId}/modified-at?path=` | Stamp the mtime (and atime), the creation time and/or the access time of an existing file or directory from `X-Kaimo-Modified-At` / `X-Kaimo-Created-At` / `X-Kaimo-Accessed-At` (at least one required; applied in the order created → modified → accessed); returns the item (+ item-tag `ETag`). `404` if missing. | — (safe to retry: same time → same item tag; each call still appends a `Modified` feed entry) |
 | `POST /api/v1/browse/{shareId}/rename` | Body `{ "from": "...", "to": "..." }`. Rename or move within one share. `409 conflict` if the target exists. | `If-Match`, `Idempotency-Key` |
 | `POST /api/v1/browse/copy` | Copy a file or folder (recursively), also across shares. See [Copy & move](#copy--move). | `Idempotency-Key` |
 | `POST /api/v1/browse/move` | Move a file or folder, also across shares. See [Copy & move](#copy--move). | `Idempotency-Key` |
@@ -141,7 +141,7 @@ on `PUT content` to keep the source file's mtime; the file, the returned item ta
   detect it.
 - A value that is not a non-negative integer (e.g. a pre-1970 time) →
   `400 invalid_modified_at`; omit the header for such files.
-- A stamped time is also used as the **last-access time** (the copy was not opened since).
+- Without `X-Kaimo-Accessed-At`, a stamped time is also used as the **last-access time**.
 
 **Preserving the creation time.** `X-Kaimo-Created-At: <Unix epoch milliseconds, UTC>` on
 `PUT content` or `PUT modified-at` sets the creation time; `GET content` returns the stored one in
@@ -163,6 +163,23 @@ written (deepest first is not required; stamping a child never changes its paren
 **Access time.** Downloads and other reads count as an access. A sync client sends
 `X-Kaimo-Preserve-Access-Time: true` on `GET content` so a transfer leaves the file's
 last-access time unchanged. Server-internal reads (search indexing, versioning) never count.
+`X-Kaimo-Accessed-At: <Unix epoch milliseconds, UTC>` on `PUT content` or `PUT modified-at` carries
+the source last-access time over; `GET content` returns the stored one in the same header, and
+`list`/`metadata`/`delta` carry it as `accessedAtUtc` (omitted when the storage reports none).
+Invalid values → `400 invalid_accessed_at`.
+
+**Timestamp contract.** All transports follow one set of rules, so a copy shows the source's
+times wherever it is viewed (web UI, SMB, the client app):
+
+| Time | New item | Overwrite | Source time unknown |
+|---|---|---|---|
+| Created | source value | only moves **back** (earliest wins) | new file: = the source Modified (`X-Kaimo-Modified-At`, or the browser's `lastModified` on a web upload), else write time; an overwrite keeps it |
+| Modified | source value | only moves **forward** | write time |
+| Accessed | source value | only moves **forward** | = the stamped modification time, else write time |
+
+`PUT modified-at` sets exactly the times it is sent (no forward/back rule): it is the repair
+call a sync client uses for metadata that differs while the content is equal. Browsers expose a
+file's `lastModified` only — never a creation or access time — and no folder times.
 
 ### Copy & move
 

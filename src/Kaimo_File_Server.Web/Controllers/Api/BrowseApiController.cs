@@ -35,6 +35,12 @@ public sealed partial class BrowseApiController : ApiControllerBase
     public const string CreatedAtHeader = "X-Kaimo-Created-At";
 
     /// <summary>
+    /// Optional upload / stamp header carrying the source last-access time as Unix epoch
+    /// milliseconds (UTC); also returned on downloads so a client can give its copy the same one.
+    /// </summary>
+    public const string AccessedAtHeader = "X-Kaimo-Accessed-At";
+
+    /// <summary>
     /// Optional download header (<c>true</c>): the read is a sync transfer, not a user access, so the
     /// file's last-access time is left unchanged.
     /// </summary>

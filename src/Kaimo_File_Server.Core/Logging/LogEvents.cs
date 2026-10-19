@@ -26,6 +26,7 @@ public static class LogEvents
     public static readonly EventId FileSearchHookFailed = new(1002, nameof(FileSearchHookFailed));
     public static readonly EventId FileOwnerRecordFailed = new(1003, nameof(FileOwnerRecordFailed));
     public static readonly EventId FileWriteVersionFailed = new(1004, nameof(FileWriteVersionFailed));
+    public static readonly EventId FileTimesApplied = new(1005, nameof(FileTimesApplied));
     public static readonly EventId FileVersionCreated = new(1101, nameof(FileVersionCreated));
 
     #endregion

@@ -387,6 +387,15 @@ namespace Kaimo_File_Server.Core.Logging {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Times applied to {Path}: created {Created}, modified {Modified}, accessed {Accessed}..
+        /// </summary>
+        public static string FileTimesApplied {
+            get {
+                return ResourceManager.GetString("FileTimesApplied", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Created version {Version} for {Path} ({OriginalBytes} -&gt; {CompressedBytes} bytes, {Ratio} ratio)..
         /// </summary>
         public static string FileVersionCreated {
@@ -648,15 +657,6 @@ namespace Kaimo_File_Server.Core.Logging {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Local index search failed, falling back to filename search..
-        /// </summary>
-        public static string SearchLocalFailed {
-            get {
-                return ResourceManager.GetString("SearchLocalFailed", resourceCulture);
-            }
-        }
-
-        /// <summary>
         ///   Looks up a localized string similar to Elasticsearch not reachable, search running in filename mode..
         /// </summary>
         public static string SearchElasticUnreachable {
@@ -680,6 +680,15 @@ namespace Kaimo_File_Server.Core.Logging {
         public static string SearchReindexFailed {
             get {
                 return ResourceManager.GetString("SearchReindexFailed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Local index search failed, falling back to filename search..
+        /// </summary>
+        public static string SearchLocalFailed {
+            get {
+                return ResourceManager.GetString("SearchLocalFailed", resourceCulture);
             }
         }
 
