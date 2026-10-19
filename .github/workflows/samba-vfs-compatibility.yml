@@ -23,7 +23,7 @@ concurrency:
 jobs:
   pinned-build-and-live-matrix:
     name: Pinned source, VFS ABI, and live operation matrix
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
 
     steps:
@@ -49,7 +49,7 @@ jobs:
     # Reuses the Samba build cached by the first job instead of compiling
     # Samba twice in parallel on a cold cache.
     needs: pinned-build-and-live-matrix
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
 
     steps:
