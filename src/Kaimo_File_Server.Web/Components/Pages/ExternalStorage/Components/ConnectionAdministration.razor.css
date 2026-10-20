@@ -246,7 +246,8 @@
     flex-wrap: wrap;
     gap: 8px;
     margin: 20px 0 0;
-    padding: 0 16px 18px;
+    /* Keep the shared top padding so the buttons don't touch the border-top divider. */
+    padding: var(--space-4) 16px 18px;
 }
 
 .connection-editor .detail-actions > button {
@@ -295,7 +296,7 @@
 .connection-detail .connection-editor--inline .detail-actions {
     justify-content: flex-start;
     margin: 14px 0 0;
-    padding: 0;
+    padding: var(--space-4) 0 0;
 }
 
 .connection-layout {
