@@ -10,7 +10,7 @@
 <button class="detail-tab @(Active ? "detail-tab--active" : "") @Class"
         type="button"
         role="tab"
-        aria-selected="@Active"
+        aria-selected="@(Active ? "true" : "false")"
         disabled="@Disabled"
         @onclick="OnClick"
         @attributes="AdditionalAttributes">

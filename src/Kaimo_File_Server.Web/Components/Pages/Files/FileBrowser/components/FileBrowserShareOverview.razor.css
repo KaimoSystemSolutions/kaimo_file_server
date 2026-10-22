@@ -124,7 +124,10 @@
     border-bottom: 0;
 }
 
+/* The row is a <button>; Chromium's UA sheet gives buttons align-items: flex-start,
+   which would leave empty cells short and break the column borders. */
 .share-overview-row {
+    align-items: stretch;
     width: 100%;
     border: 0;
     background: transparent;

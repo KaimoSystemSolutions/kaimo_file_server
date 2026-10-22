@@ -94,7 +94,7 @@ Other colors are allowed only for real semantics: red for danger/error, amber fo
 | `--accent-strong` | `#6FCE30` | `#235A00` | high-emphasis accent text (selected row name, avatar initials) |
 | `--accent-selected` | `#223F13` | `#D5ECBD` | selected list row / card background |
 | `--accent-rgb` | `63, 158, 0` | `51, 128, 0` | for `rgba(var(--accent-rgb), a)` |
-| `--text-on-accent` | `#FFFFFF` | `#FFFFFF` | text on accent fills |
+| `--text-on-accent` | `#0B0E0C` | `#FFFFFF` | text on accent fills (per accent: dark wherever white would fall below 4.5:1 — dark green, orange, blue, yellow, turquoise; light yellow) |
 | `--avatar-ring` | `#86EFAC` | `#166534` | profile-picture ring |
 
 Color MUST never be the only carrier of information.
@@ -117,7 +117,7 @@ Surfaces differ deliberately in lightness so dark and light mode never look "all
 | `--color-text` | `--text-primary` | `#F0F3F0` | `#1B201C` | primary text |
 | `--color-text-strong` | `--text-strong` | `#FFFFFF` | `#0B0E0C` | maximum-contrast text, e.g. `PropertyRow` values |
 | `--color-text-secondary` | `--text-secondary` | `#BCC3BD` | `#505852` | secondary text |
-| `--color-text-muted` | `--text-tertiary` | `#929B94` | `#707872` | metadata, micro-labels, empty states |
+| `--color-text-muted` | `--text-tertiary` | `#929B94` | `#5C635D` | metadata, micro-labels, empty states |
 
 Both naming sets are valid; the short legacy aliases (`--bg-*`, `--text-*`, `--border*`, `--accent*`) are what most existing CSS uses and SHOULD be used for consistency. Canvas, sidebar, content surface, list header and dialog MUST stay distinguishable in greyscale; separation must not rely on shadow alone.
 
@@ -125,7 +125,7 @@ Both naming sets are valid; the short legacy aliases (`--bg-*`, `--text-*`, `--b
 
 | Token (+ `-subtle`/`-hover`) | Dark | Light | Meaning |
 |---|---:|---:|---|
-| `--success` / `--success-subtle` | `#4ADE80` | `#16A34A` | success, positive state |
+| `--success` / `--success-subtle` | `#4ADE80` | `#15803D` | success, positive state |
 | `--warning` / `--warning-subtle` | `#FBBF24` | `#B45309` | warning, attention |
 | `--danger` / `--danger-subtle` / `--danger-hover` | `#F87171` | `#DC2626` | error, destructive action |
 | `--info` | `#7BB7E8` | `#256B9B` | neutral information, progress |

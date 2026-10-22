@@ -154,6 +154,16 @@
     padding: 6px 12px 2px;
 }
 
+/* Phones: the scope select gives up width so the search bar keeps room for its icon,
+   input and recycle-bin toggle instead of overlapping the select. */
+@media (max-width: 640px) {
+    .search-scope-select {
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 120px;
+    }
+}
+
 .search-bar {
     position: relative;
     display: flex;
@@ -193,6 +203,7 @@
 
 .search-input {
     flex: 1;
+    min-width: 0; /* an input's intrinsic width would push the recycle-bin toggle out of the bar */
     border: none;
     outline: none;
     background: transparent;

@@ -73,7 +73,7 @@ else
     <div class="admin-tabs entity-tabs" role="tablist" hidden="@(!VM.IsManagementUser)">
         @if (VM.CanCreateUsers || VM.AuthorizedDepartmentsForView.Any())
         {
-            <button class="admin-tab entity-tab entity-tab--users @(VM.ActiveTab == AdminTab.Users ? "active" : "")" type="button" role="tab" aria-selected="@(VM.ActiveTab == AdminTab.Users)"
+            <button class="admin-tab entity-tab entity-tab--users @(VM.ActiveTab == AdminTab.Users ? "active" : "")" type="button" role="tab" aria-selected="@(VM.ActiveTab == AdminTab.Users ? "true" : "false")"
                     @onclick="() => SwitchTab(AdminTab.Users)">
                 @Icons.SVG("user_transparent.svg", new SvgOptions())
                 @Resources.Web_Admin_Tab_Users
@@ -81,7 +81,7 @@ else
         }
         @if (VM.CanManageGroups)
         {
-            <button class="admin-tab entity-tab entity-tab--groups @(VM.ActiveTab == AdminTab.Groups ? "active" : "")" type="button" role="tab" aria-selected="@(VM.ActiveTab == AdminTab.Groups)"
+            <button class="admin-tab entity-tab entity-tab--groups @(VM.ActiveTab == AdminTab.Groups ? "active" : "")" type="button" role="tab" aria-selected="@(VM.ActiveTab == AdminTab.Groups ? "true" : "false")"
                     @onclick="() => SwitchTab(AdminTab.Groups)">
                 @Icons.SVG("users_transparent.svg", new SvgOptions())
                 @Resources.Web_Admin_Tab_Groups
@@ -89,7 +89,7 @@ else
         }
         @if (VM.CanManageRoles)
         {
-            <button class="admin-tab entity-tab entity-tab--roles @(VM.ActiveTab == AdminTab.Roles ? "active" : "")" type="button" role="tab" aria-selected="@(VM.ActiveTab == AdminTab.Roles)"
+            <button class="admin-tab entity-tab entity-tab--roles @(VM.ActiveTab == AdminTab.Roles ? "active" : "")" type="button" role="tab" aria-selected="@(VM.ActiveTab == AdminTab.Roles ? "true" : "false")"
                     @onclick="() => SwitchTab(AdminTab.Roles)">
                 @Icons.SVG("shield_transparent.svg", new SvgOptions())
                 @Resources.Web_Admin_Tab_Roles

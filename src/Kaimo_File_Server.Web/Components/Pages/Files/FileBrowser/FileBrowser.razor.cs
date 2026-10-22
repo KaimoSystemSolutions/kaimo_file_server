@@ -87,9 +87,9 @@ public partial class FileBrowser
     private Dictionary<string, double> _colWidths = new()
     {
         ["size"] = 90,
-        ["created"] = 140,
-        ["modified"] = 140,
-        ["lastaccess"] = 140
+        ["created"] = 160,
+        ["modified"] = 160,
+        ["lastaccess"] = 160
     };
 
     // Name width: 0 = not yet resized → 1fr; > 0 = fixed px

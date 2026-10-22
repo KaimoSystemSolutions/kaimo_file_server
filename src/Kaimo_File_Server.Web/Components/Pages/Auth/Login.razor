@@ -4,8 +4,9 @@
 @inject LoginViewModel VM
 @inject NavigationManager Nav
 @inject AssetProvider BrandAssets
+@using Kaimo_File_Server.Core.Language
 
-<PageTitle>Kaimo File Server – Anmelden</PageTitle>
+<PageTitle>@Resources.Web_Login_PageTitle</PageTitle>
 
 <div class="login-page">
     <div class="login-card">
@@ -13,7 +14,7 @@
             @BrandAssets.RawSVG("icon_kaimo.svg", 42, 42)
         </div>
         <h1>Kaimo File Server</h1>
-        <p class="subtitle">Melde dich an, um fortzufahren</p>
+        <p class="subtitle">@Resources.Web_Login_Subtitle</p>
 
         @if (VM.ErrorMessage is not null)
         {
@@ -22,11 +23,12 @@
 
         <div class="login-form">
             <div class="form-group">
-                <label>Benutzername</label>
-                <input type="text"
+                <label for="login-username">@Resources.Web_Login_Label_Username</label>
+                <input id="login-username"
+                       type="text"
                        name="username"
                        autocomplete="username"
-                       placeholder="Benutzername eingeben"
+                       placeholder="@Resources.Web_Login_Placeholder_Username"
                        @bind="VM.Username"
                        @bind:event="oninput"
                        @onkeydown="HandleKeyDown"
@@ -34,19 +36,20 @@
             </div>
 
             <div class="form-group">
-                <label>Passwort</label>
-                <input type="password"
+                <label for="login-password">@Resources.Web_Login_Label_Password</label>
+                <input id="login-password"
+                       type="password"
                        name="password"
                        autocomplete="current-password"
-                       placeholder="Passwort eingeben"
+                       placeholder="@Resources.Web_Login_Placeholder_Password"
                        @bind="VM.Password"
                        @bind:event="oninput"
                        @onkeydown="HandleKeyDown"
                        disabled="@VM.IsLoading" />
             </div>
 
-            <button class="btn-primary" type="button" @onclick="HandleLogin" disabled="@VM.IsLoading">
-                @(VM.IsLoading ? "Wird angemeldet…" : "Anmelden")
+            <button class="btn btn-primary" type="button" @onclick="HandleLogin" disabled="@VM.IsLoading">
+                @(VM.IsLoading ? Resources.Web_Login_LoggingIn : Resources.Web_Login_Submit)
             </button>
         </div>
     </div>

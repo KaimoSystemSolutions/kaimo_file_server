@@ -84,7 +84,7 @@
                                     var dept = VM.GetDepartmentDisplay(departmentId);
                                     var isCollapsed = _collapsedDepartments.Contains(departmentId);
                                     <button class="entity-list-department-heading" type="button"
-                                            aria-expanded="@(!isCollapsed)"
+                                            aria-expanded="@(!isCollapsed ? "true" : "false")"
                                             @onclick="() => ToggleDepartment(departmentId)">
                                         @Icons.SVG("chevron_right.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2,
                                             CssClass: "entity-list-department-chevron" + (isCollapsed ? "" : " entity-list-department-chevron--open")))

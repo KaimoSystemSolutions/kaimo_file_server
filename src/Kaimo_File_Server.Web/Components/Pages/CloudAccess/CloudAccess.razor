@@ -23,7 +23,7 @@
                     title="@(_showVirtualShareDetails
                         ? R("Web_ShareList_Card_HideDetails")
                         : R("Web_ShareList_Card_ShowDetails"))"
-                    aria-pressed="@_showVirtualShareDetails"
+                    aria-pressed="@(_showVirtualShareDetails ? "true" : "false")"
                     @onclick="ToggleVirtualShareDetails">
                 @Assets.SVG("circle_info.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
                 <span>@(_showVirtualShareDetails
@@ -161,7 +161,7 @@ else
                     var connection = VM.Connections.FirstOrDefault(x => x.Id == share.ConnectionId);
                     var isUsable = VM.IsShareUsable(share);
                     <button class="vs-table-row @(isSelected ? "vs-table-row--selected" : "")"
-                            type="button" role="option" aria-selected="@isSelected"
+                            type="button" role="option" aria-selected="@(isSelected ? "true" : "false")"
                             @onclick="() => SelectShareAsync(share)" @ondblclick="() => OpenShare(share)">
                         <span class="vs-table-cell vs-table-name">
                             <span class="vs-share-icon" aria-hidden="true">

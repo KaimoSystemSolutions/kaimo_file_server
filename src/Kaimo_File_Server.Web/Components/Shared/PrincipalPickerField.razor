@@ -100,7 +100,7 @@
                 <div class="principal-picker-tabs" role="tablist">
                     @foreach (var kind in Kinds)
                     {
-                        <button type="button" role="tab" aria-selected="@(kind == _activeKind)"
+                        <button type="button" role="tab" aria-selected="@(kind == _activeKind ? "true" : "false")"
                                 class="principal-picker-tab @(kind == _activeKind ? "is-active" : "")"
                                 @onclick="() => SetKind(kind)">
                             @Assets.SVG(IconFor(kind), new SvgOptions(Width: 15, Height: 15, StrokeWidth: 2))
@@ -421,7 +421,7 @@
     private RenderFragment Row(PrincipalPickerItem item, bool divider) => __builder =>
     {
         var isChecked = _selected.Contains(item.Id);
-        <button type="button" role="option" aria-selected="@isChecked"
+        <button type="button" role="option" aria-selected="@(isChecked ? "true" : "false")"
                 class="principal-picker-row @(isChecked ? "is-selected" : "") @(divider ? "has-divider" : "")"
                 @onclick="() => Toggle(item.Id)">
             <span class="principal-picker-check @(isChecked ? "is-checked" : "")"></span>

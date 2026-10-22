@@ -70,7 +70,7 @@ else
             {
                 var selected = row.UserId == VM.SelectedUserId;
                 <button type="button" class="homes-row homes-selectable @(selected ? "homes-selected" : "")"
-                        aria-pressed="@selected" @onclick="() => VM.SelectedUserId = row.UserId">
+                        aria-pressed="@(selected ? "true" : "false")" @onclick="() => VM.SelectedUserId = row.UserId">
                     <span class="homes-cell-name">
                         <span class="homes-avatar" aria-hidden="true">
                             @if (UserAvatar.DataUri(row.User) is { } uri)

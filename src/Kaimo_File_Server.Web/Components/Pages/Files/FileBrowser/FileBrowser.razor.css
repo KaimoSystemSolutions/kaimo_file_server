@@ -19,7 +19,7 @@
     /* Shared column track definition. Header and every data row read this variable,
        so header + virtualized rows stay column-aligned. The resize JS and the
        responsive breakpoints below override --grid-cols instead of a single grid. */
-    --grid-cols: 1fr 90px 140px 140px 140px;
+    --grid-cols: 1fr 90px 160px 160px 160px;
     display: flex;
     flex-direction: column;
     position: relative;
@@ -515,7 +515,7 @@
 @media (max-width: 1024px) {
     .file-table-wrap,
     .file-skeleton {
-        --grid-cols: 1fr 90px 140px 140px !important;
+        --grid-cols: 1fr 90px 160px 160px !important;
     }
 
     .col-lastaccess {
@@ -527,7 +527,7 @@
 @media (max-width: 800px) {
     .file-table-wrap,
     .file-skeleton {
-        --grid-cols: 1fr 90px 140px !important;
+        --grid-cols: 1fr 90px 160px !important;
     }
 
     .col-created,

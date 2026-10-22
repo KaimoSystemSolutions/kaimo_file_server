@@ -49,7 +49,7 @@
                             {
                                 var fileIndex = _fileResults.IndexOf(result);
                                 <div class="search-result-item @(fileIndex == _activeIndex ? "active" : "")"
-                                     role="option" aria-selected="@(fileIndex == _activeIndex)"
+                                     role="option" aria-selected="@(fileIndex == _activeIndex ? "true" : "false")"
                                      @onmousedown="() => NavigateToFile(result)">
                                     @* Same icon and colors as the file browser row. *@
                                     @{ var icon = FileHelper.GetEntryIcon(result.FileName, result.IsDirectory, IsRecycleBinRoot(result)); }
@@ -95,7 +95,7 @@
                         {
                             var destIndex = _fileResults.Count + _destResults.IndexOf(dest);
                             <div class="search-result-item @(destIndex == _activeIndex ? "active" : "")"
-                                 role="option" aria-selected="@(destIndex == _activeIndex)"
+                                 role="option" aria-selected="@(destIndex == _activeIndex ? "true" : "false")"
                                  @onmousedown="() => NavigateToDestination(dest)">
                                 @Assets.SVG(dest.Icon, new SvgOptions())
                                 <div class="search-result-info">

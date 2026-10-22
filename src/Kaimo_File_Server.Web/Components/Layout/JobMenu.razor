@@ -20,7 +20,7 @@
             type="button"
             title="@Text("Web_Jobs_Title", "Running jobs")"
             aria-label="@Text("Web_Jobs_Title", "Running jobs")"
-            aria-expanded="@_isOpen"
+            aria-expanded="@(_isOpen ? "true" : "false")"
             @onclick="Toggle">
         @Assets.SVG("upload.svg", new SvgOptions(Width: 18, Height: 18, StrokeWidth: 2))
         <span>@Text("Web_Jobs_Title", "Running jobs")</span>

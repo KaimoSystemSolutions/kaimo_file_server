@@ -28,7 +28,7 @@
             <button class="share-table-row @(isSelected ? "share-table-row--selected" : "") @(isStorageUnavailable ? "share-table-row--storage-unavailable" : "")"
                     type="button"
                     role="option"
-                    aria-selected="@isSelected"
+                    aria-selected="@(isSelected ? "true" : "false")"
                     @onclick="() => OnSelected.InvokeAsync(share)"
                     @ondblclick="() => OnOpened.InvokeAsync(share.Name)">
                 <span class="share-table-cell share-table-name">

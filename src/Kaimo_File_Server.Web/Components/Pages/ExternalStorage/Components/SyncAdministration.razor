@@ -158,7 +158,7 @@ else
                     </label>
                     @if (_model.ScheduleEnabled)
                     {
-                        <button class="acl-collapse-toggle cloud-schedule-custom-toggle" type="button" aria-expanded="@_scheduleCustomOpen"
+                        <button class="acl-collapse-toggle cloud-schedule-custom-toggle" type="button" aria-expanded="@(_scheduleCustomOpen ? "true" : "false")"
                                 @onclick="() => _scheduleCustomOpen = !_scheduleCustomOpen">
                             @Assets.SVG("chevron_right.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-collapse-chevron" + (_scheduleCustomOpen ? " acl-collapse-chevron--open" : "")))
                             <span>@R("Web_CloudSync_Schedule_Custom")</span>
@@ -197,7 +197,7 @@ else
                                         var active = IsScheduleSlotActive(day, hour);
                                         <button class="cloud-schedule-slot @(active ? "cloud-schedule-slot--active" : "")" type="button" role="gridcell"
                                                 data-schedule-row="@Array.IndexOf(ScheduleDays, day)" data-schedule-hour="@hour"
-                                                aria-pressed="@active" aria-label="@ScheduleSlotLabel(day, hour, active)"
+                                                aria-pressed="@(active ? "true" : "false")" aria-label="@ScheduleSlotLabel(day, hour, active)"
                                                 title="@ScheduleSlotLabel(day, hour, active)" disabled="@(!_model.ScheduleEnabled)"
                                                 @onclick="() => PaintScheduleSlot(day, hour)"></button>
                                     }

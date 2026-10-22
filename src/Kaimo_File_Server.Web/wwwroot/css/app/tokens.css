@@ -81,7 +81,8 @@
     --accent-selected: #223f13;
     --accent-border: var(--color-accent-border);
     --accent-rgb: 63, 158, 0;
-    --text-on-accent: #ffffff;
+    /* Dark label: white on this green is only 3.4:1 (WCAG AA needs 4.5:1). */
+    --text-on-accent: #0b0e0c;
     --danger: #f87171;
     --danger-hover: #fca5a5;
     --danger-subtle: rgba(248, 113, 113, 0.14);
@@ -115,7 +116,7 @@
     --color-text: #1b201c;
     --color-text-strong: #0b0e0c;
     --color-text-secondary: #505852;
-    --color-text-muted: #707872;
+    --color-text-muted: #5c635d; /* >= 4.5:1 on every light surface incl. sunken */
     --color-accent-brand: #3d9400;
     --color-accent-action: #338000;
     --color-accent-hover: #2b6d00;
@@ -151,8 +152,8 @@
     --danger: #dc2626;
     --danger-hover: #b91c1c;
     --danger-subtle: rgba(220, 38, 38, 0.08);
-    --success: #16a34a;
-    --success-subtle: rgba(22, 163, 74, 0.08);
+    --success: #15803d;
+    --success-subtle: rgba(21, 128, 61, 0.08);
     --warning: #b45309;
     --warning-subtle: rgba(180, 83, 9, 0.10);
     --info: #256b9b;
@@ -203,7 +204,7 @@
     --color-accent-soft: #33220f; --color-accent-border: #8a5417;
     --avatar-ring: #fbc98a;
     --accent-strong: #f5923a; --accent-selected: #3f2a12;
-    --accent-rgb: 217, 112, 10; --text-on-accent: #ffffff;
+    --accent-rgb: 217, 112, 10; --text-on-accent: #0b0e0c;
 }
 [data-theme="light"][data-accent="orange"] {
     --color-accent-brand: #c76500; --color-accent-action: #b85c00;
@@ -239,7 +240,7 @@
     --color-accent-soft: #111f33; --color-accent-border: #2a568a;
     --avatar-ring: #a3c8f5;
     --accent-strong: #5aa0f5; --accent-selected: #14243f;
-    --accent-rgb: 47, 127, 224; --text-on-accent: #ffffff;
+    --accent-rgb: 47, 127, 224; --text-on-accent: #0b0e0c;
 }
 [data-theme="light"][data-accent="blue"] {
     --color-accent-brand: #1f66c2; --color-accent-action: #1a5cb8;
@@ -250,7 +251,7 @@
     --accent-rgb: 26, 92, 184; --text-on-accent: #ffffff;
 }
 
-/* Yellow — always dark text-on-accent for contrast. */
+/* Yellow — always dark text-on-accent for contrast (as are dark green, orange, blue and turquoise). */
 [data-theme="dark"][data-accent="yellow"] {
     --color-accent-brand: #e6ba00; --color-accent-action: #e0b400;
     --color-accent-hover: #f5cc1a; --color-accent-active: #b89200;

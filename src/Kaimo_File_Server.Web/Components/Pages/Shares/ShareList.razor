@@ -37,7 +37,7 @@ else
                     title="@(_showExtendedShareInfo
                         ? Resources.Web_ShareList_Card_HideDetails
                         : Resources.Web_ShareList_Card_ShowDetails)"
-                    aria-pressed="@_showExtendedShareInfo"
+                    aria-pressed="@(_showExtendedShareInfo ? "true" : "false")"
                     @onclick="ToggleExtendedShareInfo">
                 @Assets.SVG("circle_info.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
                 <span>@(_showExtendedShareInfo
@@ -49,7 +49,7 @@ else
         {
             <button class="btn-secondary share-info-toggle @(_showUnreferenced ? "share-info-toggle--active" : "")"
                     type="button"
-                    aria-pressed="@_showUnreferenced"
+                    aria-pressed="@(_showUnreferenced ? "true" : "false")"
                     @onclick="ToggleUnreferenced">
                 @Assets.SVG("archive.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
                 <span>@Text("Web_ShareList_UnreferencedShares", "Deleted / unreferenced shares")</span>
