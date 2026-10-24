@@ -11,6 +11,9 @@
 		<!-- Docker restores before it copies the .razor files. Explicitly opt in
 		     so the .NET 10 restore adds the Blazor framework web assets. -->
 		<RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
+		<!-- The TypeScript package passes the sourcemap flag by default, overriding tsconfig.json. The emitted
+		     JS is the source minus types (no downleveling), so maps add nothing. -->
+		<TypeScriptSourceMap>false</TypeScriptSourceMap>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -24,10 +27,6 @@
 		<InternalsVisibleTo Include="Kaimo_File_Server.Tests" />
 	</ItemGroup>
 
-	<ItemGroup>
-	  <None Include="wwwroot\js\columnResize.js" />
-	</ItemGroup>
-	
 	<ItemGroup>
 	  <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
 	  <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
@@ -45,6 +44,8 @@
 	  <PackageReference Include="Microsoft.IdentityModel.Tokens" />
 	  <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
 	  <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+	  <!-- Compiles Scripts/*.ts to wwwroot/js during build (settings in tsconfig.json). -->
+	  <PackageReference Include="Microsoft.TypeScript.MSBuild" />
 	</ItemGroup>
 
 </Project>

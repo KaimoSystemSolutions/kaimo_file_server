@@ -1,3 +1,4 @@
+"use strict";
 // Launches a provider's interactive authorization page by POSTing the single-use
 // ticket in a form body, so the secret stays out of the URL (and therefore out of
 // browser history and reverse-proxy/access logs). The connection id is a plain

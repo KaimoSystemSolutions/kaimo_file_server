@@ -1,66 +1,61 @@
-﻿/**
- * Column Resize v9 – 5 Spalten (ohne Actions-Spalte)
+"use strict";
+/**
+ * Column resize v9 – 5 columns (no actions column)
  *
- * Handle sitzt am rechten Rand von Spalte [i].
- * Drag tauscht Breite zwischen Spalte [i] (links) und [i+1] (rechts).
- * Keine andere Spalte ändert sich.
+ * The handle sits on the right edge of column [i].
+ * Dragging trades width between column [i] (left) and [i+1] (right).
+ * No other column changes.
  *
- * Spalten: name(0), size(1), created(2), modified(3), lastaccess(4)
+ * Columns: name(0), size(1), created(2), modified(3), lastaccess(4)
  * Handles: 0→name|size, 1→size|created, 2→created|modified, 3→modified|lastaccess
  */
 window.columnResize = {
     _onMouseMove: null,
     _onMouseUp: null,
-
     /**
-     * @param {DotNetObjectReference} dotNetRef
-     * @param {number} leftIndex – Spaltenindex LINKS vom Handle
-     * @param {number} startX
-     * @param {number} minW
+     * @param leftIndex – column index to the LEFT of the handle
      */
     start: function (dotNetRef, leftIndex, startX, minW) {
         columnResize._cleanup();
-
         var wrap = document.querySelector('.file-table-wrap');
-        if (!wrap) return;
-
+        if (!wrap)
+            return;
         var rightIndex = leftIndex + 1;
-
-        // Nur sichtbare Header-Zellen messen
+        // Measure visible header cells only
         var headers = wrap.querySelectorAll('.file-grid-header > div');
-        if (rightIndex >= headers.length) return;
-
-        // Prüfen ob die Spalten sichtbar sind (responsive hiding)
+        if (rightIndex >= headers.length)
+            return;
+        // Check that both columns are visible (responsive hiding)
         var leftHeader = headers[leftIndex];
         var rightHeader = headers[rightIndex];
-        if (!leftHeader || !rightHeader) return;
-
+        if (!leftHeader || !rightHeader)
+            return;
         var leftStyle = window.getComputedStyle(leftHeader);
         var rightStyle = window.getComputedStyle(rightHeader);
-        if (leftStyle.display === 'none' || rightStyle.display === 'none') return;
-
+        if (leftStyle.display === 'none' || rightStyle.display === 'none')
+            return;
         var allWidths = [];
         headers.forEach(function (h) {
             allWidths.push(h.getBoundingClientRect().width);
         });
-
         var leftStartW = allWidths[leftIndex];
         var rightStartW = allWidths[rightIndex];
         var budget = leftStartW + rightStartW;
-
         columnResize._onMouseMove = function (e) {
             e.preventDefault();
             var delta = e.clientX - startX;
-
             var newLeft = leftStartW + delta;
             var newRight = budget - newLeft;
-
-            if (newLeft < minW) { newLeft = minW; newRight = budget - minW; }
-            if (newRight < minW) { newRight = minW; newLeft = budget - minW; }
-
+            if (newLeft < minW) {
+                newLeft = minW;
+                newRight = budget - minW;
+            }
+            if (newRight < minW) {
+                newRight = minW;
+                newLeft = budget - minW;
+            }
             allWidths[leftIndex] = newLeft;
             allWidths[rightIndex] = newRight;
-
             var parts = allWidths.map(function (w) {
                 return Math.round(w) + 'px';
             });
@@ -68,7 +63,6 @@ window.columnResize = {
             // the whole (now per-row) grid in lockstep.
             wrap.style.setProperty('--grid-cols', parts.join(' '));
         };
-
         columnResize._onMouseUp = function () {
             var finalHeaders = wrap.querySelectorAll('.file-grid-header > div');
             var colNames = ['name', 'size', 'created', 'modified', 'lastaccess'];
@@ -81,13 +75,11 @@ window.columnResize = {
             dotNetRef.invokeMethodAsync('OnResizeEnd', JSON.stringify(result));
             columnResize._cleanup();
         };
-
         document.addEventListener('mousemove', columnResize._onMouseMove);
         document.addEventListener('mouseup', columnResize._onMouseUp);
         document.body.style.userSelect = 'none';
         document.body.style.cursor = 'col-resize';
     },
-
     _cleanup: function () {
         if (columnResize._onMouseMove) {
             document.removeEventListener('mousemove', columnResize._onMouseMove);

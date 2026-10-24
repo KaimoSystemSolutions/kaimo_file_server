@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Explorer-style rectangular selection for the virtualized file list.
  *
@@ -12,11 +13,9 @@ window.fileMarquee = (() => {
     // Kept below one third of a row per frame so Blazor Virtualize has time to
     // materialize every traversed row, even on a higher-latency server circuit.
     const maximumScrollStep = 12;
-
     function intersects(a, b) {
         return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
     }
-
     function findScrollContainer(element) {
         for (let parent = element.parentElement; parent; parent = parent.parentElement) {
             const overflowY = getComputedStyle(parent).overflowY;
@@ -25,12 +24,11 @@ window.fileMarquee = (() => {
         }
         return document.scrollingElement;
     }
-
     function initialize(selector, dotNetRef) {
         dispose(selector);
         const host = document.querySelector(selector);
-        if (!host) return;
-
+        if (!host)
+            return;
         const scrollContainer = findScrollContainer(host);
         const controller = new AbortController();
         const options = { signal: controller.signal };
@@ -39,7 +37,6 @@ window.fileMarquee = (() => {
         let suppressContextMenu = false;
         let suppressClick = false;
         const marquee = document.createElement('div');
-
         // This element lives directly under body. Inline geometry styles avoid
         // component CSS isolation turning it into a layout-affecting block.
         Object.assign(marquee.style, {
@@ -47,41 +44,35 @@ window.fileMarquee = (() => {
             boxSizing: 'border-box', border: '1px solid #3b82f6',
             backgroundColor: 'rgba(59, 130, 246, 0.18)'
         });
-
         function scrollTop() {
             return scrollContainer === document.scrollingElement
                 ? window.scrollY
                 : scrollContainer.scrollTop;
         }
-
         function scrollViewport() {
             if (scrollContainer === document.scrollingElement) {
                 return { top: 0, bottom: window.innerHeight, left: 0, right: window.innerWidth };
             }
             return scrollContainer.getBoundingClientRect();
         }
-
         function scrollBy(delta) {
             if (scrollContainer === document.scrollingElement)
                 window.scrollBy(0, delta);
             else
                 scrollContainer.scrollTop += delta;
         }
-
         function contentY(clientY) {
             return clientY - scrollViewport().top + scrollTop();
         }
-
         function clearPreview() {
             host.querySelectorAll('.file-marquee-preview')
                 .forEach(row => row.classList.remove('file-marquee-preview'));
         }
-
         function captureRenderedRows() {
-            if (!gesture) return;
+            if (!gesture)
+                return;
             const viewport = scrollViewport();
             const offset = scrollTop() - viewport.top;
-
             host.querySelectorAll('.file-grid-row[data-path]').forEach(row => {
                 const rect = row.getBoundingClientRect();
                 gesture.rowGeometry.set(row.dataset.path, {
@@ -92,7 +83,6 @@ window.fileMarquee = (() => {
                 });
             });
         }
-
         function logicalRectangle() {
             const bounds = host.getBoundingClientRect();
             return {
@@ -102,35 +92,29 @@ window.fileMarquee = (() => {
                 bottom: Math.max(gesture.startContentY, contentY(gesture.currentY))
             };
         }
-
         function updateSelection() {
-            if (!gesture?.active) return;
-
+            if (!gesture?.active)
+                return;
             captureRenderedRows();
             const logical = logicalRectangle();
             const viewport = scrollViewport();
             const currentScrollTop = scrollTop();
-            const visibleTop = Math.min(viewport.bottom,
-                Math.max(viewport.top, logical.top - currentScrollTop + viewport.top));
-            const visibleBottom = Math.max(viewport.top,
-                Math.min(viewport.bottom, logical.bottom - currentScrollTop + viewport.top));
-
+            const visibleTop = Math.min(viewport.bottom, Math.max(viewport.top, logical.top - currentScrollTop + viewport.top));
+            const visibleBottom = Math.max(viewport.top, Math.min(viewport.bottom, logical.bottom - currentScrollTop + viewport.top));
             marquee.style.left = logical.left + 'px';
             marquee.style.top = visibleTop + 'px';
             marquee.style.width = Math.max(0, logical.right - logical.left) + 'px';
             marquee.style.height = Math.max(0, visibleBottom - visibleTop) + 'px';
-
             host.querySelectorAll('.file-grid-row[data-path]').forEach(row => {
                 const geometry = gesture.rowGeometry.get(row.dataset.path);
                 row.classList.toggle('file-marquee-preview', !!geometry && intersects(logical, geometry));
             });
         }
-
         function edgeScrollStep() {
-            if (!gesture?.active) return 0;
+            if (!gesture?.active)
+                return 0;
             const viewport = scrollViewport();
             const y = gesture.currentY;
-
             if (y < viewport.top + edgeScrollZone) {
                 const strength = Math.min(1, (viewport.top + edgeScrollZone - y) / edgeScrollZone);
                 return -Math.max(1, Math.round(maximumScrollStep * strength));
@@ -141,39 +125,38 @@ window.fileMarquee = (() => {
             }
             return 0;
         }
-
         function animate() {
             if (!gesture?.active) {
                 animationFrame = 0;
                 return;
             }
-
             const delta = edgeScrollStep();
-            if (delta !== 0) scrollBy(delta);
+            if (delta !== 0)
+                scrollBy(delta);
             updateSelection();
             animationFrame = requestAnimationFrame(animate);
         }
-
         function stopGesture() {
-            if (animationFrame) cancelAnimationFrame(animationFrame);
+            if (animationFrame)
+                cancelAnimationFrame(animationFrame);
             animationFrame = 0;
             marquee.remove();
             gesture = null;
         }
-
         host.addEventListener('pointerdown', event => {
-            if (event.button !== 0 && event.button !== 2) return;
+            if (event.button !== 0 && event.button !== 2)
+                return;
             // A finger drag scrolls the list; rubber-band selection is mouse/pen only.
-            if (event.pointerType === 'touch') return;
-
+            if (event.pointerType === 'touch')
+                return;
             // File rows own their complete width. Only the surrounding gutters
             // and the empty area below the list may begin a marquee gesture.
-            if (event.target.closest('.file-grid-row, .file-grid-header, button, a, input')) return;
-
+            if (event.target.closest('.file-grid-row, .file-grid-header, button, a, input'))
+                return;
             const headerBottom = host.querySelector('.file-grid-header')
                 ?.getBoundingClientRect().bottom ?? host.getBoundingClientRect().top;
-            if (event.clientY < headerBottom) return;
-
+            if (event.clientY < headerBottom)
+                return;
             gesture = {
                 startX: event.clientX,
                 startContentY: contentY(event.clientY),
@@ -187,37 +170,33 @@ window.fileMarquee = (() => {
             captureRenderedRows();
             host.setPointerCapture?.(event.pointerId);
         }, options);
-
         host.addEventListener('pointermove', event => {
-            if (!gesture) return;
-
+            if (!gesture)
+                return;
             gesture.currentX = event.clientX;
             gesture.currentY = event.clientY;
             const width = Math.abs(event.clientX - gesture.startX);
             const height = Math.abs(contentY(event.clientY) - gesture.startContentY);
-            if (!gesture.active && width < minimumDragDistance && height < minimumDragDistance) return;
-
+            if (!gesture.active && width < minimumDragDistance && height < minimumDragDistance)
+                return;
             if (!gesture.active) {
                 gesture.active = true;
                 document.body.appendChild(marquee);
                 host.classList.add('file-marquee-active');
                 animationFrame = requestAnimationFrame(animate);
             }
-
             updateSelection();
             event.preventDefault();
         }, options);
-
-        host.addEventListener('pointerup', async event => {
-            if (!gesture) return;
+        host.addEventListener('pointerup', async (event) => {
+            if (!gesture)
+                return;
             const completedGesture = gesture;
             host.classList.remove('file-marquee-active');
-
             if (!completedGesture.active) {
                 gesture = null;
                 return;
             }
-
             completedGesture.currentX = event.clientX;
             completedGesture.currentY = event.clientY;
             captureRenderedRows();
@@ -225,90 +204,93 @@ window.fileMarquee = (() => {
             const paths = Array.from(completedGesture.rowGeometry.entries())
                 .filter(([, geometry]) => intersects(selectionRectangle, geometry))
                 .map(([path]) => path);
-
             suppressContextMenu = completedGesture.button === 2;
             suppressClick = completedGesture.button === 0;
             clearPreview();
             stopGesture();
-            await dotNetRef.invokeMethodAsync(
-                'CompleteMarqueeSelection', paths, completedGesture.addToSelection);
+            await dotNetRef.invokeMethodAsync('CompleteMarqueeSelection', paths, completedGesture.addToSelection);
         }, options);
-
         host.addEventListener('pointercancel', () => {
             host.classList.remove('file-marquee-active');
             clearPreview();
             stopGesture();
         }, options);
-
         scrollContainer.addEventListener('scroll', updateSelection, options);
-
         // Escape is page-level rather than tied to whichever non-focusable row
         // was clicked last. The component decides whether an open dialog owns it.
         document.addEventListener('keydown', event => {
-            if (event.key !== 'Escape' || event.repeat) return;
+            if (event.key !== 'Escape' || event.repeat)
+                return;
             // When a modal owns the Escape (focus is inside it), the dialog's own
             // Cancel handles it. Skipping here avoids a race where the dialog
             // closes and this page-level handler then wipes the file selection.
-            if (event.target.closest?.('.modal-backdrop')) return;
+            if (event.target.closest?.('.modal-backdrop'))
+                return;
             void dotNetRef.invokeMethodAsync('ClearSelectionOnEscape');
         }, options);
-
         // Ctrl+A selects all files instead of the page text, page-level like
         // Escape so it works wherever focus is. Text fields keep native behavior.
         document.addEventListener('keydown', event => {
-            if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'a') return;
-            if (event.target.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+            if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'a')
+                return;
+            if (event.target.closest?.('input, textarea, select, [contenteditable="true"]'))
+                return;
             event.preventDefault();
-            if (event.repeat || event.target.closest?.('.modal-backdrop')) return;
+            if (event.repeat || event.target.closest?.('.modal-backdrop'))
+                return;
             void dotNetRef.invokeMethodAsync('SelectAllFiles');
         }, options);
-
         // Arrow Up/Down move the selection (Shift extends it), Enter opens it,
         // Backspace goes one level up. Page-level like Escape/Ctrl+A: the list
         // element is re-created on every folder load and focus often sits on a
         // toolbar button or body. Widgets with their own key handling (text fields,
         // dialogs, menus, tabs, the inline ACL editor) keep their native behavior.
-        document.addEventListener('keydown', async event => {
-            if (!['ArrowUp', 'ArrowDown', 'Enter', 'Backspace'].includes(event.key)) return;
-            if (event.ctrlKey || event.metaKey || event.altKey) return;
+        document.addEventListener('keydown', async (event) => {
+            if (!['ArrowUp', 'ArrowDown', 'Enter', 'Backspace'].includes(event.key))
+                return;
+            if (event.ctrlKey || event.metaKey || event.altKey)
+                return;
             // Enter/Backspace act once per press, so holding them never cascades.
-            if (event.repeat && (event.key === 'Enter' || event.key === 'Backspace')) return;
+            if (event.repeat && (event.key === 'Enter' || event.key === 'Backspace'))
+                return;
             // A focused button or link activates itself on Enter.
-            if (event.key === 'Enter' && event.target.closest?.('button, a')) return;
+            if (event.key === 'Enter' && event.target.closest?.('button, a'))
+                return;
             if (event.target.closest?.('input, textarea, select, [contenteditable="true"], .modal-backdrop, ' +
-                '[role="dialog"], [role="listbox"], [role="menu"], [role="tablist"], .file-row-acl-expand-wrap, .acl-panel')) return;
-            if (!document.querySelector(selector)) return; // still loading or error view
+                '[role="dialog"], [role="listbox"], [role="menu"], [role="tablist"], .file-row-acl-expand-wrap, .acl-panel'))
+                return;
+            if (!document.querySelector(selector))
+                return; // still loading or error view
             event.preventDefault();
-
             const result = await dotNetRef.invokeMethodAsync('OnListNavigationKey', event.key, event.shiftKey);
-            if (!result || result.index < 0) return;
+            if (!result || result.index < 0)
+                return;
             const row = document.querySelector(`${selector} .file-grid-row[data-path="${CSS.escape(result.path)}"]`);
-            if (row) row.scrollIntoView({ block: 'nearest' });
-            else scrollToIndex(selector, result.index, result.itemHeight, result.hasParent);
+            if (row)
+                row.scrollIntoView({ block: 'nearest' });
+            else
+                scrollToIndex(selector, result.index, result.itemHeight, result.hasParent);
         }, options);
-
         host.addEventListener('click', event => {
-            if (!suppressClick) return;
+            if (!suppressClick)
+                return;
             suppressClick = false;
             event.preventDefault();
             event.stopPropagation();
         }, { ...options, capture: true });
-
         host.addEventListener('contextmenu', event => {
-            if (!suppressContextMenu) return;
+            if (!suppressContextMenu)
+                return;
             suppressContextMenu = false;
             event.preventDefault();
             event.stopPropagation();
         }, { ...options, capture: true });
-
         instances.set(selector, controller);
     }
-
     function dispose(selector) {
         instances.get(selector)?.abort();
         instances.delete(selector);
     }
-
     /**
      * Scrolls the file list so the entry at `index` is centered. Used after a
      * global-search hit selects a file: rows are virtualized, so the target row
@@ -318,12 +300,11 @@ window.fileMarquee = (() => {
      */
     function scrollToIndex(selector, index, itemHeight, hasParent) {
         const host = document.querySelector(selector);
-        if (!host || index < 0) return;
-
+        if (!host || index < 0)
+            return;
         const scroller = findScrollContainer(host);
         const isPage = scroller === document.scrollingElement;
         const viewportHeight = isPage ? window.innerHeight : scroller.clientHeight;
-
         // Coarse jump by index so Virtualize materializes the (possibly off-screen)
         // target row. Instant, not smooth, so the row is rendered before we center.
         const header = host.querySelector('.file-grid-header');
@@ -335,10 +316,10 @@ window.fileMarquee = (() => {
         const entriesTop = headerBottom - viewportTop + currentScroll;
         const rowTop = entriesTop + (index + (hasParent ? 1 : 0)) * itemHeight;
         const top = Math.max(0, rowTop - viewportHeight / 2 + itemHeight / 2);
-
-        if (isPage) window.scrollTo({ top, behavior: 'auto' });
-        else scroller.scrollTop = top;
-
+        if (isPage)
+            window.scrollTo({ top, behavior: 'auto' });
+        else
+            scroller.scrollTop = top;
         // Then center the real row once it renders. scrollIntoView respects the
         // actual layout (sticky header, toolbar) that pure index math can't see,
         // so the entry is never left hidden above the fold. Blazor Server renders
@@ -348,12 +329,12 @@ window.fileMarquee = (() => {
             const row = host.querySelector('.file-row--selected');
             if (row) {
                 row.scrollIntoView({ block: 'center', behavior: 'smooth' });
-            } else if (tries++ < 20) {
+            }
+            else if (tries++ < 20) {
                 setTimeout(settle, 50);
             }
         };
         setTimeout(settle, 50);
     }
-
     return { initialize, dispose, scrollToIndex };
 })();

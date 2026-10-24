@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Context-menu positioning helper.
  *
@@ -9,10 +10,11 @@
  */
 window.contextMenu = {
     /**
-     * @param {HTMLElement} el – the `.context-menu` element to reposition.
+     * @param el – the `.context-menu` element to reposition.
      */
     reposition: function (el) {
-        if (!el) return;
+        if (!el)
+            return;
         // Wait until the menu has its final dimensions. This is essential for
         // Blazor Server because the first post-render layout can still contain
         // the scale-in animation's smaller bounding box.
@@ -21,7 +23,6 @@ window.contextMenu = {
             el.style.animation = 'none';
             el.style.maxHeight = Math.max(0, window.innerHeight - 2 * margin) + 'px';
             el.style.maxWidth = Math.max(0, window.innerWidth - 2 * margin) + 'px';
-
             var rect = el.getBoundingClientRect();
             var top = Math.min(Math.max(margin, rect.top), Math.max(margin, window.innerHeight - rect.height - margin));
             var left = Math.min(Math.max(margin, rect.left), Math.max(margin, window.innerWidth - rect.width - margin));
