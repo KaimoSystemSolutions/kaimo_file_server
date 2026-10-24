@@ -168,23 +168,31 @@
                             }
                         }
 
-                        @if (VM.CanEditSelectedUser)
+                        @if (VM.CanEditSelectedUser && !VM.CanEditSecuritySettingsForSelected)
+                        {
+                            @* Own account: the sign-in toggles are locked (enforced in SaveUserAsync too). *@
+                            <p class="form-hint">@R("Web_Admin_OwnSecurityLocked")</p>
+                        }
+                        @if (VM.CanEditSecuritySettingsForSelected || (VM.CanEditSelectedUser && VM.CanManageHomes))
                         {
                             <div class="create-form-toggles user-edit-toggles">
-                                <div class="toggle-row">
-                                    <span class="toggle-label-text">@Resources.Web_Admin_Toggle_AccountEnabled</span>
-                                    <label class="toggle-switch">
-                                        <input type="checkbox" @bind="VM.EditUserIsEnabled" />
-                                        <span class="toggle-slider"></span>
-                                    </label>
-                                </div>
-                                <div class="toggle-row">
-                                    <span class="toggle-label-text">@Resources.Web_Admin_Toggle_CanChangePassword</span>
-                                    <label class="toggle-switch">
-                                        <input type="checkbox" @bind="VM.EditUserCanChangePassword" />
-                                        <span class="toggle-slider"></span>
-                                    </label>
-                                </div>
+                                @if (VM.CanEditSecuritySettingsForSelected)
+                                {
+                                    <div class="toggle-row">
+                                        <span class="toggle-label-text">@Resources.Web_Admin_Toggle_AccountEnabled</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" @bind="VM.EditUserIsEnabled" />
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="toggle-row">
+                                        <span class="toggle-label-text">@Resources.Web_Admin_Toggle_CanChangePassword</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" @bind="VM.EditUserCanChangePassword" />
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                }
                                 @if (VM.CanManageHomes)
                                 {
                                     <div class="toggle-row">

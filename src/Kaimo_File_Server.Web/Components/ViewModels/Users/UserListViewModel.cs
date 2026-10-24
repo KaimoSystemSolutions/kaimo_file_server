@@ -164,6 +164,11 @@ public partial class UserListViewModel
     /// profile authority, or it is their own record (Tier-1 personal fields).</summary>
     public bool CanEditSelectedProfile => CanEditSelectedUser || IsViewingSelf;
 
+    /// <summary>Whether the sign-in toggles (enabled, may change password) are editable: never on
+    /// one's own account, so no admin can disable their own account or revoke their own password
+    /// change. Leaving the Admins group stays possible while another admin exists (last-admin guard).</summary>
+    public bool CanEditSecuritySettingsForSelected => CanEditSelectedUser && !IsViewingSelf;
+
     /// <summary>Whether the actor may change the selected user's password from the edit form:
     /// an admin with reset authority, or the user changing their OWN password when the account
     /// permits it (mirrors Windows/AD "user may change own password").</summary>

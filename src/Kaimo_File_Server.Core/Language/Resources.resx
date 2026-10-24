@@ -2091,6 +2091,9 @@
   <data name="Web_Admin_Toggle_CanChangePassword" xml:space="preserve">
     <value>Password change allowed</value>
   </data>
+  <data name="Web_Admin_OwnSecurityLocked" xml:space="preserve">
+    <value>Whether your own account is enabled and may change its password can only be set by another administrator.</value>
+  </data>
   <data name="Web_Admin_GroupDeptHint" xml:space="preserve">
     <value>Each group belongs to exactly one department. Default: Global.</value>
   </data>

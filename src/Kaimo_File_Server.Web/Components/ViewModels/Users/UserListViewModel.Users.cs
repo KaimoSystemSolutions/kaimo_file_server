@@ -181,13 +181,19 @@ public partial class UserListViewModel
         var leavesAdminsGroup = wasInAdminsGroup
             && EditUserGroups.Any(g => g.Item.Id == WellKnownGUIDs.GROUP_ADMINS && !g.IsChecked);
 
+        // The sign-in toggles are locked on one's own account: keep the values stored now, not
+        // the ones loaded with the form (another admin may have changed them meanwhile).
+        var current = IsViewingSelf ? await _userRepo.GetByIdAsync(SelectedUser.Id) ?? SelectedUser : null;
+        var isEnabled = current?.IsEnabled ?? EditUserIsEnabled;
+        var canChangePassword = current?.CanChangePassword ?? EditUserCanChangePassword;
+
         // Last-admin protection: if this user is currently the SOLE enabled global admin,
         // the save must not strip that — neither by disabling the account nor by leaving
         // the Admins group (admin inherited through another group survives that).
         var adminUserIds = await GetEnabledGlobalAdminUserIdsAsync();
         if (adminUserIds.Contains(SelectedUser.Id) && !adminUserIds.Any(id => id != SelectedUser.Id))
         {
-            var willBeAdmin = EditUserIsEnabled
+            var willBeAdmin = isEnabled
                 && (!leavesAdminsGroup
                     || await UserInheritsGlobalAdminFromGroupAsync(SelectedUser.Id, WellKnownGUIDs.GROUP_ADMINS));
             if (!willBeAdmin) { ErrorMessage = Resources.Web_Error_LastAdmin; return; }
@@ -203,7 +209,7 @@ public partial class UserListViewModel
 
             await _userRepo.UpdateProfileAsync(
                 SelectedUser.Id, EditUserDescription.Trim(), EditUserEmail.Trim(),
-                EditUserIsEnabled, EditUserCanChangePassword);
+                isEnabled, canChangePassword);
 
             await _userRepo.UpdatePersonalNamesAsync(
                 SelectedUser.Id, NullIfBlank(EditUserFirstName), NullIfBlank(EditUserLastName));

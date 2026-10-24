@@ -89,18 +89,21 @@ public partial class UserListViewModelDatabaseTests
     }
 
     [Fact]
-    public async Task SaveUserAsync_SoleAdminDisablesOwnAccount_IsBlocked()
+    public async Task SaveUserAsync_OtherActorDisablesSoleAdmin_IsBlocked()
     {
+        // The actor manages the admin's profile without being a global admin themselves
+        // (e.g. a scoped grant); disabling the only enabled global admin locks everyone out.
+        var actor = SeedUser("helpdesk");
         var admin = SeedUser("admin");
         var adminRole = SeedAdminRole();
         SeedGlobalAssignment(admin.Id, adminRole.Id);
 
-        var sut = BuildGlobalAdminSut(admin);
+        var sut = BuildGlobalAdminSut(actor);
         await sut.LoadAsync();
         await sut.SelectUserAsync(sut.Users.Single(u => u.Id == admin.Id));
         await sut.StartEditUserAsync();
 
-        sut.EditUserIsEnabled = false; // disabling the last admin locks everyone out
+        sut.EditUserIsEnabled = false;
         await sut.SaveUserAsync();
 
         Assert.Equal(Resources.Web_Error_LastAdmin, sut.ErrorMessage);

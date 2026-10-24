@@ -6,6 +6,7 @@ using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;
+using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Tests.Infrastructure;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
@@ -44,7 +45,7 @@ public partial class UserListViewModelDatabaseTests : DatabaseTestBase
             .ReturnsAsync(PasswordPolicy.Default());
     }
 
-    private UserListViewModel BuildGlobalAdminSut(User actor)
+    private UserListViewModel BuildGlobalAdminSut(User actor, HomeDirectoryService? homes = null)
     {
         var ctx = ContextFor(actor);
 
@@ -72,7 +73,7 @@ public partial class UserListViewModelDatabaseTests : DatabaseTestBase
             UserContextFactoryFor((actor.Username, ctx)).Object,
             AuthStateFor(actor.Username),
             NullLogger<UserListViewModel>.Instance,
-            ShareRepo(), _config.Object);
+            ShareRepo(), _config.Object, homes: homes);
     }
 
     private Group SeedGroup(string name)
