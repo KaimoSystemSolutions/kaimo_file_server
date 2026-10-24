@@ -21,7 +21,8 @@ else
     [Parameter] public string? SubPath { get; set; }
 
     // The home-folder share is never browsed as a share in the web UI: users only see their
-    // own folder as "user" (/files/user), and /files/users is the metadata-only overview.
+    // own folder as "user" (/files/user); administrators get the metadata-only overview on
+    // /home-folders (/files/users redirects there).
     protected override void OnParametersSet()
     {
         if (string.Equals(ShareName, HomeDirectoryService.ShareName, StringComparison.OrdinalIgnoreCase))

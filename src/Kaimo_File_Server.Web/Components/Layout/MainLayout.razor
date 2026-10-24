@@ -46,6 +46,13 @@
                     @Assets.SVG("folder.svg", new SvgOptions())
                     <span class="nav-label">@Resources.Web_Nav_Shares</span>
                 </NavLink>
+                @if (_canManageHomeFolders)
+                {
+                    <NavLink class="nav-item" href="/home-folders" Match="NavLinkMatch.Prefix">
+                        @Assets.SVG("user.svg", new SvgOptions())
+                        <span class="nav-label">@Text("Web_Nav_HomeFolders", "Home folders")</span>
+                    </NavLink>
+                }
                 @* Keep the File Browser selected while navigating within a share. *@
                 <NavLink class="nav-item" href="/files" Match="NavLinkMatch.Prefix">
                     @Assets.SVG("compass.svg", new SvgOptions())
@@ -235,6 +242,7 @@
     private bool _canManageSyncs;
     private bool _canManageCloudAccess;
     private bool _canManageSettings;
+    private bool _canManageHomeFolders;
     private bool _canManageUsers;
     private bool _canViewDepartments;
     private bool _canManageShareLinks;
@@ -399,6 +407,11 @@
             _canManageSettings = _currentUser != null
                                  && await ManagementAuthService.HasAnyPermissionAsync(
                                         _currentUser, ManagementPermission.ManageSystemSettings);
+            // Mirror the /home-folders tabs: Overview (Global ManageHomes) or Settings (system settings).
+            _canManageHomeFolders = _canManageSettings
+                                    || (_currentUser != null
+                                        && await ManagementAuthService.HasGlobalPermissionAsync(
+                                               _currentUser, ManagementPermission.ManageHomes));
             // Mirror UserListViewModel.CanAccessPage — show the tab only if the user
             // can reach the page behind it.
             _canManageUsers = _currentUser != null

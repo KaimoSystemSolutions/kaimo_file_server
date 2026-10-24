@@ -1,0 +1,8 @@
+@page "/files/users"
+@inject NavigationManager Nav
+
+@* The home-folder overview moved out of the file browser to /home-folders; keep old links working. *@
+
+@code {
+    protected override void OnInitialized() => Nav.NavigateTo("/home-folders", replace: true);
+}

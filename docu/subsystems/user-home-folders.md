@@ -12,8 +12,11 @@ Related: [Security model](../architecture/security-model.md) ·
 - The share is a regular `ShareDefinition` with `IsUserHomes = true`, created in a chosen pool as
   `<pool>/users`. An existing `<pool>/users` directory is adopted, so homes re-attach to their users
   after a database reset.
-- Setup, the global switch, the pool move and the recycle-bin limits live on Settings → Home folders
-  (`HomeFolderSettings.razor`); `/files/users` is the metadata overview of the individual homes.
+- Administration lives on its own page `/home-folders` (Storage → Home folders,
+  `Components/Pages/HomeFolders/`): the **Overview** tab is the metadata overview of the individual
+  homes (Global `ManageHomes`, `HomeFolderOverview.razor`), the **Settings** tab holds setup, the
+  global switch, the pool move and the recycle-bin limits (`ManageSystemSettings`,
+  `HomeFolderSettings.razor`). The former `/files/users` route redirects there.
 - The name `users` is used because `[homes]` is a reserved Samba section with special semantics.
 - The names `users` and `user` are reserved and rejected for other shares.
 - Provisioning is idempotent (`HomeDirectoryService`,

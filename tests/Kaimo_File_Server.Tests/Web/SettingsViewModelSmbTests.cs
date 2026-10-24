@@ -24,7 +24,7 @@ namespace Kaimo_File_Server.Tests;
 /// config model (defaults + range normalization) and the <see cref="SettingsViewModel"/>
 /// load/save behaviour for those settings, including permission gating and range repair.
 /// </summary>
-public class SettingsViewModelSmbTests
+public partial class SettingsViewModelSmbTests
 {
     [Fact]
     public async Task SaveCloudAccessSettingsAsync_ClampsAndPersistsGlobalTtl()

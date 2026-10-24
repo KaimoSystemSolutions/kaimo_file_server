@@ -17,7 +17,7 @@ public sealed record HomeFolderRow(Guid UserId, User? User, long SizeBytes, IRea
 }
 
 /// <summary>
-/// Metadata-only overview of all home folders (<c>/files/users</c>), gated by
+/// Metadata-only overview of all home folders (<c>/home-folders</c>, Overview tab), gated by
 /// <see cref="ManagementPermission.ManageHomes"/>. It deliberately never lists folder content:
 /// sizes are read from disk and links from the link table, while the holder of this permission
 /// has no ACL entry in anyone else's home.
@@ -31,14 +31,11 @@ public sealed class HomesAdminViewModel(
     AuthenticationStateProvider authState,
     ILogger<HomesAdminViewModel> logger)
 {
-    /// <summary>Display name of the overview entry in the share list.</summary>
-    public static string DisplayName => Resources.ResourceManager.GetString("Web_Homes_DisplayName") ?? "users";
-
     public bool IsLoading { get; private set; }
     public bool CanAccessPage { get; private set; }
     public bool IsConfigured { get; private set; }
 
-    /// <summary>False while home folders are switched off for everyone (Settings → Home folders).</summary>
+    /// <summary>False while home folders are switched off for everyone (Home folders → Settings).</summary>
     public bool IsGloballyEnabled { get; private set; }
     public string? ErrorMessage { get; private set; }
     public string? SuccessMessage { get; private set; }

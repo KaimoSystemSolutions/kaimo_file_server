@@ -4854,9 +4854,6 @@
   <data name="Web_Home_Unavailable" xml:space="preserve">
     <value>Dein Home-Ordner ist nicht verfügbar. Er ist für dein Konto deaktiviert oder noch nicht eingerichtet.</value>
   </data>
-  <data name="Web_Homes_DisplayName" xml:space="preserve">
-    <value>users</value>
-  </data>
   <data name="Web_Homes_Title" xml:space="preserve">
     <value>Home-Ordner der Benutzer</value>
   </data>
@@ -4864,7 +4861,7 @@
     <value>Größe, Status und öffentliche Links jedes Home-Ordners. Die Inhalte bleiben privat.</value>
   </data>
   <data name="Web_Homes_NotConfigured" xml:space="preserve">
-    <value>Home-Ordner sind noch nicht eingerichtet. Wähle unter Einstellungen → Home-Ordner einen Storage-Pool.</value>
+    <value>Home-Ordner sind noch nicht eingerichtet. Wähle im Tab „Einstellungen“ einen Storage-Pool.</value>
   </data>
   <data name="Web_Homes_Empty" xml:space="preserve">
     <value>Es gibt noch keine Home-Ordner.</value>
@@ -4939,7 +4936,7 @@
     <value>Die Home-Ordner sind für alle Benutzer deaktiviert.</value>
   </data>
   <data name="Web_Homes_GloballyDisabled" xml:space="preserve">
-    <value>Die Home-Ordner sind für alle Benutzer deaktiviert (Einstellungen → Home-Ordner). Die Dateien bleiben erhalten.</value>
+    <value>Die Home-Ordner sind für alle Benutzer deaktiviert (Tab „Einstellungen“). Die Dateien bleiben erhalten.</value>
   </data>
   <data name="Web_Homes_Delete" xml:space="preserve">
     <value>Home-Ordner löschen</value>
@@ -7357,7 +7354,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Settings_Tab_SystemStatus" xml:space="preserve">
     <value>Systemstatus</value>
   </data>
-  <data name="Web_Settings_Tab_Homes" xml:space="preserve">
+  <data name="Web_Nav_HomeFolders" xml:space="preserve">
     <value>Home-Ordner</value>
   </data>
   <data name="Web_Settings_Homes_MoveHint" xml:space="preserve">
@@ -7515,5 +7512,11 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   </data>
   <data name="Web_ShareLinks_DownloadsDisabled" xml:space="preserve">
     <value>Download-Links sind in den Einstellungen deaktiviert; dieser Link lässt sich derzeit nicht öffnen.</value>
+  </data>
+  <data name="Web_HomeFolders_Tab_Overview" xml:space="preserve">
+    <value>Übersicht</value>
+  </data>
+  <data name="Web_HomeFolders_Tab_Settings" xml:space="preserve">
+    <value>Einstellungen</value>
   </data>
 </root>

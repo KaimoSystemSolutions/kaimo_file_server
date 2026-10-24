@@ -1,4 +1,3 @@
-@page "/files/users"
 @using Kaimo_File_Server.Core.Domain
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Shared
@@ -8,23 +7,13 @@
 @using Kaimo_File_Server.Web.Services
 @inherits AppComponentBase
 @inject HomesAdminViewModel VM
-@inject NavigationManager Nav
 @inject DateFormatService DateFmt
 
 @*
-    Metadata-only overview of all user home folders (users/<userId>). Folder content is never
-    listed here: an administrator sees who owns a home, its size, its status and its public
-    links, and can enable or disable it. Users without ManageHomes are sent to their own home.
+    Home folders → Overview: metadata-only list of all user home folders (users/<userId>).
+    Folder content is never listed here: an administrator sees who owns a home, its size, its
+    status and its public links, and can enable, disable or delete it. The page loads VM.
 *@
-
-<PageTitle>Kaimo File Server – @T("Web_Homes_Title", "User home folders")</PageTitle>
-
-<div class="page-header">
-    <div>
-        <h1>@T("Web_Homes_Title", "User home folders")</h1>
-        <p class="subtitle">@T("Web_Homes_Subtitle", "Size, status and public links of every home folder. Contents stay private.")</p>
-    </div>
-</div>
 
 @if (VM.IsLoading)
 {
@@ -38,7 +27,7 @@ else if (!VM.IsConfigured)
 {
     <div class="empty-state">
         @Assets.SVG("users.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
-        <p>@T("Web_Homes_NotConfigured", "Home folders are not set up yet. Choose a storage pool under Settings → Home folders.")</p>
+        <p>@T("Web_Homes_NotConfigured", "Home folders are not set up yet. Choose a storage pool on the Settings tab.")</p>
     </div>
 }
 else if (!VM.Rows.Any())
@@ -56,7 +45,7 @@ else
     }
     @if (!VM.IsGloballyEnabled)
     {
-        <div class="warning-banner">@T("Web_Homes_GloballyDisabled", "Home folders are disabled for all users (Settings → Home folders). Files are kept.")</div>
+        <div class="warning-banner">@T("Web_Homes_GloballyDisabled", "Home folders are disabled for all users (Settings tab). Files are kept.")</div>
     }
     <div class="admin-content homes-workspace admin-compact">
         <section class="homes-list" aria-label="@T("Web_Homes_Title", "User home folders")">
@@ -211,14 +200,6 @@ else
 }
 
 @code {
-    protected override async Task OnInitializedAsync()
-    {
-        await VM.LoadAsync();
-        // Without ManageHomes this overview does not exist for the user; their home is /files/user.
-        if (!VM.CanAccessPage)
-            Nav.NavigateTo("/files/user", replace: true);
-    }
-
     private Guid? _confirmDeleteId;
     private bool _deleting;
 

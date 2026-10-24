@@ -56,7 +56,7 @@ Tables by area:
   is a separate bind mount (`/data/storage/pool01`, `/data/storage/pool02`, …).
 - A **share** (`ShareDefinition`) is a directory inside a pool. `ShareDefinition.Path` is its absolute
   path; all share I/O resolves through it (`src/Kaimo_File_Server.Infrastructure/Services/FileServiceFactory.cs`).
-- A share can be moved to another pool (share management, and Settings → Home folders for the
+- A share can be moved to another pool (share management, and Home folders → Settings for the
   `users` share). `SharePoolMoveService` (`src/Kaimo_File_Server.Infrastructure/Services/SharePoolMoveService.cs`)
   disables the share for the duration of the move (SMB drops it within one share sync and closes its
   sessions; every other transport refuses a disabled share), renames the folder or, across file

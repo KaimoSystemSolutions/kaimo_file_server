@@ -74,6 +74,10 @@ public static class SearchDestinations
 
     private const ManagementPermission Settings = ManagementPermission.ManageSystemSettings;
 
+    // /home-folders: Overview (ManageHomes) or Settings tab (system settings).
+    private const ManagementPermission HomeFoldersGate =
+        ManagementPermission.ManageHomes | ManagementPermission.ManageSystemSettings;
+
     public static readonly IReadOnlyList<SearchDestination> All = new List<SearchDestination>
     {
         // ── Top-level tabs ──
@@ -124,9 +128,9 @@ public static class SearchDestinations
             "/settings?tab=storage", "folder.svg", Settings),
         // "users"/"user" deliberately overlap with the Users page: the share is named
         // "users", its web label "user".
-        new("Web_Settings_Homes_Label",
+        new("Web_Nav_HomeFolders",
             ["home", "homes", "users", "user", "home folder", "home-ordner", "heimverzeichnis", "benutzerordner"],
-            "/settings?tab=homes", "users.svg", Settings),
+            "/home-folders", "user.svg", HomeFoldersGate),
         new("Web_Recycle_SectionLabel",
             ["recycle bin", "papierkorb", "trash", "retention", "aufbewahrung"],
             "/settings?tab=storage", "folder.svg", Settings),

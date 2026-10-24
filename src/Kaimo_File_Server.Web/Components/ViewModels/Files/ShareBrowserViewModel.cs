@@ -98,9 +98,6 @@ public partial class ShareBrowserViewModel
     /// <summary>Whether the pinned "user" entry (the actor's own home folder) is shown.</summary>
     public bool HasHome { get; private set; }
 
-    /// <summary>Whether the pinned "users" entry (home-folder metadata overview) is shown.</summary>
-    public bool CanManageHomes { get; private set; }
-
     // -- Computed --
     public string CurrentUserName { get; private set; } = "";
 
@@ -136,7 +133,6 @@ public partial class ShareBrowserViewModel
                 : await _userContextFactory.CreateByUsernameAsync(username);
 
             HasHome = false;
-            CanManageHomes = false;
 
             if (actor is null)
             {
@@ -175,8 +171,6 @@ public partial class ShareBrowserViewModel
 
             var homesShare = _homes is null ? null : await _homes.GetHomesShareAsync();
             HasHome = homesShare is { IsEnabled: true } && actor.User.HomeDirectoryEnabled;
-            CanManageHomes = homesShare is not null
-                && await _mgmtAuth.HasGlobalPermissionAsync(actor, ManagementPermission.ManageHomes);
 
             var allShares = await _shareRepo.GetAllEnabledAsync();
             //var allShares = await _shareRepo.GetAllAsync();

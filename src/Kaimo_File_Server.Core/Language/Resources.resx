@@ -4920,9 +4920,6 @@
   <data name="Web_Home_Unavailable" xml:space="preserve">
     <value>Your home folder is not available. It may be disabled for your account or not set up yet.</value>
   </data>
-  <data name="Web_Homes_DisplayName" xml:space="preserve">
-    <value>users</value>
-  </data>
   <data name="Web_Homes_Title" xml:space="preserve">
     <value>User home folders</value>
   </data>
@@ -4930,7 +4927,7 @@
     <value>Size, status and public links of every home folder. Contents stay private.</value>
   </data>
   <data name="Web_Homes_NotConfigured" xml:space="preserve">
-    <value>Home folders are not set up yet. Choose a storage pool under Settings → Home folders.</value>
+    <value>Home folders are not set up yet. Choose a storage pool on the Settings tab.</value>
   </data>
   <data name="Web_Homes_Empty" xml:space="preserve">
     <value>No home folders exist yet.</value>
@@ -5005,7 +5002,7 @@
     <value>Home folders are disabled for all users.</value>
   </data>
   <data name="Web_Homes_GloballyDisabled" xml:space="preserve">
-    <value>Home folders are disabled for all users (Settings → Home folders). Files are kept.</value>
+    <value>Home folders are disabled for all users (Settings tab). Files are kept.</value>
   </data>
   <data name="Web_Homes_Delete" xml:space="preserve">
     <value>Delete home folder</value>
@@ -7357,7 +7354,7 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Settings_Tab_SystemStatus" xml:space="preserve">
     <value>System status</value>
   </data>
-  <data name="Web_Settings_Tab_Homes" xml:space="preserve">
+  <data name="Web_Nav_HomeFolders" xml:space="preserve">
     <value>Home folders</value>
   </data>
   <data name="Web_Settings_Homes_MoveHint" xml:space="preserve">
@@ -7515,5 +7512,11 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   </data>
   <data name="Web_ShareLinks_DownloadsDisabled" xml:space="preserve">
     <value>Download links are disabled in the settings; this link currently does not open.</value>
+  </data>
+  <data name="Web_HomeFolders_Tab_Overview" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="Web_HomeFolders_Tab_Settings" xml:space="preserve">
+    <value>Settings</value>
   </data>
 </root>

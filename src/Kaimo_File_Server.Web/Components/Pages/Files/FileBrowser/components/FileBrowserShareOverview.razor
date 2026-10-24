@@ -35,7 +35,7 @@ else if (VM.ErrorMessage is not null)
 {
     <div class="error-banner">@VM.ErrorMessage</div>
 }
-else if (!VM.Shares.Any() && !RemoteVM.Shares.Any() && !VM.HasHome && !VM.CanManageHomes)
+else if (!VM.Shares.Any() && !RemoteVM.Shares.Any() && !VM.HasHome)
 {
     <div class="empty-state">
         @Assets.SVG("folder.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
@@ -66,14 +66,10 @@ else
                 @SortArrow("size")
             </div>
         </div>
-        @* Home entries are pinned above both share groups, so they stay on top in every sort order. *@
+        @* The own home is pinned above both share groups, so it stays on top in every sort order. *@
         @if (VM.HasHome)
         {
             @PinnedRow(HomeFileBrowserViewModel.DisplayName, "user.svg", "/files/user")
-        }
-        @if (VM.CanManageHomes)
-        {
-            @PinnedRow(HomesAdminViewModel.DisplayName, "users.svg", "/files/users")
         }
         @foreach (var share in SortedLocalShares())
         {

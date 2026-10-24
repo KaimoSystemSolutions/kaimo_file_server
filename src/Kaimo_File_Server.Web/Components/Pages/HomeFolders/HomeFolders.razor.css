@@ -1,0 +1,51 @@
+.homes-tabs {
+    margin-bottom: var(--space-4);
+}
+
+/* Settings tab: one surface like the Settings page content pane, sections divided edge to edge. */
+.homes-settings {
+    max-width: 880px;
+    padding: 22px 24px 28px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+}
+
+.homes-settings ::deep .detail-section {
+    margin-bottom: 24px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border);
+}
+
+.homes-settings ::deep .detail-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.homes-settings ::deep .detail-label {
+    color: var(--text-primary);
+}
+
+.homes-settings ::deep .settings-description {
+    margin-bottom: 16px;
+    color: var(--text-tertiary);
+    font-size: 12px;
+}
+
+.homes-settings ::deep .settings-field-label {
+    min-width: 200px;
+    font-size: 13px;
+}
+
+.homes-settings ::deep .settings-empty {
+    margin-top: 8px;
+    color: var(--text-tertiary);
+    font-size: 13px;
+}
+
+@media (max-width: 480px) {
+    .homes-settings {
+        padding: var(--space-4);
+    }
+}
