@@ -48,6 +48,17 @@ window.fileMarquee = (() => {
             backgroundColor: 'rgba(59, 130, 246, 0.18)'
         });
 
+        // The component disposes its DotNetObjectReference right after requesting
+        // dispose() here, so a key pressed while navigating away can reach .NET after
+        // the reference is gone. That rejection arrives after the abort; drop it.
+        // Failures while the instance is still live keep surfacing.
+        function invoke<T = unknown>(methodName: string, ...args: unknown[]): Promise<T | undefined> {
+            return dotNetRef.invokeMethodAsync<T>(methodName, ...args).catch(error => {
+                if (!controller.signal.aborted) throw error;
+                return undefined;
+            });
+        }
+
         function scrollTop() {
             return scrollContainer === document.scrollingElement
                 ? window.scrollY
@@ -230,7 +241,7 @@ window.fileMarquee = (() => {
             suppressClick = completedGesture.button === 0;
             clearPreview();
             stopGesture();
-            await dotNetRef.invokeMethodAsync(
+            await invoke(
                 'CompleteMarqueeSelection', paths, completedGesture.addToSelection);
         }, options);
 
@@ -250,7 +261,7 @@ window.fileMarquee = (() => {
             // Cancel handles it. Skipping here avoids a race where the dialog
             // closes and this page-level handler then wipes the file selection.
             if ((event.target as Element).closest?.('.modal-backdrop')) return;
-            void dotNetRef.invokeMethodAsync('ClearSelectionOnEscape');
+            void invoke('ClearSelectionOnEscape');
         }, options);
 
         // Ctrl+A selects all files instead of the page text, page-level like
@@ -260,7 +271,7 @@ window.fileMarquee = (() => {
             if ((event.target as Element).closest?.('input, textarea, select, [contenteditable="true"]')) return;
             event.preventDefault();
             if (event.repeat || (event.target as Element).closest?.('.modal-backdrop')) return;
-            void dotNetRef.invokeMethodAsync('SelectAllFiles');
+            void invoke('SelectAllFiles');
         }, options);
 
         // Arrow Up/Down move the selection (Shift extends it), Enter opens it,
@@ -280,7 +291,7 @@ window.fileMarquee = (() => {
             if (!document.querySelector(selector)) return; // still loading or error view
             event.preventDefault();
 
-            const result = await dotNetRef.invokeMethodAsync<KaimoListNavigationResult | null>('OnListNavigationKey', event.key, event.shiftKey);
+            const result = await invoke<KaimoListNavigationResult | null>('OnListNavigationKey', event.key, event.shiftKey);
             if (!result || result.index < 0) return;
             const row = document.querySelector(`${selector} .file-grid-row[data-path="${CSS.escape(result.path)}"]`);
             if (row) row.scrollIntoView({ block: 'nearest' });

@@ -44,6 +44,17 @@ window.fileMarquee = (() => {
             boxSizing: 'border-box', border: '1px solid #3b82f6',
             backgroundColor: 'rgba(59, 130, 246, 0.18)'
         });
+        // The component disposes its DotNetObjectReference right after requesting
+        // dispose() here, so a key pressed while navigating away can reach .NET after
+        // the reference is gone. That rejection arrives after the abort; drop it.
+        // Failures while the instance is still live keep surfacing.
+        function invoke(methodName, ...args) {
+            return dotNetRef.invokeMethodAsync(methodName, ...args).catch(error => {
+                if (!controller.signal.aborted)
+                    throw error;
+                return undefined;
+            });
+        }
         function scrollTop() {
             return scrollContainer === document.scrollingElement
                 ? window.scrollY
@@ -208,7 +219,7 @@ window.fileMarquee = (() => {
             suppressClick = completedGesture.button === 0;
             clearPreview();
             stopGesture();
-            await dotNetRef.invokeMethodAsync('CompleteMarqueeSelection', paths, completedGesture.addToSelection);
+            await invoke('CompleteMarqueeSelection', paths, completedGesture.addToSelection);
         }, options);
         host.addEventListener('pointercancel', () => {
             host.classList.remove('file-marquee-active');
@@ -226,7 +237,7 @@ window.fileMarquee = (() => {
             // closes and this page-level handler then wipes the file selection.
             if (event.target.closest?.('.modal-backdrop'))
                 return;
-            void dotNetRef.invokeMethodAsync('ClearSelectionOnEscape');
+            void invoke('ClearSelectionOnEscape');
         }, options);
         // Ctrl+A selects all files instead of the page text, page-level like
         // Escape so it works wherever focus is. Text fields keep native behavior.
@@ -238,7 +249,7 @@ window.fileMarquee = (() => {
             event.preventDefault();
             if (event.repeat || event.target.closest?.('.modal-backdrop'))
                 return;
-            void dotNetRef.invokeMethodAsync('SelectAllFiles');
+            void invoke('SelectAllFiles');
         }, options);
         // Arrow Up/Down move the selection (Shift extends it), Enter opens it,
         // Backspace goes one level up. Page-level like Escape/Ctrl+A: the list
@@ -262,7 +273,7 @@ window.fileMarquee = (() => {
             if (!document.querySelector(selector))
                 return; // still loading or error view
             event.preventDefault();
-            const result = await dotNetRef.invokeMethodAsync('OnListNavigationKey', event.key, event.shiftKey);
+            const result = await invoke('OnListNavigationKey', event.key, event.shiftKey);
             if (!result || result.index < 0)
                 return;
             const row = document.querySelector(`${selector} .file-grid-row[data-path="${CSS.escape(result.path)}"]`);
