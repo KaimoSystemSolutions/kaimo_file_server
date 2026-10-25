@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -198,16 +198,18 @@ public sealed class SearchApiTests : IDisposable
         var (controller, _) = CreateController(
             Hit("docs", "a.txt"),
             Hit("gone", "b.txt"),          // share no longer enabled → dropped
-            Hit("users", "u1/c.txt"),      // home share → shown as "user"
+            Hit("users", $"{Caller.User.Id}/c.txt"),   // own home → shown as "user"
+            Hit("users", "u1/e.txt"),      // another home (AccessHomeContents) → keeps "users"
             Hit("docs", "d.txt"));
 
-        var result = await controller.Search(new SearchRequestDto("report", Limit: 2));
+        var result = await controller.Search(new SearchRequestDto("report", Limit: 3));
 
         var dtos = Assert.IsType<List<SearchHitDto>>(Assert.IsType<OkObjectResult>(result).Value);
         Assert.Collection(dtos,
             d => Assert.Equal((DocsShare.Id, "docs", "a.txt"), (d.ShareId, d.ShareName, d.Path)),
-            d => Assert.Equal((HomesShare.Id, HomeFileBrowserViewModel.DisplayName, "u1/c.txt"),
-                (d.ShareId, d.ShareName, d.Path)));
+            d => Assert.Equal((HomesShare.Id, HomeFileBrowserViewModel.DisplayName, $"{Caller.User.Id}/c.txt"),
+                (d.ShareId, d.ShareName, d.Path)),
+            d => Assert.Equal((HomesShare.Id, "users", "u1/e.txt"), (d.ShareId, d.ShareName, d.Path)));
         Assert.Equal("no-store", controller.Response.Headers.CacheControl.ToString());
     }
 
@@ -227,9 +229,11 @@ public sealed class SearchApiTests : IDisposable
         return Assert.IsType<ApiError>(obj.Value).Code;
     }
 
+    private static readonly UserContext Caller = NewUser();
+
     private static (SearchApiController, Mock<ISearchService>) CreateController(params FileDocument[] hits)
     {
-        var user = NewUser();
+        var user = Caller;
         var users = new Mock<IUserContextFactory>();
         users.Setup(f => f.CreateByUserIdAsync(user.User.Id)).ReturnsAsync(user);
 

@@ -18,6 +18,10 @@ public partial class UserListViewModel
     /// starts. Drives the live "will be added to the department" warning below.</summary>
     private HashSet<Guid> _editGroupDeptMemberIds = [];
 
+    private static string GroupGrantsUnassignableRolesMessage
+        => Resources.ResourceManager.GetString("Web_Error_GroupGrantsUnassignableRoles")
+           ?? "This group grants roles you are not allowed to assign, so you cannot add members to it.";
+
     /// <summary>Live warning shown while editing a department-scoped group's members: the selected
     /// users that are not yet in the group's department and so will be added to it on save. <c>null</c>
     /// when the group is Global or every selected member already belongs to the department.</summary>
@@ -110,6 +114,15 @@ public partial class UserListViewModel
             return;
         }
 
+        // Joining grants the group's roles: adding members needs the right to assign them.
+        var previousIds = (await _groupRepo.GetMembersAsync(SelectedGroup.Id)).Select(u => u.Id).ToHashSet();
+        if (EditGroupMembers.Any(m => m.IsChecked && !previousIds.Contains(m.Item.Id))
+            && !await _roleAssignments.CanAddGroupMembersAsync(_actorContext, SelectedGroup.Id))
+        {
+            ErrorMessage = GroupGrantsUnassignableRolesMessage;
+            return;
+        }
+
         // Admins membership mirrors the global admin role, so emptying it of enabled
         // members would strip the last admin. Block that, mirroring the last-admin guard.
         if (SelectedGroup.Id == WellKnownGUIDs.GROUP_ADMINS
@@ -142,8 +155,7 @@ public partial class UserListViewModel
             if (SelectedGroup.Id == WellKnownGUIDs.GROUP_ADMINS)
             {
                 // Full-mirror: every membership change here grants/revokes the admin role.
-                var previousMemberIds = (await _groupRepo.GetMembersAsync(SelectedGroup.Id))
-                    .Select(u => u.Id).ToHashSet();
+                var previousMemberIds = previousIds;
                 await _groupRepo.SetMembersAsync(SelectedGroup.Id, selectedUserIds);
 
                 foreach (var uid in selectedUserIds)

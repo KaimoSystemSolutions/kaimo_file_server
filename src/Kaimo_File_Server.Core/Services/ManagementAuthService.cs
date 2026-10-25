@@ -244,8 +244,23 @@ public class ManagementAuthService : IManagementAuthService
 
         // ... and may not grant a single bit the actor does not itself hold there.
         // Subset check: no bit of the role falls outside the actor's effective set.
-        return (rolePermissions & ~effective) == ManagementPermission.None;
+        if ((rolePermissions & ~effective) != ManagementPermission.None)
+            return false;
+
+        // Sensitive bits are passed on only by actors holding them system-wide: a department-
+        // scoped holder may use them but never delegate them, not even within its department.
+        var sensitive = rolePermissions & GlobalDelegationOnly;
+        if (sensitive == ManagementPermission.None || targetScopeType == ScopeType.Global)
+            return true;
+        var global = await GetEffectivePermissionsAtAsync(actor, ScopeType.Global, Guid.Empty);
+        return (sensitive & ~global) == ManagementPermission.None;
     }
+
+    /// <summary>
+    /// Permissions that only system-wide holders may delegate (see <see cref="CanAssignRoleAsync"/>).
+    /// Role definitions are global, so editing them already requires the bits globally.
+    /// </summary>
+    public const ManagementPermission GlobalDelegationOnly = ManagementPermission.AccessHomeContents;
 
     /// <summary>
     /// Whether an actor's <paramref name="assignment"/> authority reaches a target scope.
@@ -404,12 +419,42 @@ public class ManagementAuthService : IManagementAuthService
         var users = (await userRepo.GetAllAsync()).ToDictionary(u => u.Id);
         var groupIds = (await groupRepo.GetAllAsync()).Select(g => g.Id).ToHashSet();
 
-        var holders = new HashSet<Guid>();
-        foreach (var a in globalAssignments)
-        {
-            if (a.Id == excludeAssignmentId) continue;
-            if (!roles.TryGetValue(a.RoleId, out var role) || !roleMatches(role)) continue;
+        var matching = globalAssignments.Where(a => a.Id != excludeAssignmentId
+            && roles.TryGetValue(a.RoleId, out var role) && roleMatches(role));
+        return await ExpandToEnabledUserIdsAsync(matching, users, groupIds, groupRepo);
+    }
 
+    /// <summary>
+    /// The ENABLED users who hold a role matching <paramref name="roleMatches"/> at ANY scope
+    /// (Global, department or share), directly or through a group. Used where the transport needs
+    /// to admit every potential holder up front (the SMB allow list of the home-folder share);
+    /// the scope itself is still enforced per path by the ACL service.
+    /// </summary>
+    public static async Task<HashSet<Guid>> GetPermissionHolderUserIdsAsync(
+        IScopedRoleAssignmentRepository assignmentRepo,
+        IRoleRepository roleRepo,
+        IUserRepository userRepo,
+        IGroupRepository groupRepo,
+        Func<Role, bool> roleMatches)
+    {
+        var matching = new List<ScopedRoleAssignment>();
+        foreach (var role in (await roleRepo.GetAllAsync()).Where(roleMatches))
+            matching.AddRange(await assignmentRepo.GetByRoleAsync(role.Id));
+        if (matching.Count == 0)
+            return [];
+
+        var users = (await userRepo.GetAllAsync()).ToDictionary(u => u.Id);
+        var groupIds = (await groupRepo.GetAllAsync()).Select(g => g.Id).ToHashSet();
+        return await ExpandToEnabledUserIdsAsync(matching, users, groupIds, groupRepo);
+    }
+
+    private static async Task<HashSet<Guid>> ExpandToEnabledUserIdsAsync(
+        IEnumerable<ScopedRoleAssignment> assignments, Dictionary<Guid, User> users,
+        HashSet<Guid> groupIds, IGroupRepository groupRepo)
+    {
+        var holders = new HashSet<Guid>();
+        foreach (var a in assignments)
+        {
             if (users.TryGetValue(a.PrincipalId, out var user))
             {
                 if (user.IsEnabled) holders.Add(user.Id);

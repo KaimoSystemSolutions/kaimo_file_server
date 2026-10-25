@@ -16,7 +16,7 @@ namespace Kaimo_File_Server.Tests;
 /// <see cref="ScopeType.Global"/>, so it carries the full system-wide meaning (system bits,
 /// role ACLs, admin coupling and the last-admin guard) whichever page created it.
 /// </summary>
-public class RoleAssignmentServiceTests : DatabaseTestBase
+public partial class RoleAssignmentServiceTests : DatabaseTestBase
 {
     private readonly Mock<IManagementAuthService> _mgmtAuth = new();
 

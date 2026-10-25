@@ -159,6 +159,17 @@ evaluated by `AccessRestrictionService`).
   `ScopeType.Global` (see [domain model](domain-model.md#the-global-department)). A department
   scope covers that department and its descendants; Global covers everything. Permissions of all
   matching assignments are combined (union, no deny).
+- Delegation never elevates (`ManagementAuthService.CanAssignRoleAsync`, enforced by
+  `RoleAssignmentService`): assigning or removing a role needs `AssignRoles` at the target scope and
+  every bit of the role held there. Editing a role definition needs `AssignRoles` globally, and the
+  new set may not exceed the actor's global permissions.
+- Bits in `ManagementAuthService.GlobalDelegationOnly` (currently `AccessHomeContents`) can only be
+  delegated by actors holding them globally; department-scoped holders may use them but never pass
+  them on.
+- Group membership confers the group's roles, so adding members (group editor or the user's group
+  list) requires the right to assign every role the group holds; joining Admins requires the right to
+  assign the system-wide admin role (`RoleAssignmentService.CanAddGroupMembersAsync`). Removing members
+  is not restricted by this rule.
 
 ## Secrets and key material
 

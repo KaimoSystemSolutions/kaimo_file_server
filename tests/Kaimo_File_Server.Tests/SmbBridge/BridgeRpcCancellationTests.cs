@@ -1,4 +1,4 @@
-using Grpc.Core;
+﻿using Grpc.Core;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Security;
@@ -42,7 +42,8 @@ public sealed class BridgeRpcCancellationTests
             .Returns(new TaskCompletionSource<List<Core.Domain.ShareDefinition>>(
                 TaskCreationOptions.RunContinuationsAsynchronously).Task);
         var sut = new ShareGrpcService(
-            shares.Object, Mock.Of<IUserRepository>(), NullLogger<ShareGrpcService>.Instance);
+            shares.Object, Mock.Of<IUserRepository>(), Mock.Of<IScopedRoleAssignmentRepository>(),
+            Mock.Of<IRoleRepository>(), Mock.Of<IGroupRepository>(), NullLogger<ShareGrpcService>.Instance);
 
         await AssertRpcCancellationAsync(context => sut.ListShares(
             new ListSharesRequest(), context));

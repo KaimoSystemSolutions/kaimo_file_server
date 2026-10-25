@@ -4932,6 +4932,12 @@
   <data name="Web_Perm_ManageHomes" xml:space="preserve">
     <value>Manage home folders</value>
   </data>
+  <data name="Web_Perm_AccessHomeContents" xml:space="preserve">
+    <value>Access home folder contents</value>
+  </data>
+  <data name="Web_Error_GroupGrantsUnassignableRoles" xml:space="preserve">
+    <value>This group grants roles you are not allowed to assign, so you cannot add members to it.</value>
+  </data>
   <data name="Web_Home_DisplayName" xml:space="preserve">
     <value>user</value>
   </data>

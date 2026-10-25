@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Domain;
+﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
@@ -98,6 +98,12 @@ public partial class ShareBrowserViewModel
     /// <summary>Whether the pinned "user" entry (the actor's own home folder) is shown.</summary>
     public bool HasHome { get; private set; }
 
+    /// <summary>
+    /// Whether the pinned "users" entry (the whole home-folder share) is shown: the actor holds
+    /// <see cref="ManagementPermission.AccessHomeContents"/> at any scope.
+    /// </summary>
+    public bool HasAllHomes { get; private set; }
+
     // -- Computed --
     public string CurrentUserName { get; private set; } = "";
 
@@ -133,6 +139,7 @@ public partial class ShareBrowserViewModel
                 : await _userContextFactory.CreateByUsernameAsync(username);
 
             HasHome = false;
+            HasAllHomes = false;
 
             if (actor is null)
             {
@@ -171,6 +178,8 @@ public partial class ShareBrowserViewModel
 
             var homesShare = _homes is null ? null : await _homes.GetHomesShareAsync();
             HasHome = homesShare is { IsEnabled: true } && actor.User.HomeDirectoryEnabled;
+            HasAllHomes = homesShare is { IsEnabled: true }
+                && await _mgmtAuth.HasAnyPermissionAsync(actor, ManagementPermission.AccessHomeContents);
 
             var allShares = await _shareRepo.GetAllEnabledAsync();
             //var allShares = await _shareRepo.GetAllAsync();

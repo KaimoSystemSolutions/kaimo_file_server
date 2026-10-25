@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Kaimo_File_Server.Core.Security;
 
+
 /// <summary>
 /// Unified ACL evaluation service with integrated department default permissions.
 ///
@@ -13,7 +14,8 @@ namespace Kaimo_File_Server.Core.Security;
 ///   1. Explicit Deny ACL entries  → immediately denies access
 ///   2. Explicit Allow ACL entries → immediately grants access
 ///   3. Department Default         → grants baseline access if user is in the share's department
-///   4. No match                   → access denied
+///   4. Home access (homes share)  → AccessHomeContents grant for homes in the actor's scope
+///   5. No match                   → access denied
 ///
 /// Department defaults are evaluated at RUNTIME as a "virtual allow" layer.
 /// No AccessEntry records are created — this means:
@@ -25,7 +27,7 @@ namespace Kaimo_File_Server.Core.Security;
 /// The department default is resolved ONCE per share (not per file),
 /// making batch operations efficient: 1 extra query regardless of item count.
 /// </summary>
-public class AclService : IAclService
+public partial class AclService : IAclService
 {
     private readonly IServiceProvider _serviceProvider;
 
@@ -138,9 +140,14 @@ public class AclService : IAclService
             aclByPath, hierarchy, normalizedPath, isDirectory);
 
         // Resolve department default ONCE for this share
-        var deptDefault = await ResolveDepartmentDefaultAsync(userContext, shareId, sp);
+        var share = await sp.GetRequiredService<IShareRepository>().GetByIdAsync(shareId);
+        var deptDefault = await ResolveDepartmentDefaultAsync(userContext, share, sp);
 
-        return EvaluateAccess(effectiveAcl, userPrincipalIds, permission, deptDefault);
+        if (EvaluateAccess(effectiveAcl, userPrincipalIds, permission, deptDefault))
+            return true;
+
+        return share is { IsUserHomes: true } && EvaluateAccess(effectiveAcl, userPrincipalIds, permission,
+            await new HomeAccessGrant(userContext, sp).ForAsync(normalizedPath));
     }
 
     // ══════════════════════════════════════════
@@ -198,7 +205,9 @@ public class AclService : IAclService
         var allAcls = await aclRepo.GetAclsForPathsAsync(shareId, allPaths.ToList());
 
         // -- 3. Resolve department default ONCE for the entire batch --
-        var deptDefault = await ResolveDepartmentDefaultAsync(userContext, shareId, sp);
+        var share = await sp.GetRequiredService<IShareRepository>().GetByIdAsync(shareId);
+        var deptDefault = await ResolveDepartmentDefaultAsync(userContext, share, sp);
+        var homeGrant = share is { IsUserHomes: true } ? new HomeAccessGrant(userContext, sp) : null;
 
         // -- 4. Index ACLs for O(1) lookup --
         var aclByPath = IndexAclsByPath(allAcls);
@@ -208,8 +217,11 @@ public class AclService : IAclService
         {
             var effectiveAcl = ResolveEffectiveAclFromCache(
                 aclByPath, hierarchy, normalized, isDir);
-            results[normalized] = EvaluateAccess(
-                effectiveAcl, userPrincipalIds, permission, deptDefault);
+            var allowed = EvaluateAccess(effectiveAcl, userPrincipalIds, permission, deptDefault);
+            if (!allowed && homeGrant is not null)
+                allowed = EvaluateAccess(effectiveAcl, userPrincipalIds, permission,
+                    await homeGrant.ForAsync(normalized));
+            results[normalized] = allowed;
         }
 
         return results;
@@ -231,10 +243,8 @@ public class AclService : IAclService
     /// for all items in a batch operation.
     /// </summary>
     private static async Task<FilePermission> ResolveDepartmentDefaultAsync(
-        UserContext userContext, Guid shareId, IServiceProvider sp)
+        UserContext userContext, ShareDefinition? share, IServiceProvider sp)
     {
-        var shareRepo = sp.GetRequiredService<IShareRepository>();
-        var share = await shareRepo.GetByIdAsync(shareId);
         // Home folders are private: only explicit per-user entries may grant access there,
         // otherwise every member of the share's department would reach every home.
         if (share == null || share.IsUserHomes)

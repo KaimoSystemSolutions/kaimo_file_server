@@ -81,8 +81,15 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
 
     public event Action? OnStateChanged;
 
-    public virtual BrowserCapabilities Capabilities =>
-        _demo.ReadOnly ? BrowserCapabilities.Local.AsReadOnly() : BrowserCapabilities.Local;
+    public virtual BrowserCapabilities Capabilities
+    {
+        get
+        {
+            var caps = _demo.ReadOnly ? BrowserCapabilities.Local.AsReadOnly() : BrowserCapabilities.Local;
+            // Cloud sync and the ACL editor are administrative features that do not belong in homes.
+            return CurrentShare is { IsUserHomes: true } ? caps with { HasCloudSync = false, HasFileAcls = false } : caps;
+        }
+    }
 
     /// <summary>
     /// When false, share-link management is never offered regardless of the actor's
@@ -99,8 +106,8 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     protected virtual string RootPath => "";
 
     /// <summary>
-    /// Only the dedicated home browser may open the home-folder share; everywhere else it is
-    /// treated as unknown, so the web UI never exposes <c>users/&lt;id&gt;</c>.
+    /// The dedicated home browser may open the home-folder share; everywhere else it is treated
+    /// as unknown unless the user holds <see cref="ManagementPermission.AccessHomeContents"/>.
     /// </summary>
     protected virtual bool IsHomeBrowser => false;
 
@@ -253,9 +260,12 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             CurrentShare = null;
             CurrentPath = "";
 
-            CurrentShare = await _shareRepo.GetByNameAsync(shareName);
-            if (CurrentShare is not null && CurrentShare.IsUserHomes && !IsHomeBrowser)
-                CurrentShare = null;
+            // Resolved into a local first: the permission check awaits, and an overlapping load
+            // resets CurrentShare meanwhile.
+            var share = await _shareRepo.GetByNameAsync(shareName);
+            if (share is { IsUserHomes: true } && !IsHomeBrowser && !await CanBrowseAllHomesAsync())
+                share = null;
+            CurrentShare = share;
             if (CurrentShare is null)
             {
                 ErrorMessage = Resources.Web_Error_ShareNotFound;
@@ -340,7 +350,8 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
                 CurrentPath, shareName, userContext.User.Username);
 
             Items = await _fileService.ListAsync(CurrentPath, userContext);
-            
+            await LoadHomeOwnerNamesAsync();
+
             _logger.LogDebug("Found {Total} items ({Dirs} dirs, {Files} files)",
                 Items.Count, Directories.Count(), Files.Count());
 

@@ -43,6 +43,8 @@ public partial class UserListViewModel
             new(ManagementPermission.ResetPasswords, Resources.Web_Perm_ResetPasswords),
             new(ManagementPermission.ManageHomes,
                 Resources.ResourceManager.GetString("Web_Perm_ManageHomes") ?? "Manage home folders"),
+            new(ManagementPermission.AccessHomeContents,
+                Resources.ResourceManager.GetString("Web_Perm_AccessHomeContents") ?? "Access home folder contents"),
             // EnableDisableUsers is intentionally NOT offered here: the IsEnabled
             // toggle lives in the profile-edit form and is enforced via
             // EditUserProfiles. A standalone bit would be dead (never checked).

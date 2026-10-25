@@ -19,7 +19,7 @@ namespace Kaimo_File_Server.Tests;
 /// repositories and evaluates the resulting entries with the real <see cref="AclService"/>,
 /// so the tests cover the actual ACL schema rather than a restatement of it.
 /// </summary>
-public sealed class HomeDirectoryServiceTests : IDisposable
+public sealed partial class HomeDirectoryServiceTests : IDisposable
 {
     private const FilePermission ReadWrite = FilePermission.ReadAll | FilePermission.WriteAll;
 
@@ -35,6 +35,7 @@ public sealed class HomeDirectoryServiceTests : IDisposable
     private readonly Department _dept;
     private readonly HomeDirectoryService _sut;
     private readonly AclService _aclService;
+    private readonly Mock<IManagementAuthService> _mgmt = new();
 
     public HomeDirectoryServiceTests()
     {
@@ -93,6 +94,7 @@ public sealed class HomeDirectoryServiceTests : IDisposable
         services.AddSingleton(shares.Object);
         services.AddSingleton(depts.Object);
         services.AddSingleton(acls.Object);
+        services.AddSingleton(_mgmt.Object);
         _aclService = new AclService(services.BuildServiceProvider());
 
         acls.Setup(r => r.DeleteFileMetadataPathsAsync(It.IsAny<Guid>(), It.IsAny<string>()))
@@ -359,7 +361,8 @@ public sealed class HomeDirectoryServiceTests : IDisposable
         var users = new Mock<IUserRepository>();
         users.Setup(r => r.GetAllAsync()).ReturnsAsync(() => _users.ToList());
         var bridge = new Kaimo_File_Server.SmbBridge.Services.ShareGrpcService(
-            shares.Object, users.Object,
+            shares.Object, users.Object, Mock.Of<IScopedRoleAssignmentRepository>(),
+            Mock.Of<IRoleRepository>(), Mock.Of<IGroupRepository>(),
             NullLogger<Kaimo_File_Server.SmbBridge.Services.ShareGrpcService>.Instance);
 
         var reply = await bridge.ListShares(new Kaimo_File_Server.SmbBridge.Grpc.ListSharesRequest(), null!);

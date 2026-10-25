@@ -176,7 +176,8 @@ public partial class GlobalSearch : IDisposable
     /// <summary>
     /// Presents a home-folder hit the way the browser shows the home: as "user", relative to
     /// the caller's own folder, so the folder GUID never reaches the dropdown or the URL.
-    /// Hits in other users' homes cannot be opened in the web UI and are dropped.
+    /// Hits in other users' homes only pass the ACL filter for holders of AccessHomeContents;
+    /// they keep the "users" share and open in /files/users.
     /// </summary>
     private FileDocument? ToWebHit(FileDocument hit)
     {
@@ -186,7 +187,7 @@ public partial class GlobalSearch : IDisposable
         var root = HomeDirectoryService.HomePathOf(_user!.User.Id) + "/";
         var path = hit.SharePath.Replace('\\', '/').TrimStart('/');
         if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-            return null;
+            return hit;
 
         hit.ShareName = HomeRoute;
         hit.SharePath = path[root.Length..];

@@ -4,6 +4,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Services;
@@ -56,6 +57,7 @@ public sealed partial class BrowseApiController : ApiControllerBase
     private readonly IShareRepository _shares;
     private readonly IFileServiceFactory _fileServiceFactory;
     private readonly HomeDirectoryService _homes;
+    private readonly IManagementAuthService _mgmtAuth;
     private readonly ILogger<BrowseApiController> _logger;
 
     public BrowseApiController(
@@ -63,12 +65,14 @@ public sealed partial class BrowseApiController : ApiControllerBase
         IShareRepository shares,
         IFileServiceFactory fileServiceFactory,
         HomeDirectoryService homes,
+        IManagementAuthService mgmtAuth,
         ILogger<BrowseApiController> logger)
     {
         _userContextFactory = userContextFactory;
         _shares = shares;
         _fileServiceFactory = fileServiceFactory;
         _homes = homes;
+        _mgmtAuth = mgmtAuth;
         _logger = logger;
     }
 
@@ -94,8 +98,15 @@ public sealed partial class BrowseApiController : ApiControllerBase
 
         foreach (var share in await _shares.GetAllEnabledAsync())
         {
-            // The home-folder share is only offered as the caller's own "user" entry above.
-            if (share.IsShareHidden || share.IsUserHomes) continue;
+            // The home-folder share is offered as the caller's own "user" entry above; as a whole
+            // only to holders of AccessHomeContents (owners also hold a root list right, for SMB).
+            if (share.IsUserHomes)
+            {
+                if (await _mgmtAuth.HasAnyPermissionAsync(user, ManagementPermission.AccessHomeContents))
+                    visible.Add(new ShareDto(share.Id, share.Name, share.IsRecycleEnabled));
+                continue;
+            }
+            if (share.IsShareHidden) continue;
             var fs = _fileServiceFactory.CreateForShare(share);
             if (await fs.CanListAsync(string.Empty, user))
                 visible.Add(new ShareDto(share.Id, share.Name, share.IsRecycleEnabled));

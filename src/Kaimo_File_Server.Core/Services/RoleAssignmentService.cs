@@ -81,6 +81,28 @@ public sealed class RoleAssignmentService(
     }
 
     /// <summary>
+    /// Whether the actor may add members to the group. Joining a group confers every role the
+    /// group holds (and joining Admins the system-wide admin role, via the mirror), so the actor
+    /// must be allowed to assign each of them directly. Removing members needs no such check.
+    /// </summary>
+    public async Task<bool> CanAddGroupMembersAsync(UserContext actor, Guid groupId)
+    {
+        var grants = new List<(Guid RoleId, ScopeType ScopeType, Guid ScopeId)>();
+        grants.AddRange((await assignmentRepo.GetByPrincipalAsync(groupId))
+            .Select(a => (a.RoleId, a.ScopeType, a.ScopeId)));
+        if (groupId == WellKnownGUIDs.GROUP_ADMINS)
+            grants.Add((WellKnownGUIDs.ROLE_ADMIN, ScopeType.Global, Guid.Empty));
+
+        foreach (var (roleId, scopeType, scopeId) in grants)
+        {
+            if (await roleRepo.GetByIdAsync(roleId) is { } role
+                && !await mgmtAuth.CanAssignRoleAsync(actor, role.ManagementPermissions, scopeType, scopeId))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
     /// The ENABLED users who effectively hold a system-wide admin role, directly or through a
     /// group. The last-admin guards never let this set become empty.
     /// </summary>

@@ -4851,6 +4851,12 @@
   <data name="Web_Perm_ManageHomes" xml:space="preserve">
     <value>Home-Ordner verwalten</value>
   </data>
+  <data name="Web_Perm_AccessHomeContents" xml:space="preserve">
+    <value>Auf Inhalte der Home-Ordner zugreifen</value>
+  </data>
+  <data name="Web_Error_GroupGrantsUnassignableRoles" xml:space="preserve">
+    <value>Diese Gruppe vergibt Rollen, die Sie nicht zuweisen dürfen. Sie können ihr daher keine Mitglieder hinzufügen.</value>
+  </data>
   <data name="Web_Home_DisplayName" xml:space="preserve">
     <value>user</value>
   </data>

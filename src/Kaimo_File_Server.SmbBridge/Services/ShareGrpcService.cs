@@ -1,6 +1,8 @@
-using Grpc.Core;
+﻿using Grpc.Core;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.SmbBridge.Grpc;
 
 namespace Kaimo_File_Server.SmbBridge.Services;
@@ -15,7 +17,8 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 ///
 /// Visibility (ABE): the hidden flag (<see cref="ShareEntry.IsHidden"/> →
 /// <c>browseable = no</c>) for every share, plus a per-user allow list for the
-/// home-folder share only (users with an enabled home), so other users never see
+/// home-folder share only (users with an enabled home, plus holders of
+/// <see cref="ManagementPermission.AccessHomeContents"/> at any scope), so other users never see
 /// it in the share list. Hard share access is unchanged and decided by the VFS
 /// connect hook based on real Kaimo ACLs (<see cref="AuthzGrpcService.AuthorizeConnect"/>).
 /// </summary>
@@ -23,13 +26,20 @@ public sealed class ShareGrpcService : ShareService.ShareServiceBase
 {
     private readonly IShareRepository _shares;
     private readonly IUserRepository _users;
+    private readonly IScopedRoleAssignmentRepository _assignments;
+    private readonly IRoleRepository _roles;
+    private readonly IGroupRepository _groups;
     private readonly ILogger<ShareGrpcService> _logger;
 
     public ShareGrpcService(
-        IShareRepository shares, IUserRepository users, ILogger<ShareGrpcService> logger)
+        IShareRepository shares, IUserRepository users, IScopedRoleAssignmentRepository assignments,
+        IRoleRepository roles, IGroupRepository groups, ILogger<ShareGrpcService> logger)
     {
         _shares = shares;
         _users = users;
+        _assignments = assignments;
+        _roles = roles;
+        _groups = groups;
         _logger = logger;
     }
 
@@ -53,10 +63,16 @@ public sealed class ShareGrpcService : ShareService.ShareServiceBase
             };
             if (def.IsUserHomes)
             {
-                // Mirrors the per-user root entries HomeDirectoryService grants.
+                // Mirrors the per-user root entries HomeDirectoryService grants, plus everyone who may
+                // reach other homes; which homes they reach is decided per path by the ACL service.
+                var homeAdmins = await ManagementAuthService.GetPermissionHolderUserIdsAsync(
+                        _assignments, _roles, _users, _groups,
+                        r => (r.ManagementPermissions & ManagementPermission.AccessHomeContents) != 0)
+                    .WaitAsync(cancellationToken);
                 entry.Restricted = true;
                 entry.AllowedUsers.Add((await _users.GetAllAsync().WaitAsync(cancellationToken))
-                    .Where(u => u.IsEnabled && u.HomeDirectoryEnabled && SambaName.IsValidUsername(u.Username))
+                    .Where(u => u.IsEnabled && (u.HomeDirectoryEnabled || homeAdmins.Contains(u.Id))
+                        && SambaName.IsValidUsername(u.Username))
                     .Select(u => u.Username));
             }
             reply.Shares.Add(entry);

@@ -16,7 +16,7 @@ Related: [Security model](../architecture/security-model.md) ·
   `Components/Pages/HomeFolders/`): the **Overview** tab is the metadata overview of the individual
   homes (Global `ManageHomes`, `HomeFolderOverview.razor`), the **Settings** tab holds setup, the
   global switch, the pool move and the recycle-bin limits (`ManageSystemSettings`,
-  `HomeFolderSettings.razor`). The former `/files/users` route redirects there.
+  `HomeFolderSettings.razor`). Without `AccessHomeContents`, `/files/users` redirects there.
 - The name `users` is used because `[homes]` is a reserved Samba section with special semantics.
 - The names `users` and `user` are reserved and rejected for other shares.
 - Provisioning is idempotent (`HomeDirectoryService`,
@@ -39,10 +39,43 @@ Per user with an enabled home:
   only their own folder.
 - Users get no `Delete` on the home folder itself (it cannot be removed or renamed) and no `AdminAll`
   (they cannot grant access to others).
-- Administrators receive no entry.
+- Administrators receive no entry. Content access for administrators comes only from the
+  management permission `AccessHomeContents` (see [Administrator access](#administrator-access)).
 - Department defaults never apply: `AclService.ResolveDepartmentDefaultAsync` returns `None` for a
   share with `IsUserHomes`.
 - Managing homes requires the global permission `ManageHomes`.
+
+### Administrator access
+
+`ManagementPermission.AccessHomeContents` (bit 30) lets a role reach the content of other users'
+homes. The system role Administrator holds it; it stays outside `FullAdmin`. Its scope follows
+user management: a Global assignment covers every home, a department assignment covers the homes of
+the members of that department and its descendants (`IManagementAuthService.CanManageUserAsync`).
+
+The grant is a virtual allow layer in `AclService` (`AclService.HomeAccess.cs`), so every transport
+enforces it without special code paths. It is evaluated only for the `users` share and only when the
+explicit entries did not already allow; explicit Deny entries still win.
+
+| Path | Granted to a holder |
+|---|---|
+| Share root `""` | `ReadAll` (listing; it shows only the homes in scope) |
+| `<userId>` in scope | `ReadAll | WriteAll` **without** `Delete` |
+| Below `<userId>` in scope | `ReadAll | WriteAll` |
+
+No `AdminAll` is granted, and no access entries are written. Revoking the role revokes the access
+immediately.
+
+Delegation is restricted: only actors holding `AccessHomeContents` system-wide can assign a role
+carrying it (also at department scope), and members can only be added to a group holding such a
+role by actors who could assign that role directly (see
+[Security model](../architecture/security-model.md#administrative-authorization)).
+
+- Web: holders see a pinned `users` entry in the share overview (`/files/users`). Home folders keep
+  their GUID name; at the share root the owner's username is shown as a note next to it. Cloud sync
+  and the ACL editor stay off in the share. Search hits in other homes in scope link there.
+- REST API: `GET /api/v1/browse/shares` additionally lists the `users` share (no `rootPath`).
+  Syncing its root stays refused.
+- SMB: holders at any scope are added to the share's allow list (`ListShares`).
 
 ## Lifecycle
 
@@ -70,7 +103,8 @@ any transport: it is an ordinary folder inside the home. Deleting `<userId>/docs
 - `IFileServiceFactory.CreateForShare(ShareDefinition)` passes the depth to `FileService`.
   `AuthorizeDelete` returns it to the Samba VFS as `recycle_root_depth`.
 - The bin lies inside the home, so it inherits the owner's home entries. The owner can browse it,
-  restore items (move them out) and empty it. Other users and administrators have no access.
+  restore items (move them out) and empty it. Other users have no access; holders of
+  `AccessHomeContents` reach it like the rest of the home.
 - Users cannot create or move items into the bin directly (reserved namespace). Deleting an entry
   inside it is permanent.
 - On SMB and on macOS, the dot name makes the folder hidden by default. The web UI shows it with
@@ -86,9 +120,9 @@ any transport: it is an ordinary folder inside the home. Deleting `<userId>/docs
 
 | Transport | Behavior |
 |---|---|
-| REST API | `GET /api/v1/browse/shares` lists the caller's home first with `rootPath = <userId>` |
+| REST API | `GET /api/v1/browse/shares` lists the caller's home first with `rootPath = <userId>`; holders of `AccessHomeContents` also get the `users` share |
 | WebDAV | `users` appears in the root listing; inside, only the caller's own folder is visible |
-| SMB | The bridge's `ListShares` marks `users` as `restricted` with the usernames of all enabled homes; `sync-shares.sh` resolves them to SIDs and writes the share security descriptor (`sharesec`), and `access based share enum` hides the share from everyone else |
+| SMB | The bridge's `ListShares` marks `users` as `restricted` with the usernames of all enabled homes and of all holders of `AccessHomeContents`; `sync-shares.sh` resolves them to SIDs and writes the share security descriptor (`sharesec`), and `access based share enum` hides the share from everyone else |
 
 ## Safeguards
 

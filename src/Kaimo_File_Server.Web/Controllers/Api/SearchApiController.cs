@@ -1,6 +1,7 @@
-using Kaimo_File_Server.Core.Domain.Identity;
+﻿using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Microsoft.AspNetCore.Authorization;
@@ -114,8 +115,10 @@ public sealed class SearchApiController : ApiControllerBase
             if (!sharesByName.TryGetValue(hit.ShareName, out var share))
                 continue;
 
-            // Homes are presented as the caller's "user" entry, as in api/v1/browse/shares.
-            var displayName = share.IsUserHomes ? HomeFileBrowserViewModel.DisplayName : share.Name;
+            // The own home is presented as the caller's "user" entry, as in api/v1/browse/shares;
+            // hits in other homes (AccessHomeContents) keep the share name "users".
+            var displayName = share.IsUserHomes && IsInOwnHome(hit, user.User.Id)
+                ? HomeFileBrowserViewModel.DisplayName : share.Name;
             dtos.Add(SearchHitDto.From(hit, share.Id, displayName));
             if (dtos.Count == limit)
                 break;
@@ -123,6 +126,10 @@ public sealed class SearchApiController : ApiControllerBase
 
         return Ok(dtos);
     }
+
+    private static bool IsInOwnHome(FileDocument hit, Guid userId)
+        => hit.SharePath.Replace('\\', '/').TrimStart('/')
+            .StartsWith(HomeDirectoryService.HomePathOf(userId) + "/", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Trims and validates untrusted search text: length within bounds and no control

@@ -37,6 +37,7 @@
         ManageShareAccess = 1L << 27,  // share-level access: enable/disable + visibility (hidden)
         ManageShareAcls = 1L << 28,  // manage file/folder ACLs within shares (incl. share root)
         ManageHomes = 1L << 29,  // view user home folder metadata and enable/disable home folders (never their content)
+        AccessHomeContents = 1L << 30,  // read/write the content of the home folders of users in scope (all transports)
         ManageShareLinks = 1L << 56,  // create/manage anonymous public download links for share content
         ManageUploadLinks = 1L << 57,  // create/manage anonymous public upload links into share folders
 

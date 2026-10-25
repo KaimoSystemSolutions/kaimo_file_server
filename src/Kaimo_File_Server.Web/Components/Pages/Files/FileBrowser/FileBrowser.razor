@@ -1,4 +1,4 @@
-@using System.Collections
+﻿@using System.Collections
 @using System.Diagnostics
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.Acl
@@ -522,6 +522,13 @@ else
                     @{ var icon = FileHelper.GetEntryIcon(entry.Name, entry.IsDirectory, IsRecycleBinEntry(entry)); }
                     @Assets.SVG(icon.File, new SvgOptions(Width: 20, Height: 20, Color: icon.Color, Fill: icon.Fill, CssClass: "file-icon"))
                     <span>@entry.Name</span>
+                    @if (VM is FileBrowserViewModel local && local.GetHomeOwnerName(entry) is { } owner)
+                    {
+                        <span class="home-owner-note" title="@owner">
+                            @Assets.SVG("user.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, Color: "var(--text-tertiary)"))
+                            <span>@owner</span>
+                        </span>
+                    }
                     @if (syncMarker is not null)
                     {
                         <span class="sync-indicator @SyncIndicatorClass(syncMarker.State) @(CanManageSyncs() && syncMarker.SyncId != Guid.Empty ? "sync-indicator--clickable" : "")"

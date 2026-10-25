@@ -1,6 +1,7 @@
-@using Kaimo_File_Server.Core.Language
+﻿@using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Infrastructure.Services
 @inject ShareBrowserViewModel VM
 @inject CloudAccessShareBrowserViewModel RemoteVM
 @inject NavigationManager Nav
@@ -35,7 +36,7 @@ else if (VM.ErrorMessage is not null)
 {
     <div class="error-banner">@VM.ErrorMessage</div>
 }
-else if (!VM.Shares.Any() && !RemoteVM.Shares.Any() && !VM.HasHome)
+else if (!VM.Shares.Any() && !RemoteVM.Shares.Any() && !VM.HasHome && !VM.HasAllHomes)
 {
     <div class="empty-state">
         @Assets.SVG("folder.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
@@ -66,10 +67,15 @@ else
                 @SortArrow("size")
             </div>
         </div>
-        @* The own home is pinned above both share groups, so it stays on top in every sort order. *@
+        @* The own home (and, for AccessHomeContents holders, all homes) is pinned above both
+           share groups, so it stays on top in every sort order. *@
         @if (VM.HasHome)
         {
             @PinnedRow(HomeFileBrowserViewModel.DisplayName, "user.svg", "/files/user")
+        }
+        @if (VM.HasAllHomes)
+        {
+            @PinnedRow(HomeDirectoryService.ShareName, "users.svg", $"/files/{HomeDirectoryService.ShareName}")
         }
         @foreach (var share in SortedLocalShares())
         {

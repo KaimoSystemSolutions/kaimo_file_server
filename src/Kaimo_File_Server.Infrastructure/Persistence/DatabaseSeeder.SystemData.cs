@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Domain.Department;
+﻿using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Logging;
@@ -108,9 +108,9 @@ public partial class DatabaseSeeder
     /// </summary>
     private static readonly (string Name, ManagementPermission Perms, bool IsSystem, Guid uuid)[] RoleDefinitions =
     [
-        // ManageHomes stays outside FullAdmin: FullAdmin doubles as the "is global admin" test, so a
+        // ManageHomes/AccessHomeContents stay outside FullAdmin: FullAdmin doubles as the "is global admin" test, so a
         // new bit there would demote custom roles that were built from the FullAdmin preset.
-        ("Administrator",     ManagementPermission.FullAdmin | ManagementPermission.ManageHomes | ManagementPermission.ManageMailServer | ManagementPermission.ManageNotifications | ManagementPermission.FileBackupAdmin, true, WellKnownGUIDs.ROLE_ADMIN),
+        ("Administrator",     ManagementPermission.FullAdmin | ManagementPermission.ManageHomes | ManagementPermission.AccessHomeContents | ManagementPermission.ManageMailServer | ManagementPermission.ManageNotifications | ManagementPermission.FileBackupAdmin, true, WellKnownGUIDs.ROLE_ADMIN),
         ("UserManager",       ManagementPermission.UserAdmin | ManagementPermission.AssignGroups,   true, WellKnownGUIDs.ROLE_USER_MANAGER), 
         ("ShareManager",      ManagementPermission.ShareAdmin,                                     true, WellKnownGUIDs.ROLE_SHARE_MANAGER),
         ("DepartmentAdmin",   ManagementPermission.DepartmentAdmin,                                true, WellKnownGUIDs.ROLE_DEPARTMENT_ADMIN),

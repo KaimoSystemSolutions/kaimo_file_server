@@ -15,7 +15,7 @@ namespace Kaimo_File_Server.Tests;
 /// user, group, share and department management, so the shared-helper refactor cannot
 /// change behaviour silently.
 /// </summary>
-public class ManagementAuthServiceTests
+public partial class ManagementAuthServiceTests
 {
     private readonly Mock<IScopedRoleAssignmentRepository> _assignmentRepo = new();
     private readonly Mock<IDepartmentRepository> _departmentRepo = new();

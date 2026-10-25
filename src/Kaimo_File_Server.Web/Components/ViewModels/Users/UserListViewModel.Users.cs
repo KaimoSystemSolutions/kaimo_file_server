@@ -182,6 +182,16 @@ public partial class UserListViewModel
         var leavesAdminsGroup = wasInAdminsGroup
             && EditUserGroups.Any(g => g.Item.Id == WellKnownGUIDs.GROUP_ADMINS && !g.IsChecked);
 
+        // Joining a group grants its roles: refuse additions the actor could not assign directly.
+        foreach (var joined in EditUserGroups.Where(g => g.IsChecked && UserGroups.All(ug => ug.Id != g.Item.Id)))
+        {
+            if (!await _roleAssignments.CanAddGroupMembersAsync(_actorContext, joined.Item.Id))
+            {
+                ErrorMessage = GroupGrantsUnassignableRolesMessage;
+                return;
+            }
+        }
+
         // The sign-in toggles are locked on one's own account: keep the values stored now, not
         // the ones loaded with the form (another admin may have changed them meanwhile).
         var current = IsViewingSelf ? await _userRepo.GetByIdAsync(SelectedUser.Id) ?? SelectedUser : null;

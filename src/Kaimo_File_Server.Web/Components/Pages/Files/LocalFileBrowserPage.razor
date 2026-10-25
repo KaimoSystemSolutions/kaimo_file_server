@@ -1,4 +1,4 @@
-@page "/files/{ShareName}/{*SubPath}"
+﻿@page "/files/{ShareName}/{*SubPath}"
 @page "/files/{ShareName}"
 @page "/files"
 @using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser
@@ -11,7 +11,7 @@
 {
     <FileBrowserShareOverview />
 }
-else
+else if (!IsHomesShare || _homesAllowed)
 {
     <FileBrowser VM="LocalViewModel" ShareName="@ShareName" ShareDisplayName="@ShareName" SubPath="@SubPath" />
 }
@@ -20,12 +20,28 @@ else
     [Parameter] public string ShareName { get; set; } = "";
     [Parameter] public string? SubPath { get; set; }
 
-    // The home-folder share is never browsed as a share in the web UI: users only see their
-    // own folder as "user" (/files/user); administrators get the metadata-only overview on
-    // /home-folders (/files/users redirects there).
-    protected override void OnParametersSet()
+    private bool _homesAllowed;
+
+    private bool IsHomesShare
+        => string.Equals(ShareName, HomeDirectoryService.ShareName, StringComparison.OrdinalIgnoreCase);
+
+    // The home-folder share is browsed as a whole only by holders of AccessHomeContents (the ACL
+    // service decides which homes they reach). Everyone else sees their own folder as "user"
+    // (/files/user); /files/users itself leads to the metadata-only overview on /home-folders.
+    protected override async Task OnParametersSetAsync()
     {
-        if (string.Equals(ShareName, HomeDirectoryService.ShareName, StringComparison.OrdinalIgnoreCase))
-            Nav.NavigateTo("/files/user", replace: true);
+        // Checked once on entering the share: navigating inside /files/users then completes
+        // synchronously, so the browser is neither re-mounted nor loaded twice. The view model
+        // re-checks the permission on every load.
+        if (!IsHomesShare)
+        {
+            _homesAllowed = false;
+            return;
+        }
+        if (_homesAllowed)
+            return;
+        _homesAllowed = await LocalViewModel.CanBrowseAllHomesAsync();
+        if (!_homesAllowed)
+            Nav.NavigateTo(string.IsNullOrEmpty(SubPath) ? "/home-folders" : "/files/user", replace: true);
     }
 }
