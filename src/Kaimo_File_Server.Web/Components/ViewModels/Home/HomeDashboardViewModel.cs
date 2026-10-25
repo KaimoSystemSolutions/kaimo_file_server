@@ -20,7 +20,7 @@ public sealed record HealthCounts(int Ok, int Warning, int Failed, int Inactive)
 public sealed record HomeDeviceItem(SyncDevice Device, int SyncFolderCount);
 
 /// <summary>
-/// Start page: a read-only overview for every user (own shares, home folder, client
+/// Start page: a read-only overview for every user (home folder, client
 /// devices) plus, per management permission, the state of the areas the user runs
 /// (external-storage syncs and connections, share links, backups, users, security).
 ///
@@ -33,7 +33,6 @@ public sealed class HomeDashboardViewModel(
     IUserContextFactory userContexts,
     IManagementAuthService mgmtAuth,
     ShareBrowserViewModel shareBrowser,
-    CloudAccessShareBrowserViewModel virtualShares,
     ExternalStorageSyncViewModel syncs,
     ShareLinkListViewModel shareLinks,
     ISyncDeviceRepository devices,
@@ -50,8 +49,6 @@ public sealed class HomeDashboardViewModel(
 
     // ── Every user ──
     public bool HasHome { get; private set; }
-    public int ShareCount { get; private set; }
-    public int VirtualShareCount { get; private set; }
     public IReadOnlyList<HomeDeviceItem> Devices { get; private set; } = [];
 
     // ── External storage (SyncAdmin / global connection rights) ──
@@ -101,9 +98,6 @@ public sealed class HomeDashboardViewModel(
             {
                 await shareBrowser.LoadAsync(loadSizes: false);
                 HasHome = shareBrowser.HasHome;
-                ShareCount = shareBrowser.Shares.Count;
-                await virtualShares.LoadAsync();
-                VirtualShareCount = virtualShares.Shares.Count;
             });
 
             await SectionAsync("devices", async () =>

@@ -1,4 +1,5 @@
 @using System.IO
+@using Kaimo_File_Server.Core.Domain.Identity
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Security
 @using Kaimo_File_Server.Web.Components.ViewModels
@@ -39,6 +40,12 @@
                     <Tab Active="@(_editTab == EditTab.Security)" Icon="shield.svg"
                          Label="@Resources.Web_Admin_EditTab_Security"
                          OnClick="() => _editTab = EditTab.Security" />
+                }
+                @if (VM.CanEditSelectedUser)
+                {
+                    <Tab Active="@(_editTab == EditTab.Services)" Icon="settings.svg"
+                         Label="@R("Web_Admin_EditTab_Services")"
+                         OnClick="() => _editTab = EditTab.Services" />
                 }
                 @if (showAssignment)
                 {
@@ -208,6 +215,44 @@
                     </div>
                 }
 
+                @* ── Services: client app, web login, SMB, WebDAV ── *@
+                @if (VM.CanEditSelectedUser)
+                {
+                    <div class="user-edit-tabpanel detail-field-grid" hidden="@(_editTab != EditTab.Services)">
+                        @if (!VM.CanEditSecuritySettingsForSelected)
+                        {
+                            <p class="form-hint">@R("Web_User_FileServices_SelfLocked")</p>
+                        }
+                        <div class="create-form-toggles user-edit-toggles">
+                            @foreach (var service in FileServiceAccessViewModel.Services)
+                            {
+                                var locked = !VM.CanEditSecuritySettingsForSelected
+                                    || (service == UserServiceAccess.Web && VM.SelectedUserKeepsWebLogin);
+                                var name = R($"Web_FileServices_Service_{service}");
+                                <div class="toggle-row">
+                                    <span class="toggle-label-text user-service-label">
+                                        @name
+                                        @if (service == UserServiceAccess.Web && VM.SelectedUserKeepsWebLogin)
+                                        {
+                                            <small class="form-hint">@R("Web_FileServices_AdminLocked")</small>
+                                        }
+                                        else if (VM.IsServiceOffGlobally(service))
+                                        {
+                                            <small class="form-hint user-service-off">@R("Web_User_FileServices_GloballyOff")</small>
+                                        }
+                                    </span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" checked="@VM.EditUserHasService(service)" disabled="@locked"
+                                               aria-label="@name"
+                                               @onchange="e => VM.SetEditUserService(service, e.Value is true)" />
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
                 @* ── Assignment: departments + groups (roles are managed on the Roles tab) ── *@
                 @if (showAssignment)
                 {
@@ -308,6 +353,18 @@
             <PropertyRow Label="@Resources.Web_Admin_Label_Description" Value="@user.Description" />
             <PropertyRow Label="@Resources.Web_Admin_Label_PasswordChange"
                          Value="@(user.CanChangePassword ? Resources.Web_Admin_PasswordChange_Allowed : Resources.Web_Admin_PasswordChange_Locked)" />
+        </DetailSection>
+
+        <DetailSection Title="@R("Web_User_FileServices_Title")">
+            @foreach (var service in FileServiceAccessViewModel.Services)
+            {
+                var allowed = user.ServiceAccess.HasFlag(service)
+                    || (service == UserServiceAccess.Web && VM.SelectedUserKeepsWebLogin);
+                <PropertyRow Label="@R($"Web_FileServices_Service_{service}")">
+                    <StatusBadge ShowDot="false" Tone="@(allowed ? StatusTone.Positive : StatusTone.Neutral)"
+                                 Label="@R(allowed ? "Web_FileServices_Allowed" : "Web_FileServices_Blocked")" />
+                </PropertyRow>
+            }
         </DetailSection>
 
         @* One list for every role assignment; Global (the whole system) is just the topmost
@@ -473,7 +530,7 @@
         @if (VM.PasswordPolicy.RequireSpecial) { <li>@R("Web_Settings_Pw_RequireSpecial")</li> }
     </ul>;
 
-    private enum EditTab { General, Security, Assignment }
+    private enum EditTab { General, Security, Services, Assignment }
     private EditTab _editTab = EditTab.General;
 
     private async Task EditUser() { await VM.StartEditUserAsync(); _editTab = EditTab.General; StateHasChanged(); }

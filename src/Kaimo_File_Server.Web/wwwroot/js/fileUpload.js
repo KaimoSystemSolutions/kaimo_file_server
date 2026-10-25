@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 // Folder-aware uploads. Blazor's InputFile only reports each file's leaf name, so the
 // folder of every file is registered with .NET first (SetPendingUploadPaths, awaited)
 // and only then are the files handed to the Blazor input. dirs[i] belongs to files[i].
@@ -64,87 +73,96 @@ window.kaimoUpload = (() => {
         return { entries, loose };
     }
     // Walks dropped folders recursively. Stops early once more than maxFiles were found.
-    async function collect(snapshot, maxFiles = MAX_FILES) {
-        const files = [...snapshot.loose];
-        const dirs = files.map(() => '');
-        const emptyDirs = [];
-        async function walk(entry) {
-            if (files.length > maxFiles)
-                return;
-            if (entry.isFile) {
-                try {
-                    files.push(await entryFile(entry));
-                    dirs.push(dirOf(entry.fullPath));
-                }
-                catch (err) {
-                    console.warn('Skipping unreadable file', entry.fullPath, err);
-                }
+    function collect(snapshot_1) {
+        return __awaiter(this, arguments, void 0, function* (snapshot, maxFiles = MAX_FILES) {
+            const files = [...snapshot.loose];
+            const dirs = files.map(() => '');
+            const emptyDirs = [];
+            function walk(entry) {
+                return __awaiter(this, void 0, void 0, function* () {
+                    if (files.length > maxFiles)
+                        return;
+                    if (entry.isFile) {
+                        try {
+                            files.push(yield entryFile(entry));
+                            dirs.push(dirOf(entry.fullPath));
+                        }
+                        catch (err) {
+                            console.warn('Skipping unreadable file', entry.fullPath, err);
+                        }
+                        return;
+                    }
+                    // readEntries returns at most ~100 entries per call; read until it is drained.
+                    const reader = entry.createReader();
+                    let hasChildren = false;
+                    for (;;) {
+                        let batch;
+                        try {
+                            batch = yield readEntries(reader);
+                        }
+                        catch (err) {
+                            // Like an unreadable file: skip this folder, keep the rest of the drop.
+                            console.warn('Skipping unreadable folder', entry.fullPath, err);
+                            return;
+                        }
+                        if (batch.length === 0)
+                            break;
+                        hasChildren = true;
+                        for (const child of batch)
+                            yield walk(child);
+                    }
+                    if (!hasChildren)
+                        emptyDirs.push(trimSlashes(entry.fullPath));
+                });
+            }
+            for (const entry of snapshot.entries)
+                yield walk(entry);
+            return { files, dirs, emptyDirs };
+        });
+    }
+    function handOver(inputId_1, dotNetRef_1, collected_1) {
+        return __awaiter(this, arguments, void 0, function* (inputId, dotNetRef, collected, maxFiles = MAX_FILES) {
+            const { files, dirs, emptyDirs } = collected;
+            if (files.length > maxFiles) {
+                yield dotNetRef.invokeMethodAsync('OnUploadTooManyFiles', maxFiles);
                 return;
             }
-            // readEntries returns at most ~100 entries per call; read until it is drained.
-            const reader = entry.createReader();
-            let hasChildren = false;
-            for (;;) {
-                let batch;
-                try {
-                    batch = await readEntries(reader);
-                }
-                catch (err) {
-                    // Like an unreadable file: skip this folder, keep the rest of the drop.
-                    console.warn('Skipping unreadable folder', entry.fullPath, err);
-                    return;
-                }
-                if (batch.length === 0)
-                    break;
-                hasChildren = true;
-                for (const child of batch)
-                    await walk(child);
+            if (files.length === 0 && emptyDirs.length === 0)
+                return;
+            const packed = packDirs(dirs);
+            if (!fitsInMessages(files, packed, emptyDirs)) {
+                yield dotNetRef.invokeMethodAsync('OnUploadSelectionTooLarge');
+                return;
             }
-            if (!hasChildren)
-                emptyDirs.push(trimSlashes(entry.fullPath));
-        }
-        for (const entry of snapshot.entries)
-            await walk(entry);
-        return { files, dirs, emptyDirs };
+            yield dotNetRef.invokeMethodAsync('SetPendingUploadPaths', packed.dirs, packed.dirIndex, emptyDirs);
+            // Look the input up only now: the active upload slot may have changed meanwhile.
+            const input = document.getElementById(inputId);
+            if (!input) {
+                // Withdraw the folders so they cannot attach to a later selection.
+                yield dotNetRef.invokeMethodAsync('SetPendingUploadPaths', [], [], []);
+                return;
+            }
+            const transfer = new DataTransfer();
+            files.forEach(f => transfer.items.add(f));
+            input.files = transfer.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        });
     }
-    async function handOver(inputId, dotNetRef, collected, maxFiles = MAX_FILES) {
-        const { files, dirs, emptyDirs } = collected;
-        if (files.length > maxFiles) {
-            await dotNetRef.invokeMethodAsync('OnUploadTooManyFiles', maxFiles);
-            return;
-        }
-        if (files.length === 0 && emptyDirs.length === 0)
-            return;
-        const packed = packDirs(dirs);
-        if (!fitsInMessages(files, packed, emptyDirs)) {
-            await dotNetRef.invokeMethodAsync('OnUploadSelectionTooLarge');
-            return;
-        }
-        await dotNetRef.invokeMethodAsync('SetPendingUploadPaths', packed.dirs, packed.dirIndex, emptyDirs);
-        // Look the input up only now: the active upload slot may have changed meanwhile.
-        const input = document.getElementById(inputId);
-        if (!input) {
-            // Withdraw the folders so they cannot attach to a later selection.
-            await dotNetRef.invokeMethodAsync('SetPendingUploadPaths', [], [], []);
-            return;
-        }
-        const transfer = new DataTransfer();
-        files.forEach(f => transfer.items.add(f));
-        input.files = transfer.files;
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    async function handleDrop(dataTransferSnapshot, inputId, dotNetRef, maxFiles = MAX_FILES) {
-        try {
-            const collected = await collect(dataTransferSnapshot, maxFiles);
-            await handOver(inputId, dotNetRef, collected, maxFiles);
-        }
-        catch (err) {
-            console.error('Folder upload failed', err);
-        }
+    function handleDrop(dataTransferSnapshot_1, inputId_1, dotNetRef_1) {
+        return __awaiter(this, arguments, void 0, function* (dataTransferSnapshot, inputId, dotNetRef, maxFiles = MAX_FILES) {
+            try {
+                const collected = yield collect(dataTransferSnapshot, maxFiles);
+                yield handOver(inputId, dotNetRef, collected, maxFiles);
+            }
+            catch (err) {
+                console.error('Folder upload failed', err);
+            }
+        });
     }
     // Opens the browser's file dialog of the layout's active hidden InputFile.
     function openFilePicker(inputId = 'global-file-input') {
-        document.getElementById(inputId)?.click();
+        var _a;
+        (_a = document.getElementById(inputId)) === null || _a === void 0 ? void 0 : _a.click();
     }
     // Opens the browser's folder dialog. Files keep their folder in webkitRelativePath.
     function pickFolder(dotNetRef, inputId = 'global-file-input', maxFiles = MAX_FILES) {
@@ -153,16 +171,16 @@ window.kaimoUpload = (() => {
         picker.multiple = true;
         picker.webkitdirectory = true;
         picker.style.display = 'none';
-        picker.addEventListener('change', async () => {
+        picker.addEventListener('change', () => __awaiter(this, void 0, void 0, function* () {
             const files = Array.from(picker.files || []);
             picker.remove();
             try {
-                await handOver(inputId, dotNetRef, { files, dirs: files.map(f => dirOf(f.webkitRelativePath)), emptyDirs: [] }, maxFiles);
+                yield handOver(inputId, dotNetRef, { files, dirs: files.map(f => dirOf(f.webkitRelativePath)), emptyDirs: [] }, maxFiles);
             }
             catch (err) {
                 console.error('Folder upload failed', err);
             }
-        }, { once: true });
+        }), { once: true });
         picker.addEventListener('cancel', () => picker.remove(), { once: true });
         document.body.appendChild(picker);
         picker.click();
@@ -185,12 +203,13 @@ window.kaimoUpload = (() => {
                 zone.classList.remove('public-upload-drop--over');
         });
         zone.addEventListener('drop', e => {
+            var _a;
             if (!isFileDrag(e))
                 return;
             // Take over from the native input so dropped folders keep their structure.
             e.preventDefault();
             zone.classList.remove('public-upload-drop--over');
-            if (document.getElementById(inputId)?.disabled)
+            if ((_a = document.getElementById(inputId)) === null || _a === void 0 ? void 0 : _a.disabled)
                 return;
             handleDrop(snapshotDrop(e.dataTransfer), inputId, dotNetRef, maxFiles);
         });
@@ -198,10 +217,11 @@ window.kaimoUpload = (() => {
     return { MAX_FILES, snapshotDrop, handleDrop, openFilePicker, pickFolder, initPublicDrop };
 })();
 function initFileUpload(elementSelector, dotNetRef) {
+    var _a;
     // FileBrowser can be destroyed and recreated while the layout (and its file
     // input) stays alive. Abort the previous document-level handlers so one OS drop
     // can never dispatch several concurrent uploads after navigating around.
-    window.kaimoFileUploadAbortController?.abort();
+    (_a = window.kaimoFileUploadAbortController) === null || _a === void 0 ? void 0 : _a.abort();
     const controller = new AbortController();
     window.kaimoFileUploadAbortController = controller;
     const listenerOptions = { signal: controller.signal };
@@ -213,7 +233,7 @@ function initFileUpload(elementSelector, dotNetRef) {
             return;
         const el = document.querySelector(elementSelector);
         e.preventDefault();
-        if (el?.contains(e.target)) {
+        if (el === null || el === void 0 ? void 0 : el.contains(e.target)) {
             el.classList.add('file-dragged-over');
         }
     }, listenerOptions);
@@ -225,7 +245,7 @@ function initFileUpload(elementSelector, dotNetRef) {
             return;
         const el = document.querySelector(elementSelector);
         e.preventDefault();
-        if (el?.contains(e.target)) {
+        if (el === null || el === void 0 ? void 0 : el.contains(e.target)) {
             el.classList.add('file-dragged-over');
         }
     }, listenerOptions);
@@ -242,7 +262,7 @@ function initFileUpload(elementSelector, dotNetRef) {
             return;
         e.preventDefault();
         const el = document.querySelector(elementSelector);
-        if (el?.contains(e.target)) {
+        if (el === null || el === void 0 ? void 0 : el.contains(e.target)) {
             el.classList.remove('file-dragged-over');
             if (dotNetRef) {
                 window.kaimoUpload.handleDrop(window.kaimoUpload.snapshotDrop(e.dataTransfer), 'global-file-input', dotNetRef);

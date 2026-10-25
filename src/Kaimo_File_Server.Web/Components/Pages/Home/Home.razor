@@ -29,171 +29,159 @@
 }
 else
 {
-    <div class="home-actions">
-        @if (VM.HasHome)
-        {
-            <ActionTile Href="/files/user" Icon="home.svg" Primary="true"
-                        Title="@R("Web_Home_OpenHome", "My folder")"
-                        Description="@R("Web_Home_Action_Home", "Your personal storage")" />
-        }
-        <ActionTile Href="/files" Icon="compass.svg" IconColor="TileColor.Folder"
-                    Title="@Resources.Web_Nav_BrowseFiles"
-                    Description="@R("Web_Home_Action_Browse", "All shares and folders")" />
-        @if (VM.CanSeeSyncs || VM.CanSeeConnections)
-        {
-            <ActionTile Href="/external-storage" Icon="cloud-download.svg" IconColor="TileColor.Info"
-                        Title="@R("Web_ExternalStorage_Title", "External Storage")"
-                        Description="@R("Web_Home_Action_External", "Syncs and connections")" />
-        }
-        @if (VM.CanSeeShareLinks)
-        {
-            <ActionTile Href="/share-links" Icon="share.svg" IconColor="TileColor.Role"
-                        Title="@R("Web_Nav_ShareLinks", "Share Links")"
-                        Description="@R("Web_Home_Action_ShareLinks", "Public download and upload links")" />
-        }
-    </div>
-
-    <section class="home-group" aria-labelledby="home-workspace">
-        <h2 id="home-workspace" class="ui-label home-group-title">@R("Web_Home_Group_Workspace", "My workspace")</h2>
-        <div class="fact-tiles">
-            <FactTile Icon="folder.svg" IconColor="TileColor.Folder" Label="@Resources.Web_Nav_Shares" Value="@Count(VM.ShareCount)"
-                      OnLink="@(() => Nav.NavigateTo("/shares"))" LinkLabel="@Resources.Web_Nav_Shares" />
-            @if (VM.VirtualShareCount > 0)
-            {
-                <FactTile Icon="cloud-download.svg" IconColor="TileColor.Info" Label="@R("Web_Shares_VirtualShares", "Virtual Shares")"
-                          Value="@Count(VM.VirtualShareCount)"
-                          OnLink="@(() => Nav.NavigateTo("/shares?view=virtual"))"
-                          LinkLabel="@R("Web_Shares_VirtualShares", "Virtual Shares")" />
-            }
-            <FactTile Icon="devices.svg" IconColor="TileColor.User" Label="@R("Web_Home_Tile_Devices", "Signed-in devices")"
-                      Value="@Count(VM.Devices.Count)" />
-            <FactTile Icon="sync-twoway.svg" IconColor="TileColor.Info" Label="@R("Web_Home_Tile_DeviceSyncs", "Device sync folders")"
-                      Value="@Count(VM.Devices.Sum(d => d.SyncFolderCount))" />
-        </div>
-
-        <DetailSection Title="@R("Web_Home_Devices_Title", "My devices")">
-            <Body>
-                @if (VM.Devices.Count == 0)
-                {
-                    <p class="home-empty">@R("Web_Home_Devices_None", "No device is signed in to your account.")</p>
-                }
-                else
-                {
-                    <ul class="home-list">
-                        @foreach (var item in VM.Devices)
-                        {
-                            <li class="home-row">
-                                <span class="home-row-icon">@Assets.SVG("devices.svg", new SvgOptions(Width: 18, Height: 18))</span>
-                                <span class="home-row-main">
-                                    <strong>@item.Device.DisplayName</strong>
-                                    <small>@(string.IsNullOrWhiteSpace(item.Device.Platform) ? "–" : item.Device.Platform)</small>
-                                </span>
-                                <span class="home-row-cell">
-                                    @string.Format(R("Web_Home_Devices_Folders", "{0} sync folders"), item.SyncFolderCount)
-                                </span>
-                                <span class="home-row-cell">
-                                    @Resources.Web_Devices_LastSeen: @DateFmt.FormatDateTime(item.Device.LastSeenUtc)
-                                </span>
-                                <StatusBadge Tone="StatusTone.Positive" Label="@R("Web_Devices_Active", "Active")" Class="home-row-status" />
-                            </li>
-                        }
-                    </ul>
-                }
-            </Body>
-        </DetailSection>
-    </section>
-
-    @if (VM.HasAdminSections)
+    @if (VM.CanSeeSyncs || VM.CanSeeConnections || VM.CanSeeBackups)
     {
-        <section class="home-group" aria-labelledby="home-admin">
-            <h2 id="home-admin" class="ui-label home-group-title">@R("Web_Home_Group_Admin", "Administration")</h2>
-            <div class="fact-tiles">
-                @if (VM.CanSeeSyncs)
-                {
-                    <FactTile Icon="refresh.svg" IconColor="TileColor.Info" Label="@R("Web_ExternalStorage_Tab_Syncs", "Syncs")"
-                              Value="@Count(VM.Syncs.Count)" Segments="@HealthSegments(VM.SyncHealth)"
-                              OnLink="@(() => Nav.NavigateTo("/external-storage?tab=syncs"))"
-                              LinkLabel="@R("Web_ExternalStorage_Tab_Syncs", "Syncs")" />
-                }
-                @if (VM.CanSeeConnections)
-                {
-                    <FactTile Icon="cloud-download.svg" IconColor="TileColor.Info" Label="@R("Web_ExternalStorage_Tab_Connections", "Connections")"
-                              Value="@Count(VM.Connections.Count)" Segments="@HealthSegments(VM.ConnectionHealth)"
-                              OnLink="@(() => Nav.NavigateTo("/external-storage?tab=connections"))"
-                              LinkLabel="@R("Web_ExternalStorage_Tab_Connections", "Connections")" />
-                }
-                @if (VM.CanSeeBackups)
-                {
-                    <FactTile Icon="archive.svg" IconColor="TileColor.Group" Label="@R("Web_Home_Tile_Backups", "Backup jobs")"
-                              Value="@Count(VM.BackupJobs.Count)" Segments="@HealthSegments(VM.BackupHealth)"
-                              OnLink="@(() => Nav.NavigateTo("/backup"))"
-                              LinkLabel="@R("Web_Nav_Backup", "Backup")" />
-                }
-                @if (VM.CanSeeShareLinks)
-                {
-                    <FactTile Icon="share.svg" IconColor="TileColor.Role" Label="@R("Web_Home_Tile_ShareLinks", "Active share links")"
-                              Value="@Count(VM.ActiveDownloadLinks + VM.ActiveUploadLinks)" Segments="@LinkSegments()"
-                              OnLink="@(() => Nav.NavigateTo("/share-links"))"
-                              LinkLabel="@R("Web_Nav_ShareLinks", "Share Links")" />
-                }
-                @if (VM.CanSeeUsers)
-                {
-                    <FactTile Icon="users.svg" IconColor="TileColor.User" Label="@Resources.Web_Nav_Users" Value="@Count(VM.UserCount)"
-                              Hint="@(VM.DisabledUserCount > 0 ? string.Format(R("Web_Home_Users_Hint", "{0} disabled"), VM.DisabledUserCount) : null)"
-                              OnLink="@(() => Nav.NavigateTo("/users"))" LinkLabel="@Resources.Web_Nav_Users" />
-                }
-                @if (VM.CanSeeSecurity && VM.SecurityLast24h is { } security)
-                {
-                    <FactTile Icon="shield.svg" IconColor="TileColor.Department" Label="@R("Web_Home_Tile_FailedLogins", "Failed sign-ins (24 h)")"
-                              Value="@Count(security.Failures)"
-                              Tone="@(security.ActiveLockouts > 0 ? StatusTone.Warning : null)"
-                              Hint="@(security.ActiveLockouts > 0 ? string.Format(R("Web_Home_Security_Hint", "{0} active lockouts"), security.ActiveLockouts) : null)"
-                              OnLink="@(() => Nav.NavigateTo("/security"))"
-                              LinkLabel="@R("Web_Nav_Security", "Security")" />
-                }
-            </div>
-
-            @if (VM.CanSeeSyncs || VM.CanSeeConnections || VM.CanSeeBackups)
+        var attention = AttentionItems();
+        <section class="home-status" aria-label="@R("Web_Home_Attention_Title", "Needs attention")">
+            @if (attention.Count == 0)
             {
-                var attention = AttentionItems();
-                <DetailSection Title="@R("Web_Home_Attention_Title", "Needs attention")">
-                    <Body>
-                        @if (attention.Count == 0)
-                        {
-                            <p class="home-empty home-empty--ok">
-                                <StatusBadge Tone="StatusTone.Positive" Label="@R("Web_Home_AllHealthy", "All healthy")" />
-                                <span>@R("Web_Home_Attention_None", "All syncs, connections and backup jobs are running normally.")</span>
-                            </p>
-                        }
-                        else
-                        {
-                            <ul class="home-list">
-                                @foreach (var item in attention)
-                                {
-                                    <li class="home-row home-row--attention">
-                                        <span class="home-row-icon">@Assets.SVG(item.Icon, new SvgOptions(Width: 18, Height: 18))</span>
-                                        <span class="home-row-main">
-                                            <strong>@item.Name</strong>
-                                            <small>@item.Context</small>
-                                        </span>
-                                        <StatusBadge Tone="item.Tone" Label="@item.State" Class="home-row-status" />
-                                        <button type="button" class="btn-icon btn-icon--small"
-                                                title="@R("Web_Detail_Open", "Open")" aria-label="@($"{R("Web_Detail_Open", "Open")}: {item.Name}")"
-                                                @onclick="() => Nav.NavigateTo(item.Url)">
-                                            @Assets.SVG("arrow_up_right.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2f))
-                                        </button>
-                                    </li>
-                                }
-                            </ul>
-                        }
-                    </Body>
-                </DetailSection>
+                <div class="success-banner home-status-banner" role="status">
+                    @R("Web_Home_Attention_None", "All syncs, connections and backup jobs are running normally.")
+                </div>
+            }
+            else
+            {
+                <div class="warning-banner home-status-banner" role="status">
+                    @string.Format(R("Web_Home_Attention_Count", "Needs attention: {0}"), attention.Count)
+                </div>
+                <ul class="home-list home-attention-list">
+                    @foreach (var item in attention)
+                    {
+                        <li class="home-row home-row--attention">
+                            <span class="home-row-icon">@Assets.SVG(item.Icon, new SvgOptions(Width: 18, Height: 18))</span>
+                            <span class="home-row-main">
+                                <strong>@item.Name</strong>
+                                <small>@item.Context</small>
+                            </span>
+                            <StatusBadge Tone="item.Tone" Label="@item.State" Class="home-row-status" />
+                            <button type="button" class="btn-icon btn-icon--small"
+                                    title="@R("Web_Detail_Open", "Open")" aria-label="@($"{R("Web_Detail_Open", "Open")}: {item.Name}")"
+                                    @onclick="() => Nav.NavigateTo(item.Url)">
+                                @Assets.SVG("arrow_up_right.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2f))
+                            </button>
+                        </li>
+                    }
+                </ul>
             }
         </section>
     }
+
+    <div class="home-columns @(VM.HasAdminSections ? "home-columns--split" : null)">
+        <section class="home-group" aria-labelledby="home-workspace">
+            <h2 id="home-workspace" class="ui-label home-group-title">@R("Web_Home_Group_Workspace", "My workspace")</h2>
+            <div class="home-actions">
+                @if (VM.HasHome)
+                {
+                    <ActionTile Href="/files/user" Icon="home.svg" Primary="true"
+                                Title="@R("Web_Home_OpenHome", "My folder")"
+                                Description="@R("Web_Home_Action_Home", "Your personal storage")" />
+                }
+                else
+                {
+                    <ActionTile Href="/files" Icon="compass.svg" Primary="true"
+                                Title="@Resources.Web_Nav_BrowseFiles"
+                                Description="@R("Web_Home_Action_Browse", "All shares and folders")" />
+                }
+            </div>
+
+            <DetailSection Title="@R("Web_Home_Devices_Title", "My devices")">
+                <Body>
+                    @if (VM.Devices.Count == 0)
+                    {
+                        <p class="home-empty">@R("Web_Home_Devices_None", "No device is signed in to your account.")</p>
+                    }
+                    else
+                    {
+                        <ul class="home-list">
+                            @foreach (var item in _showAllDevices ? VM.Devices : VM.Devices.Take(DeviceLimit))
+                            {
+                                <li class="home-row home-row--device">
+                                    <span class="home-row-icon">@Assets.SVG("devices.svg", new SvgOptions(Width: 18, Height: 18))</span>
+                                    <span class="home-row-main">
+                                        <strong>@item.Device.DisplayName</strong>
+                                        <small>@DeviceContext(item)</small>
+                                    </span>
+                                    <span class="home-row-cell">
+                                        @Resources.Web_Devices_LastSeen: @DateFmt.FormatDateTime(item.Device.LastSeenUtc)
+                                    </span>
+                                </li>
+                            }
+                        </ul>
+                        @if (VM.Devices.Count > DeviceLimit)
+                        {
+                            <button type="button" class="btn btn-secondary btn-secondary--sm home-more"
+                                    aria-expanded="@(_showAllDevices ? "true" : "false")"
+                                    @onclick="() => _showAllDevices = !_showAllDevices">
+                                @(_showAllDevices
+                                    ? R("Web_Home_Devices_ShowLess", "Show fewer")
+                                    : string.Format(R("Web_Home_Devices_ShowAll", "Show all ({0})"), VM.Devices.Count))
+                            </button>
+                        }
+                    }
+                </Body>
+            </DetailSection>
+        </section>
+
+        @if (VM.HasAdminSections)
+        {
+            <section class="home-group" aria-labelledby="home-admin">
+                <h2 id="home-admin" class="ui-label home-group-title">@R("Web_Home_Group_Admin", "Administration")</h2>
+                <div class="fact-tiles">
+                    @if (VM.CanSeeSyncs)
+                    {
+                        <FactTile Icon="refresh.svg" IconColor="TileColor.Info" Label="@R("Web_ExternalStorage_Tab_Syncs", "Syncs")"
+                                  Value="@Count(VM.Syncs.Count)" Segments="@HealthSegments(VM.SyncHealth)"
+                                  OnLink="@(() => Nav.NavigateTo("/external-storage?tab=syncs"))"
+                                  LinkLabel="@R("Web_ExternalStorage_Tab_Syncs", "Syncs")" />
+                    }
+                    @if (VM.CanSeeConnections)
+                    {
+                        <FactTile Icon="cloud-download.svg" IconColor="TileColor.Info" Label="@R("Web_ExternalStorage_Tab_Connections", "Connections")"
+                                  Value="@Count(VM.Connections.Count)" Segments="@HealthSegments(VM.ConnectionHealth)"
+                                  OnLink="@(() => Nav.NavigateTo("/external-storage?tab=connections"))"
+                                  LinkLabel="@R("Web_ExternalStorage_Tab_Connections", "Connections")" />
+                    }
+                    @if (VM.CanSeeBackups)
+                    {
+                        <FactTile Icon="archive.svg" IconColor="TileColor.Group" Label="@R("Web_Home_Tile_Backups", "Backup jobs")"
+                                  Value="@Count(VM.BackupJobs.Count)" Segments="@HealthSegments(VM.BackupHealth)"
+                                  OnLink="@(() => Nav.NavigateTo("/backup"))"
+                                  LinkLabel="@R("Web_Nav_Backup", "Backup")" />
+                    }
+                    @if (VM.CanSeeShareLinks)
+                    {
+                        <FactTile Icon="share.svg" IconColor="TileColor.Role" Label="@R("Web_Home_Tile_ShareLinks", "Active share links")"
+                                  Value="@Count(VM.ActiveDownloadLinks + VM.ActiveUploadLinks)" Segments="@LinkSegments()"
+                                  OnLink="@(() => Nav.NavigateTo("/share-links"))"
+                                  LinkLabel="@R("Web_Nav_ShareLinks", "Share Links")" />
+                    }
+                    @if (VM.CanSeeUsers)
+                    {
+                        <FactTile Icon="users.svg" IconColor="TileColor.User" Label="@Resources.Web_Nav_Users" Value="@Count(VM.UserCount)"
+                                  Hint="@(VM.DisabledUserCount > 0 ? string.Format(R("Web_Home_Users_Hint", "{0} disabled"), VM.DisabledUserCount) : null)"
+                                  OnLink="@(() => Nav.NavigateTo("/users"))" LinkLabel="@Resources.Web_Nav_Users" />
+                    }
+                    @if (VM.CanSeeSecurity && VM.SecurityLast24h is { } security)
+                    {
+                        <FactTile Icon="shield.svg" IconColor="TileColor.Department" Label="@R("Web_Home_Tile_FailedLogins", "Failed sign-ins (24 h)")"
+                                  Value="@Count(security.Failures)"
+                                  Tone="@(security.ActiveLockouts > 0 ? StatusTone.Warning : null)"
+                                  Hint="@(security.ActiveLockouts > 0 ? string.Format(R("Web_Home_Security_Hint", "{0} active lockouts"), security.ActiveLockouts) : null)"
+                                  OnLink="@(() => Nav.NavigateTo("/security"))"
+                                  LinkLabel="@R("Web_Nav_Security", "Security")" />
+                    }
+                </div>
+            </section>
+        }
+    </div>
 }
 
 @code {
+    /// <summary>Devices shown before "Show all"; the list is ordered by last seen.</summary>
+    private const int DeviceLimit = 5;
+
+    private bool _showAllDevices;
+
     private sealed record AttentionItem(string Icon, string Name, string Context, StatusTone Tone, string State, string Url);
 
     protected override async Task OnInitializedAsync() => await VM.LoadAsync();
@@ -245,6 +233,12 @@ else
         new(VM.ActiveDownloadLinks, R("Web_Home_Links_Download", "download"), TileColor.Info),
         new(VM.ActiveUploadLinks, R("Web_Home_Links_Upload", "upload"), TileColor.Role),
     ];
+
+    private static string DeviceContext(HomeDeviceItem item)
+    {
+        var folders = string.Format(R("Web_Home_Devices_Folders", "{0} sync folders"), item.SyncFolderCount);
+        return string.IsNullOrWhiteSpace(item.Device.Platform) ? folders : $"{item.Device.Platform} · {folders}";
+    }
 
     private static string Count(int value) => value.ToString(System.Globalization.CultureInfo.CurrentCulture);
 

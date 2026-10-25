@@ -9,6 +9,7 @@ using Kaimo_File_Server.Infrastructure.Storage;
 using Kaimo_File_Server.Web.Controllers.WebDav;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;
 
@@ -23,11 +24,12 @@ public sealed class WebDavWindowsNameTests : IDisposable
     private readonly string _root = Directory.CreateTempSubdirectory("kaimo-dav-names-").FullName;
     private readonly ShareDefinition _share;
     private readonly WebDavController _sut;
+    private readonly UserContext _user;
 
     public WebDavWindowsNameTests()
     {
         _share = new ShareDefinition("a", _root, isEnabled: true);
-        var user = new UserContext(new User(Guid.NewGuid(), "Test", "test", "hash", "nt"), [], [], []);
+        var user = _user = new UserContext(new User(Guid.NewGuid(), "Test", "test", "hash", "nt"), [], [], []);
 
         var acl = new Mock<IAclService>();
         acl.Setup(a => a.HasAccessAsync(It.IsAny<UserContext>(), It.IsAny<Guid>(), It.IsAny<string>(),
@@ -50,6 +52,8 @@ public sealed class WebDavWindowsNameTests : IDisposable
             {
                 HttpContext = new DefaultHttpContext
                 {
+                    RequestServices = new ServiceCollection()
+                        .AddSingleton(TestGates.AllGloballyOn()).BuildServiceProvider(),
                     User = new ClaimsPrincipal(new ClaimsIdentity(
                         [new Claim(ClaimTypes.NameIdentifier, user.User.Id.ToString())], "test"))
                 }
@@ -82,6 +86,16 @@ public sealed class WebDavWindowsNameTests : IDisposable
         Request(Uri.UnescapeDataString(path));
 
         Assert.Equal(400, Status(await _sut.Put(CancellationToken.None)));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(_root));
+    }
+
+    [Fact]
+    public async Task Put_with_webdav_switched_off_for_the_user_is_refused()
+    {
+        _user.User.ServiceAccess = UserServiceAccess.All & ~UserServiceAccess.WebDav;
+        Request("/dav/a/ok.txt");
+
+        Assert.IsType<ChallengeResult>(await _sut.Put(CancellationToken.None));
         Assert.Empty(Directory.EnumerateFileSystemEntries(_root));
     }
 

@@ -123,6 +123,9 @@ namespace Kaimo_File_Server.Core.Repositories
 
         /// <summary>Sets whether the user's personal home folder is available.</summary>
         Task UpdateHomeDirectoryEnabledAsync(Guid userId, bool enabled);
+
+        /// <summary>Sets which file services (app, web, SMB, WebDAV) the user may use.</summary>
+        Task UpdateServiceAccessAsync(Guid userId, UserServiceAccess access);
     }
 
     /// <summary>Minimal database projection used by Samba credential export.</summary>

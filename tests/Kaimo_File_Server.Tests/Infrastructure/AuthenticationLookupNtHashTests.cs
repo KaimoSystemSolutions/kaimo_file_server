@@ -77,6 +77,33 @@ public class AuthenticationLookupNtHashTests
     }
 
     [Fact]
+    public async Task GetNtHashAsync_SmbSwitchedOffForUser_ReturnsNull()
+    {
+        var user = MakeUser(_protector.Protect("0123456789ABCDEF0123456789ABCDEF"));
+        user.ServiceAccess = UserServiceAccess.All & ~UserServiceAccess.Smb;
+
+        Assert.Null(await BuildSut(user).GetNtHashAsync("test"));
+    }
+
+    [Fact]
+    public async Task ResolveUserContextAsync_SmbSwitchedOffForUser_ReturnsNull()
+    {
+        // Every SMB open, delete and rename authorization resolves the user through here.
+        var user = MakeUser("0123456789ABCDEF0123456789ABCDEF");
+        var userRepo = new Mock<IUserRepository>();
+        userRepo.Setup(r => r.GetByUsernameAsync("test")).ReturnsAsync(user);
+        var contexts = new Mock<IUserContextFactory>();
+        contexts.Setup(c => c.CreateAsync(user)).ReturnsAsync(new UserContext(user, [], [], []));
+        var sut = new AuthenticationLookup(
+            userRepo.Object, Mock.Of<IShareRepository>(), Mock.Of<IAclService>(),
+            contexts.Object, _passwords, _protector);
+        Assert.NotNull(await sut.ResolveUserContextAsync("test"));
+
+        user.ServiceAccess = UserServiceAccess.App | UserServiceAccess.Web;
+        Assert.Null(await sut.ResolveUserContextAsync("test"));
+    }
+
+    [Fact]
     public async Task GetNtHashAsync_EmptyPasswordHash_ReturnsNull()
     {
         // The well-known empty-password NT hash must be rejected even when stored encrypted.

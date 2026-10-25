@@ -1,0 +1,114 @@
+@using Kaimo_File_Server.Core.Domain.Identity
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+
+@*
+    File services → per-user matrix. The first row below the header is the default for newly
+    created users; then one row per user. Every checkbox saves at once. A column whose service
+    is off globally is dimmed but stays editable; an administrator's web cell is locked on.
+*@
+
+<div class="detail-section">
+    <span class="detail-label">@R("Web_FileServices_MatrixTitle")</span>
+    <p class="settings-description">@R("Web_FileServices_MatrixDescription")</p>
+
+    @if (Access.IsLoading)
+    {
+        <p class="settings-description">@R("Web_Common_Loading")</p>
+    }
+    else if (!Access.CanManage)
+    {
+        <div class="warning-banner">@R("Web_FileServices_Forbidden")</div>
+    }
+    else if (Access.LoadFailed)
+    {
+        <div class="error-banner">@R("Web_FileServices_LoadFailed")</div>
+    }
+    else
+    {
+        @if (Access.ErrorMessage is not null)
+        {
+            <div class="error-banner" role="alert">@Access.ErrorMessage</div>
+        }
+        <input class="edit-input fs-matrix-search" type="search" @bind="_filter" @bind:event="oninput"
+               placeholder="@R("Web_FileServices_Search")" aria-label="@R("Web_FileServices_Search")" />
+
+        <div class="fs-matrix" role="table" aria-label="@R("Web_FileServices_MatrixTitle")">
+            <div class="fs-row fs-header" role="row">
+                <span role="columnheader">@R("Web_FileServices_Column_User")</span>
+                @foreach (var service in FileServiceAccessViewModel.Services)
+                {
+                    <span role="columnheader" class="fs-cell @(VM.IsServiceEnabled(service) ? "" : "fs-cell--off")">@R($"Web_FileServices_Service_{service}")</span>
+                }
+            </div>
+
+            <div class="fs-row fs-default" role="row">
+                <span class="fs-name" role="cell">
+                    <span class="fs-avatar" aria-hidden="true">@Assets.SVG("plus.svg", new SvgOptions(Width: 14, Height: 14, Color: "currentColor"))</span>
+                    <span class="fs-name-text"><strong>@R("Web_FileServices_Default")</strong><small>@R("Web_FileServices_DefaultHint")</small></span>
+                </span>
+                @foreach (var service in FileServiceAccessViewModel.Services)
+                {
+                    var name = R($"Web_FileServices_Service_{service}");
+                    <span role="cell" class="fs-cell @(VM.IsServiceEnabled(service) ? "" : "fs-cell--off")">
+                        <input type="checkbox" checked="@Access.DefaultAccess.HasFlag(service)"
+                               aria-label="@string.Format(R("Web_FileServices_DefaultCellLabel"), name)"
+                               @onchange="e => Access.SetDefaultAsync(service, e.Value is true)" />
+                    </span>
+                }
+            </div>
+
+            @{ var rows = Access.Filter(_filter).ToList(); }
+            @foreach (var row in rows)
+            {
+                <div class="fs-row" role="row" @key="row.Id">
+                    <span class="fs-name" role="cell">
+                        <span class="fs-avatar" aria-hidden="true">
+                            @if (UserAvatar.DataUri(row.User) is { } uri)
+                            {
+                                <img src="@uri" alt="" />
+                            }
+                            else
+                            {
+                                @UserAvatar.Initials(row.User)
+                            }
+                        </span>
+                        <span class="fs-name-text"><strong>@row.Name</strong><small>@("@" + row.Username)</small></span>
+                    </span>
+                    @foreach (var service in FileServiceAccessViewModel.Services)
+                    {
+                        var label = string.Format(R("Web_FileServices_CellLabel"), row.Name, R($"Web_FileServices_Service_{service}"));
+                        <span role="cell" class="fs-cell @(VM.IsServiceEnabled(service) ? "" : "fs-cell--off")">
+                            @if (row.IsLocked(service))
+                            {
+                                <span class="fs-lock" title="@R("Web_FileServices_AdminLocked")" role="img" aria-label="@($"{label}: {R("Web_FileServices_AdminLocked")}")">
+                                    @Assets.SVG("shield.svg", new SvgOptions(Width: 16, Height: 16, Color: "currentColor"))
+                                </span>
+                            }
+                            else
+                            {
+                                <input type="checkbox" checked="@row.Has(service)" aria-label="@label"
+                                       @onchange="e => Access.SetAsync(row, service, e.Value is true)" />
+                            }
+                        </span>
+                    }
+                </div>
+            }
+        </div>
+        @if (rows.Count == 0)
+        {
+            <p class="settings-description fs-matrix-empty">@R("Web_FileServices_NoMatch")</p>
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public FileServiceAccessViewModel Access { get; set; } = default!;
+    [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+
+    private string? _filter;
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+}

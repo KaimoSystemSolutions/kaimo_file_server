@@ -10,7 +10,8 @@ namespace Kaimo_File_Server.Web.Services;
 /// WebDAV). A valid signature alone is not enough: the token must be a device-scoped
 /// client-API token (the web login token is not accepted here), its device must still
 /// be active, its account enabled, and its security stamp current — so revoking a
-/// device, disabling an account or changing the password takes effect immediately.
+/// device, disabling an account, switching off a file service (<see cref="ServiceAccessGate"/>)
+/// or changing the password takes effect immediately.
 /// </summary>
 public static class BearerTokenValidation
 {
@@ -20,14 +21,21 @@ public static class BearerTokenValidation
         string? failure = await CheckAsync(
             context.Principal,
             services.GetRequiredService<IUserRepository>(),
-            services.GetRequiredService<ISyncDeviceRepository>());
+            services.GetRequiredService<ISyncDeviceRepository>(),
+            services.GetRequiredService<ServiceAccessGate>(),
+            ServiceFor(context.HttpContext.Request.Path));
         if (failure is not null)
             context.Fail(failure);
     }
 
+    /// <summary>The file service a bearer request uses: WebDAV under <c>/dav</c>, otherwise the client app.</summary>
+    internal static UserServiceAccess ServiceFor(PathString path)
+        => path.StartsWithSegments("/dav") ? UserServiceAccess.WebDav : UserServiceAccess.App;
+
     /// <summary>Returns <c>null</c> when the principal is acceptable, otherwise the rejection reason.</summary>
     internal static async Task<string?> CheckAsync(
-        ClaimsPrincipal? principal, IUserRepository users, ISyncDeviceRepository devices)
+        ClaimsPrincipal? principal, IUserRepository users, ISyncDeviceRepository devices,
+        ServiceAccessGate serviceAccess, UserServiceAccess service)
     {
         if (principal is null)
             return "No principal.";
@@ -48,6 +56,9 @@ public static class BearerTokenValidation
 
         if (!JwtTokenService.HasCurrentSecurityStamp(principal, user))
             return "Token was issued before the account's credentials changed.";
+
+        if (!await serviceAccess.IsAllowedAsync(user, service))
+            return $"{service} access is switched off for this account.";
 
         return null;
     }

@@ -1,0 +1,82 @@
+@using Kaimo_File_Server.Core.Domain.Identity
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+@inject DateFormatService DateFmt
+
+@*
+    File services → one card per service with its global on/off switch (saved with the tab's
+    Save button, like before), the SMB/WebDAV run status and how many users may use it.
+*@
+
+@if (VM.HostUnreachable)
+{
+    <div class="warning-banner" role="status">@(VM.HostLastSeenUtc is null
+        ? R("Web_Settings_Data_HostNeverReportedHint")
+        : string.Format(R("Web_Settings_Data_HostUnreachableHint"), DateFmt.FormatDateTime(VM.HostLastSeenUtc)))</div>
+}
+<div class="fs-cards">
+    @foreach (var service in FileServiceAccessViewModel.Services)
+    {
+        var on = VM.IsServiceEnabled(service);
+        var name = R($"Web_FileServices_Service_{service}");
+        <div class="fs-card @(on ? "" : "fs-card--off")">
+            <div class="fs-card__head">
+                <span class="fs-card__icon" aria-hidden="true">@Assets.SVG(Icon(service), new SvgOptions(Width: 18, Height: 18, Color: "currentColor"))</span>
+                <span class="fs-card__name">@name</span>
+                <label class="toggle-switch" title="@string.Format(R("Web_FileServices_GlobalToggle"), name)">
+                    <input type="checkbox" checked="@on" aria-label="@string.Format(R("Web_FileServices_GlobalToggle"), name)"
+                           @onchange="e => VM.SetServiceEnabled(service, e.Value is true)" />
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <span class="fs-card__hint">@R($"Web_FileServices_Service_{service}_Hint")</span>
+            <div class="fs-card__meta">
+                @if (!on)
+                {
+                    <StatusBadge Tone="StatusTone.Warning" Label="@R("Web_FileServices_GloballyOff")" />
+                    @if (service == UserServiceAccess.Web)
+                    {
+                        <span class="fs-card__note">@R("Web_FileServices_AdminsOnly")</span>
+                    }
+                }
+                else if (Access is { CanManage: true, IsLoading: false })
+                {
+                    <span class="fs-card__count">@string.Format(R("Web_FileServices_UsersCount"), Access.CountAllowed(service), Access.Rows.Count)</span>
+                }
+                @if (Status(service) is { } status)
+                {
+                    <span class="service-status service-status--@status.Css">@status.Label</span>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+    [Parameter] public FileServiceAccessViewModel? Access { get; set; }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
+    private static string Icon(UserServiceAccess service) => service switch
+    {
+        UserServiceAccess.App => "devices.svg",
+        UserServiceAccess.Web => "globe.svg",
+        UserServiceAccess.Smb => "connection_smb.svg",
+        _ => "connection_webdav.svg",
+    };
+
+    /// <summary>Reported run status of the services that have one (SMB from the Host, WebDAV in-process).</summary>
+    private (string Css, string Label)? Status(UserServiceAccess service) => service switch
+    {
+        UserServiceAccess.Smb when VM.HostUnreachable => ("unreachable", R("Web_Settings_Data_StatusHostUnreachable")),
+        UserServiceAccess.Smb => (VM.SmbStatus.ToLowerInvariant(), StatusLabel(VM.SmbStatus)),
+        UserServiceAccess.WebDav => (VM.WebDavStatus.ToLowerInvariant(), StatusLabel(VM.WebDavStatus)),
+        _ => null,
+    };
+
+    private static string StatusLabel(string status) => status switch { "Running" => R("Web_Settings_Data_StatusRunning"), "Stopped" => R("Web_Settings_Data_StatusStopped"), "Starting" => R("Web_Settings_Data_StatusStarting"), "Stopping" => R("Web_Settings_Data_StatusStopping"), "Faulted" => R("Web_Settings_Data_StatusFaulted"), _ => R("Web_Settings_Data_StatusUnknown") };
+}

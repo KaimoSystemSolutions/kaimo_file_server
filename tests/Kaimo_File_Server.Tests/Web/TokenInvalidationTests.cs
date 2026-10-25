@@ -104,7 +104,7 @@ public sealed class TokenInvalidationTests : DatabaseTestBase
         var (users, devices) = Repos(user, device);
         var token = Jwt.GenerateToken(user.Id, "alice", "Alice", [], device.Id, user.SecurityStamp);
 
-        Assert.Null(await BearerTokenValidation.CheckAsync(Principal(token), users.Object, devices.Object));
+        Assert.Null(await BearerTokenValidation.CheckAsync(Principal(token), users.Object, devices.Object, TestGates.AllGloballyOn(), UserServiceAccess.App));
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public sealed class TokenInvalidationTests : DatabaseTestBase
         var (users, devices) = Repos(user, null);
         var webToken = Jwt.GenerateToken(user.Id, "alice", "Alice", [], securityStamp: user.SecurityStamp);
 
-        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(webToken), users.Object, devices.Object));
+        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(webToken), users.Object, devices.Object, TestGates.AllGloballyOn(), UserServiceAccess.App));
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public sealed class TokenInvalidationTests : DatabaseTestBase
 
         user.SecurityStamp = User.NewSecurityStamp(); // password changed
 
-        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(token), users.Object, devices.Object));
+        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(token), users.Object, devices.Object, TestGates.AllGloballyOn(), UserServiceAccess.App));
     }
 
     [Fact]
@@ -138,7 +138,7 @@ public sealed class TokenInvalidationTests : DatabaseTestBase
         var (users, devices) = Repos(user, device);
         var legacy = Jwt.GenerateToken(user.Id, "alice", "Alice", [], device.Id);
 
-        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(legacy), users.Object, devices.Object));
+        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(legacy), users.Object, devices.Object, TestGates.AllGloballyOn(), UserServiceAccess.App));
     }
 
     [Fact]
@@ -148,20 +148,53 @@ public sealed class TokenInvalidationTests : DatabaseTestBase
         var revoked = new SyncDevice { UserId = user.Id, RevokedAtUtc = DateTime.UtcNow };
         var (users, devices) = Repos(user, revoked);
         var token = Jwt.GenerateToken(user.Id, "alice", "Alice", [], revoked.Id, user.SecurityStamp);
-        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(token), users.Object, devices.Object));
+        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(token), users.Object, devices.Object, TestGates.AllGloballyOn(), UserServiceAccess.App));
 
         var disabled = NewUser(enabled: false);
         var device = new SyncDevice { UserId = disabled.Id };
         (users, devices) = Repos(disabled, device);
         token = Jwt.GenerateToken(disabled.Id, "alice", "Alice", [], device.Id, disabled.SecurityStamp);
-        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(token), users.Object, devices.Object));
+        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(token), users.Object, devices.Object, TestGates.AllGloballyOn(), UserServiceAccess.App));
 
         var owner = NewUser();
         var foreign = new SyncDevice { UserId = Guid.NewGuid() };
         (users, devices) = Repos(owner, foreign);
         token = Jwt.GenerateToken(owner.Id, "alice", "Alice", [], foreign.Id, owner.SecurityStamp);
-        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(token), users.Object, devices.Object));
+        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(token), users.Object, devices.Object, TestGates.AllGloballyOn(), UserServiceAccess.App));
     }
+
+    [Fact]
+    public async Task Bearer_AppSwitchedOff_IsRejectedForApi_ButAcceptedForWebDav()
+    {
+        var user = NewUser();
+        user.ServiceAccess = UserServiceAccess.All & ~UserServiceAccess.App;
+        var device = new SyncDevice { UserId = user.Id };
+        var (users, devices) = Repos(user, device);
+        var token = Jwt.GenerateToken(user.Id, "alice", "Alice", [], device.Id, user.SecurityStamp);
+
+        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(token), users.Object, devices.Object, TestGates.AllGloballyOn(), UserServiceAccess.App));
+        Assert.Null(await BearerTokenValidation.CheckAsync(Principal(token), users.Object, devices.Object, TestGates.AllGloballyOn(), UserServiceAccess.WebDav));
+    }
+
+    [Fact]
+    public async Task Bearer_WebDavSwitchedOff_IsRejectedForWebDav()
+    {
+        var user = NewUser();
+        user.ServiceAccess = UserServiceAccess.App;
+        var device = new SyncDevice { UserId = user.Id };
+        var (users, devices) = Repos(user, device);
+        var token = Jwt.GenerateToken(user.Id, "alice", "Alice", [], device.Id, user.SecurityStamp);
+
+        Assert.NotNull(await BearerTokenValidation.CheckAsync(Principal(token), users.Object, devices.Object, TestGates.AllGloballyOn(), UserServiceAccess.WebDav));
+    }
+
+    [Theory]
+    [InlineData("/api/v1/browse/shares", UserServiceAccess.App)]
+    [InlineData("/dav/share/file.txt", UserServiceAccess.WebDav)]
+    [InlineData("/dav", UserServiceAccess.WebDav)]
+    [InlineData("/davinci", UserServiceAccess.App)]
+    public void Bearer_ServiceIsChosenByPath(string path, UserServiceAccess expected)
+        => Assert.Equal(expected, BearerTokenValidation.ServiceFor(new PathString(path)));
 
     // ─────────────── Short client-API access tokens ───────────────
 

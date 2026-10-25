@@ -1,10 +1,12 @@
+using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Web.Controllers.WebDav;
+using Kaimo_File_Server.Web.Services;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
-/// <summary>Data-service settings: SMB (dialects/security) and WebDAV.</summary>
+/// <summary>Data-service settings: SMB (dialects/security), WebDAV and the global client-app/web-login switches.</summary>
 public partial class SettingsViewModel
 {
     // ── Data Services (SMB) ──
@@ -49,6 +51,36 @@ public partial class SettingsViewModel
     /// <summary>The connect URL shown as a read-only hint (e.g. <c>https://host:8443/dav/</c>).</summary>
     public static string BuildWebDavUrl(string baseUri) => $"{baseUri.TrimEnd('/')}/dav/";
 
+    // ── Client app and web login (global switches of the per-user file services) ──
+
+    /// <summary>Whether the client app (sync and browsing over the REST API) is usable at all.</summary>
+    public bool AppEnabled { get; set; } = true;
+
+    /// <summary>Whether the web login is usable at all; members of the Admins group always keep it.</summary>
+    public bool WebEnabled { get; set; } = true;
+
+    /// <summary>Working copy of the global switch of a file service (saved by <see cref="SaveDataServicesAsync"/>).</summary>
+    public bool IsServiceEnabled(UserServiceAccess service) => service switch
+    {
+        UserServiceAccess.App => AppEnabled,
+        UserServiceAccess.Web => WebEnabled,
+        UserServiceAccess.Smb => SmbEnabled,
+        UserServiceAccess.WebDav => WebDavEnabled,
+        _ => throw new ArgumentOutOfRangeException(nameof(service), service, "Exactly one service expected."),
+    };
+
+    public void SetServiceEnabled(UserServiceAccess service, bool enabled)
+    {
+        switch (service)
+        {
+            case UserServiceAccess.App: AppEnabled = enabled; break;
+            case UserServiceAccess.Web: WebEnabled = enabled; break;
+            case UserServiceAccess.Smb: SmbEnabled = enabled; break;
+            case UserServiceAccess.WebDav: WebDavEnabled = enabled; break;
+            default: throw new ArgumentOutOfRangeException(nameof(service), service, "Exactly one service expected.");
+        }
+    }
+
     // ── Save Data Services ──
 
     public async Task<bool> SaveDataServicesAsync()
@@ -65,6 +97,8 @@ public partial class SettingsViewModel
         try
         {
             await _config.SetAsync(DataServiceKeys.EnabledKey("smb"), SmbEnabled);
+            await _config.SetAsync(ServiceAccessGate.GlobalKey(UserServiceAccess.App), AppEnabled);
+            await _config.SetAsync(ServiceAccessGate.GlobalKey(UserServiceAccess.Web), WebEnabled);
 
             await _config.SetAsync(WebDavOptions.EnabledKey, WebDavEnabled);
             await _config.SetAsync(WebDavOptions.RequireHttpsKey, WebDavRequireHttps);
@@ -74,8 +108,9 @@ public partial class SettingsViewModel
             await _config.SetAsync(WebDavOptions.StatusKey, WebDavStatus);
 
             _logger.LogInformation(
-                "SMB service desired state set to {SmbEnabled}; WebDAV set to {WebDavEnabled}",
-                SmbEnabled, WebDavEnabled);
+                "SMB service desired state set to {SmbEnabled}; WebDAV set to {WebDavEnabled}; " +
+                "client app set to {AppEnabled}; web login set to {WebEnabled}",
+                SmbEnabled, WebDavEnabled, AppEnabled, WebEnabled);
             SuccessMessage = SmbEnabled
                 ? Resources.Web_Settings_SmbEnabled
                 : Resources.Web_Settings_SmbDisabled;

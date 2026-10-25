@@ -173,6 +173,30 @@ public sealed class DisabledShareBridgeTests
         acl.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task AuthorizeConnect_DeniesUserWithSmbSwitchedOff()
+    {
+        var user = new User(Guid.NewGuid(), "Bob", "bob", "hash", "nt")
+        {
+            ServiceAccess = UserServiceAccess.All & ~UserServiceAccess.Smb,
+        };
+        var users = new Mock<IUserRepository>();
+        users.Setup(x => x.GetByUsernameAsync("bob")).ReturnsAsync(user);
+        var config = new Mock<ISmbConfigStore>();
+        config.Setup(x => x.IsSmbEnabledAsync()).ReturnsAsync(true);
+        var auth = new Mock<IAuthenticationLookup>();
+        var sut = new AuthzGrpcService(
+            users.Object, DisabledShareRepository().Object, auth.Object, Mock.Of<IAclService>(),
+            config.Object, NullLogger<AuthzGrpcService>.Instance);
+
+        var connect = await sut.AuthorizeConnect(
+            new AuthorizeConnectRequest { Username = "bob", Share = "disabled" }, null!);
+
+        Assert.False(connect.Allow);
+        Assert.Contains("SMB switched off", connect.Reason);
+        auth.VerifyNoOtherCalls();
+    }
+
     private Mock<IShareRepository> DisabledShareRepository()
     {
         var shares = new Mock<IShareRepository>();

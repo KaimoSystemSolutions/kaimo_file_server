@@ -117,6 +117,11 @@ public sealed class AuthApiController : ApiControllerBase
                 _logger.LogWarning("Login rejected – access restriction: {Username}", request.Username);
                 return ApiUnauthorized("Invalid username or password.");
 
+            case LoginOutcome.ServiceDisabled:
+                // Same answer as a wrong password: a distinct one would confirm the credentials.
+                _logger.LogWarning("Login rejected – client app switched off: {Username}", request.Username);
+                return ApiUnauthorized("Invalid username or password.");
+
             default:
                 return ApiUnauthorized("Invalid username or password.");
         }
@@ -139,6 +144,8 @@ public sealed class AuthApiController : ApiControllerBase
                 DeviceId: Guid.Empty)),
             RefreshOutcome.Reuse => ApiUnauthorized("Refresh token was already used; sign in again."),
             RefreshOutcome.AddressNotAllowed => AddressNotAllowed(),
+            RefreshOutcome.ServiceDisabled => StatusCode(StatusCodes.Status403Forbidden,
+                new ApiError("service_disabled", "The client app is switched off for this account.")),
             _ => ApiUnauthorized("Refresh token is invalid or expired."),
         };
     }

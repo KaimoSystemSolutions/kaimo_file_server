@@ -32,6 +32,7 @@ public partial class UserListViewModel
     private readonly IShareRepository _shareRepo;
     private readonly IConfigRepository _config;
     private readonly HomeDirectoryService? _homes;
+    private readonly ServiceAccessGate? _serviceAccess;
     private readonly ILoginService? _loginService;
     private readonly ClientConnectionInfo? _client;
     private readonly JwtTokenService? _jwt;
@@ -58,8 +59,10 @@ public partial class UserListViewModel
         JwtTokenService? jwt = null,
         IMemoryCache? cache = null,
         HomeDirectoryService? homes = null,
-        INotificationPublisher? notifications = null)
+        INotificationPublisher? notifications = null,
+        ServiceAccessGate? serviceAccess = null)
     {
+        _serviceAccess = serviceAccess;
         _homes = homes;
         _notifications = notifications;
         _loginService = loginService;

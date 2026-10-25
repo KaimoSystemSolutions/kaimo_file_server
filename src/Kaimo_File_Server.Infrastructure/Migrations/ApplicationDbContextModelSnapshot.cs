@@ -2023,6 +2023,11 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<int>("ServiceAccess")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(15);
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(100)

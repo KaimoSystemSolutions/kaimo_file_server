@@ -65,3 +65,19 @@
     display: flex;
     gap: 8px;
 }
+
+/* Services tab: the hint (admin lock, off globally) sits under the service name. */
+.user-service-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.user-service-label .form-hint {
+    margin: 0;
+    font-weight: 400;
+}
+
+.user-service-label .user-service-off {
+    color: var(--warning);
+}

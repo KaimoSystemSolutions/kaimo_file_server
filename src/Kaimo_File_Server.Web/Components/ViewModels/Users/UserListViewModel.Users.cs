@@ -144,6 +144,7 @@ public partial class UserListViewModel
         EditUserIsEnabled = SelectedUser.IsEnabled;
         EditUserCanChangePassword = SelectedUser.CanChangePassword;
         EditUserHomeDirectoryEnabled = SelectedUser.HomeDirectoryEnabled;
+        await LoadEditServicesAsync(SelectedUser);
 
         var departmentIds = UserDepartments.Select(department => department.Id).ToHashSet();
         var allGroups = (await _groupRepo.GetAllAsync())
@@ -213,6 +214,7 @@ public partial class UserListViewModel
 
             await _userRepo.UpdatePersonalNamesAsync(
                 SelectedUser.Id, NullIfBlank(EditUserFirstName), NullIfBlank(EditUserLastName));
+            await SaveEditServicesAsync(SelectedUser);
             if (CanManageHomes && EditUserHomeDirectoryEnabled != SelectedUser.HomeDirectoryEnabled)
                 await _homes!.SetEnabledAsync(SelectedUser.Id, EditUserHomeDirectoryEnabled);
             if (_photoChanged)
@@ -354,6 +356,8 @@ public partial class UserListViewModel
                 _ntHashProtector.Protect(_passwordService.ComputeNtHash(CreateUserPassword)),
                 description: CreateUserDescription.Trim(), email: CreateUserEmail.Trim(),
                 isEnabled: CreateUserIsEnabled, canChangePassword: CreateUserCanChangePassword);
+            if (_serviceAccess is not null)
+                user.ServiceAccess = await _serviceAccess.GetDefaultAccessAsync();
 
             await _userRepo.CreateAsync(user);
             // Membership in the Global department is implicit for every user, so it is never stored.

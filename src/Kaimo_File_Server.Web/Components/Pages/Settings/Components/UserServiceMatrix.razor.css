@@ -1,0 +1,148 @@
+.fs-matrix-search {
+    max-width: 320px;
+    margin-bottom: var(--space-3);
+}
+
+.fs-matrix {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+
+.fs-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(4, minmax(56px, 84px));
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 48px;
+    padding: var(--space-2) 14px;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 13px;
+}
+
+.fs-row:last-child {
+    border-bottom: 0;
+}
+
+.fs-row:not(.fs-header):not(.fs-default):hover {
+    background: var(--bg-hover);
+}
+
+.fs-header {
+    min-height: 36px;
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .045em;
+    text-transform: uppercase;
+}
+
+/* The default row reads as a template, not a user: tinted and separated from the users. */
+.fs-default {
+    background: var(--accent-subtle);
+    border-bottom-color: var(--border);
+}
+
+.fs-cell {
+    display: flex;
+    justify-content: center;
+    text-align: center;
+}
+
+.fs-cell input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    cursor: pointer;
+}
+
+.fs-cell input[type="checkbox"]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Off globally: still editable, but visibly without effect. */
+.fs-cell--off {
+    opacity: .45;
+}
+
+.fs-lock {
+    display: inline-flex;
+    color: var(--text-tertiary);
+    cursor: help;
+}
+
+.fs-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.fs-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    overflow: hidden;
+    border: 1px solid var(--border-light);
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.fs-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.fs-name-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.fs-name-text strong,
+.fs-name-text small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fs-name-text strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.fs-name-text small {
+    color: var(--text-tertiary);
+    font-size: 11.5px;
+}
+
+.fs-matrix-empty {
+    margin-top: var(--space-3);
+}
+
+@media (max-width: 640px) {
+    .fs-row {
+        grid-template-columns: minmax(0, 1fr) repeat(4, 40px);
+        gap: var(--space-2);
+        padding: var(--space-2) 10px;
+    }
+
+    .fs-header {
+        font-size: 10px;
+        letter-spacing: 0;
+    }
+
+    .fs-avatar {
+        display: none;
+    }
+}

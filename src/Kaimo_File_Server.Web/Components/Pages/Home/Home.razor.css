@@ -1,13 +1,38 @@
-/* Quick access row (ActionTile). */
+/* Status strip at the top: one banner, plus the problem list when something needs attention. */
+.home-status {
+    margin-bottom: var(--space-6);
+}
+
+.home-status .home-status-banner {
+    margin-bottom: 0;
+}
+
+.home-status .home-attention-list {
+    margin: var(--space-2) 0 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+
+/* "My workspace" and, for administrators, "Administration" side by side. */
+.home-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
+    align-items: start;
+}
+
+.home-columns--split {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+}
+
+/* Quick access (ActionTile). */
 .home-actions {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: var(--space-3);
-    margin-bottom: var(--space-6);
-}
-
-.home-group {
-    margin-bottom: var(--space-6);
+    margin-bottom: var(--space-3);
 }
 
 .home-group-title {
@@ -64,6 +89,10 @@
     grid-template-columns: auto minmax(0, 1fr) auto auto;
 }
 
+.home-row.home-row--device {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
 .home-row-icon {
     display: grid;
     place-items: center;
@@ -102,21 +131,25 @@
     white-space: nowrap;
 }
 
+.home-more {
+    margin-top: var(--space-3);
+}
+
 .home-empty {
     margin: 0;
     color: var(--text-secondary);
 }
 
-.home-empty--ok {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2);
+@media (max-width: 1100px) {
+    .home-columns--split {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 @media (max-width: 760px) {
     .home-row {
         grid-template-columns: auto minmax(0, 1fr) auto;
+        row-gap: var(--space-1);
     }
 
     /* Secondary cells (folder count, last seen) wrap under the name. */

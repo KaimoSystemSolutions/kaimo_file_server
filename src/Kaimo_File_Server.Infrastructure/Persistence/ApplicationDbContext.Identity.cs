@@ -36,6 +36,11 @@ public partial class ApplicationDbContext
             entity.Property(e => e.IsEnabled).IsRequired().HasDefaultValue(true);
             entity.Property(e => e.CanChangePassword).IsRequired().HasDefaultValue(true);
             entity.Property(e => e.HomeDirectoryEnabled).IsRequired().HasDefaultValue(true);
+            // Existing rows keep every service (the behavior before per-user switches). The
+            // sentinel is a value never assigned, so EF always writes the entity's own value
+            // and an explicit None is not replaced by the column default on insert.
+            entity.Property(e => e.ServiceAccess).IsRequired().HasConversion<int>()
+                .HasDefaultValue(UserServiceAccess.All).HasSentinel((UserServiceAccess)(-1));
             entity.Property(e => e.SecurityStamp).IsRequired().HasMaxLength(64);
             entity.Property(e => e.MustChangePassword).IsRequired();
         });

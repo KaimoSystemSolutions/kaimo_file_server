@@ -47,8 +47,9 @@ namespace Kaimo_File_Server.Infrastructure.Services
             var user = await _userRepo.GetByUsernameAsync(username);
             if (user == null) return null;
 
-            // Disabled accounts must never authenticate, regardless of correct credentials.
-            if (!user.IsEnabled) return null;
+            // Disabled accounts must never authenticate, regardless of correct credentials;
+            // neither may accounts with SMB switched off.
+            if (!user.IsEnabled || !user.ServiceAccess.HasFlag(UserServiceAccess.Smb)) return null;
 
             try
             {
@@ -134,7 +135,10 @@ namespace Kaimo_File_Server.Infrastructure.Services
         public async Task<UserContext?> ResolveUserContextAsync(string username)
         {
             var user = await _userRepo.GetByUsernameAsync(username);
-            if (user == null || !user.IsEnabled) return null;
+            // Every SMB authorization resolves the caller here, so switching SMB off for the
+            // account denies open/delete/rename on connections that are already established.
+            if (user == null || !user.IsEnabled || !user.ServiceAccess.HasFlag(UserServiceAccess.Smb))
+                return null;
             return await _contextFactory.CreateAsync(user);
         }
 

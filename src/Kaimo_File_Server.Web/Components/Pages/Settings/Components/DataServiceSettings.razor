@@ -1,35 +1,16 @@
 ﻿
 @using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject AssetProvider Icons
 @inject NavigationManager Nav
-@inject DateFormatService DateFmt
+@inject FileServiceAccessViewModel Access
 @implements IDisposable
 
 <div class="detail-section">
     <span class="detail-label">@R("Web_Settings_Data_Title")</span>
     <p class="settings-description">@R("Web_Settings_Data_Description")</p>
-    @if (VM.HostUnreachable)
-    {
-        <div class="warning-banner" role="status">@(VM.HostLastSeenUtc is null
-            ? R("Web_Settings_Data_HostNeverReportedHint")
-            : string.Format(R("Web_Settings_Data_HostUnreachableHint"), DateFmt.FormatDateTime(VM.HostLastSeenUtc)))</div>
-    }
-    <div class="service-row">
-        @if (VM.HostUnreachable)
-        {
-            <div class="service-info"><span class="service-name">SMB / CIFS</span><span class="service-status service-status--unreachable">@R("Web_Settings_Data_StatusHostUnreachable")</span></div>
-        }
-        else
-        {
-            <div class="service-info"><span class="service-name">SMB / CIFS</span><span class="service-status service-status--@VM.SmbStatus.ToLowerInvariant()">@StatusLabel(VM.SmbStatus)</span></div>
-        }
-        <label class="toggle-switch" title="@R("Web_Settings_Data_SmbToggle")"><input type="checkbox" @bind="VM.SmbEnabled" /><span class="toggle-slider"></span></label>
-    </div>
-    <div class="service-row">
-        <div class="service-info"><span class="service-name">WebDAV</span><span class="service-status service-status--@VM.WebDavStatus.ToLowerInvariant()">@StatusLabel(VM.WebDavStatus)</span></div>
-        <label class="toggle-switch" title="@R("Web_Settings_Data_WebDavToggle")"><input type="checkbox" @bind="VM.WebDavEnabled" /><span class="toggle-slider"></span></label>
-    </div>
+    <FileServiceCards VM="VM" Access="Access" />
     <label class="pw-rule"><span class="toggle-switch"><input type="checkbox" @bind="VM.WebDavRequireHttps" /><span class="toggle-slider"></span></span><span>@R("Web_Settings_Data_WebDavRequireHttps")</span></label>
     <p class="settings-description">@R("Web_Settings_Data_WebDavUrl"): <code>@SettingsViewModel.BuildWebDavUrl(Nav.BaseUri)</code></p>
     <div class="settings-row settings-actions">
@@ -37,6 +18,8 @@
         <button class="btn-icon" title="@R("Web_Settings_Data_RefreshStatus")" @onclick="Refresh"><span>@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</span></button>
     </div>
 </div>
+
+<UserServiceMatrix Access="Access" VM="VM" />
 
 <div class="detail-section">
     <span class="detail-label">@R("Web_Settings_Data_ProtocolTitle")</span>
@@ -54,6 +37,8 @@
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
     private CancellationTokenSource? _statusPoll;
+
+    protected override Task OnInitializedAsync() => Access.LoadAsync();
 
     private async Task SaveServices()
     {
@@ -97,5 +82,4 @@
     }
     private async Task SaveProtocol() { await VM.SaveSmbProtocolAsync(); StateHasChanged(); }
     private async Task Refresh() { await VM.RefreshDataServiceStatusAsync(); StateHasChanged(); }
-    private static string StatusLabel(string status) => status switch { "Running" => R("Web_Settings_Data_StatusRunning"), "Stopped" => R("Web_Settings_Data_StatusStopped"), "Starting" => R("Web_Settings_Data_StatusStarting"), "Stopping" => R("Web_Settings_Data_StatusStopping"), "Faulted" => R("Web_Settings_Data_StatusFaulted"), _ => R("Web_Settings_Data_StatusUnknown") };
 }

@@ -7147,17 +7147,17 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Home_Group_Admin" xml:space="preserve">
     <value>Administration</value>
   </data>
-  <data name="Web_Home_Tile_Devices" xml:space="preserve">
-    <value>Signed-in devices</value>
-  </data>
-  <data name="Web_Home_Tile_DeviceSyncs" xml:space="preserve">
-    <value>Device sync folders</value>
-  </data>
   <data name="Web_Home_Devices_Title" xml:space="preserve">
     <value>My devices</value>
   </data>
   <data name="Web_Home_Devices_None" xml:space="preserve">
     <value>No device is signed in to your account. Sign in with the Kaimo app to sync folders to your phone or computer.</value>
+  </data>
+  <data name="Web_Home_Devices_ShowAll" xml:space="preserve">
+    <value>Show all ({0})</value>
+  </data>
+  <data name="Web_Home_Devices_ShowLess" xml:space="preserve">
+    <value>Show fewer</value>
   </data>
   <data name="Web_Home_Devices_Folders" xml:space="preserve">
     <value>{0} sync folders</value>
@@ -7177,11 +7177,11 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Home_Security_Hint" xml:space="preserve">
     <value>{0} active lockouts</value>
   </data>
-  <data name="Web_Home_AllHealthy" xml:space="preserve">
-    <value>All healthy</value>
-  </data>
   <data name="Web_Home_Attention_Title" xml:space="preserve">
     <value>Needs attention</value>
+  </data>
+  <data name="Web_Home_Attention_Count" xml:space="preserve">
+    <value>Needs attention: {0}</value>
   </data>
   <data name="Web_Home_Attention_None" xml:space="preserve">
     <value>All syncs, connections and backup jobs are running normally.</value>
@@ -7203,12 +7203,6 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   </data>
   <data name="Web_Home_Action_Browse" xml:space="preserve">
     <value>All shares and folders</value>
-  </data>
-  <data name="Web_Home_Action_External" xml:space="preserve">
-    <value>Syncs and connections</value>
-  </data>
-  <data name="Web_Home_Action_ShareLinks" xml:space="preserve">
-    <value>Public download and upload links</value>
   </data>
   <data name="Web_Home_Health_Ok" xml:space="preserve">
     <value>healthy</value>
@@ -7521,5 +7515,101 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   </data>
   <data name="Web_HomeFolders_Tab_Settings" xml:space="preserve">
     <value>Settings</value>
+  </data>
+  <data name="Web_Security_Outcome_ServiceDisabled" xml:space="preserve">
+    <value>Service switched off</value>
+  </data>
+  <data name="Web_FileServices_SaveFailed" xml:space="preserve">
+    <value>The change could not be saved.</value>
+  </data>
+  <data name="Web_FileServices_LoadFailed" xml:space="preserve">
+    <value>The users could not be loaded.</value>
+  </data>
+  <data name="Web_FileServices_Service_App" xml:space="preserve">
+    <value>App</value>
+  </data>
+  <data name="Web_FileServices_Service_App_Hint" xml:space="preserve">
+    <value>Sync and browsing</value>
+  </data>
+  <data name="Web_FileServices_Service_Web" xml:space="preserve">
+    <value>Web login</value>
+  </data>
+  <data name="Web_FileServices_Service_Web_Hint" xml:space="preserve">
+    <value>Browser access</value>
+  </data>
+  <data name="Web_FileServices_Service_Smb" xml:space="preserve">
+    <value>SMB</value>
+  </data>
+  <data name="Web_FileServices_Service_Smb_Hint" xml:space="preserve">
+    <value>Windows network drives</value>
+  </data>
+  <data name="Web_FileServices_Service_WebDav" xml:space="preserve">
+    <value>WebDAV</value>
+  </data>
+  <data name="Web_FileServices_Service_WebDav_Hint" xml:space="preserve">
+    <value>Network drive over HTTPS</value>
+  </data>
+  <data name="Web_FileServices_UsersCount" xml:space="preserve">
+    <value>{0} of {1} users</value>
+  </data>
+  <data name="Web_FileServices_GloballyOff" xml:space="preserve">
+    <value>Off globally</value>
+  </data>
+  <data name="Web_FileServices_AdminsOnly" xml:space="preserve">
+    <value>Only admins can sign in</value>
+  </data>
+  <data name="Web_FileServices_GlobalToggle" xml:space="preserve">
+    <value>Switch {0} on or off for everyone</value>
+  </data>
+  <data name="Web_FileServices_MatrixTitle" xml:space="preserve">
+    <value>Access per user</value>
+  </data>
+  <data name="Web_FileServices_MatrixDescription" xml:space="preserve">
+    <value>Choose which file services each user may use. Changes are saved immediately. A service that is off globally stays blocked for everyone; members of the Admins group always keep the web login.</value>
+  </data>
+  <data name="Web_FileServices_Column_User" xml:space="preserve">
+    <value>User</value>
+  </data>
+  <data name="Web_FileServices_Default" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="Web_FileServices_DefaultHint" xml:space="preserve">
+    <value>For newly created users</value>
+  </data>
+  <data name="Web_FileServices_AdminLocked" xml:space="preserve">
+    <value>Members of the Admins group always keep the web login.</value>
+  </data>
+  <data name="Web_FileServices_Search" xml:space="preserve">
+    <value>Search users</value>
+  </data>
+  <data name="Web_FileServices_NoMatch" xml:space="preserve">
+    <value>No user matches the search.</value>
+  </data>
+  <data name="Web_FileServices_Forbidden" xml:space="preserve">
+    <value>Managing file services per user requires the permission to enable and disable users system-wide.</value>
+  </data>
+  <data name="Web_FileServices_CellLabel" xml:space="preserve">
+    <value>{1} for {0}</value>
+  </data>
+  <data name="Web_FileServices_DefaultCellLabel" xml:space="preserve">
+    <value>{0} for new users</value>
+  </data>
+  <data name="Web_FileServices_Allowed" xml:space="preserve">
+    <value>Allowed</value>
+  </data>
+  <data name="Web_FileServices_Blocked" xml:space="preserve">
+    <value>Blocked</value>
+  </data>
+  <data name="Web_Admin_EditTab_Services" xml:space="preserve">
+    <value>Services</value>
+  </data>
+  <data name="Web_User_FileServices_Title" xml:space="preserve">
+    <value>File services</value>
+  </data>
+  <data name="Web_User_FileServices_GloballyOff" xml:space="preserve">
+    <value>Switched off globally</value>
+  </data>
+  <data name="Web_User_FileServices_SelfLocked" xml:space="preserve">
+    <value>You cannot change the file services of your own account.</value>
   </data>
 </root>

@@ -94,6 +94,12 @@ public class LoginViewModel
                     ErrorMessage = Resources.Web_Login_InvalidCredentials;
                     return false;
 
+                case LoginOutcome.ServiceDisabled:
+                    _logger.LogWarning("Login rejected – web login switched off for {Username}", Username);
+                    // Reached only with the correct password, so it must look like a wrong one.
+                    ErrorMessage = Resources.Web_Login_InvalidCredentials;
+                    return false;
+
                 case LoginOutcome.LockedOut:
                     var minutes = Math.Max(1, (int)Math.Ceiling(result.RetryAfter.TotalMinutes));
                     _logger.LogWarning(

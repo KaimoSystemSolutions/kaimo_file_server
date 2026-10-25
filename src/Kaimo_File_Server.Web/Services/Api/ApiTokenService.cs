@@ -25,6 +25,11 @@ public enum RefreshOutcome
     /// the token is not rotated, so it works again from an allowed address.
     /// </summary>
     AddressNotAllowed,
+    /// <summary>
+    /// Valid token, but the client app is switched off for the account (or globally); the
+    /// token is not rotated, so it works again once the app is switched back on.
+    /// </summary>
+    ServiceDisabled,
 }
 
 /// <summary>Result of <see cref="ApiTokenService.RefreshAsync"/>.</summary>
@@ -48,6 +53,7 @@ public sealed class ApiTokenService
     private readonly int _refreshTokenDays;
     private readonly TimeSpan _refreshReuseGrace;
     private readonly AccessRestrictionService? _access;
+    private readonly ServiceAccessGate? _serviceAccess;
 
     public ApiTokenService(
         JwtTokenService jwt,
@@ -57,9 +63,11 @@ public sealed class ApiTokenService
         TimeProvider clock,
         IConfiguration config,
         ILogger<ApiTokenService> logger,
-        AccessRestrictionService? access = null)
+        AccessRestrictionService? access = null,
+        ServiceAccessGate? serviceAccess = null)
     {
         _access = access;
+        _serviceAccess = serviceAccess;
         _jwt = jwt;
         _refreshTokens = refreshTokens;
         _devices = devices;
@@ -171,6 +179,9 @@ public sealed class ApiTokenService
 
         if (_access is not null && !await _access.IsAllowedAsync(user, remoteAddress, host))
             return new RefreshResult(RefreshOutcome.AddressNotAllowed);
+
+        if (_serviceAccess is not null && !await _serviceAccess.IsAllowedAsync(user.User, UserServiceAccess.App))
+            return new RefreshResult(RefreshOutcome.ServiceDisabled);
 
         // Rotate: mint the replacement, then atomically revoke the old + insert new.
         (string secret, string newHash) = GenerateOpaqueToken();

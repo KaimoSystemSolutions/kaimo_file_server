@@ -35,6 +35,7 @@ internal static class ViewModelSetup
         builder.Services.AddScoped<ExternalStorageSyncViewModel>();
         builder.Services.AddScoped<HomeDashboardViewModel>();
         builder.Services.AddScoped<ClientDeviceAdminViewModel>();
+        builder.Services.AddScoped<FileServiceAccessViewModel>();
         builder.Services.AddScoped<MailServerSettingsViewModel>();
         builder.Services.AddScoped<AccessSettingsViewModel>();
         builder.Services.AddScoped<NotificationsViewModel>();

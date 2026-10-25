@@ -191,6 +191,8 @@ public partial class SettingsViewModel
                 SmbProtocol.Normalize();
 
                 WebDavEnabled = await _config.GetBoolAsync(WebDavOptions.EnabledKey, false);
+                AppEnabled = await _config.GetBoolAsync(ServiceAccessGate.GlobalKey(UserServiceAccess.App), true);
+                WebEnabled = await _config.GetBoolAsync(ServiceAccessGate.GlobalKey(UserServiceAccess.Web), true);
                 WebDavRequireHttps = await _config.GetBoolAsync(WebDavOptions.RequireHttpsKey, true);
 
                 // Statuses and the Host heartbeat are written by other processes → read fresh.

@@ -37,6 +37,7 @@ builder.Services.AddCoreServices(poolStoragePaths, applicationDataPath);
 
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<IConfigRepository, ConfigRepository>();
+builder.Services.AddScoped<Kaimo_File_Server.Web.Services.ServiceAccessGate>();
 
 builder.AddKaimoBlazorAndControllers();
 builder.AddKaimoAuthentication();

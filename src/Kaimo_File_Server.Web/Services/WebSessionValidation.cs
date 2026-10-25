@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
@@ -10,7 +11,7 @@ namespace Kaimo_File_Server.Web.Services;
 /// <see cref="WebSessionCookie"/>). The counterpart of <see cref="BearerTokenValidation"/>:
 /// a valid signature alone is not enough — the token must be a web (not device-scoped)
 /// token, unexpired, not signed out, and its account enabled with the current security
-/// stamp. Used both when the Blazor connection is established and by the periodic
+/// stamp and the web login switched on (<see cref="ServiceAccessGate"/>). Used both when the Blazor connection is established and by the periodic
 /// revalidation in <see cref="JwtAuthenticationStateProvider"/>.
 /// </summary>
 public static class WebSessionValidation
@@ -21,14 +22,16 @@ public static class WebSessionValidation
         string? failure = await CheckAsync(
             context.Principal,
             services.GetRequiredService<IUserRepository>(),
-            services.GetRequiredService<IRevokedWebTokenRepository>());
+            services.GetRequiredService<IRevokedWebTokenRepository>(),
+            services.GetRequiredService<ServiceAccessGate>());
         if (failure is not null)
             context.Fail(failure);
     }
 
     /// <summary>Returns <c>null</c> when the session is acceptable, otherwise the rejection reason.</summary>
     internal static async Task<string?> CheckAsync(
-        ClaimsPrincipal? principal, IUserRepository users, IRevokedWebTokenRepository revokedTokens)
+        ClaimsPrincipal? principal, IUserRepository users, IRevokedWebTokenRepository revokedTokens,
+        ServiceAccessGate serviceAccess)
     {
         if (principal is null)
             return "No principal.";
@@ -51,6 +54,9 @@ public static class WebSessionValidation
 
         if (!JwtTokenService.HasCurrentSecurityStamp(principal, user))
             return "Token was issued before the account's credentials changed.";
+
+        if (!await serviceAccess.IsAllowedAsync(user, UserServiceAccess.Web))
+            return "Web login is switched off for this account.";
 
         var jti = principal.FindFirstValue(JwtRegisteredClaimNames.Jti);
         if (!string.IsNullOrEmpty(jti) && await revokedTokens.IsRevokedAsync(jti))

@@ -45,7 +45,8 @@ public partial class UserListViewModelDatabaseTests : DatabaseTestBase
             .ReturnsAsync(PasswordPolicy.Default());
     }
 
-    private UserListViewModel BuildGlobalAdminSut(User actor, HomeDirectoryService? homes = null)
+    private UserListViewModel BuildGlobalAdminSut(
+        User actor, HomeDirectoryService? homes = null, ServiceAccessGate? serviceAccess = null)
     {
         var ctx = ContextFor(actor);
 
@@ -73,7 +74,7 @@ public partial class UserListViewModelDatabaseTests : DatabaseTestBase
             UserContextFactoryFor((actor.Username, ctx)).Object,
             AuthStateFor(actor.Username),
             NullLogger<UserListViewModel>.Instance,
-            ShareRepo(), _config.Object, homes: homes);
+            ShareRepo(), _config.Object, homes: homes, serviceAccess: serviceAccess);
     }
 
     private Group SeedGroup(string name)

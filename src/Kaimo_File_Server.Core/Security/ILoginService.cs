@@ -17,6 +17,13 @@ public enum LoginOutcome
     /// so it never confirms the password; only the admin-side security log tells them apart.
     /// </summary>
     AddressNotAllowed,
+
+    /// <summary>
+    /// Valid credentials, but the file service used for the login (web, client app, WebDAV)
+    /// is switched off for this account or globally. Shown to the client exactly like
+    /// <see cref="InvalidCredentials"/>; only the admin-side security log tells them apart.
+    /// </summary>
+    ServiceDisabled,
 }
 
 /// <summary>
@@ -42,6 +49,9 @@ public sealed record LoginResult(
 
     public static readonly LoginResult AddressNotAllowed =
         new(LoginOutcome.AddressNotAllowed);
+
+    public static readonly LoginResult ServiceDisabled =
+        new(LoginOutcome.ServiceDisabled);
 
     public static LoginResult LockedOut(TimeSpan retryAfter) =>
         new(LoginOutcome.LockedOut, RetryAfter: retryAfter);

@@ -90,6 +90,12 @@ namespace Kaimo_File_Server.Core.Domain.Identity
         /// </summary>
         public bool HomeDirectoryEnabled { get; set; } = true;
 
+        /// <summary>
+        /// File services this user may use (app, web login, SMB, WebDAV). A service also has
+        /// to be enabled globally; see <see cref="UserServiceAccess"/>.
+        /// </summary>
+        public UserServiceAccess ServiceAccess { get; set; } = UserServiceAccess.All;
+
         /// <summary>Creates a fresh, unpredictable <see cref="SecurityStamp"/> value.</summary>
         public static string NewSecurityStamp() => Guid.NewGuid().ToString("N");
 

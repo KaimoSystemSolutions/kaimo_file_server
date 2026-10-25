@@ -184,7 +184,8 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider,
             failure = await WebSessionValidation.CheckAsync(
                 principal,
                 scope.ServiceProvider.GetRequiredService<IUserRepository>(),
-                scope.ServiceProvider.GetRequiredService<IRevokedWebTokenRepository>());
+                scope.ServiceProvider.GetRequiredService<IRevokedWebTokenRepository>(),
+                scope.ServiceProvider.GetRequiredService<ServiceAccessGate>());
 
             // Access restriction rules may have changed since the hub connection was checked.
             if (failure is null

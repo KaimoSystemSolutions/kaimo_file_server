@@ -1,6 +1,7 @@
 "use strict";
 function initInternalDragDrop() {
-    window.kaimoInternalDragDropAbortController?.abort();
+    var _a;
+    (_a = window.kaimoInternalDragDropAbortController) === null || _a === void 0 ? void 0 : _a.abort();
     const controller = new AbortController();
     window.kaimoInternalDragDropAbortController = controller;
     const listenerOptions = { signal: controller.signal };
@@ -25,9 +26,9 @@ function initInternalDragDrop() {
             return;
         const row = nameEl.closest('.file-grid-row');
         const selectedRows = document.querySelectorAll('.file-grid-row.file-row--selected');
-        draggingPaths = (row?.classList.contains('file-row--selected') && selectedRows.length > 0)
+        draggingPaths = ((row === null || row === void 0 ? void 0 : row.classList.contains('file-row--selected')) && selectedRows.length > 0)
             ? Array.from(selectedRows).map(r => r.dataset.path)
-            : [row?.dataset.path].filter(Boolean);
+            : [row === null || row === void 0 ? void 0 : row.dataset.path].filter(Boolean);
     }, listenerOptions);
     document.addEventListener('dragend', () => {
         draggingPaths = [];

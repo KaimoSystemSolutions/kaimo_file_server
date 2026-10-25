@@ -116,8 +116,13 @@ internal static class AuthenticationSetup
         builder.Services.AddSingleton<SecurityMonitor>();
         builder.Services.AddHostedService<SecurityMonitorFlushService>();
         builder.Services.AddScoped<CredentialLoginService>();
+        // The service-access check sits inside the monitor, so refused logins are recorded
+        // with their real outcome (ServiceDisabled).
         builder.Services.AddScoped<ILoginService>(sp => new MonitoredLoginService(
-            sp.GetRequiredService<CredentialLoginService>(),
+            new ServiceAccessLoginService(
+                sp.GetRequiredService<CredentialLoginService>(),
+                sp.GetRequiredService<ServiceAccessGate>(),
+                sp.GetRequiredService<IHttpContextAccessor>()),
             sp.GetRequiredService<SecurityMonitor>(),
             sp.GetRequiredService<IHttpContextAccessor>(),
             sp.GetRequiredService<Kaimo_File_Server.Core.Services.Notifications.INotificationPublisher>(),

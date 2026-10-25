@@ -268,6 +268,19 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         }
 
         /// <inheritdoc />
+        public async Task UpdateServiceAccessAsync(Guid userId, UserServiceAccess access)
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            var user = await db.Users.FindAsync(userId)
+                ?? throw new KeyNotFoundException($"User {userId} not found");
+
+            user.ServiceAccess = access;
+
+            await db.SaveChangesAsync();
+        }
+
+        /// <inheritdoc />
         // SaveChanges path (see UpdatePersonalNamesAsync) so the read-only demo guard applies.
         public async Task UpdatePhotoAsync(Guid userId, byte[]? photo, string? contentType)
         {

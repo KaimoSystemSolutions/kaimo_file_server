@@ -291,6 +291,7 @@ else
         LoginOutcome.LockedOut => StatusTone.Warning,
         LoginOutcome.AccountDisabled => StatusTone.Neutral,
         LoginOutcome.AddressNotAllowed => StatusTone.Warning,
+        LoginOutcome.ServiceDisabled => StatusTone.Neutral,
         _ => StatusTone.Negative,
     };
 
@@ -300,6 +301,7 @@ else
         LoginOutcome.LockedOut => T("Web_Security_Outcome_Locked", "Locked out"),
         LoginOutcome.AccountDisabled => T("Web_Security_Outcome_Disabled", "Account disabled"),
         LoginOutcome.AddressNotAllowed => T("Web_Security_Outcome_AddressNotAllowed", "Address not allowed"),
+        LoginOutcome.ServiceDisabled => T("Web_Security_Outcome_ServiceDisabled", "Service switched off"),
         _ => T("Web_Security_Outcome_Invalid", "Invalid credentials"),
     };
 }

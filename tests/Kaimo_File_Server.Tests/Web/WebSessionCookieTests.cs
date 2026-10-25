@@ -209,7 +209,7 @@ public class WebSessionCookieTests
             jwt.GenerateToken(userId, "alice", "Alice", ["User"], deviceId: device, securityStamp: "s"))!;
 
         var revoked = new Mock<IRevokedWebTokenRepository>().Object;
-        Assert.Null(await WebSessionValidation.CheckAsync(Principal(null), users.Object, revoked));
-        Assert.NotNull(await WebSessionValidation.CheckAsync(Principal(Guid.NewGuid()), users.Object, revoked));
+        Assert.Null(await WebSessionValidation.CheckAsync(Principal(null), users.Object, revoked, TestGates.AllGloballyOn()));
+        Assert.NotNull(await WebSessionValidation.CheckAsync(Principal(Guid.NewGuid()), users.Object, revoked, TestGates.AllGloballyOn()));
     }
 }

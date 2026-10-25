@@ -36,9 +36,10 @@ public partial class WebDavController
 
     /// <summary>
     /// Rebuilds the caller's <see cref="UserContext"/> from the authenticated
-    /// principal (Basic or Bearer), re-checking existence and the enabled flag, and
-    /// — for device-scoped bearer tokens — that the device is still active. Returns
-    /// <c>null</c> when the account is gone/disabled or the device was revoked.
+    /// principal (Basic or Bearer), re-checking existence, the enabled flag, the WebDAV
+    /// service switch and — for device-scoped bearer tokens — that the device is still
+    /// active. Returns <c>null</c> when the account is gone/disabled, WebDAV is switched off
+    /// for it or the device was revoked.
     /// </summary>
     private async Task<UserContext?> ResolveUserAsync()
     {
@@ -54,7 +55,12 @@ public partial class WebDavController
         }
 
         var context = await _userContextFactory.CreateByUserIdAsync(userId);
-        return context is { User.IsEnabled: true } ? context : null;
+        if (context is not { User.IsEnabled: true })
+            return null;
+
+        // Checked on every request, so switching WebDAV off also ends cached Basic logins.
+        var serviceAccess = HttpContext.RequestServices.GetRequiredService<ServiceAccessGate>();
+        return await serviceAccess.IsAllowedAsync(context.User, UserServiceAccess.WebDav) ? context : null;
     }
 
     /// <summary>

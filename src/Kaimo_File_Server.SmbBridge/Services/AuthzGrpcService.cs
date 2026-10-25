@@ -1,5 +1,6 @@
 ﻿using Grpc.Core;
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
@@ -120,6 +121,8 @@ public sealed partial class AuthzGrpcService : AuthzService.AuthzServiceBase
             .WaitAsync(cancellationToken);
         if (user is null || !user.IsEnabled)
             return Deny($"unknown or disabled user '{request.Username}'");
+        if (!user.ServiceAccess.HasFlag(UserServiceAccess.Smb))
+            return Deny($"SMB switched off for user '{request.Username}'");
 
         var share = await _shares.ResolveEnabledShareAsync(
             request.Share, cancellationToken);

@@ -60,10 +60,12 @@ public class JwtAuthenticationStateProviderTests
             .Returns(() => _dbThrows
                 ? throw new InvalidOperationException("db down")
                 : Task.FromResult<User?>(_dbUser));
+        repo.Setup(r => r.GetGroupsForUserAsync(It.IsAny<Guid>())).ReturnsAsync([]);
 
         var services = new ServiceCollection();
         services.AddScoped(_ => repo.Object);
         services.AddSingleton(_revoked.Object);
+        services.AddScoped(_ => TestGates.AllGloballyOn(repo.Object));
         if (_configuredSeconds is not null)
         {
             var configRepo = new Mock<IConfigRepository>();
@@ -107,7 +109,7 @@ public class JwtAuthenticationStateProviderTests
     {
         var principal = _jwt.ValidateToken(_currentToken);
         string? failure;
-        try { failure = await WebSessionValidation.CheckAsync(principal, _users, _revoked.Object); }
+        try { failure = await WebSessionValidation.CheckAsync(principal, _users, _revoked.Object, TestGates.AllGloballyOn(_users)); }
         catch { failure = "exception"; }
 
         var user = failure is null ? principal! : new ClaimsPrincipal(new ClaimsIdentity());
@@ -234,6 +236,28 @@ public class JwtAuthenticationStateProviderTests
         Assert.NotNull(pushed);
         Assert.False(IsAuthenticated(pushed!));                       // circuit dropped to anonymous
         Assert.False(IsAuthenticated(await f.GetAuthenticationStateAsync())); // and stays out
+    }
+
+    [Fact]
+    public async Task RevalidateOnceAsync_WebLoginSwitchedOff_InterruptsSession()
+    {
+        using var f = CreateProvider(enabled: true);
+        Assert.True(IsAuthenticated(await Connect(f)));
+
+        _dbUser = MakeUser(enabled: true);
+        _dbUser.ServiceAccess = UserServiceAccess.All & ~UserServiceAccess.Web; // admin revokes web login
+        await f.RevalidateOnceAsync();
+
+        Assert.False(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+    }
+
+    [Fact]
+    public async Task Connect_WebLoginSwitchedOff_IsAnonymous()
+    {
+        using var f = CreateProvider(enabled: true);
+        _dbUser!.ServiceAccess = UserServiceAccess.App;
+
+        Assert.False(IsAuthenticated(await Connect(f)));
     }
 
     [Fact]
