@@ -39,6 +39,7 @@ public partial class ConnectionAdministration
         _port = IsSmbProvider ? 445 : UsesPinnedSshSetup ? 22 : _port;
         _minimumDialect = "3.1.1";
         _sshHostFingerprint = _privateKeySecretReference = _knownHostsSecretReference = string.Empty;
+        _sshUsePassword = _selected.AuthorizationMode == StorageAuthorizationMode.UsernamePassword;
         _settingsJson = _selected.SettingsJson ?? string.Empty;
 
         if (!string.IsNullOrWhiteSpace(_selected.SettingsJson))
@@ -98,7 +99,7 @@ public partial class ConnectionAdministration
         if (_selected is null)
             return;
         var connectionId = _selected.Id;
-        bool usesUsernamePassword = IsSmbProvider || IsWebDavProvider;
+        bool usesUsernamePassword = IsSmbProvider || IsWebDavProvider || UsesSshPassword;
         string? settingsJson = EditsNameOnly ? null : BuildSettingsJson();
         await ActAsync(async () =>
         {

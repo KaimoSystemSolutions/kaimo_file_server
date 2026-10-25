@@ -40,6 +40,7 @@ public partial class ConnectionAdministration
     private string _privateKeySecretReference = string.Empty;
     private string _knownHostsSecretReference = string.Empty;
     private bool _advancedSshSetup;
+    private bool _sshUsePassword;
     private bool _sshSetupBusy;
     private byte[]? _sshPrivateKey;
     private string? _sshPrivateKeyName;
@@ -80,6 +81,8 @@ public partial class ConnectionAdministration
     private bool IsInsecureWebDavUrl => _serverUrl.TrimStart().StartsWith("http://", StringComparison.OrdinalIgnoreCase);
     // rsync-over-SSH and SFTP share the identical pinned-SSH setup (key + host key).
     private bool UsesPinnedSshSetup => IsRsyncSshProvider || IsSftpProvider;
+    // SFTP may sign in with a password instead of a key; rsync stays key-only.
+    private bool UsesSshPassword => IsSftpProvider && _sshUsePassword;
     /// <summary>Live duplicate-name check against the loaded list; the view model re-checks on save.</summary>
     private bool ConnectionNameTaken => !string.IsNullOrWhiteSpace(_name)
         && !(_editing && string.Equals(_selected?.Name, _name.Trim(), StringComparison.Ordinal))
@@ -100,11 +103,12 @@ public partial class ConnectionAdministration
                                       && _port is >= 1 and <= 65535
                                       && !string.IsNullOrWhiteSpace(_username)
                                       && !string.IsNullOrWhiteSpace(_remoteRoot)
+                                      && (!UsesSshPassword || !string.IsNullOrEmpty(_password))
                                       && (_advancedSshSetup
                                           ? !string.IsNullOrWhiteSpace(_sshHostFingerprint)
-                                            && !string.IsNullOrWhiteSpace(_privateKeySecretReference)
+                                            && (UsesSshPassword || !string.IsNullOrWhiteSpace(_privateKeySecretReference))
                                             && (IsSftpProvider || !string.IsNullOrWhiteSpace(_knownHostsSecretReference))
-                                          : _sshPrivateKey is not null
+                                          : (UsesSshPassword || _sshPrivateKey is not null)
                                             && SelectedHostKey is not null
                                             && _hostKeyConfirmed))
                                   || (!IsSmbProvider && !UsesPinnedSshSetup
@@ -131,13 +135,16 @@ public partial class ConnectionAdministration
             if (UsesPinnedSshSetup && !_advancedSshSetup)
                 await PrepareManagedSshSettingsAsync();
             string settingsJson = BuildSettingsJson();
-            bool usesUsernamePassword = IsSmbProvider || IsWebDavProvider;
+            bool usesUsernamePassword = IsSmbProvider || IsWebDavProvider || UsesSshPassword;
             await VM.CreateConfiguredConnectionAsync(
                 _provider, _name, settingsJson,
                 usesUsernamePassword ? _username : null,
                 usesUsernamePassword ? _password : null,
                 IsSmbProvider ? _domain : null,
-                UsesPinnedSshSetup && !_advancedSshSetup ? _sshPrivateKey : null);
+                UsesPinnedSshSetup && !_advancedSshSetup && !UsesSshPassword ? _sshPrivateKey : null,
+                UsesPinnedSshSetup
+                    ? UsesSshPassword ? StorageAuthorizationMode.UsernamePassword : StorageAuthorizationMode.SshKey
+                    : null);
             if (_sshPrivateKey is not null)
                 CryptographicOperations.ZeroMemory(_sshPrivateKey);
             _sshPrivateKey = null;
@@ -188,6 +195,8 @@ public partial class ConnectionAdministration
     {
         if (!UsesPinnedSshSetup)
             await ResetGuidedSshStateAsync();
+        if (!IsSftpProvider)
+            _sshUsePassword = false;
         _port = IsSmbProvider ? 445 : UsesPinnedSshSetup ? 22 : _port;
         _remoteRoot = "/";
         _serverUrl = string.Empty;
@@ -230,7 +239,7 @@ public partial class ConnectionAdministration
                 Username = _username.Trim(),
                 RemoteRoot = _remoteRoot.Trim(),
                 ExpectedHostKeySha256 = _sshHostFingerprint.Trim(),
-                PrivateKeySecretReference = _privateKeySecretReference.Trim(),
+                PrivateKeySecretReference = UsesSshPassword ? string.Empty : _privateKeySecretReference.Trim(),
                 KnownHostsSecretReference = _knownHostsSecretReference.Trim()
             });
         return _settingsJson;
@@ -241,6 +250,7 @@ public partial class ConnectionAdministration
         _creating = false;
         _name = _settingsJson = _server = _username = _password = _domain = _serverUrl = string.Empty;
         _allowInsecureHttp = false;
+        _sshUsePassword = false;
         _sshHostFingerprint = _privateKeySecretReference = _knownHostsSecretReference = string.Empty;
         _remoteRoot = "/";
         _port = 445;

@@ -7633,4 +7633,28 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_User_FileServices_SelfLocked" xml:space="preserve">
     <value>You cannot change the file services of your own account.</value>
   </data>
+  <data name="Web_ExternalStorage_SshAuthMethod" xml:space="preserve">
+    <value>Sign-in method</value>
+  </data>
+  <data name="Web_ExternalStorage_SshAuthKey" xml:space="preserve">
+    <value>SSH key (recommended)</value>
+  </data>
+  <data name="Web_ExternalStorage_SshAuthPassword" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Web_ExternalStorage_SshPasswordStep" xml:space="preserve">
+    <value>Enter the account password</value>
+  </data>
+  <data name="Web_ExternalStorage_SshPasswordHelp" xml:space="preserve">
+    <value>The password is stored encrypted and is also used by SFTP backup repositories. Prefer an SSH key where the server allows it.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshPasswordSetupHelp" xml:space="preserve">
+    <value>Enter the password of the remote account and explicitly verify the server identity.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_ssh_password_missing" xml:space="preserve">
+    <value>The SSH password is missing. Edit the connection and enter it again.</value>
+  </data>
+  <data name="Web_Backup_Error_ssh_password_missing" xml:space="preserve">
+    <value>The SSH connection has no password.</value>
+  </data>
 </root>

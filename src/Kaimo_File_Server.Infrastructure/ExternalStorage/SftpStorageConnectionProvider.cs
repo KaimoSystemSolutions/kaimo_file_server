@@ -15,7 +15,8 @@ namespace Kaimo_File_Server.Infrastructure.ExternalStorage;
 /// can therefore back a virtual share. It shares the pinned-SSH trust model:
 /// the private key comes from the connection credential vault (or an external
 /// secret file) and the server identity is verified in process against the
-/// pinned SHA-256 host-key fingerprint the administrator confirmed.
+/// pinned SHA-256 host-key fingerprint the administrator confirmed. As an
+/// alternative to the key, a vault-protected password may be used.
 /// </summary>
 public sealed class SftpStorageConnectionProvider(
     ICredentialVault credentialVault,
@@ -29,7 +30,7 @@ public sealed class SftpStorageConnectionProvider(
         SmbStorageConnectionProvider.ReadWriteCapabilities
         | StorageProviderCapabilities.DirectFileAccess;
     public IReadOnlySet<StorageAuthorizationMode> AuthorizationModes { get; }
-        = new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.SshKey };
+        = new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.SshKey, StorageAuthorizationMode.UsernamePassword };
 
     public async Task<IStorageSession> OpenSessionAsync(
         StorageConnection connection,
@@ -87,11 +88,26 @@ public sealed class SftpStorageConnectionProvider(
         RsyncSshConnectionSettings settings,
         CancellationToken cancellationToken)
     {
-        PrivateKeyFile key = LoadPrivateKey(connection, settings);
+        PrivateKeyFile? key = null;
+        AuthenticationMethod[] authentication;
+        if (connection.AuthorizationMode == StorageAuthorizationMode.UsernamePassword)
+        {
+            if (!PinnedSshSettings.TryReadVaultPassword(connection, credentialVault, out string password))
+                throw new ProtocolConfigurationException("ssh_password_missing", "The SSH password is missing.");
+            authentication = PasswordAuthentication(settings.Username, password);
+        }
+        else
+        {
+            key = LoadPrivateKey(connection, settings);
+            authentication = [new PrivateKeyAuthenticationMethod(settings.Username, key)];
+        }
+        // Key and authentication methods hold disposable state; the session owns them once connected.
+        List<IDisposable>? resources = [.. authentication.OfType<IDisposable>()];
+        if (key is IDisposable disposableKey)
+            resources.Add(disposableKey);
         SftpClient? client = null;
         try
         {
-            var authentication = new PrivateKeyAuthenticationMethod(settings.Username, key);
             var connectionInfo = new ConnectionInfo(
                 settings.Host, settings.Port, settings.Username, authentication)
             {
@@ -131,17 +147,43 @@ public sealed class SftpStorageConnectionProvider(
             }
 
             var session = new SftpStorageSession(
-                connection.Id, Capabilities, client, key,
+                connection.Id, Capabilities, client, resources,
                 new SftpRemoteFileStore(client, settings.RemoteRoot));
             client = null;
-            key = null!;
+            resources = null;
             return session;
         }
         finally
         {
             client?.Dispose();
-            (key as IDisposable)?.Dispose();
+            resources?.ForEach(resource => resource.Dispose());
         }
+    }
+
+    // Servers offer passwords either as "password" or as a keyboard-interactive
+    // prompt (PAM); both answer with the same stored secret.
+    private static AuthenticationMethod[] PasswordAuthentication(string username, string password)
+    {
+        var interactive = new KeyboardInteractiveAuthenticationMethod(username);
+        bool answered = false;
+        interactive.AuthenticationPrompt += (_, prompt) =>
+            answered |= TryAnswerPasswordPrompt([.. prompt.Prompts], password, answered);
+        return [new PasswordAuthenticationMethod(username, password), interactive];
+    }
+
+    /// <summary>
+    /// Answers one keyboard-interactive round with the stored password only when it is the
+    /// first round with exactly one hidden prompt. Anything else (a second round, several
+    /// prompts, a visible prompt) stays unanswered, so an OTP or username prompt never
+    /// receives the password and authentication fails instead.
+    /// </summary>
+    internal static bool TryAnswerPasswordPrompt(
+        IReadOnlyList<AuthenticationPrompt> prompts, string password, bool alreadyAnswered)
+    {
+        if (alreadyAnswered || prompts.Count != 1 || prompts[0].IsEchoed)
+            return false;
+        prompts[0].Response = password;
+        return true;
     }
 
     private PrivateKeyFile LoadPrivateKey(StorageConnection connection, RsyncSshConnectionSettings settings)
@@ -175,7 +217,7 @@ internal sealed class SftpStorageSession(
     Guid connectionId,
     StorageProviderCapabilities capabilities,
     SftpClient client,
-    PrivateKeyFile privateKey,
+    IReadOnlyList<IDisposable> resources,
     IRemoteFileStore remoteFiles) : IStorageSession
 {
     public Guid ConnectionId { get; } = connectionId;
@@ -187,7 +229,8 @@ internal sealed class SftpStorageSession(
     public ValueTask DisposeAsync()
     {
         client.Dispose();
-        (privateKey as IDisposable)?.Dispose();
+        foreach (IDisposable resource in resources)
+            resource.Dispose();
         return ValueTask.CompletedTask;
     }
 }

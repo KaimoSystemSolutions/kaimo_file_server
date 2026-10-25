@@ -17,7 +17,7 @@ Related: [Connections and credentials](connections-and-credentials.md) ·
 | `dropbox` | Dropbox API (HTTPS) | `DelegatedAuthorizationCode` (PKCE, no redirect) | Yes | Pull, Push, TwoWay | Yes |
 | `google` | Google Drive API (HTTPS) | Stored OAuth user grant | Yes | Pull, Push, TwoWay | Yes |
 | `smb` | `smbclient` | `UsernamePassword` | Yes | Pull, Push, TwoWay | Yes |
-| `sftp` | SSH.NET (in process) | `SshKey` | Yes | Pull, Push, TwoWay | Yes |
+| `sftp` | SSH.NET (in process) | `SshKey`, `UsernamePassword` | Yes | Pull, Push, TwoWay | Yes |
 | `webdav` | HTTPS (in process) | `UsernamePassword` | Yes | Pull, Push, TwoWay | Yes |
 | `rsync-ssh` | `rsync` over `ssh` | `SshKey` | No (`IOptimizedStorageSync`) | Pull, Push | No |
 
@@ -86,6 +86,9 @@ credential payload.
 
 - Uses the managed SSH.NET client. The private key is loaded from the vault into memory and never
   written to disk.
+- Alternatively the connection authenticates with a vault-protected password (`UsernamePassword`
+  mode; offered as `password` and `keyboard-interactive`). The mode is chosen at creation; host
+  pinning is identical. rsync over SSH stays key-only.
 - **Host identity** is pinned in process: the server key is accepted only if its SHA-256 fingerprint
   equals `ExpectedHostKeySha256`. A mismatch is an identity failure, not a transient error.
 - Paths are normalized, traversal is rejected, every request is resolved beneath `RemoteRoot`, and

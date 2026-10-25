@@ -60,7 +60,7 @@ A repository is created on the Repositories tab: backend, location, credentials,
 | Backend | Location | Credentials |
 |---|---|---|
 | Local | Path below one of `Backup:Restic:LocalRoots` (default `/data/kaimo-backups/restic`) | – |
-| SFTP | Existing SFTP or rsync-over-SSH connection (pinned host key required) plus remote path | SSH key of the connection |
+| SFTP | Existing SFTP or rsync-over-SSH connection (pinned host key required) plus remote path | SSH key or password of the connection (password via a private `SSH_ASKPASS` helper in the restic temp directory, never as argument or environment value) |
 | REST server | `https://host[:port]`, optional path; optional CA certificate | Optional user and password (`RESTIC_REST_USERNAME/PASSWORD`) |
 | S3 | Endpoint, bucket, optional path, region, path-style flag; optional CA certificate | Access key and secret key |
 | Backblaze B2 | Bucket, optional path (`b2:<bucket>:/<path>`) | Key ID and application key (`B2_ACCOUNT_ID/KEY`) |
@@ -71,7 +71,9 @@ A repository is created on the Repositories tab: backend, location, credentials,
 
 Secrets are stored vault-encrypted. The GCS key and the rclone section are written to owner-only
 files in `Backup:Restic:TempDirectory` per restic process (`GOOGLE_APPLICATION_CREDENTIALS`,
-`RCLONE_CONFIG`) and deleted afterwards.
+`RCLONE_CONFIG`) and deleted afterwards. SFTP password connections also place their `SSH_ASKPASS`
+helper there, which ssh executes: the directory must not be on a `noexec` mount, and the OpenSSH
+client must be 8.4 or newer (`SSH_ASKPASS_REQUIRE=force`).
 
 **rclone** reaches any storage rclone supports (OneDrive, Google Drive, Dropbox, WebDAV, …) with the
 bundled, checksum-pinned rclone binary (`/usr/local/bin/rclone`). The pasted section is always
@@ -296,7 +298,7 @@ Without a Full job, restore the share backup points the same way and set permiss
 | `Backup:Restic:Binary` | `restic` | restic executable |
 | `Backup:Restic:LocalRoots` | `/data/kaimo-backups/restic` | Folders local repositories may be created in (list or comma-separated) |
 | `Backup:Restic:CacheDirectory` | `/data/kaimo-system/.kaimo-restic-cache` | restic cache (grows with repository size) |
-| `Backup:Restic:TempDirectory` | `/data/kaimo-system/.kaimo-restic-tmp` | Owner-only SSH keys, CA files, GCS keys and rclone configs of running processes |
+| `Backup:Restic:TempDirectory` | `/data/kaimo-system/.kaimo-restic-tmp` | Owner-only SSH keys, SSH password helpers, CA files, GCS keys and rclone configs of running processes (must not be `noexec`) |
 | `Backup:Restic:MetaDirectory` | `/data/kaimo-backups/restic-meta` | Staging of manifests, dump and run info (part of the snapshot paths; keep stable) |
 | `Backup:Restic:RestoreDirectory` | `/data/kaimo-backups/restic-restore` | Target of system and pool restores |
 | `Storage:RootPath` | `/data/storage` | Pools are its direct child folders |

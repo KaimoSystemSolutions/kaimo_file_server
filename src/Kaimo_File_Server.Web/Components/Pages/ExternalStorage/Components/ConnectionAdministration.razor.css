@@ -101,6 +101,14 @@
     line-height: 1.45;
 }
 
+/* SFTP key/password choice: label above the segmented control, like a field label. */
+.ssh-auth-method {
+    display: grid;
+    gap: 7px;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
 .connection-form-hint {
     margin: 0;
     color: var(--text-tertiary);

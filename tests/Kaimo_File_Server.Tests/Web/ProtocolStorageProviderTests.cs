@@ -491,7 +491,43 @@ public sealed class ProtocolStorageProviderTests : IDisposable
         Assert.True(provider.Capabilities.HasFlag(StorageProviderCapabilities.Write));
         Assert.True(provider.Capabilities.HasFlag(StorageProviderCapabilities.DirectFileAccess));
         Assert.False(provider.Capabilities.HasFlag(StorageProviderCapabilities.OptimizedSync));
-        Assert.Equal([StorageAuthorizationMode.SshKey], provider.AuthorizationModes);
+        Assert.Equal(
+            [StorageAuthorizationMode.UsernamePassword, StorageAuthorizationMode.SshKey],
+            provider.AuthorizationModes.Order());
+    }
+
+    [Fact]
+    public void PinnedSshSettings_AcceptsPasswordModeForSftpOnly()
+    {
+        var settings = new RsyncSshConnectionSettings(
+            "backup.example.test", 22, "backup", "/srv/archive", SampleFingerprint(),
+            PrivateKeySecretReference: null, KnownHostsSecretReference: string.Empty);
+
+        var parsed = PinnedSshSettings.ParseAndValidate(
+            Connection("sftp", StorageAuthorizationMode.UsernamePassword, settings), "sftp", requireKnownHosts: false);
+        Assert.Equal("backup", parsed.Username);
+
+        // rsync runs ssh in batch mode and has no password path: keep it key-only.
+        var exception = Assert.Throws<ProtocolConfigurationException>(() => PinnedSshSettings.ParseAndValidate(
+            Connection("rsync-ssh", StorageAuthorizationMode.UsernamePassword, settings), "rsync-ssh", requireKnownHosts: false));
+        Assert.Equal("connection_mode_invalid", exception.Code);
+    }
+
+    [Fact]
+    public async Task SftpProvider_PasswordModeWithoutStoredPasswordIsInvalidConfiguration()
+    {
+        var connection = Connection(
+            "sftp",
+            StorageAuthorizationMode.UsernamePassword,
+            new RsyncSshConnectionSettings(
+                "backup.example.test", 22, "backup", "/srv/archive", SampleFingerprint(),
+                PrivateKeySecretReference: null, KnownHostsSecretReference: string.Empty));
+        connection.EncryptedCredentialPayload = null;
+
+        var result = await new SftpStorageConnectionProvider(CredentialVault()).TestAsync(connection);
+
+        Assert.Equal(StorageConnectionHealthState.InvalidConfiguration, result.State);
+        Assert.Equal("ssh_password_missing", result.Code);
     }
 
     [Fact]

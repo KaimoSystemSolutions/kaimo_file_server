@@ -179,6 +179,25 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
                + $"-i {settings.PrivateKeySecretReference} -p {settings.Port}";
     }
 
+    /// <summary>
+    /// The password-mode variant for SFTP backups: identical host pinning, but no key
+    /// and no batch mode. The password reaches ssh only through an <c>SSH_ASKPASS</c>
+    /// helper the caller provides; at most one attempt is made. With public keys off, the
+    /// client's defaults leave keyboard-interactive and password. The command contains no
+    /// comma: restic splits its <c>-o</c> values at commas.
+    /// </summary>
+    internal static string BuildPasswordRemoteShell(RsyncSshConnectionSettings settings)
+    {
+        if (!ShellNeutralPath(settings.KnownHostsSecretReference))
+            throw new ProtocolConfigurationException(
+                "secret_path_unsafe",
+                "SSH secret references must contain only shell-neutral path characters.");
+        return "ssh -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "
+               + $"-o UserKnownHostsFile={settings.KnownHostsSecretReference} "
+               + "-o PubkeyAuthentication=no -o GSSAPIAuthentication=no -o HostbasedAuthentication=no "
+               + $"-o NumberOfPasswordPrompts=1 -p {settings.Port}";
+    }
+
     private static bool ShellNeutralPath(string path)
         => path.All(character => char.IsAsciiLetterOrDigit(character) || character is '/' or '_' or '-' or '.');
 

@@ -108,11 +108,27 @@ public partial class ConnectionAdministration
         }
     }
 
+    // Switching between key and password discards the material of the other method.
+    private void SelectSshAuthMethod(bool password)
+    {
+        if (_sshUsePassword == password)
+            return;
+        _sshUsePassword = password;
+        _error = null;
+        _password = string.Empty;
+        if (_sshPrivateKey is not null)
+            CryptographicOperations.ZeroMemory(_sshPrivateKey);
+        _sshPrivateKey = null;
+        _sshPrivateKeyName = null;
+        _sshPublicKey = string.Empty;
+        _privateKeySecretReference = string.Empty;
+    }
+
     private async Task PrepareManagedSshSettingsAsync()
     {
         RsyncSshHostKeyCandidate candidate = SelectedHostKey
             ?? throw new InvalidOperationException(R("Web_ExternalStorage_SshHostKeyNotFound"));
-        if (!_hostKeyConfirmed || _sshPrivateKey is null)
+        if (!_hostKeyConfirmed || (_sshPrivateKey is null && !UsesSshPassword))
             throw new InvalidOperationException(R("Web_ExternalStorage_SshSetupIncomplete"));
         _managedKnownHostsPath ??= await RsyncSshSetup.PersistKnownHostAsync(candidate);
         _sshHostFingerprint = candidate.FingerprintSha256;

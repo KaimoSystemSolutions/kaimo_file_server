@@ -245,6 +245,12 @@ else
         </Tabs>
     </text>;
 
+    // Segmented key/password choice of SFTP (DESIGN_SPEC: .toggle-button-group).
+    private RenderFragment SshAuthChoice(bool password, string label) => @<button type="button" role="radio"
+        aria-checked="@(_sshUsePassword == password ? "true" : "false")"
+        class="toggle-btn @(_sshUsePassword == password ? "toggle-btn--active" : null)"
+        disabled="@_sshSetupBusy" @onclick="() => SelectSshAuthMethod(password)">@label</button>;
+
     // Fields of the active tab. In edit mode the provider and department are
     // fixed (shown read-only) and the password may be left blank to keep the
     // stored credential.
@@ -314,28 +320,53 @@ else
             else if (UsesPinnedSshSetup)
             {
                 <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="64" autocomplete="username" @bind="_username" @bind:event="oninput" /></label>
+                @if (IsSftpProvider && !_editing)
+                {
+                    <div class="storage-wide ssh-auth-method">
+                        <span id="ssh-auth-method-label">@R("Web_ExternalStorage_SshAuthMethod")</span>
+                        <div class="toggle-button-group" role="radiogroup" aria-labelledby="ssh-auth-method-label">
+                            @SshAuthChoice(false, R("Web_ExternalStorage_SshAuthKey"))
+                            @SshAuthChoice(true, R("Web_ExternalStorage_SshAuthPassword"))
+                        </div>
+                    </div>
+                }
                 @if (_editing)
                 {
+                    @if (UsesSshPassword)
+                    {
+                        <label><span>@R("Web_ExternalStorage_Password")</span><input class="edit-input" type="password" maxlength="4096" autocomplete="new-password" @bind="_password" @bind:event="oninput" /></label>
+                    }
                     <label><span>@R("Web_ExternalStorage_SshHostFingerprint")</span><input class="edit-input" maxlength="100" placeholder="SHA256:…" @bind="_sshHostFingerprint" /></label>
-                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_SshKeyEditHint")</p>
+                    <p class="storage-wide connection-form-hint">@R(UsesSshPassword ? "Web_ExternalStorage_PasswordKeepHint" : "Web_ExternalStorage_SshKeyEditHint")</p>
                 }
                 else
                 {
                     <section class="storage-wide ssh-setup-card">
-                        <div class="ssh-setup-heading"><div><strong>@R("Web_ExternalStorage_SshKeySetup")</strong><small>@R("Web_ExternalStorage_SshKeySetupHelp")</small></div><label class="storage-check"><span class="toggle-switch"><input type="checkbox" @bind="_advancedSshSetup" @bind:after="SshModeChangedAsync" /><span class="toggle-slider"></span></span> <span>@R("Web_ExternalStorage_SshAdvancedMode")</span></label></div>
+                        <div class="ssh-setup-heading"><div><strong>@R("Web_ExternalStorage_SshKeySetup")</strong><small>@R(UsesSshPassword ? "Web_ExternalStorage_SshPasswordSetupHelp" : "Web_ExternalStorage_SshKeySetupHelp")</small></div><label class="storage-check"><span class="toggle-switch"><input type="checkbox" @bind="_advancedSshSetup" @bind:after="SshModeChangedAsync" /><span class="toggle-slider"></span></span> <span>@R("Web_ExternalStorage_SshAdvancedMode")</span></label></div>
                         @if (!_advancedSshSetup)
                         {
-                            <div class="ssh-setup-section">
-                                <span class="ssh-step">1</span><div class="ssh-step-content"><strong>@R("Web_ExternalStorage_SshPrivateKey")</strong><small>@R("Web_ExternalStorage_SshPrivateKeyHelp")</small>
-                                    <div class="ssh-actions"><InputFile OnChange="UploadSshPrivateKeyAsync" accept=".key,.pem,.openssh" /><button class="btn-secondary" type="button" disabled="@_sshSetupBusy" @onclick="GenerateSshPrivateKeyAsync">@R("Web_ExternalStorage_SshGenerateKey")</button></div>
-                                    @if (_sshPrivateKey is not null)
-                                    {
-                                        <div class="ssh-ready-line"><span class="connection-health"></span>@(_sshPrivateKeyName ?? R("Web_ExternalStorage_SshGeneratedKeyReady"))</div>
-                                        <label><span>@R("Web_ExternalStorage_SshPublicKey")</span><textarea class="edit-input ssh-public-key" readonly rows="3">@_sshPublicKey</textarea></label>
-                                        <button class="btn-secondary ssh-copy" type="button" @onclick="CopyPublicKeyAsync">@R("Web_ExternalStorage_CopyPublicKey")</button>
-                                    }
+                            @if (UsesSshPassword)
+                            {
+                                <div class="ssh-setup-section">
+                                    <span class="ssh-step">1</span><div class="ssh-step-content"><strong>@R("Web_ExternalStorage_SshPasswordStep")</strong><small>@R("Web_ExternalStorage_SshPasswordHelp")</small>
+                                        <label><span>@R("Web_ExternalStorage_Password")</span><input class="edit-input" type="password" maxlength="4096" autocomplete="new-password" @bind="_password" @bind:event="oninput" /></label>
+                                    </div>
                                 </div>
-                            </div>
+                            }
+                            else
+                            {
+                                <div class="ssh-setup-section">
+                                    <span class="ssh-step">1</span><div class="ssh-step-content"><strong>@R("Web_ExternalStorage_SshPrivateKey")</strong><small>@R("Web_ExternalStorage_SshPrivateKeyHelp")</small>
+                                        <div class="ssh-actions"><InputFile OnChange="UploadSshPrivateKeyAsync" accept=".key,.pem,.openssh" /><button class="btn-secondary" type="button" disabled="@_sshSetupBusy" @onclick="GenerateSshPrivateKeyAsync">@R("Web_ExternalStorage_SshGenerateKey")</button></div>
+                                        @if (_sshPrivateKey is not null)
+                                        {
+                                            <div class="ssh-ready-line"><span class="connection-health"></span>@(_sshPrivateKeyName ?? R("Web_ExternalStorage_SshGeneratedKeyReady"))</div>
+                                            <label><span>@R("Web_ExternalStorage_SshPublicKey")</span><textarea class="edit-input ssh-public-key" readonly rows="3">@_sshPublicKey</textarea></label>
+                                            <button class="btn-secondary ssh-copy" type="button" @onclick="CopyPublicKeyAsync">@R("Web_ExternalStorage_CopyPublicKey")</button>
+                                        }
+                                    </div>
+                                </div>
+                            }
                             <div class="ssh-setup-section">
                                 <span class="ssh-step">2</span><div class="ssh-step-content"><strong>@R("Web_ExternalStorage_SshHostVerification")</strong><small>@R("Web_ExternalStorage_SshHostVerificationHelp")</small>
                                     <button class="btn-secondary" type="button" disabled="@(_sshSetupBusy || string.IsNullOrWhiteSpace(_server) || _port is < 1 or > 65535)" @onclick="DiscoverHostKeysAsync">@R("Web_ExternalStorage_SshFetchHostKey")</button>
@@ -354,7 +385,14 @@ else
                         {
                             <div class="ssh-advanced-grid">
                                 <label><span>@R("Web_ExternalStorage_SshHostFingerprint")</span><input class="edit-input" maxlength="100" placeholder="SHA256:…" @bind="_sshHostFingerprint" @bind:event="oninput" /></label>
-                                <label><span>@R("Web_ExternalStorage_PrivateKeySecretReference")</span><input class="edit-input" maxlength="4096" placeholder="/run/secrets/kaimo_rsync_key" @bind="_privateKeySecretReference" @bind:event="oninput" /></label>
+                                @if (UsesSshPassword)
+                                {
+                                    <label><span>@R("Web_ExternalStorage_Password")</span><input class="edit-input" type="password" maxlength="4096" autocomplete="new-password" @bind="_password" @bind:event="oninput" /></label>
+                                }
+                                else
+                                {
+                                    <label><span>@R("Web_ExternalStorage_PrivateKeySecretReference")</span><input class="edit-input" maxlength="4096" placeholder="/run/secrets/kaimo_rsync_key" @bind="_privateKeySecretReference" @bind:event="oninput" /></label>
+                                }
                                 <label><span>@R("Web_ExternalStorage_KnownHostsSecretReference")</span><input class="edit-input" maxlength="4096" placeholder="/run/secrets/kaimo_known_hosts" @bind="_knownHostsSecretReference" @bind:event="oninput" /></label>
                             </div>
                         }

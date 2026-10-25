@@ -229,6 +229,72 @@ public sealed class CloudAccessViewModelTests
     }
 
     [Fact]
+    public async Task CreateConfiguredConnectionAsync_SftpPasswordMode_ProtectsPasswordAndRecordsMode()
+    {
+        var user = new User(Guid.NewGuid(), "Alice", "alice", "hash", "nt");
+        var actor = new UserContext(user, [], [], []);
+        var savedConnections = new List<StorageConnection>();
+        var connectionRepository = new Mock<IStorageConnectionRepository>();
+        connectionRepository.Setup(x => x.SaveAsync(It.IsAny<StorageConnection>(), default))
+            .Callback<StorageConnection, CancellationToken>((connection, _) => savedConnections.Add(connection))
+            .Returns(Task.CompletedTask);
+        connectionRepository.Setup(x => x.GetAllAsync(default)).ReturnsAsync(() => savedConnections);
+        connectionRepository.Setup(x => x.GetUsageAsync(It.IsAny<Guid>(), default))
+            .ReturnsAsync(new StorageConnectionUsage(0, 0));
+        var cloudRepository = new Mock<ICloudAccessRepository>();
+        cloudRepository.Setup(x => x.GetSharesAsync(default)).ReturnsAsync([]);
+        var management = new Mock<IManagementAuthService>();
+        management.Setup(x => x.HasGlobalPermissionAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(true);
+        management.Setup(x => x.GetAuthorizedDepartmentIdsAsync(actor, It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(AuthorizedScopeResult.Unrestricted());
+        var contexts = new Mock<IUserContextFactory>();
+        contexts.Setup(x => x.CreateByUsernameAsync("alice")).ReturnsAsync(actor);
+        var authentication = new Mock<AuthenticationStateProvider>();
+        authentication.Setup(x => x.GetAuthenticationStateAsync()).ReturnsAsync(new AuthenticationState(
+            new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "alice")], "test"))));
+        var departments = new Mock<IDepartmentRepository>();
+        departments.Setup(x => x.GetAllAsync()).ReturnsAsync([]);
+        IReadOnlyDictionary<string, string>? protectedCredentials = null;
+        var vault = new Mock<ICredentialVault>();
+        vault.Setup(x => x.Protect(It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CredentialContext>()))
+            .Callback<IReadOnlyDictionary<string, string>, CredentialContext>((credentials, _) => protectedCredentials = credentials)
+            .Returns("protected-password");
+        var provider = new Mock<IStorageConnectionProvider>();
+        provider.SetupGet(x => x.Id).Returns("sftp");
+        provider.SetupGet(x => x.AuthorizationModes).Returns(new HashSet<StorageAuthorizationMode>
+            { StorageAuthorizationMode.SshKey, StorageAuthorizationMode.UsernamePassword });
+        provider.Setup(x => x.TestAsync(It.IsAny<StorageConnection>(), default))
+            .ReturnsAsync(new StorageConnectionHealthResult(StorageConnectionHealthState.Healthy, "ok", DateTime.UtcNow));
+        var viewModel = new CloudAccessViewModel(
+            cloudRepository.Object, connectionRepository.Object, Mock.Of<ICloudAuthorizationTicketStore>(),
+            management.Object, contexts.Object, authentication.Object, departments.Object,
+            Mock.Of<IUserRepository>(), Mock.Of<IGroupRepository>(), Mock.Of<IShareRepository>(),
+            ConnectionFactory(connectionRepository.Object, vault.Object),
+            NullLogger<CloudAccessViewModel>.Instance,
+            new StorageConnectionProviderCatalog([provider.Object]), vault.Object);
+        const string settings = "{\"Host\":\"nas.example.com\",\"Username\":\"backup\"}";
+
+        // A provider offering several modes needs an explicit, supported choice.
+        await Assert.ThrowsAsync<NotSupportedException>(() => viewModel.CreateConfiguredConnectionAsync(
+            "sftp", "NAS", settings, "backup", "pw"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => viewModel.CreateConfiguredConnectionAsync(
+            "sftp", "NAS", settings, "backup", "pw", authorizationMode: StorageAuthorizationMode.HostMount));
+        // Password mode needs a password.
+        await Assert.ThrowsAsync<ArgumentException>(() => viewModel.CreateConfiguredConnectionAsync(
+            "sftp", "NAS", settings, "backup", "", authorizationMode: StorageAuthorizationMode.UsernamePassword));
+
+        await viewModel.CreateConfiguredConnectionAsync(
+            "sftp", "NAS", settings, "backup", "pw", authorizationMode: StorageAuthorizationMode.UsernamePassword);
+
+        var connection = Assert.Single(savedConnections);
+        Assert.Equal(StorageAuthorizationMode.UsernamePassword, connection.AuthorizationMode);
+        Assert.Equal("protected-password", connection.EncryptedCredentialPayload);
+        Assert.Equal("pw", protectedCredentials?["password"]);
+        Assert.DoesNotContain("pw", connection.SettingsJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task UpdateConfiguredConnectionAsync_KeepsStoredPassword_WhenPasswordBlankAndTargetUnchanged()
     {
         var (viewModel, connection, provider, captured) = ArrangePasswordConnectionEdit();

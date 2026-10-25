@@ -7633,4 +7633,28 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_User_FileServices_SelfLocked" xml:space="preserve">
     <value>Die Dateidienste des eigenen Kontos lassen sich nicht ändern.</value>
   </data>
+  <data name="Web_ExternalStorage_SshAuthMethod" xml:space="preserve">
+    <value>Anmeldeverfahren</value>
+  </data>
+  <data name="Web_ExternalStorage_SshAuthKey" xml:space="preserve">
+    <value>SSH-Schlüssel (empfohlen)</value>
+  </data>
+  <data name="Web_ExternalStorage_SshAuthPassword" xml:space="preserve">
+    <value>Kennwort</value>
+  </data>
+  <data name="Web_ExternalStorage_SshPasswordStep" xml:space="preserve">
+    <value>Kennwort des Kontos eingeben</value>
+  </data>
+  <data name="Web_ExternalStorage_SshPasswordHelp" xml:space="preserve">
+    <value>Das Kennwort wird verschlüsselt gespeichert und auch von SFTP-Backup-Repositorys verwendet. Nutzen Sie nach Möglichkeit einen SSH-Schlüssel.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshPasswordSetupHelp" xml:space="preserve">
+    <value>Geben Sie das Kennwort des entfernten Kontos ein und prüfen Sie ausdrücklich die Serveridentität.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_ssh_password_missing" xml:space="preserve">
+    <value>Das SSH-Kennwort fehlt. Bearbeiten Sie die Verbindung und geben Sie es erneut ein.</value>
+  </data>
+  <data name="Web_Backup_Error_ssh_password_missing" xml:space="preserve">
+    <value>Die SSH-Verbindung hat kein Kennwort.</value>
+  </data>
 </root>

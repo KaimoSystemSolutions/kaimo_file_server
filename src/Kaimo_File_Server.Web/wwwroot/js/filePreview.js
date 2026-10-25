@@ -1,47 +1,36 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 window.filePreview = {
     // Builds the preview. Returns { displayUrl, downloadUrl }:
     //   downloadUrl - blob of the ORIGINAL bytes, always usable for "Herunterladen".
     //   displayUrl  - blob to render inline (text/docx get a generated HTML doc),
     //                 or null when the file can't be shown inline.
-    preparePreview: function (bytes, contentType, kind) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const arr = new Uint8Array(bytes);
-            const downloadUrl = URL.createObjectURL(new Blob([arr], { type: contentType || 'application/octet-stream' }));
-            let displayUrl = null;
-            try {
-                switch (kind) {
-                    case 'Text':
-                        displayUrl = buildTextDocUrl(arr);
-                        break;
-                    case 'Docx':
-                        displayUrl = yield buildDocxDocUrl(arr);
-                        break;
-                    case 'Image':
-                    case 'Video':
-                    case 'Audio':
-                    case 'Pdf':
-                        displayUrl = downloadUrl;
-                        break;
-                    default:
-                        displayUrl = null; // Unsupported -> fallback panel
-                }
+    preparePreview: async function (bytes, contentType, kind) {
+        const arr = new Uint8Array(bytes);
+        const downloadUrl = URL.createObjectURL(new Blob([arr], { type: contentType || 'application/octet-stream' }));
+        let displayUrl = null;
+        try {
+            switch (kind) {
+                case 'Text':
+                    displayUrl = buildTextDocUrl(arr);
+                    break;
+                case 'Docx':
+                    displayUrl = await buildDocxDocUrl(arr);
+                    break;
+                case 'Image':
+                case 'Video':
+                case 'Audio':
+                case 'Pdf':
+                    displayUrl = downloadUrl;
+                    break;
+                default:
+                    displayUrl = null; // Unsupported -> fallback panel
             }
-            catch (e) {
-                console.error('Preview rendering failed', e);
-                displayUrl = null;
-            }
-            return { displayUrl: displayUrl, downloadUrl: downloadUrl };
-        });
+        }
+        catch (e) {
+            console.error('Preview rendering failed', e);
+            displayUrl = null;
+        }
+        return { displayUrl: displayUrl, downloadUrl: downloadUrl };
     },
     revokeBlob: function (url) {
         if (url)
@@ -105,15 +94,13 @@ function buildTextDocUrl(arr) {
     const html = wrapHtmlDocument(escapeHtml(text), true);
     return URL.createObjectURL(new Blob([html], { type: 'text/html' }));
 }
-function buildDocxDocUrl(arr) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (typeof mammoth === 'undefined') {
-            throw new Error('mammoth.js not loaded');
-        }
-        // mammoth needs a plain ArrayBuffer; slice to drop any offset/extra capacity.
-        const buffer = arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength);
-        const result = yield mammoth.convertToHtml({ arrayBuffer: buffer });
-        const html = wrapHtmlDocument(result.value || '<em>Leeres Dokument</em>', false);
-        return URL.createObjectURL(new Blob([html], { type: 'text/html' }));
-    });
+async function buildDocxDocUrl(arr) {
+    if (typeof mammoth === 'undefined') {
+        throw new Error('mammoth.js not loaded');
+    }
+    // mammoth needs a plain ArrayBuffer; slice to drop any offset/extra capacity.
+    const buffer = arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength);
+    const result = await mammoth.convertToHtml({ arrayBuffer: buffer });
+    const html = wrapHtmlDocument(result.value || '<em>Leeres Dokument</em>', false);
+    return URL.createObjectURL(new Blob([html], { type: 'text/html' }));
 }

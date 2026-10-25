@@ -56,6 +56,8 @@ public partial class CloudAccessViewModel
     /// <summary>
     /// Creates a provider-configured protocol connection. Passwords are stored
     /// only in the context-bound credential vault and never in SettingsJson.
+    /// <paramref name="authorizationMode"/> picks the mode of a provider that offers
+    /// several (SFTP: key or password); otherwise the provider's single mode is used.
     /// </summary>
     public async Task CreateConfiguredConnectionAsync(
         string providerId,
@@ -64,16 +66,19 @@ public partial class CloudAccessViewModel
         string? username = null,
         string? password = null,
         string? domain = null,
-        byte[]? sshPrivateKey = null)
+        byte[]? sshPrivateKey = null,
+        StorageAuthorizationMode? authorizationMode = null)
     {
         await EnsureCanManageConnectionsAsync();
         if (_providerCatalog is null)
             throw new NotSupportedException(R("Web_ExternalStorage_ProviderUnsupported"));
         var provider = _providerCatalog.GetRequired(providerId);
-        if (provider.AuthorizationModes.Count != 1)
+        if (authorizationMode is null
+                ? provider.AuthorizationModes.Count != 1
+                : !provider.AuthorizationModes.Contains(authorizationMode.Value))
             throw new NotSupportedException(R("Web_ExternalStorage_ProviderUnsupported"));
-        var authorizationMode = provider.AuthorizationModes.Single();
-        if (authorizationMode is not (StorageAuthorizationMode.HostMount
+        var mode = authorizationMode ?? provider.AuthorizationModes.Single();
+        if (mode is not (StorageAuthorizationMode.HostMount
             or StorageAuthorizationMode.SshKey
             or StorageAuthorizationMode.UsernamePassword
             or StorageAuthorizationMode.NetworkIdentity))
@@ -86,10 +91,11 @@ public partial class CloudAccessViewModel
             throw new ArgumentException(R("Web_ExternalStorage_InvalidSettings"));
         bool hasUsername = !string.IsNullOrWhiteSpace(username);
         bool hasPassword = !string.IsNullOrEmpty(password);
-        if (string.Equals(provider.Id, "smb", StringComparison.OrdinalIgnoreCase)
+        if ((string.Equals(provider.Id, "smb", StringComparison.OrdinalIgnoreCase)
+             || mode == StorageAuthorizationMode.UsernamePassword && string.Equals(provider.Id, "sftp", StringComparison.OrdinalIgnoreCase))
             && (!hasUsername || !hasPassword))
             throw new ArgumentException(R("Web_ExternalStorage_InvalidCredentials"));
-        if (authorizationMode == StorageAuthorizationMode.SshKey
+        if (mode == StorageAuthorizationMode.SshKey
             && sshPrivateKey is { Length: > 1024 * 1024 })
             throw new ArgumentException(R("Web_ExternalStorage_InvalidPrivateKey"));
 
@@ -98,7 +104,7 @@ public partial class CloudAccessViewModel
             CreatedByUserId = _actor!.User.Id,
             ProviderId = provider.Id,
             Name = normalizedName,
-            AuthorizationMode = authorizationMode,
+            AuthorizationMode = mode,
             SettingsJson = settingsJson,
             State = StorageConnectionState.PendingConfiguration
         };

@@ -72,7 +72,8 @@ public partial class ResticClient
             {
                 case "RESTIC_REPOSITORY": env["RESTIC_FROM_REPOSITORY"] = value; break;
                 case "RESTIC_PASSWORD": env["RESTIC_FROM_PASSWORD"] = value; break;
-                case "GOOGLE_APPLICATION_CREDENTIALS" or "RCLONE_CONFIG": env.TryAdd(key, value); break;
+                // The SSH_ASKPASS helpers of one password connection print the same password.
+                case "GOOGLE_APPLICATION_CREDENTIALS" or "RCLONE_CONFIG" or "SSH_ASKPASS": env.TryAdd(key, value); break;
                 default:
                     if (env.TryGetValue(key, out var existing) && existing != value)
                         throw new ResticException("mirror_conflict", $"Both repositories need different values for {key}.");

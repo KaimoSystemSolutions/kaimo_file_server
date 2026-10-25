@@ -13,8 +13,9 @@ namespace Kaimo_File_Server.Infrastructure.Backup.Restic;
 /// <summary>
 /// Turns a stored repository into a runnable <see cref="ResticTarget"/>: decrypts the
 /// password and backend secrets (Web process only — the vault lives there), loads the SSH
-/// connection of SFTP repositories and writes key / CA files into a private temp directory
-/// that the target deletes on dispose.
+/// connection of SFTP repositories and writes key / CA files (or, for password connections,
+/// the password and an <c>SSH_ASKPASS</c> helper) into a private temp directory that the
+/// target deletes on dispose.
 /// </summary>
 public sealed class ResticTargetResolver(
     IDbContextFactory<ApplicationDbContext> dbFactory,
@@ -99,23 +100,36 @@ public sealed class ResticTargetResolver(
         try
         {
             var arguments = new List<string>();
+            var sshEnvironment = new Dictionary<string, string>();
             RsyncSshConnectionSettings? ssh = null;
 
             if (repository.Backend == BackupBackend.Sftp)
             {
-                ssh = await LoadSshSettingsAsync(settings.StorageConnectionId!.Value, ct);
-                if (string.IsNullOrWhiteSpace(ssh.PrivateKeySecretReference))
+                var connection = await LoadConnectionAsync(settings.StorageConnectionId!.Value, ct);
+                ssh = ParseSshSettings(connection);
+                var usePassword = connection.AuthorizationMode == Core.Domain.StorageAuthorizationMode.UsernamePassword;
+                if (usePassword)
+                {
+                    if (!PinnedSshSettings.TryReadVaultPassword(connection, vault, out var sshPassword))
+                        throw new ResticException("ssh_password_missing", "The SSH connection has no password.");
+                    tempDir ??= CreateTempDirectory();
+                    sshEnvironment["SSH_ASKPASS"] = await WriteAskpassAsync(tempDir, sshPassword, ct);
+                    sshEnvironment["SSH_ASKPASS_REQUIRE"] = "force";
+                }
+                else if (string.IsNullOrWhiteSpace(ssh.PrivateKeySecretReference))
                 {
                     tempDir ??= CreateTempDirectory();
                     var keyPath = Path.Combine(tempDir, "id_key");
-                    var privateKey = await ReadVaultKeyAsync(settings.StorageConnectionId.Value, ct);
+                    var privateKey = PinnedSshSettings.TryReadVaultPrivateKey(connection, vault, out var key)
+                        ? key
+                        : throw new ResticException("private_key_missing", "The SSH connection has no private key.");
                     try { await ProtocolTemporaryFile.WriteRestrictedBytesAsync(keyPath, privateKey, ct); }
                     finally { CryptographicOperations.ZeroMemory(privateKey); }
                     ssh = ssh with { PrivateKeySecretReference = keyPath };
                 }
                 try
                 {
-                    arguments.AddRange(["-o", "sftp.command=" + ResticBackend.BuildSftpCommand(ssh)]);
+                    arguments.AddRange(["-o", "sftp.command=" + ResticBackend.BuildSftpCommand(ssh, usePassword)]);
                 }
                 catch (ProtocolConfigurationException ex)
                 {
@@ -136,6 +150,8 @@ public sealed class ResticTargetResolver(
 
             var url = ResticBackend.BuildUrl(repository.Backend, settings, ssh);
             var env = ResticBackend.BuildEnvironment(repository.Backend, settings, secrets, password, url);
+            foreach (var (name, value) in sshEnvironment)
+                env[name] = value;
 
             if (repository.Backend == BackupBackend.Gcs)
             {
@@ -220,9 +236,8 @@ public sealed class ResticTargetResolver(
         return path;
     }
 
-    private async Task<RsyncSshConnectionSettings> LoadSshSettingsAsync(Guid connectionId, CancellationToken ct)
+    private static RsyncSshConnectionSettings ParseSshSettings(Core.Domain.StorageConnection connection)
     {
-        var connection = await LoadConnectionAsync(connectionId, ct);
         try
         {
             // restic runs the OpenSSH client, which needs the pinned known_hosts file.
@@ -234,12 +249,23 @@ public sealed class ResticTargetResolver(
         }
     }
 
-    private async Task<byte[]> ReadVaultKeyAsync(Guid connectionId, CancellationToken ct)
+    /// <summary>
+    /// Writes the SSH password (0600) and the <c>SSH_ASKPASS</c> helper (0700) that prints it.
+    /// ssh runs the helper instead of prompting, so the password never appears in arguments
+    /// or the environment. Returns the helper path.
+    /// </summary>
+    internal static async Task<string> WriteAskpassAsync(string tempDir, string password, CancellationToken ct)
     {
-        var connection = await LoadConnectionAsync(connectionId, ct);
-        return PinnedSshSettings.TryReadVaultPrivateKey(connection, vault, out var key)
-            ? key
-            : throw new ResticException("private_key_missing", "The SSH connection has no private key.");
+        var passwordPath = Path.Combine(tempDir, "ssh-password");
+        if (passwordPath.Contains('\''))
+            throw new ResticException("temp_path_invalid", "The restic temp directory must not contain quotes.");
+        await ProtocolTemporaryFile.WriteRestrictedTextAsync(passwordPath, password, ct);
+        var helperPath = Path.Combine(tempDir, "askpass");
+        // ssh executes the helper, so Backup:Restic:TempDirectory must not be on a noexec mount.
+        await ProtocolTemporaryFile.WriteRestrictedTextAsync(helperPath, $"#!/bin/sh\nexec /bin/cat '{passwordPath}'\n", ct);
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(helperPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        return helperPath;
     }
 
     private async Task<Core.Domain.StorageConnection> LoadConnectionAsync(Guid connectionId, CancellationToken ct)

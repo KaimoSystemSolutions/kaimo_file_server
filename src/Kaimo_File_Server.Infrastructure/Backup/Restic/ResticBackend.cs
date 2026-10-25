@@ -309,9 +309,12 @@ public static partial class ResticBackend
     /// <summary>
     /// The <c>sftp.command</c> restic runs: the same hardened ssh invocation the rsync
     /// provider uses (pinned known_hosts, batch mode, key only) plus the sftp subsystem.
+    /// With <paramref name="password"/> the connection authenticates by password through
+    /// the <c>SSH_ASKPASS</c> helper the resolver writes (same host pinning).
     /// </summary>
-    public static string BuildSftpCommand(RsyncSshConnectionSettings ssh)
-        => RsyncProcessRunner.BuildRemoteShell(ssh) + $" {ssh.Username}@{ssh.Host} -s sftp";
+    public static string BuildSftpCommand(RsyncSshConnectionSettings ssh, bool password = false)
+        => (password ? RsyncProcessRunner.BuildPasswordRemoteShell(ssh) : RsyncProcessRunner.BuildRemoteShell(ssh))
+           + $" {ssh.Username}@{ssh.Host} -s sftp";
 
     /// <summary>32 random bytes, URL-safe base64 — the generated repository password.</summary>
     public static string GeneratePassword()

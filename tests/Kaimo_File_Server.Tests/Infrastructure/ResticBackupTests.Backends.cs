@@ -98,6 +98,51 @@ public partial class ResticBackupTests
         Assert.Equal("sftp:backup@nas.example.com:/volume1/kaimo", url);
     }
 
+    [Fact]
+    public void Sftp_PasswordMode_UsesPinnedSshWithoutKey()
+    {
+        var ssh = new RsyncSshConnectionSettings("nas.example.com", 2222, "backup", "/volume1", "SHA256:abcdefghijklmnopqrstuvwxyz",
+            null, "/data/kaimo-system/known_hosts");
+        var command = ResticBackend.BuildSftpCommand(ssh, password: true);
+
+        // Host pinning stays identical to the key mode; only the authentication differs.
+        Assert.Contains("StrictHostKeyChecking=yes", command);
+        Assert.Contains("UserKnownHostsFile=/data/kaimo-system/known_hosts", command);
+        Assert.Contains("PubkeyAuthentication=no", command);
+        Assert.Contains("NumberOfPasswordPrompts=1", command);
+        // restic splits "-o" values at commas (string slice), which would cut the command apart.
+        Assert.DoesNotContain(",", command);
+        Assert.DoesNotContain(" -i ", command);
+        Assert.DoesNotContain("BatchMode=yes", command);
+        Assert.EndsWith("-p 2222 backup@nas.example.com -s sftp", command);
+    }
+
+    [Fact]
+    public void Sftp_PasswordMode_RejectsShellUnsafeKnownHostsPath()
+    {
+        var ssh = new RsyncSshConnectionSettings("nas.example.com", 22, "backup", "/volume1", "SHA256:abcdefghijklmnopqrstuvwxyz",
+            null, "/data/known hosts;rm -rf /");
+        Assert.Throws<ProtocolConfigurationException>(() => ResticBackend.BuildSftpCommand(ssh, password: true));
+    }
+
+    [Fact]
+    public void Mirror_BetweenSftpPasswordRepositories_SharesOneAskpassHelper()
+    {
+        ResticTarget Target(string url, string dir) => new(url,
+            new Dictionary<string, string>
+            {
+                ["RESTIC_REPOSITORY"] = url, ["RESTIC_PASSWORD"] = "pw",
+                ["SSH_ASKPASS"] = $"/tmp/{dir}/askpass", ["SSH_ASKPASS_REQUIRE"] = "force",
+            },
+            ["-o", "sftp.command=ssh x"], null);
+
+        // Both helpers of one connection print the same password, so the destination's serves both.
+        var copy = ResticClient.BuildCopyTarget(Target("sftp:a", "d1"), Target("sftp:b", "d2"));
+
+        Assert.Equal("/tmp/d1/askpass", copy.Environment["SSH_ASKPASS"]);
+        Assert.Equal("sftp:b", copy.Environment["RESTIC_FROM_REPOSITORY"]);
+    }
+
     private const string GcsKey = """{ "type": "service_account", "project_id": "kaimo-backup-1", "private_key": "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----\n" }""";
 
     // Restic URL syntax verified against restic 0.19.1 (b2:/azure:/gs:/swift:/rclone:).
