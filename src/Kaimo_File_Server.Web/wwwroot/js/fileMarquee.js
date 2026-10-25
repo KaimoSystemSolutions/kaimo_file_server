@@ -263,6 +263,19 @@ window.fileMarquee = (() => {
                 return;
             void invoke('SelectAllFiles');
         }, options);
+        // Ctrl+Z reverts the last file operation in the open folder. Same scoping
+        // as Ctrl+A: text fields keep their own undo, dialogs own the keyboard.
+        document.addEventListener('keydown', event => {
+            var _a, _b, _c, _d;
+            if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== 'z')
+                return;
+            if ((_b = (_a = event.target).closest) === null || _b === void 0 ? void 0 : _b.call(_a, 'input, textarea, select, [contenteditable="true"]'))
+                return;
+            event.preventDefault();
+            if (event.repeat || ((_d = (_c = event.target).closest) === null || _d === void 0 ? void 0 : _d.call(_c, '.modal-backdrop')))
+                return;
+            void invoke('UndoLast');
+        }, options);
         // Arrow Up/Down move the selection (Shift extends it), Enter opens it,
         // Backspace goes one level up. Page-level like Escape/Ctrl+A: the list
         // element is re-created on every folder load and focus often sits on a

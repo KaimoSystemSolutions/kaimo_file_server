@@ -6913,6 +6913,21 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Transfer_Paste" xml:space="preserve">
     <value>Einfügen</value>
   </data>
+  <data name="Web_Undo_Button" xml:space="preserve">
+    <value>Rückgängig</value>
+  </data>
+  <data name="Web_Undo_Tooltip" xml:space="preserve">
+    <value>Letzte Aktion in diesem Ordner rückgängig machen (Strg+Z)</value>
+  </data>
+  <data name="Web_Undo_Done" xml:space="preserve">
+    <value>Aktion rückgängig gemacht.</value>
+  </data>
+  <data name="Web_Undo_Failed" xml:space="preserve">
+    <value>Die Aktion konnte nicht rückgängig gemacht werden. Das Element wurde zwischenzeitlich möglicherweise geändert oder entfernt.</value>
+  </data>
+  <data name="Web_Undo_Partial" xml:space="preserve">
+    <value>Teilweise rückgängig gemacht: {0} von {1} Elementen konnten nicht wiederhergestellt werden. Sie wurden zwischenzeitlich möglicherweise geändert oder entfernt.</value>
+  </data>
   <data name="Web_Transfer_CopyingOne" xml:space="preserve">
     <value>Kopieren: {0}</value>
   </data>

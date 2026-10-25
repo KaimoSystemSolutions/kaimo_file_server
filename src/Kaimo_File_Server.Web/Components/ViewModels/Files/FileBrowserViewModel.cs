@@ -232,6 +232,7 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
 
     public async Task LoadShareAsync(string shareName, string subPath = "")
     {
+        TrackUndoLocation(shareName, subPath);
         try
         {
             IsLoading = true;

@@ -146,10 +146,62 @@ public partial class FileServiceTests
             s => s.DeleteAsync(It.IsAny<string>()), Times.Never);
     }
 
+    // ═══════════════════ DeleteFileReturningRecyclePathAsync ═══════════════════
+
+    [Fact]
+    public async Task DeleteFileReturningRecyclePathAsync_Recycled_ReturnsPathThatLandedIncludingSuffix()
+    {
+        _storageMock.Setup(s => s.IsDirectoryAsync("doc.txt")).ReturnsAsync(false);
+        _storageMock.Setup(s => s.MoveAsync("doc.txt", ".RECYCLE_BIN/doc.txt"))
+            .ReturnsAsync(".RECYCLE_BIN/doc.txt_2026-10-25_10-00-00");
+        AllowAccess(FilePermission.Delete);
+
+        var landed = await _sut.DeleteFileReturningRecyclePathAsync("doc.txt", CreateContext(), isRecycleEnabled: true);
+
+        Assert.Equal(".RECYCLE_BIN/doc.txt_2026-10-25_10-00-00", landed);
+    }
+
+    [Fact]
+    public async Task DeleteFileReturningRecyclePathAsync_PermanentDelete_ReturnsNull()
+    {
+        _storageMock.Setup(s => s.IsDirectoryAsync("doc.txt")).ReturnsAsync(false);
+        AllowAccess(FilePermission.Delete);
+
+        var landed = await _sut.DeleteFileReturningRecyclePathAsync("doc.txt", CreateContext(), isRecycleEnabled: false);
+
+        Assert.Null(landed);
+        _storageMock.Verify(s => s.DeleteAsync("doc.txt"), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteFileReturningRecyclePathAsync_InsideRecycleBin_ReturnsNull()
+    {
+        _storageMock.Setup(s => s.IsDirectoryAsync(".RECYCLE_BIN/doc.txt")).ReturnsAsync(false);
+        AllowAccess(FilePermission.Delete);
+
+        var landed = await _sut.DeleteFileReturningRecyclePathAsync(".RECYCLE_BIN/doc.txt", CreateContext(), isRecycleEnabled: true);
+
+        Assert.Null(landed);
+    }
+
     // ═══════════════════ Per-home recycle bin (recycleRootDepth = 1) ═══════════════════
 
     private FileService CreateHomeSut()
         => new(_storageMock.Object, _aclMock.Object, null, _shareId, recycleRootDepth: 1);
+
+    [Fact]
+    public async Task DeleteFileReturningRecyclePathAsync_InHome_ReturnsHomeRecycleBinPath()
+    {
+        const string source = "uid/docs/doc.txt";
+        const string destination = "uid/.RECYCLE_BIN/docs/doc.txt";
+        _storageMock.Setup(s => s.IsDirectoryAsync(source)).ReturnsAsync(false);
+        _storageMock.Setup(s => s.MoveAsync(source, destination)).ReturnsAsync(destination);
+        AllowAccess(FilePermission.Delete);
+
+        var landed = await CreateHomeSut().DeleteFileReturningRecyclePathAsync(source, CreateContext(), isRecycleEnabled: true);
+
+        Assert.Equal(destination, landed);
+    }
 
     [Fact]
     public async Task DeleteFileAsync_InHome_RecyclesIntoTheHomesOwnRecycleBin()

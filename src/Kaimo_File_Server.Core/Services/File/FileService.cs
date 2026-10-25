@@ -374,7 +374,10 @@ public partial class FileService : IFileService
             normalized);
     }
 
-    public async Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled)
+    public Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled)
+        => DeleteFileReturningRecyclePathAsync(path, user, isRecycleEnabled);
+
+    public async Task<string?> DeleteFileReturningRecyclePathAsync(string path, UserContext user, bool isRecycleEnabled)
     {
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
@@ -404,6 +407,7 @@ public partial class FileService : IFileService
                     : _searchService!.onFileRenamed(absolutePath, actualRecycleAbsolutePath),
                 "recycle move",
                 normalized);
+            return actualRecyclePath;
         }
         else
         {
@@ -417,6 +421,7 @@ public partial class FileService : IFileService
                     : _searchService!.onFileDeleted(absolutePath),
                 "delete",
                 normalized);
+            return null;
         }
     }
 

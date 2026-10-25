@@ -82,6 +82,9 @@ public sealed class PublicShareFileBrowserViewModel : FileBrowserViewModel
     // A public link never offers a "share" action of its own.
     protected override bool AllowShareLinkManagement => false;
 
+    // Restoring a delete renames out of the recycle bin, which lies outside the shared root.
+    protected override bool SupportsUndo => false;
+
     // Every operation runs as the link creator, resolved once and cached for the circuit.
     protected override async Task<UserContext?> GetCurrentUserContextAsync()
     {

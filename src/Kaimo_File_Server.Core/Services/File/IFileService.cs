@@ -51,6 +51,14 @@ namespace Kaimo_File_Server.Core.Services.File
         Task CreateFileAsync(string path, UserContext user);
         Task CreateDirectoryAsync(string path, UserContext user);
         Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled);
+        // Same as above, but returns the share-relative path the item landed at in the recycle
+        // bin (including a collision suffix), or null when it was deleted permanently. The web
+        // file browser uses it to undo a delete. Implementations without a recycle bin report null.
+        async Task<string?> DeleteFileReturningRecyclePathAsync(string path, UserContext user, bool isRecycleEnabled)
+        {
+            await DeleteFileAsync(path, user, isRecycleEnabled);
+            return null;
+        }
         Task<FileMetadata> GetMetadataAsync(string path, UserContext user);
         Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user);
 

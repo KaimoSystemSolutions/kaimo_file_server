@@ -157,10 +157,18 @@
         }
         @if (VM.Capabilities.CanCopy)
         {
-            <button class="toolbar-btn" title="@T("Web_Transfer_Paste")"
+            <button class="toolbar-btn toolbar-btn--no-selection" title="@T("Web_Transfer_Paste")"
                     disabled="@(!CanPasteClipboard)" @onclick="PasteClipboard">
                 @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 16, Height: 16))
                 <span>@T("Web_Transfer_Paste")</span>
+            </button>
+        }
+        @if (VM.Capabilities.CanMove)
+        {
+            <button class="toolbar-btn toolbar-btn--no-selection" title="@Resources.Web_Undo_Tooltip" aria-label="@Resources.Web_Undo_Tooltip"
+                    disabled="@(!VM.CanUndo || _undoRunning)" @onclick="UndoLast">
+                @Assets.SVG("undo.svg", new SvgOptions(Width: 16, Height: 16))
+                <span>@Resources.Web_Undo_Button</span>
             </button>
         }
         @if (VM.Capabilities.CanRename)

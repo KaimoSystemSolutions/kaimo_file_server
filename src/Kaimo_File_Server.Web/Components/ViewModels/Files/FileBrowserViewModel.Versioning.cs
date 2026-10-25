@@ -147,6 +147,8 @@ public partial class FileBrowserViewModel
         if (userContext is null)
             return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
 
+        // Overwrites the file in place: not undoable, and older inverses would hit it.
+        ClearUndo();
         try
         {
             await _fileService.RestoreFileVersionAsync(ToShareRelative(file.Path), snapshotTimestampUtc, userContext);

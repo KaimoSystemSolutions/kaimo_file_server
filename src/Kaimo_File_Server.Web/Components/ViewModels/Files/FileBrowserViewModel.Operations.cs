@@ -9,7 +9,11 @@ public partial class FileBrowserViewModel
     public async Task CreateFolderAtAsync(string path)
     {
         var (service, user) = await RequireServiceAndUserAsync();
+        // An existing folder is merged into (paste); only a new one is undone as a whole.
+        var existed = ExistsOnDisk(service, path);
         await service.CreateDirectoryAsync(path, user);
+        if (!existed)
+            RecordCreated(path);
     }
 
     /// <summary>Create a new sub-folder inside the current directory.</summary>
@@ -37,6 +41,7 @@ public partial class FileBrowserViewModel
             var targetPath = GetCurrentPath(folderName);
 
             await _fileService.CreateDirectoryAsync(targetPath, userContext);
+            RecordCreated(targetPath);
 
             _logger.LogInformation("Folder created: '{Path}' by {User}",
                 targetPath, userContext.User.Username);
@@ -79,7 +84,9 @@ public partial class FileBrowserViewModel
             if (relativePath.StartsWith(CurrentShare.Path))
                 relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
 
-            await _fileService.DeleteFileAsync(relativePath, userContext, CurrentShare.IsRecycleEnabled);
+            var recyclePath = await _fileService.DeleteFileReturningRecyclePathAsync(
+                relativePath, userContext, CurrentShare.IsRecycleEnabled);
+            RecordRecycled(relativePath, recyclePath);
 
             _logger.LogInformation("{Type} deleted: '{Path}' by {User}",
                 item.IsDirectory ? "Directory" : "File",
@@ -160,8 +167,10 @@ public partial class FileBrowserViewModel
     public async Task CopyAsync(FileMetadata item, string targetPath, CancellationToken cancellationToken)
     {
         var (service, user) = await RequireServiceAndUserAsync();
+        var existed = ExistsOnDisk(service, targetPath);
         Stream fileToCopy = await service.ReadFileAsync(item.Path, user);
         await service.WriteFileAsync(targetPath, fileToCopy, user, cancellationToken);
+        RecordCreated(targetPath, overwroteExisting: existed);
     }
 
     private string GetCurrentPath(string fileName)
@@ -192,6 +201,7 @@ public partial class FileBrowserViewModel
                 return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
 
             await _fileService.RenameAsync(relativePath, newRelativePath, userContext);
+            RecordRenamed(relativePath, newRelativePath);
 
             _logger.LogInformation("{Type} {Verb}: '{OldPath}' -> '{NewPath}' by {User}",
                 item.IsDirectory ? "Directory" : "File",
@@ -242,6 +252,7 @@ public partial class FileBrowserViewModel
             var targetPath = GetCurrentPath(archiveName);
 
             await _fileService.ArchiveAsync(relativePaths, targetPath, format, userContext);
+            RecordCreated(targetPath);
 
             _logger.LogInformation("Archived {Count} items -> '{Target}' by {User}",
                 items.Count, targetPath, userContext.User.Username);
@@ -284,6 +295,7 @@ public partial class FileBrowserViewModel
             var targetDir = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(parentDir, folderName);
 
             await _fileService.UnzipAsync(relativePath, targetDir, userContext);
+            RecordCreated(targetDir);
 
             _logger.LogInformation("Unzipped: '{Path}' -> '{Target}' by {User}",
                 relativePath, targetDir, userContext.User.Username);

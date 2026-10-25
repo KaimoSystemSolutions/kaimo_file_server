@@ -371,6 +371,8 @@ public partial class FileBrowser
     /// </summary>
     private async Task PasteAcrossSharesAsync()
     {
+        // The transfer service writes here without recording undo steps.
+        VM.ClearUndo();
         using var job = StartTransferJob();
         RemoveClipboardToast();
         var toastId = Toast.Show(T("Web_Transfer_Progress"), ToastType.Progress,
@@ -429,6 +431,8 @@ public partial class FileBrowser
 
         using var localJob = StartTransferJob();
         var cancellationToken = localJob.CancellationToken;
+        // Copies and (for a cut) the source deletes revert as one entry.
+        using var undoGroup = VM.BeginUndoGroup();
 
         RemoveClipboardToast();
         _clipboardToastID = Toast.Show(T("Web_Transfer_Progress"), ToastType.Progress,
@@ -798,12 +802,14 @@ public partial class FileBrowser
             ToastType.Progress);
 
         var failed = new List<string>();
-        foreach (var item in items)
+        using (VM.BeginUndoGroup())
         {
-
-            var result = await VM.MoveAsync(item, destRelativePath);
-            if (!result.Success)
-                failed.Add(item.Name);
+            foreach (var item in items)
+            {
+                var result = await VM.MoveAsync(item, destRelativePath);
+                if (!result.Success)
+                    failed.Add(item.Name);
+            }
         }
 
         if (failed.Count == 0)

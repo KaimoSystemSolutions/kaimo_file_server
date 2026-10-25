@@ -36,6 +36,8 @@ public partial class FileBrowserViewModel
             return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
 
         var targetPath = GetCurrentPath(fileName, relativeDir);
+        // Not undoable (it may overwrite), and older inverses could hit the new file.
+        ClearUndo();
 
         try
         {
@@ -85,6 +87,7 @@ public partial class FileBrowserViewModel
 
         // Only missing folders are created; existing ones are merged into. Cancellation
         // propagates so the upload batch can stop as cancelled.
+        ClearUndo();
         try
         {
             await UploadFolderPath.EnsureFoldersAsync(

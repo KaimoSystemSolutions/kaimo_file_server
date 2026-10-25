@@ -12049,6 +12049,51 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Undo ähnelt.
+        /// </summary>
+        public static string Web_Undo_Button {
+            get {
+                return ResourceManager.GetString("Web_Undo_Button", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Action undone. ähnelt.
+        /// </summary>
+        public static string Web_Undo_Done {
+            get {
+                return ResourceManager.GetString("Web_Undo_Done", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The action could not be undone. The item may have been changed or removed in the meantime. ähnelt.
+        /// </summary>
+        public static string Web_Undo_Failed {
+            get {
+                return ResourceManager.GetString("Web_Undo_Failed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Partly undone: {0} of {1} items could not be restored. They may have been changed or removed in the meantime. ähnelt.
+        /// </summary>
+        public static string Web_Undo_Partial {
+            get {
+                return ResourceManager.GetString("Web_Undo_Partial", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Undo the last action in this folder (Ctrl+Z) ähnelt.
+        /// </summary>
+        public static string Web_Undo_Tooltip {
+            get {
+                return ResourceManager.GetString("Web_Undo_Tooltip", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Paste ähnelt.
         /// </summary>
         public static string Web_Transfer_Paste {

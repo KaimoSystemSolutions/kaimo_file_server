@@ -21,8 +21,12 @@ public partial class FileBrowser
 {
 // ========== Lifecycle ==========
 
+    // Explicit refresh (context menu) also ends the undo history of this folder.
     public async Task Refresh()
-        => await OnParametersSetAsync();
+    {
+        VM.ClearUndo();
+        await OnParametersSetAsync();
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -324,6 +328,7 @@ public partial class FileBrowser
         using var job = Jobs.Start(jobTitle, Resources.Web_Common_Deleting, "delete");
         Toast.Update(toastId, onDismiss: () => { job.Cancel(); return Task.CompletedTask; });
 
+        using var undoGroup = VM.BeginUndoGroup();
         var done = 0;
         foreach (var target in targets)
         {

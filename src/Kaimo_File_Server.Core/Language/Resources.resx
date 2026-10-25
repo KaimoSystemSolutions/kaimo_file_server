@@ -3459,6 +3459,21 @@
   <data name="Web_Transfer_Paste" xml:space="preserve">
     <value>Paste</value>
   </data>
+  <data name="Web_Undo_Button" xml:space="preserve">
+    <value>Undo</value>
+  </data>
+  <data name="Web_Undo_Tooltip" xml:space="preserve">
+    <value>Undo the last action in this folder (Ctrl+Z)</value>
+  </data>
+  <data name="Web_Undo_Done" xml:space="preserve">
+    <value>Action undone.</value>
+  </data>
+  <data name="Web_Undo_Failed" xml:space="preserve">
+    <value>The action could not be undone. The item may have been changed or removed in the meantime.</value>
+  </data>
+  <data name="Web_Undo_Partial" xml:space="preserve">
+    <value>Partly undone: {0} of {1} items could not be restored. They may have been changed or removed in the meantime.</value>
+  </data>
   <data name="Web_Transfer_CopyingOne" xml:space="preserve">
     <value>Copying: {0}</value>
   </data>

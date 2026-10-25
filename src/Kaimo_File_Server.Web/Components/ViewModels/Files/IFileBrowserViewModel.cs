@@ -257,4 +257,20 @@ public interface IFileBrowserViewModel
 
     Task<OperationResult> UnzipAsync(FileMetadata file)
         => Task.FromResult(OperationResult.Fail("Extracting archives is not supported by this backend."));
+
+    /// <summary>True when the last operation(s) in the open folder can be reverted.</summary>
+    bool CanUndo => false;
+
+    /// <summary>Reverts the most recent undo entry (LIFO).</summary>
+    Task<OperationResult> UndoAsync()
+        => Task.FromResult(OperationResult.Fail("Undo is not supported by this backend."));
+
+    /// <summary>Drops the undo history (explicit refresh).</summary>
+    void ClearUndo() { }
+
+    /// <summary>
+    /// Groups all operations until disposal into one undo entry; null when the backend
+    /// has no undo or a group is already open (<c>using</c> accepts null).
+    /// </summary>
+    IDisposable? BeginUndoGroup() => null;
 }
