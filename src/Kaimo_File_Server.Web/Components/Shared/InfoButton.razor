@@ -4,70 +4,67 @@
     One button that explains a complex input or operation, replacing the
     hand-rolled "i"/info-circle widgets that were scattered across the app.
 
-    Adaptive by content:
-      * Text only            -> lightweight hover/focus tooltip (also opens on
-                                tap for touch), rendered with role="tooltip".
-      * ChildContent (+Title) -> click-toggled dismissible popover (backdrop
-                                click, the close button, or Escape close it).
+    Always a hover/focus tooltip (role="tooltip"); a tap/click pins it for touch
+    and pointer-leave, blur or Escape release it. `Text` is the plain hint;
+    `ChildContent` (+ optional `Title`) renders rich, non-interactive content
+    (paragraphs, lists) in the same tooltip look.
+
+    The trigger is deliberately a <span role="button">, not a <button>: the info
+    button sits inside <label> elements across the app, and a label forwards hover
+    and clicks to its first labelable descendant. A <button> trigger would open
+    the tooltip whenever the label or its field is hovered or clicked, and would
+    steal the field's label. The trigger also cancels its click, so a surrounding
+    <label> or <summary> never reacts to it.
 
     The icon is the shared info.svg tinted with the semantic --info
-    token so info buttons read the same everywhere. The trigger stops click
-    propagation, so it is safe to nest inside a <label> or a form.
+    token so info buttons read the same everywhere.
 *@
 @inherits AppComponentBase
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
-@inject IJSRuntime JS
 
 <span class="info-btn @(_open ? "info-btn--open" : null) @Class" @attributes="AdditionalAttributes">
-    <button type="button"
-            class="info-btn__trigger"
-            @ref="_triggerRef"
-            aria-label="@(AriaLabel ?? DefaultLabel)"
-            @attributes="TriggerAttrs()"
-            @onclick="Toggle"
-            @onclick:stopPropagation="true"
-            @onclick:preventDefault="true"
-            @onkeydown="OnKeyDown"
-            @onmouseleave="CloseTooltip"
-            @onfocusout="CloseTooltip">
+    <span class="info-btn__trigger"
+          role="button"
+          tabindex="0"
+          aria-label="@(AriaLabel ?? DefaultLabel)"
+          aria-describedby="@_id"
+          @onclick="Toggle"
+          @onclick:stopPropagation="true"
+          @onclick:preventDefault="true"
+          @onkeydown="OnKeyDown"
+          @onmouseleave="Close"
+          @onfocusout="Close">
         @* Round caps are what make info.svg's zero-length dot render — without them the
            "i" is just a thin bar. Stroke 2 matches the icon's 24×24 grid for a thin outline. *@
         @Assets.SVG("info.svg", new SvgOptions(Width: IconSize, Height: IconSize, StrokeWidth: 2f,
             Style: "stroke-linecap:round;stroke-linejoin:round"))
-        @if (IsTooltip)
+    </span>
+    @* Positioned (position: fixed) by infoPopover.js when the trigger is hovered or focused. *@
+    <span id="@_id" class="info-btn__tip" role="tooltip">
+        @if (!string.IsNullOrEmpty(Title))
         {
-            <span id="@_id" class="info-btn__tip" role="tooltip">@Text</span>
+            <strong class="info-btn__tip-title">@Title</strong>
         }
-    </button>
-
-    @if (!IsTooltip && _open)
-    {
-        <div class="info-btn__backdrop" @onclick="Close"></div>
-        <div class="info-btn__pop" @ref="_popRef" role="dialog" aria-label="@(Title ?? AriaLabel ?? DefaultLabel)">
-            <div class="info-btn__pop-head">
-                @if (!string.IsNullOrEmpty(Title))
-                {
-                    <strong class="info-btn__pop-title">@Title</strong>
-                }
-                <button type="button" class="btn-icon btn-icon--small info-btn__close"
-                        aria-label="@CloseLabel" @onclick="Close" @onclick:stopPropagation="true">
-                    @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2f))
-                </button>
-            </div>
-            <div class="info-btn__pop-body">@ChildContent</div>
-        </div>
-    }
+        @if (ChildContent is not null)
+        {
+            <span class="info-btn__tip-body">@ChildContent</span>
+        }
+        else
+        {
+            @Text
+        }
+    </span>
 </span>
 
 @code {
-    /// <summary>Short localized hint. Shown as a hover/focus tooltip. Ignored when <see cref="ChildContent"/> is set.</summary>
+    /// <summary>Short localized hint shown in the tooltip. Ignored when <see cref="ChildContent"/> is set.</summary>
     [Parameter] public string? Text { get; set; }
 
-    /// <summary>Rich body (e.g. a bullet list). Switches the button to click-toggled popover mode.</summary>
+    /// <summary>Rich, non-interactive body (e.g. paragraphs or a bullet list) shown in the tooltip.</summary>
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
-    /// <summary>Optional heading shown at the top of the popover.</summary>
+    /// <summary>Optional heading shown at the top of the tooltip.</summary>
     [Parameter] public string? Title { get; set; }
 
     /// <summary>Accessible label for the trigger. Defaults to the localized "More information".</summary>
@@ -84,49 +81,22 @@
 
     private readonly string _id = "info-" + Guid.NewGuid().ToString("N")[..8];
     private bool _open;
-    private bool _placed;
-    private ElementReference _triggerRef;
-    private ElementReference _popRef;
 
-    private bool IsTooltip => ChildContent is null;
     private string DefaultLabel => Text2("Web_Common_Info", "More information");
-    private string CloseLabel => Text2("Web_Common_Close", "Close");
 
-    private void Toggle() { _open = !_open; if (!_open) _placed = false; }
-    private void Close() { _open = false; _placed = false; }
-    private void OnKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") { Close(); } }
+    // A tap/click pins the tooltip open (touch support); it is released as soon as
+    // the pointer or focus leaves, so it never stays behind after moving away.
+    private void Toggle() => _open = !_open;
+    private void Close() => _open = false;
 
-    // A tap/click pins the tooltip open (touch support); release it as soon as the
-    // pointer or focus leaves, otherwise it stays visible after hovering away.
-    private void CloseTooltip() { if (IsTooltip && _open) { Close(); } }
-
-    // Position the popover into the viewport once it has rendered (top layer +
-    // flip/clamp). Tooltips are positioned by infoPopover.js on hover/focus.
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    // Keyboard parity with a native button (Space is kept from scrolling by infoPopover.js).
+    private void OnKeyDown(KeyboardEventArgs e)
     {
-        if (!IsTooltip && _open && !_placed)
-        {
-            _placed = true;
-            await JS.InvokeVoidAsync("infoPopover.place", _popRef, _triggerRef);
-        }
+        if (e.Key is "Enter" or " ") { Toggle(); }
+        else if (e.Key == "Escape") { Close(); }
     }
 
     // Runtime lookup so newly added keys need no Resources.Designer regeneration.
     private static string Text2(string key, string fallback)
         => Resources.ResourceManager.GetString(key) ?? fallback;
-
-    private Dictionary<string, object> TriggerAttrs()
-    {
-        var attrs = new Dictionary<string, object>();
-        if (IsTooltip)
-        {
-            attrs["aria-describedby"] = _id;
-        }
-        else
-        {
-            attrs["aria-haspopup"] = "dialog";
-            attrs["aria-expanded"] = _open ? "true" : "false";
-        }
-        return attrs;
-    }
 }

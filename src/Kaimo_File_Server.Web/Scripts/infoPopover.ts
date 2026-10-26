@@ -10,11 +10,12 @@
  *
  * Tooltips (CSS :hover/:focus driven) are positioned just-in-time via delegated
  * listeners here, so no Blazor round-trip is needed and hover stays instant.
- * The popover (click, Blazor `_open` state) calls `place()` after it renders.
+ * Other panels (e.g. the DetailHeader menu) call `place()` after they render.
  *
- * ponytail: uses `position: fixed` (same approach as contextMenu.ts). Ceiling —
- * a transformed/filtered ancestor rebases fixed to itself and would offset the
- * panel; switch to the Popover API top layer if that ever bites.
+ * ponytail: uses `position: fixed` (same approach as contextMenu.ts) and corrects
+ * for a transformed ancestor's offset. Ceiling — such an ancestor that also clips
+ * (overflow) or scales would still clip/skew the panel; switch to the Popover API
+ * top layer if that ever bites.
  */
 window.infoPopover = {
     MARGIN: 8, // keep this far from every viewport edge
@@ -58,6 +59,13 @@ window.infoPopover = {
 
         panel.style.left = Math.round(left) + 'px';
         panel.style.top = Math.round(top) + 'px';
+
+        // A transformed/filtered ancestor (e.g. a modal backdrop with backdrop-filter)
+        // rebases `fixed` onto itself; shift by the measured offset so the panel still
+        // lands at the intended viewport coordinates.
+        var placed = panel.getBoundingClientRect();
+        panel.style.left = Math.round(2 * left - placed.left) + 'px';
+        panel.style.top = Math.round(2 * top - placed.top) + 'px';
     }
 };
 
@@ -70,9 +78,16 @@ window.infoPopover = {
         if (!trigger) return;
         // Only when entering from outside the trigger (mimic pointerenter/focus).
         if (e.relatedTarget && trigger.contains(e.relatedTarget as Node)) return;
-        var tip = trigger.querySelector<HTMLElement>('.info-btn__tip');
+        var tip = trigger.parentElement && trigger.parentElement.querySelector<HTMLElement>('.info-btn__tip');
         if (tip) window.infoPopover._position(tip, trigger);
     }
     document.addEventListener('pointerover', onEnter, true);
     document.addEventListener('focusin', onEnter, true);
+
+    // The trigger is a <span role="button"> (see InfoButton.razor); keep Space from
+    // scrolling the page, as a native button would. Blazor handles the toggle itself.
+    document.addEventListener('keydown', function (e: KeyboardEvent) {
+        var t = e.target as Element | null;
+        if (e.key === ' ' && t && t.classList && t.classList.contains('info-btn__trigger')) e.preventDefault();
+    });
 })();

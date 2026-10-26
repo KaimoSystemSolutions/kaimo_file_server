@@ -247,7 +247,7 @@ Reuse these before writing anything new. New patterns that will be needed more t
 | `MultiSelect<T>` | Compact checkbox dropdown for small option sets (e.g. context-menu settings). |
 | `PrincipalPickerField` | Single/multi selection of users, groups, roles, departments, shares: modal with search, type tabs, scrollable list, selected chips. Always use it for principal selection. |
 | `StatusBadge` | Every entity status pill; `Tone` = Positive/Negative/Warning/Neutral. See §10.4. |
-| `InfoButton` | Inline "i" button that reveals an explanation (e.g. password rules) instead of static hint walls. |
+| `InfoButton` | Inline "i" button that reveals an explanation (e.g. password rules) instead of static hint walls. Always a hover/focus tooltip (tap pins it on touch); `Text` for a short hint, `ChildContent` + `Title` for rich, non-interactive content in the same look. Safe inside `<label>` (trigger is not a labelable element). |
 | `DetailHeader` | Header of a detail pane: icon, title, subtitle, `Status`, `Actions` and the "⋯" `MoreActions` menu (§9.2). |
 | `MenuItem` | Entry of a dropdown menu (icon, label, `Danger`, `Disabled` + `Tooltip` reason, `Separator`). |
 | `FactTile` | Key fact tile (label, value, optional hint, `Tone`, `Compact` for dates, `Tooltip`, optional arrow link) inside `.fact-tiles`. Overview pages only (not detail panes): `Icon` + `IconColor` (category colour) and `Segments` (distribution bar, e.g. healthy / warning / failed / inactive, with a text legend so colour is never the only carrier). |
