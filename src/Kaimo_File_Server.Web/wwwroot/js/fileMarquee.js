@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 /**
  * Explorer-style rectangular selection for the virtualized file list.
  *
@@ -104,7 +113,7 @@ window.fileMarquee = (() => {
             };
         }
         function updateSelection() {
-            if (!gesture?.active)
+            if (!(gesture === null || gesture === void 0 ? void 0 : gesture.active))
                 return;
             captureRenderedRows();
             const logical = logicalRectangle();
@@ -122,7 +131,7 @@ window.fileMarquee = (() => {
             });
         }
         function edgeScrollStep() {
-            if (!gesture?.active)
+            if (!(gesture === null || gesture === void 0 ? void 0 : gesture.active))
                 return 0;
             const viewport = scrollViewport();
             const y = gesture.currentY;
@@ -137,7 +146,7 @@ window.fileMarquee = (() => {
             return 0;
         }
         function animate() {
-            if (!gesture?.active) {
+            if (!(gesture === null || gesture === void 0 ? void 0 : gesture.active)) {
                 animationFrame = 0;
                 return;
             }
@@ -155,6 +164,8 @@ window.fileMarquee = (() => {
             gesture = null;
         }
         host.addEventListener('pointerdown', event => {
+            var _a, _b;
+            var _c;
             if (event.button !== 0 && event.button !== 2)
                 return;
             // A finger drag scrolls the list; rubber-band selection is mouse/pen only.
@@ -164,8 +175,7 @@ window.fileMarquee = (() => {
             // and the empty area below the list may begin a marquee gesture.
             if (event.target.closest('.file-grid-row, .file-grid-header, button, a, input'))
                 return;
-            const headerBottom = host.querySelector('.file-grid-header')
-                ?.getBoundingClientRect().bottom ?? host.getBoundingClientRect().top;
+            const headerBottom = (_c = (_a = host.querySelector('.file-grid-header')) === null || _a === void 0 ? void 0 : _a.getBoundingClientRect().bottom) !== null && _c !== void 0 ? _c : host.getBoundingClientRect().top;
             if (event.clientY < headerBottom)
                 return;
             gesture = {
@@ -179,7 +189,7 @@ window.fileMarquee = (() => {
                 rowGeometry: new Map()
             };
             captureRenderedRows();
-            host.setPointerCapture?.(event.pointerId);
+            (_b = host.setPointerCapture) === null || _b === void 0 ? void 0 : _b.call(host, event.pointerId);
         }, options);
         host.addEventListener('pointermove', event => {
             if (!gesture)
@@ -199,7 +209,7 @@ window.fileMarquee = (() => {
             updateSelection();
             event.preventDefault();
         }, options);
-        host.addEventListener('pointerup', async (event) => {
+        host.addEventListener('pointerup', (event) => __awaiter(this, void 0, void 0, function* () {
             if (!gesture)
                 return;
             const completedGesture = gesture;
@@ -219,8 +229,8 @@ window.fileMarquee = (() => {
             suppressClick = completedGesture.button === 0;
             clearPreview();
             stopGesture();
-            await invoke('CompleteMarqueeSelection', paths, completedGesture.addToSelection);
-        }, options);
+            yield invoke('CompleteMarqueeSelection', paths, completedGesture.addToSelection);
+        }), options);
         host.addEventListener('pointercancel', () => {
             host.classList.remove('file-marquee-active');
             clearPreview();
@@ -230,36 +240,39 @@ window.fileMarquee = (() => {
         // Escape is page-level rather than tied to whichever non-focusable row
         // was clicked last. The component decides whether an open dialog owns it.
         document.addEventListener('keydown', event => {
+            var _a, _b;
             if (event.key !== 'Escape' || event.repeat)
                 return;
             // When a modal owns the Escape (focus is inside it), the dialog's own
             // Cancel handles it. Skipping here avoids a race where the dialog
             // closes and this page-level handler then wipes the file selection.
-            if (event.target.closest?.('.modal-backdrop'))
+            if ((_b = (_a = event.target).closest) === null || _b === void 0 ? void 0 : _b.call(_a, '.modal-backdrop'))
                 return;
             void invoke('ClearSelectionOnEscape');
         }, options);
         // Ctrl+A selects all files instead of the page text, page-level like
         // Escape so it works wherever focus is. Text fields keep native behavior.
         document.addEventListener('keydown', event => {
+            var _a, _b, _c, _d;
             if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'a')
                 return;
-            if (event.target.closest?.('input, textarea, select, [contenteditable="true"]'))
+            if ((_b = (_a = event.target).closest) === null || _b === void 0 ? void 0 : _b.call(_a, 'input, textarea, select, [contenteditable="true"]'))
                 return;
             event.preventDefault();
-            if (event.repeat || event.target.closest?.('.modal-backdrop'))
+            if (event.repeat || ((_d = (_c = event.target).closest) === null || _d === void 0 ? void 0 : _d.call(_c, '.modal-backdrop')))
                 return;
             void invoke('SelectAllFiles');
         }, options);
         // Ctrl+Z reverts the last file operation in the open folder. Same scoping
         // as Ctrl+A: text fields keep their own undo, dialogs own the keyboard.
         document.addEventListener('keydown', event => {
+            var _a, _b, _c, _d;
             if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== 'z')
                 return;
-            if (event.target.closest?.('input, textarea, select, [contenteditable="true"]'))
+            if ((_b = (_a = event.target).closest) === null || _b === void 0 ? void 0 : _b.call(_a, 'input, textarea, select, [contenteditable="true"]'))
                 return;
             event.preventDefault();
-            if (event.repeat || event.target.closest?.('.modal-backdrop'))
+            if (event.repeat || ((_d = (_c = event.target).closest) === null || _d === void 0 ? void 0 : _d.call(_c, '.modal-backdrop')))
                 return;
             void invoke('UndoLast');
         }, options);
@@ -268,7 +281,8 @@ window.fileMarquee = (() => {
         // element is re-created on every folder load and focus often sits on a
         // toolbar button or body. Widgets with their own key handling (text fields,
         // dialogs, menus, tabs, the inline ACL editor) keep their native behavior.
-        document.addEventListener('keydown', async (event) => {
+        document.addEventListener('keydown', (event) => __awaiter(this, void 0, void 0, function* () {
+            var _a, _b, _c, _d;
             if (!['ArrowUp', 'ArrowDown', 'Enter', 'Backspace'].includes(event.key))
                 return;
             if (event.ctrlKey || event.metaKey || event.altKey)
@@ -277,15 +291,15 @@ window.fileMarquee = (() => {
             if (event.repeat && (event.key === 'Enter' || event.key === 'Backspace'))
                 return;
             // A focused button or link activates itself on Enter.
-            if (event.key === 'Enter' && event.target.closest?.('button, a'))
+            if (event.key === 'Enter' && ((_b = (_a = event.target).closest) === null || _b === void 0 ? void 0 : _b.call(_a, 'button, a')))
                 return;
-            if (event.target.closest?.('input, textarea, select, [contenteditable="true"], .modal-backdrop, ' +
+            if ((_d = (_c = event.target).closest) === null || _d === void 0 ? void 0 : _d.call(_c, 'input, textarea, select, [contenteditable="true"], .modal-backdrop, ' +
                 '[role="dialog"], [role="listbox"], [role="menu"], [role="tablist"], .file-row-acl-expand-wrap, .acl-panel'))
                 return;
             if (!document.querySelector(selector))
                 return; // still loading or error view
             event.preventDefault();
-            const result = await invoke('OnListNavigationKey', event.key, event.shiftKey);
+            const result = yield invoke('OnListNavigationKey', event.key, event.shiftKey);
             if (!result || result.index < 0)
                 return;
             const row = document.querySelector(`${selector} .file-grid-row[data-path="${CSS.escape(result.path)}"]`);
@@ -293,25 +307,26 @@ window.fileMarquee = (() => {
                 row.scrollIntoView({ block: 'nearest' });
             else
                 scrollToIndex(selector, result.index, result.itemHeight, result.hasParent);
-        }, options);
+        }), options);
         host.addEventListener('click', event => {
             if (!suppressClick)
                 return;
             suppressClick = false;
             event.preventDefault();
             event.stopPropagation();
-        }, { ...options, capture: true });
+        }, Object.assign(Object.assign({}, options), { capture: true }));
         host.addEventListener('contextmenu', event => {
             if (!suppressContextMenu)
                 return;
             suppressContextMenu = false;
             event.preventDefault();
             event.stopPropagation();
-        }, { ...options, capture: true });
+        }, Object.assign(Object.assign({}, options), { capture: true }));
         instances.set(selector, controller);
     }
     function dispose(selector) {
-        instances.get(selector)?.abort();
+        var _a;
+        (_a = instances.get(selector)) === null || _a === void 0 ? void 0 : _a.abort();
         instances.delete(selector);
     }
     /**

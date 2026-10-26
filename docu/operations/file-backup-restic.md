@@ -94,8 +94,17 @@ rclone (1.75.2) has no option to require SMB signing, encryption or a minimum di
 External Storage SMB provider (`smbclient`, which always requires SMB 3 with signing and
 encryption). rclone signs and encrypts when the server requires it — verified against Samba 4 with
 `smb encrypt = required` and `server signing = mandatory`: SMB 3.1.1, AES-128-GCM, AES-128-CMAC.
-**Require encryption on the server for the backup share**; otherwise the server may accept an
-unencrypted session. The repository content itself is always encrypted by restic.
+**The server must require encryption for the backup share** (Samba: `smb encrypt = required`;
+Windows: `Set-SmbShare -EncryptData $true`), and Kaimo enforces this: before every restic process
+`ResticTargetResolver` probes the share with `smbclient` — SMB 3, *without* requesting signing or
+encryption (`--client-protection=off`), debug level 5. Samba's client always encrypts when the
+server requires it, and only then logs `Encrypted SMB2 message`; without that line the run fails
+with `smb_encryption_not_enforced`. Probe failures map to `smb_share_not_found`, `access_denied`
+(also `NT_STATUS_LOGON_FAILURE`) or `repo_unreachable` (incl. servers without SMB 3). Asking for an
+unencrypted session cannot serve as the check: neither `--client-protection=off` nor
+`client smb encrypt = off` makes smbclient refuse a server that requires encryption. The probe
+checks the server's policy, not rclone's own session: an active attacker between Kaimo and the
+server is not excluded by it. The repository content itself is always encrypted by restic.
 
 **rclone** reaches any storage rclone supports (OneDrive, Google Drive, Dropbox, WebDAV, …) with the
 bundled, checksum-pinned rclone binary (`/usr/local/bin/rclone`). The pasted section is always

@@ -75,23 +75,43 @@
 
 /* ── Job editor ── */
 
+/* Time slots in an even grid; the add button is the last cell. Grid rows stretch their
+   items, so slot, remove and add buttons always share one height. */
 .backup-page ::deep .backup-times {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: var(--space-2);
     margin-bottom: var(--space-3);
 }
 
 .backup-page ::deep .backup-time {
-    display: inline-flex;
-    align-items: center;
+    display: flex;
     gap: var(--space-1);
+    min-width: 0;
 }
 
     .backup-page ::deep .backup-time .edit-input {
-        width: 9.5em;
+        flex: 1 1 auto;
+        min-width: 0;
     }
+
+    .backup-page ::deep .backup-time .backup-time-remove {
+        flex: 0 0 auto;
+        width: 36px;
+        height: auto;
+    }
+
+.backup-page ::deep .backup-time-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+/* The native clock icon follows color-scheme; without it it stays black on dark. */
+:root[data-theme="dark"] .backup-page ::deep .backup-time input[type="time"] {
+    color-scheme: dark;
+}
 
 .backup-page ::deep .backup-days {
     display: flex;
@@ -136,6 +156,46 @@
     align-items: center;
     gap: var(--space-1);
 }
+
+    .backup-page ::deep .backup-label-with-info .info-btn__trigger {
+        width: 22px;
+        height: 22px;
+    }
+
+/* Local folder: the allowed root is a fixed prefix inside the field frame, only the
+   sub-folder after it is editable. The frame takes the focus ring of a normal field. */
+.backup-page ::deep .backup-path-input {
+    display: flex;
+    align-items: center;
+    cursor: text;
+}
+
+    .backup-page ::deep .backup-path-input:focus-within {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-subtle);
+    }
+
+.backup-page ::deep .backup-path-prefix {
+    flex: 0 0 auto;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    user-select: none;
+}
+
+.backup-page ::deep .backup-path-field {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+}
+
+    .backup-page ::deep .backup-path-field::placeholder {
+        color: var(--text-tertiary);
+    }
 
 .backup-page ::deep .backup-inline-actions {
     margin-top: 0;
@@ -582,6 +642,12 @@
     color: var(--text-primary);
     font-size: 13px;
 }
+
+    /* A label with an info button stays on one line with its toggle (the grid above would
+       stack the button under the text, leaving the toggle between them). */
+    .backup-page ::deep .workspace-form .toggle-row > .backup-label-with-info {
+        display: inline-flex;
+    }
 
 @media (max-width: 760px) {
     .backup-page ::deep .backup-toolbar {

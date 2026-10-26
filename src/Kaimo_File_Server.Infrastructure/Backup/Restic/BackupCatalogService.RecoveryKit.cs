@@ -26,8 +26,18 @@ public partial class BackupCatalogService
         var settings = ResticRepositorySettings.Parse(repository.SettingsJson);
         string url;
         var parameters = new StringBuilder();
-        using (var target = await resolver.ResolveAsync(repository, resolver.ReadSecrets(repository), password, ct))
+        if (repository.Backend == BackupBackend.Smb)
+        {
+            // Resolving would probe the SMB server; the kit must stay downloadable while it is
+            // unreachable, and its URL does not depend on the connection.
+            ResticBackend.Validate(repository.Backend, settings, resolver.ReadSecrets(repository), resolver.LocalRoots);
+            url = ResticBackend.BuildUrl(repository.Backend, settings);
+        }
+        else
+        {
+            using var target = await resolver.ResolveAsync(repository, resolver.ReadSecrets(repository), password, ct);
             url = target.RepositoryUrl;
+        }
         if (!string.IsNullOrWhiteSpace(settings.Region)) parameters.AppendLine("AWS_DEFAULT_REGION=" + settings.Region);
         if (settings.S3PathStyle) parameters.AppendLine("-o s3.bucket-lookup=path");
         if (repository.Backend == BackupBackend.Sftp && settings.StorageConnectionId is { } connectionId)
@@ -48,7 +58,7 @@ public partial class BackupCatalogService
         }
         if (repository.Backend == BackupBackend.Smb && settings.StorageConnectionId is { } smbConnectionId)
         {
-            // Resolving above already validated the connection; the password stays out of the kit.
+            // Validates the connection (missing, disabled, invalid); the password stays out of the kit.
             var (smb, credentials) = await resolver.LoadSmbConnectionAsync(smbConnectionId, ct);
             var domain = string.IsNullOrWhiteSpace(credentials.Domain) ? "WORKGROUP" : credentials.Domain;
             parameters.AppendLine($"SMB {credentials.Username}@{smb.Server}:{smb.Port}, domain {domain}, path {settings.Path!.Trim().Trim('/')}");

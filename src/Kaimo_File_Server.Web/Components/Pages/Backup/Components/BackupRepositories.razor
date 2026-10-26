@@ -62,7 +62,7 @@
                 <label>
                     <span>@R("Web_Backup_Repos_Backend")</span>
                     <select class="edit-input" @bind="form.Backend" @bind:after="BackendChanged" disabled="@(!isNew)">
-                        @foreach (var backend in Enum.GetValues<BackupBackend>())
+                        @foreach (var backend in BackupUi.SelectableBackends(form.Backend))
                         {
                             <option value="@backend">@BackupUi.BackendLabel(backend)</option>
                         }
@@ -74,13 +74,27 @@
                     case BackupBackend.Local:
                         <label>
                             <span>@R("Web_Backup_Repos_LocalPath")</span>
-                            <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
-                            <small>@string.Format(R("Web_Backup_Repos_LocalPathHelp"), string.Join(", ", VM.LocalRoots))</small>
+                            @if (LocalPrefix is { } prefix && LocalSubPath is not null)
+                            {
+                                <span class="edit-input backup-path-input">
+                                    <span class="backup-path-prefix">@prefix</span>
+                                    <input class="backup-path-field" @bind:get="LocalSubPath" @bind:set="SetLocalSubPathAsync" @bind:event="oninput"
+                                           spellcheck="false" placeholder="kaimo-repo" />
+                                </span>
+                            }
+                            else
+                            {
+                                <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                                <small>@string.Format(R("Web_Backup_Repos_LocalPathHelp"), string.Join(", ", VM.LocalRoots))</small>
+                            }
                         </label>
                         break;
                     case BackupBackend.Sftp:
                         <label>
-                            <span>@R("Web_Backup_Repos_Connection")</span>
+                            <span class="backup-label-with-info">
+                                @R("Web_Backup_Repos_Connection")
+                                <InfoButton Text="@R("Web_Backup_Repos_ConnectionHelp")" IconSize="16" />
+                            </span>
                             <select class="edit-input" @bind="form.ConnectionId" @bind:after="Changed">
                                 <option value="@Guid.Empty">@R("Web_Backup_Select")</option>
                                 @foreach (var (id, name) in VM.SshConnections)
@@ -88,7 +102,6 @@
                                     <option value="@id">@name</option>
                                 }
                             </select>
-                            <small>@R("Web_Backup_Repos_ConnectionHelp")</small>
                         </label>
                         <label>
                             <span>@R("Web_Backup_Repos_RemotePath")</span>
@@ -189,15 +202,19 @@
                                    placeholder="@(isNew ? "" : R("Web_Backup_Repos_KeepSecret"))" />
                         </label>
                         <label>
-                            <span>@R("Web_Backup_Repos_AzureSas")</span>
+                            <span class="backup-label-with-info">
+                                @R("Web_Backup_Repos_AzureSas")
+                                <InfoButton Text="@R("Web_Backup_Repos_AzureCredentialsHelp")" IconSize="16" />
+                            </span>
                             <input class="edit-input" type="password" @bind="form.AzureSasToken" @bind:event="oninput" @bind:after="Changed" autocomplete="new-password"
                                    placeholder="@(isNew ? "" : R("Web_Backup_Repos_KeepSecret"))" />
-                            <small>@R("Web_Backup_Repos_AzureCredentialsHelp")</small>
                         </label>
                         <label>
-                            <span>@R("Web_Backup_Repos_AzureSuffix")</span>
+                            <span class="backup-label-with-info">
+                                @R("Web_Backup_Repos_AzureSuffix")
+                                <InfoButton Text="@R("Web_Backup_Repos_AzureSuffixHelp")" IconSize="16" />
+                            </span>
                             <input class="edit-input" @bind="form.AzureEndpointSuffix" @bind:event="oninput" @bind:after="Changed" spellcheck="false" placeholder="core.windows.net" />
-                            <small>@R("Web_Backup_Repos_AzureSuffixHelp")</small>
                         </label>
                         break;
                     case BackupBackend.Gcs:
@@ -210,10 +227,12 @@
                             <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
                         </label>
                         <label>
-                            <span>@R("Web_Backup_Repos_GcsKey")</span>
+                            <span class="backup-label-with-info">
+                                @R("Web_Backup_Repos_GcsKey")
+                                <InfoButton Text="@R("Web_Backup_Repos_GcsKeyHelp")" IconSize="16" />
+                            </span>
                             <textarea class="edit-input backup-pem" rows="4" spellcheck="false" autocomplete="off" @bind="form.GcsCredentialsJson" @bind:event="oninput" @bind:after="Changed"
                                       placeholder="@(isNew ? "{ \"type\": \"service_account\", … }" : R("Web_Backup_Repos_KeepSecret"))"></textarea>
-                            <small>@R("Web_Backup_Repos_GcsKeyHelp")</small>
                         </label>
                         break;
                     case BackupBackend.Swift:
@@ -226,18 +245,22 @@
                             <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
                         </label>
                         <label>
-                            <span>@R("Web_Backup_Repos_SwiftEnv")</span>
+                            <span class="backup-label-with-info">
+                                @R("Web_Backup_Repos_SwiftEnv")
+                                <InfoButton Text="@R("Web_Backup_Repos_SwiftEnvHelp")" IconSize="16" />
+                            </span>
                             <textarea class="edit-input backup-pem" rows="6" spellcheck="false" autocomplete="off" @bind="form.SwiftEnvironment" @bind:event="oninput" @bind:after="Changed"
                                       placeholder="@(isNew ? "OS_AUTH_URL=https://keystone.example.com:5000/v3\nOS_USERNAME=…\nOS_PASSWORD=…" : R("Web_Backup_Repos_KeepSecret"))"></textarea>
-                            <small>@R("Web_Backup_Repos_SwiftEnvHelp")</small>
                         </label>
                         break;
                     case BackupBackend.Rclone:
                         <label>
-                            <span>@R("Web_Backup_Repos_RcloneConfig")</span>
+                            <span class="backup-label-with-info">
+                                @R("Web_Backup_Repos_RcloneConfig")
+                                <InfoButton Text="@R("Web_Backup_Repos_RcloneConfigHelp")" IconSize="16" />
+                            </span>
                             <textarea class="edit-input backup-pem" rows="6" spellcheck="false" autocomplete="off" @bind="form.RcloneConfig" @bind:event="oninput" @bind:after="Changed"
                                       placeholder="@(isNew ? "[onedrive]\ntype = onedrive\ntoken = {…}" : R("Web_Backup_Repos_KeepSecret"))"></textarea>
-                            <small>@R("Web_Backup_Repos_RcloneConfigHelp")</small>
                         </label>
                         <label>
                             <span>@R("Web_Backup_Repos_RclonePath")</span>
@@ -253,7 +276,10 @@
                             </p>
                         }
                         <label>
-                            <span>@R("Web_Backup_Repos_SmbConnection")</span>
+                            <span class="backup-label-with-info">
+                                @R("Web_Backup_Repos_SmbConnection")
+                                <InfoButton Text="@R("Web_Backup_Repos_SmbConnectionHelp")" IconSize="16" />
+                            </span>
                             <select class="edit-input" @bind="form.ConnectionId" @bind:after="Changed">
                                 <option value="@Guid.Empty">@R("Web_Backup_Select")</option>
                                 @foreach (var (id, name) in VM.SmbConnections)
@@ -261,23 +287,27 @@
                                     <option value="@id">@name</option>
                                 }
                             </select>
-                            <small>@R("Web_Backup_Repos_SmbConnectionHelp")</small>
                         </label>
                         <label>
-                            <span>@R("Web_Backup_Repos_SmbPath")</span>
+                            <span class="backup-label-with-info">
+                                @R("Web_Backup_Repos_SmbPath")
+                                <InfoButton Text="@R("Web_Backup_Repos_SmbPathHelp")" IconSize="16" />
+                            </span>
                             <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" placeholder="backup/kaimo-repo" />
-                            <small>@R("Web_Backup_Repos_SmbPathHelp")</small>
                         </label>
+                        <div class="warning-banner" role="note">@R("Web_Backup_Repos_SmbEncryptionHint")</div>
                         break;
                 }
 
                 @if (form.Backend is BackupBackend.Rest or BackupBackend.S3 or BackupBackend.Swift)
                 {
                     <label>
-                        <span>@R("Web_Backup_Repos_CaCertificate")</span>
+                        <span class="backup-label-with-info">
+                            @R("Web_Backup_Repos_CaCertificate")
+                            <InfoButton Text="@R("Web_Backup_Repos_CaCertificateHelp")" IconSize="16" />
+                        </span>
                         <textarea class="edit-input backup-pem" rows="3" spellcheck="false" @bind="form.CaCertificatePem" @bind:event="oninput" @bind:after="Changed"
                                   placeholder="-----BEGIN CERTIFICATE-----"></textarea>
-                        <small>@R("Web_Backup_Repos_CaCertificateHelp")</small>
                     </label>
                 }
 
@@ -294,7 +324,7 @@
                     <div class="toggle-row">
                         <span class="backup-label-with-info">
                             @R("Web_Backup_Repos_AppendOnly")
-                            <InfoButton Text="@R("Web_Backup_Repos_AppendOnlyHelp")" />
+                            <InfoButton Text="@R("Web_Backup_Repos_AppendOnlyHelp")" IconSize="16" />
                         </span>
                         <label class="toggle-switch">
                             <input type="checkbox" @bind="form.IsAppendOnly" aria-label="@R("Web_Backup_Repos_AppendOnly")" />
@@ -306,22 +336,28 @@
                 <div class="workspace-field">
                     <span class="backup-label-with-info">
                         @R("Web_Backup_Repos_Departments")
-                        <InfoButton Text="@R("Web_Backup_Repos_DepartmentsHelp")" />
+                        <InfoButton Text="@R("Web_Backup_Repos_DepartmentsHelp")" IconSize="16" />
                     </span>
-                    <MultiSelect T="Department" Items="form.Departments" Label="d => d.Name"
-                                 PlaceholderText="@R("Web_Backup_Repos_DepartmentsNone")" />
+                    <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                          Items="VM.AllDepartments.ToDepartmentItems()"
+                                          SelectedIds="form.Departments.CheckedIds(d => d.Id)"
+                                          SelectedIdsChanged="ids => form.Departments.ApplySelection(ids, d => d.Id)"
+                                          Title="@R("Web_Backup_Repos_Departments")"
+                                          Placeholder="@R("Web_Backup_Repos_DepartmentsNone")" />
                 </div>
             </div>
 
             <section class="workspace-section">
-                <h4>@R("Web_Backup_Maintenance")</h4>
-                <p>@R("Web_Backup_Maintenance_Help")</p>
+                <h4 class="backup-label-with-info">
+                    @R("Web_Backup_Maintenance")
+                    <InfoButton Text="@R("Web_Backup_Maintenance_Help")" IconSize="16" />
+                </h4>
                 <BackupScheduleEditor Times="form.MaintenanceTimes" Days="form.MaintenanceDays" />
                 <div class="workspace-form backup-maintenance-form">
                     <div class="toggle-row">
                         <span class="backup-label-with-info">
                             @R("Web_Backup_Maintenance_ReadData")
-                            <InfoButton Text="@R("Web_Backup_Maintenance_ReadDataHelp")" />
+                            <InfoButton Text="@R("Web_Backup_Maintenance_ReadDataHelp")" IconSize="16" />
                         </span>
                         <label class="toggle-switch">
                             <input type="checkbox" @bind="form.ReadDataMonthly" aria-label="@R("Web_Backup_Maintenance_ReadData")" />
@@ -331,14 +367,17 @@
                     <label>
                         <span class="backup-label-with-info">
                             @R("Web_Backup_Maintenance_SampleSize")
-                            <InfoButton Text="@R("Web_Backup_Maintenance_SampleSizeHelp")" />
+                            <InfoButton Text="@R("Web_Backup_Maintenance_SampleSizeHelp")" IconSize="16" />
                         </span>
                         <input class="edit-input" type="number" min="0" max="@BackupCatalogService.MaximumTestRestoreSample" @bind="form.TestRestoreSampleSize" />
                     </label>
                     <label>
                         <span class="backup-label-with-info">
                             @R("Web_Backup_Maintenance_Mirror")
-                            <InfoButton Text="@R("Web_Backup_Maintenance_MirrorHelp")" />
+                            <InfoButton Title="@R("Web_Backup_Maintenance_Mirror")" IconSize="16">
+                                <p>@R("Web_Backup_Maintenance_MirrorHelp")</p>
+                                <p>@R("Web_Backup_Maintenance_MirrorRule")</p>
+                            </InfoButton>
                         </span>
                         <select class="edit-input" @bind="form.MirrorTargetId">
                             <option value="@Guid.Empty">@R("Web_Backup_Maintenance_NoMirror")</option>
@@ -347,7 +386,6 @@
                                 <option value="@candidate.Id">@candidate.Name (@BackupUi.BackendLabel(candidate.Backend))</option>
                             }
                         </select>
-                        <small>@R("Web_Backup_Maintenance_MirrorRule")</small>
                     </label>
                 </div>
                 @if (form.Backend == BackupBackend.Rest && form.IsAppendOnly)

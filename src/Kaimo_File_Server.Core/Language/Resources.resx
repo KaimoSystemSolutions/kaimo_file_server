@@ -6710,22 +6710,22 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>At these times unused data is cleaned up, the repository is checked, a sample of files is restored as a test and new backup points are copied to the mirror. Job retentions are applied once more (also to mirrored backup points).</value>
   </data>
   <data name="Web_Backup_Maintenance_ReadData" xml:space="preserve">
-    <value>Read data monthly</value>
+    <value>Read and verify stored data monthly</value>
   </data>
   <data name="Web_Backup_Maintenance_ReadDataHelp" xml:space="preserve">
-    <value>The first check of each month also reads and verifies one twelfth of the stored data, so all data is read once a year. This causes download traffic on remote repositories.</value>
+    <value>The regular check only verifies the structure of the repository (index and references), not the stored content. With this option, the first maintenance of each month additionally downloads one twelfth of the stored data, decrypts it and verifies its checksums. After twelve months every part has been read once, so damage on the storage medium is found before a restore needs the data. On remote repositories this causes download traffic of about one twelfth of the repository size per month.</value>
   </data>
   <data name="Web_Backup_Maintenance_SampleSize" xml:space="preserve">
-    <value>Test restore (files)</value>
+    <value>Test restore: number of files</value>
   </data>
   <data name="Web_Backup_Maintenance_SampleSizeHelp" xml:space="preserve">
-    <value>Number of randomly chosen files (up to 256 MB each) restored from the newest backup point of every share and compared with the live file. Files changed or deleted since the backup are skipped. 0 turns the test restore off.</value>
+    <value>After a successful check, this many randomly chosen files are restored from the newest backup point of each share into a hidden temporary folder and compared with the current file on the server via SHA-256; the copies are deleted afterwards. The number is spread over all shares; files larger than 256 MB are left out. Files changed or deleted since the backup cannot be compared and are only counted. Any difference fails the maintenance and sends a notification. If the repository holds a system backup, its database dump is also restored and checked for readability. 0 turns the test restore off.</value>
   </data>
   <data name="Web_Backup_Maintenance_Mirror" xml:space="preserve">
     <value>Mirror</value>
   </data>
   <data name="Web_Backup_Maintenance_MirrorHelp" xml:space="preserve">
-    <value>After a successful check, new backup points are copied into this second repository, ideally on another medium or at another location (3-2-1 rule).</value>
+    <value>A mirror is a second, independent copy of this repository, ideally on another medium or at another location (3-2-1 rule). After every successful check, all backup points not yet in the mirror are copied there and the mirror is checked as well. If the check of this repository fails, nothing is copied, so damaged data never reaches the mirror. The mirror's own maintenance removes old backup points with the same retention rules as the jobs.</value>
   </data>
   <data name="Web_Backup_Maintenance_NoMirror" xml:space="preserve">
     <value>No mirror</value>
@@ -7055,13 +7055,19 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>This rclone remote type is not allowed (local, alias, crypt, union, …).</value>
   </data>
   <data name="Web_Backup_Backend_Smb" xml:space="preserve">
-    <value>SMB (External Storage connection)</value>
+    <value>SMB</value>
   </data>
   <data name="Web_Backup_Repos_SmbConnection" xml:space="preserve">
     <value>SMB connection</value>
   </data>
   <data name="Web_Backup_Repos_SmbConnectionHelp" xml:space="preserve">
-    <value>An existing SMB connection from External Storage; server and credentials are reused. Nothing is mounted: the bundled rclone talks SMB directly. rclone cannot require signing or encryption itself, it uses both when the server requires them – so set the share to require encryption on the server.</value>
+    <value>An existing SMB connection from External Storage; server and credentials are reused. Nothing is mounted: the bundled rclone talks SMB directly.</value>
+  </data>
+  <data name="Web_Backup_Repos_SmbEncryptionHint" xml:space="preserve">
+    <value>The server must require encryption for this share (Samba: smb encrypt = required; Windows: Set-SmbShare -EncryptData $true). rclone cannot require encryption itself, so Kaimo checks the share before every backup and refuses it while the server accepts unencrypted connections.</value>
+  </data>
+  <data name="Web_Backup_Error_smb_encryption_not_enforced" xml:space="preserve">
+    <value>The SMB server does not require encryption for this share. Require it on the server (Samba: smb encrypt = required; Windows: Set-SmbShare -EncryptData $true).</value>
   </data>
   <data name="Web_Backup_Repos_SmbPath" xml:space="preserve">
     <value>Share and folder</value>

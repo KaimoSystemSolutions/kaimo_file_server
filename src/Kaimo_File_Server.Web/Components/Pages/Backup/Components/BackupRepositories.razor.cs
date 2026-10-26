@@ -50,7 +50,7 @@ public partial class BackupRepositories
             var f = VM.RepositoryForm;
             return !string.IsNullOrWhiteSpace(f.Name) && f.Backend switch
             {
-                BackupBackend.Local => !string.IsNullOrWhiteSpace(f.Path),
+                BackupBackend.Local => !string.IsNullOrWhiteSpace(LocalSubPath ?? f.Path),
                 BackupBackend.Sftp => f.ConnectionId != Guid.Empty && !string.IsNullOrWhiteSpace(f.Path),
                 BackupBackend.Rest => !string.IsNullOrWhiteSpace(f.Endpoint),
                 BackupBackend.S3 => !string.IsNullOrWhiteSpace(f.Endpoint) && !string.IsNullOrWhiteSpace(f.Bucket),
@@ -61,6 +61,18 @@ public partial class BackupRepositories
                 _ => false,
             };
         }
+    }
+
+    // With a single allowed root, the root is shown as a fixed, non-editable prefix and only
+    // the folder below it is typed. Several roots (or a path outside the root) keep the free field.
+    private string? LocalPrefix => VM.LocalRoots.Count == 1 ? VM.LocalRoots[0].TrimEnd('/') + "/" : null;
+
+    private string? LocalSubPath => LocalPrefix is { } prefix ? BackupUi.LocalSubPath(VM.RepositoryForm.Path, prefix) : null;
+
+    private Task SetLocalSubPathAsync(string? value)
+    {
+        VM.RepositoryForm.Path = LocalPrefix + (value ?? string.Empty).TrimStart('/');
+        return Changed();
     }
 
     private void Select(Guid id)

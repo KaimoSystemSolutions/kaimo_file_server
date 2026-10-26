@@ -12,13 +12,13 @@
         <span class="backup-time">
             <input class="edit-input" type="time" value="@Times[index].ToString("HH:mm", CultureInfo.InvariantCulture)"
                    aria-label="@R("Web_Backup_Schedule_Time")" @onchange="e => SetTime(index, e.Value)" />
-            <button type="button" class="btn-icon btn-icon--small btn-icon--danger" title="@R("Web_Backup_Schedule_RemoveTime")"
+            <button type="button" class="btn-icon btn-icon--danger backup-time-remove" title="@R("Web_Backup_Schedule_RemoveTime")"
                     aria-label="@R("Web_Backup_Schedule_RemoveTime")" @onclick="() => Times.RemoveAt(index)">
                 @Assets.SVG("close.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2))
             </button>
         </span>
     }
-    <button type="button" class="btn-secondary btn-secondary--sm" disabled="@(Times.Count >= 24)" @onclick="AddTime">
+    <button type="button" class="btn-secondary backup-time-add" disabled="@(Times.Count >= 24)" @onclick="AddTime">
         @Assets.SVG("plus.svg", new SvgOptions(Width: 12, Height: 12))
         <span>@R("Web_Backup_Schedule_AddTime")</span>
     </button>

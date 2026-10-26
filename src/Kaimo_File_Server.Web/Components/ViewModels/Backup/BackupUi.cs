@@ -11,6 +11,21 @@ public static class BackupUi
 
     public static string BackendLabel(BackupBackend backend) => R("Web_Backup_Backend_" + backend);
 
+    // B2, Azure, GCS and Swift are hidden in the UI only: they are implemented and still work
+    // for existing repositories, but have had too little testing to be offered for new ones.
+    private static readonly BackupBackend[] OfferedBackends =
+        [BackupBackend.Local, BackupBackend.Sftp, BackupBackend.Smb, BackupBackend.Rest, BackupBackend.Rclone, BackupBackend.S3];
+
+    /// <summary>Storage types of the editor's dropdown; a hidden type stays listed while its repository is edited.</summary>
+    public static IReadOnlyList<BackupBackend> SelectableBackends(BackupBackend current)
+        => OfferedBackends.Contains(current) ? OfferedBackends : [.. OfferedBackends, current];
+
+    /// <summary>The part of a local repository path below <paramref name="prefix"/> (ends with '/'); null when outside.</summary>
+    public static string? LocalSubPath(string path, string prefix)
+        => string.IsNullOrEmpty(path) ? string.Empty
+            : path.StartsWith(prefix, StringComparison.Ordinal) ? path[prefix.Length..]
+            : null;
+
     public static string RunStatusLabel(BackupRunStatus status) => R("Web_Backup_Status_" + status);
 
     public static string RunTypeLabel(BackupRunType type) => R("Web_Backup_RunType_" + type);

@@ -21,9 +21,11 @@ public sealed class ResticTargetResolver(
     IDbContextFactory<ApplicationDbContext> dbFactory,
     ICredentialVault vault,
     IConfiguration configuration,
-    ILogger<ResticTargetResolver>? logger = null)
+    ILogger<ResticTargetResolver>? logger = null,
+    IProtocolCommandRunner? smbCommandRunner = null)
 {
     private readonly ILogger _logger = logger ?? NullLogger<ResticTargetResolver>.Instance;
+    private readonly IProtocolCommandRunner _smbCommandRunner = smbCommandRunner ?? new ProtocolCommandRunner();
 
     /// <summary>Internal application data (DataProtection keys, certificates); part of Full backups.</summary>
     public string ApplicationDataPath => configuration["Storage:ApplicationDataPath"] ?? "/data/kaimo-system";
@@ -175,6 +177,7 @@ public sealed class ResticTargetResolver(
             {
                 // Built from the connection on every run; nothing to store back (no tokens).
                 var (smb, credentials) = await LoadSmbConnectionAsync(settings.StorageConnectionId!.Value, ct);
+                await EnsureSmbEncryptionEnforcedAsync(smb, credentials, settings.Path!, ct);
                 tempDir ??= CreateTempDirectory();
                 var configPath = Path.Combine(tempDir, "rclone.conf");
                 await ProtocolTemporaryFile.WriteRestrictedTextAsync(configPath,
@@ -270,6 +273,42 @@ public sealed class ResticTargetResolver(
             // No or undecryptable credentials.
             throw new ResticException("credentials_invalid", "The SMB credentials are invalid.", ex);
         }
+    }
+
+    /// <summary>
+    /// rclone cannot require SMB signing or encryption, it only follows a server that requires
+    /// them. So before every restic process the share is probed with smbclient: a server that lets
+    /// a client use the share unencrypted is refused (<c>smb_encryption_not_enforced</c>), which
+    /// upholds the SMB connection's transport policy for the backup path too.
+    /// </summary>
+    private async Task EnsureSmbEncryptionEnforcedAsync(
+        SmbConnectionSettings smb, SmbCredentials credentials, string path, CancellationToken ct)
+    {
+        ProtocolCommandResult probe;
+        try
+        {
+            probe = await new SmbCommandRemoteFileStore(smb, credentials, _smbCommandRunner)
+                .ProbeServerEncryptionAsync(path, ct);
+        }
+        catch (ProtocolConfigurationException ex)
+        {
+            throw new ResticException(ex.Code, ex.Message, ex);
+        }
+        var output = probe.StandardOutput + "\n" + probe.StandardError;
+        if (probe.ExitCode != 0)
+        {
+            if (output.Contains("NT_STATUS_BAD_NETWORK_NAME", StringComparison.OrdinalIgnoreCase))
+                throw new ResticException("smb_share_not_found", "The SMB share does not exist on the server.");
+            // NT status codes only: debug level 5 prints unrelated "Permission denied" lines.
+            if (output.Contains("NT_STATUS_LOGON_FAILURE", StringComparison.OrdinalIgnoreCase)
+                || output.Contains("NT_STATUS_ACCESS_DENIED", StringComparison.OrdinalIgnoreCase)
+                || output.Contains("NT_STATUS_ACCOUNT_", StringComparison.OrdinalIgnoreCase))
+                throw new ResticException("access_denied", "The SMB server rejected the credentials.");
+            throw new ResticException("repo_unreachable", "The SMB server could not be reached with SMB 3.");
+        }
+        if (!output.Contains(SmbCommandRemoteFileStore.EncryptedMessageMarker, StringComparison.Ordinal))
+            throw new ResticException("smb_encryption_not_enforced",
+                "The SMB server does not require encryption for this share.");
     }
 
     private static RsyncSshConnectionSettings ParseSshSettings(Core.Domain.StorageConnection connection)

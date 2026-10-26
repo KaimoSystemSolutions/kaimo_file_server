@@ -6629,22 +6629,22 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Zu diesen Zeiten werden nicht mehr benötigte Daten aufgeräumt, das Repository geprüft, eine Stichprobe von Dateien testweise wiederhergestellt und neue Sicherungsstände in den Spiegel kopiert. Die Aufbewahrungsregeln der Aufträge werden erneut angewendet (auch auf gespiegelte Sicherungsstände).</value>
   </data>
   <data name="Web_Backup_Maintenance_ReadData" xml:space="preserve">
-    <value>Daten monatlich lesen</value>
+    <value>Gespeicherte Daten monatlich auslesen und prüfen</value>
   </data>
   <data name="Web_Backup_Maintenance_ReadDataHelp" xml:space="preserve">
-    <value>Die erste Prüfung jedes Monats liest und verifiziert zusätzlich ein Zwölftel der gespeicherten Daten, so wird einmal im Jahr alles gelesen. Bei entfernten Repositorys verursacht das Download-Verkehr.</value>
+    <value>Die normale Prüfung kontrolliert nur die Struktur des Repositorys (Index und Verweise), nicht den gespeicherten Inhalt. Mit dieser Option lädt die erste Wartung jedes Monats zusätzlich ein Zwölftel der gespeicherten Daten herunter, entschlüsselt es und prüft die Prüfsummen. Nach zwölf Monaten ist jeder Teil einmal gelesen; so fallen Schäden am Speichermedium auf, bevor eine Wiederherstellung die Daten braucht. Bei entfernten Repositorys entsteht dadurch pro Monat Download-Verkehr von etwa einem Zwölftel der Repository-Größe.</value>
   </data>
   <data name="Web_Backup_Maintenance_SampleSize" xml:space="preserve">
-    <value>Test-Wiederherstellung (Dateien)</value>
+    <value>Test-Wiederherstellung: Anzahl Dateien</value>
   </data>
   <data name="Web_Backup_Maintenance_SampleSizeHelp" xml:space="preserve">
-    <value>Anzahl zufällig gewählter Dateien (je bis 256 MB), die aus dem neuesten Sicherungsstand jeder Freigabe wiederhergestellt und mit der aktuellen Datei verglichen werden. Seit der Sicherung geänderte oder gelöschte Dateien werden übersprungen. 0 schaltet die Test-Wiederherstellung ab.</value>
+    <value>Nach einer erfolgreichen Prüfung werden so viele zufällig gewählte Dateien aus dem neuesten Sicherungsstand jeder Freigabe in einen versteckten temporären Ordner wiederhergestellt und per SHA-256 mit der aktuellen Datei auf dem Server verglichen; die Kopien werden danach gelöscht. Die Anzahl wird auf alle Freigaben verteilt; Dateien über 256 MB bleiben außen vor. Seit der Sicherung geänderte oder gelöschte Dateien lassen sich nicht vergleichen und werden nur gezählt. Jede Abweichung lässt die Wartung fehlschlagen und löst eine Benachrichtigung aus. Enthält das Repository eine Systemsicherung, wird zusätzlich deren Datenbank-Dump wiederhergestellt und auf Lesbarkeit geprüft. 0 schaltet die Test-Wiederherstellung ab.</value>
   </data>
   <data name="Web_Backup_Maintenance_Mirror" xml:space="preserve">
     <value>Spiegel</value>
   </data>
   <data name="Web_Backup_Maintenance_MirrorHelp" xml:space="preserve">
-    <value>Nach einer erfolgreichen Prüfung werden neue Sicherungsstände in dieses zweite Repository kopiert, idealerweise auf einem anderen Medium oder an einem anderen Ort (3-2-1-Regel).</value>
+    <value>Ein Spiegel ist eine zweite, unabhängige Kopie dieses Repositorys, idealerweise auf einem anderen Medium oder an einem anderen Ort (3-2-1-Regel). Nach jeder erfolgreichen Prüfung werden alle Sicherungsstände, die noch nicht im Spiegel liegen, dorthin kopiert, und der Spiegel wird ebenfalls geprüft. Schlägt die Prüfung dieses Repositorys fehl, wird nichts kopiert, damit beschädigte Daten nie in den Spiegel gelangen. Die Wartung des Spiegels entfernt alte Sicherungsstände nach denselben Aufbewahrungsregeln wie die Aufträge.</value>
   </data>
   <data name="Web_Backup_Maintenance_NoMirror" xml:space="preserve">
     <value>Kein Spiegel</value>
@@ -7055,13 +7055,19 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Dieser rclone-Remote-Typ ist nicht erlaubt (local, alias, crypt, union, …).</value>
   </data>
   <data name="Web_Backup_Backend_Smb" xml:space="preserve">
-    <value>SMB (Verbindung aus „Externer Speicher“)</value>
+    <value>SMB</value>
   </data>
   <data name="Web_Backup_Repos_SmbConnection" xml:space="preserve">
     <value>SMB-Verbindung</value>
   </data>
   <data name="Web_Backup_Repos_SmbConnectionHelp" xml:space="preserve">
-    <value>Eine vorhandene SMB-Verbindung aus „Externer Speicher“; Server und Zugangsdaten werden übernommen. Es wird nichts eingebunden: das mitgelieferte rclone spricht SMB direkt. rclone kann Signierung und Verschlüsselung nicht selbst erzwingen, nutzt beides aber, wenn der Server es verlangt – Verschlüsselung daher serverseitig für die Freigabe erzwingen.</value>
+    <value>Eine vorhandene SMB-Verbindung aus „Externer Speicher“; Server und Zugangsdaten werden übernommen. Es wird nichts eingebunden: das mitgelieferte rclone spricht SMB direkt.</value>
+  </data>
+  <data name="Web_Backup_Repos_SmbEncryptionHint" xml:space="preserve">
+    <value>Der Server muss für diese Freigabe Verschlüsselung erzwingen (Samba: smb encrypt = required; Windows: Set-SmbShare -EncryptData $true). rclone kann Verschlüsselung nicht selbst verlangen, daher prüft Kaimo die Freigabe vor jeder Sicherung und verweigert sie, solange der Server unverschlüsselte Verbindungen annimmt.</value>
+  </data>
+  <data name="Web_Backup_Error_smb_encryption_not_enforced" xml:space="preserve">
+    <value>Der SMB-Server erzwingt für diese Freigabe keine Verschlüsselung. Bitte serverseitig erzwingen (Samba: smb encrypt = required; Windows: Set-SmbShare -EncryptData $true).</value>
   </data>
   <data name="Web_Backup_Repos_SmbPath" xml:space="preserve">
     <value>Freigabe und Ordner</value>

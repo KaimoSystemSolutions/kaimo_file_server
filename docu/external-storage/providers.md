@@ -83,7 +83,9 @@ credential payload.
   (`RemoteFileStoreSyncAdapter`).
 - Restic backup repositories of type SMB reuse the connection: `ParseAndValidate` and
   `ReadCredentials` are shared with `ResticTargetResolver`, which turns the connection into an rclone
-  SMB remote (see [File backup](../operations/file-backup-restic.md#repositories)).
+  SMB remote (see [File backup](../operations/file-backup-restic.md#repositories)). As rclone cannot
+  require encryption, `SmbCommandRemoteFileStore.ProbeServerEncryptionAsync` checks before every
+  restic process that the server enforces it for the share.
 
 ### SFTP (`SftpStorageConnectionProvider.cs`)
 

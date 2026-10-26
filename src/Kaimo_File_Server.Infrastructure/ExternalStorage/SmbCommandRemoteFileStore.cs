@@ -102,12 +102,26 @@ internal sealed class SmbCommandRemoteFileStore(
             $"rename {QuoteRemote(source)} {QuoteRemote(destination)}", false, cancellationToken);
     }
 
+    /// <summary>smbclient's debug line (level 5) for a message it sent encrypted.</summary>
+    internal const string EncryptedMessageMarker = "Encrypted SMB2 message";
+
+    /// <summary>
+    /// Connects to <paramref name="share"/> with SMB 3 but without requesting signing or encryption,
+    /// at debug level 5, and returns the result without throwing. Samba's client always encrypts
+    /// when the server requires it, so <see cref="EncryptedMessageMarker"/> in the output shows that
+    /// the server enforces encryption for this share (used for clients that cannot require it
+    /// themselves, such as rclone for restic SMB repositories).
+    /// </summary>
+    internal Task<ProtocolCommandResult> ProbeServerEncryptionAsync(string share, CancellationToken cancellationToken)
+        => RunAsync(Split(Normalize(share)).Share, "pwd", false, cancellationToken, throwOnFailure: false, encryptionProbe: true);
+
     private async Task<ProtocolCommandResult> RunAsync(
         string? share,
         string? command,
         bool listShares,
         CancellationToken cancellationToken,
-        bool throwOnFailure = true)
+        bool throwOnFailure = true,
+        bool encryptionProbe = false)
     {
         string authFile = ProtocolTemporaryFile.CreatePath();
         try
@@ -131,7 +145,10 @@ internal sealed class SmbCommandRemoteFileStore(
                 _ => "SMB3"
             };
             arguments.AddRange(["--option", $"client min protocol={minimumProtocol}"]);
-            arguments.Add("--client-protection=encrypt");
+            if (encryptionProbe)
+                arguments.AddRange(["--client-protection=off", "-d", "5"]);
+            else
+                arguments.Add("--client-protection=encrypt");
             if (command is not null)
                 arguments.AddRange(["-c", command]);
             return await runner.RunAsync("smbclient", arguments, cancellationToken, throwOnFailure);
