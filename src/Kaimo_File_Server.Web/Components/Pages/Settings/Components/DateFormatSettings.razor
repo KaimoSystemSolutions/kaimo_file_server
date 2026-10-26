@@ -1,6 +1,7 @@
 @using System.Globalization
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Services
+@inject NavigationManager Nav
 
 <div class="detail-section">
     <span class="detail-label">@Resources.Web_Settings_DateFormat_Detail</span>
@@ -55,7 +56,13 @@
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
 
-    private async Task Save() { await VM.SaveDateFormatAsync(); StateHasChanged(); }
+    // Language + date/time format are saved together; a full reload re-renders every
+    // page and the layout with the new culture and display format.
+    private async Task Save()
+    {
+        if (await VM.SaveRegionAsync()) Nav.NavigateTo(Nav.Uri, forceLoad: true);
+        else StateHasChanged();
+    }
 
     private static string Label(string key) => Resources.ResourceManager.GetString(key) ?? key;
 

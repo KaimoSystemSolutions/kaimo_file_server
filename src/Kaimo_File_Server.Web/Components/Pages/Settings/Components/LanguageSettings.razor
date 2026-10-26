@@ -6,11 +6,10 @@
         <select class="edit-input settings-select" @bind="VM.SelectedLanguage">
             @foreach (var lang in SettingsViewModel.AvailableLanguages) { <option value="@lang.Key">@lang.Value</option> }
         </select>
-        <button class="btn-primary" @onclick="Save">@Resources.Web_Settings_Button_Save</button>
     </div>
 </div>
 
+@* Saved together with the date/time format by the button in DateFormatSettings. *@
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
-    private async Task Save() { await VM.SaveLanguageAsync(); StateHasChanged(); }
 }

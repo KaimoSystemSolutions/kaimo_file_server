@@ -40,6 +40,12 @@ public partial class SettingsViewModel
         ["12h"] = "Web_Settings_TimeFormat_12h",
     };
 
+    // ── Save Region (single save button for language + date/time format) ──
+
+    /// <summary>Saves language, then date/time format; stops at the first failure so its error stays visible.</summary>
+    public async Task<bool> SaveRegionAsync()
+        => await SaveLanguageAsync() && await SaveDateFormatAsync();
+
     // ── Save Language ──
 
     public async Task<bool> SaveLanguageAsync()
