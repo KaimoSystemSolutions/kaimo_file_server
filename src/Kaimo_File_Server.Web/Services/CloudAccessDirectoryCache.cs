@@ -67,6 +67,10 @@ public sealed class CloudAccessDirectoryCache
     public void InvalidateShare(Guid shareId)
         => _shareGenerations.AddOrUpdate(shareId, 1, static (_, generation) => generation + 1);
 
+    /// <summary>Drops the cached listing of one directory (full page reload of that folder).</summary>
+    public void InvalidatePath(Guid shareId, string relativePath)
+        => _cache.Remove(CreateKey(shareId, relativePath));
+
     public void InvalidateAll() => Interlocked.Increment(ref _globalGeneration);
 
     private CacheKey CreateKey(Guid shareId, string relativePath)

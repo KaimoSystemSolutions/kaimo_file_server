@@ -100,6 +100,11 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
                 return;
             }
 
+            // The view model is circuit-scoped, so its first load is a full page load
+            // (F5 / deep link): never answer it from the cross-circuit cache.
+            if (_share is null)
+                _directoryCache.InvalidatePath(share.Id, relativePath);
+
             await ReplaceConnectionAsync(connectionRecord);
             _share = share;
             _shareWritable = permission == CloudAccessPermission.Write;
@@ -130,8 +135,13 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
     public override async Task RefreshCurrentDirectoryAsync()
     {
         if (_share is null) return;
-        _directoryCache.InvalidateShare(_share.Id);
+        InvalidateListingCache();
         await LoadShareAsync(_share.Id.ToString(), CurrentPath);
+    }
+
+    public override void InvalidateListingCache()
+    {
+        if (_share is not null) _directoryCache.InvalidateShare(_share.Id);
     }
 
     public override async Task<OperationResult> CreateFolderAsync(string folderName)

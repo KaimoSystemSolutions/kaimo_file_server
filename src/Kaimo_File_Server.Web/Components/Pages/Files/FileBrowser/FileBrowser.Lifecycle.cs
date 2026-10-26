@@ -21,10 +21,12 @@ public partial class FileBrowser
 {
 // ========== Lifecycle ==========
 
-    // Explicit refresh (context menu) also ends the undo history of this folder.
+    // Explicit refresh (context menu) also ends the undo history of this folder and
+    // bypasses cached listings (virtual shares).
     public async Task Refresh()
     {
         VM.ClearUndo();
+        VM.InvalidateListingCache();
         await OnParametersSetAsync();
     }
 

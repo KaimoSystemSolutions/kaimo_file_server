@@ -268,6 +268,9 @@ public interface IFileBrowserViewModel
     /// <summary>Drops the undo history (explicit refresh).</summary>
     void ClearUndo() { }
 
+    /// <summary>Drops cached directory listings so the next load hits the backend (explicit refresh).</summary>
+    void InvalidateListingCache() { }
+
     /// <summary>
     /// Groups all operations until disposal into one undo entry; null when the backend
     /// has no undo or a group is already open (<c>using</c> accepts null).

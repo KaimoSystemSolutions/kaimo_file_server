@@ -35,6 +35,10 @@ public abstract class RemoteFileBrowserViewModelBase : IFileBrowserViewModel
     /// </summary>
     public virtual bool CanManageVirtualShareAcls => false;
 
+    /// <inheritdoc cref="IFileBrowserViewModel.InvalidateListingCache" />
+    /// <remarks>Declared here for the same interface-dispatch reason as above.</remarks>
+    public virtual void InvalidateListingCache() { }
+
     public IEnumerable<FileMetadata> Directories
         => Items.Where(item => item.IsDirectory).OrderBy(item => item.Name);
 
