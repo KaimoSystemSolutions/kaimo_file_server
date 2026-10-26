@@ -243,7 +243,7 @@ Reuse these before writing anything new. New patterns that will be needed more t
 
 | Component | Purpose |
 |---|---|
-| `Tabs` / `Tab` | All tab strips. Variants: horizontal underline (default), vertical (settings nav), `detail-tabs--panel` (full-bleed bar inside detail panes). Active = accent underline/indicator. |
+| `Tabs` / `Tab` | All tab strips. Variants: horizontal underline (default), vertical (settings nav), `detail-tabs--panel` (full-bleed bar inside detail panes). Active = accent underline/indicator. Keyboard focus ring is drawn inset (`outline-offset: -2px`) because the strip scrolls and would clip an outside ring. |
 | `MultiSelect<T>` | Compact checkbox dropdown for small option sets (e.g. context-menu settings). |
 | `PrincipalPickerField` | Single/multi selection of users, groups, roles, departments, shares: modal with search, type tabs, scrollable list, selected chips. Always use it for principal selection. |
 | `StatusBadge` | Every entity status pill; `Tone` = Positive/Negative/Warning/Neutral. See §10.4. |

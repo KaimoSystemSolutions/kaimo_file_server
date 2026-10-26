@@ -80,6 +80,12 @@
         opacity: 1;
     }
 
+    /* The strip scrolls (overflow-x: auto), which clips an outside ring; draw it inset instead. */
+    .detail-tabs ::deep .detail-tab:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: -2px;
+    }
+
     .detail-tabs ::deep .detail-tab:disabled {
         cursor: not-allowed;
         opacity: 0.48;

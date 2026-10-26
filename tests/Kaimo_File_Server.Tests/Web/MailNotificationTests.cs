@@ -653,6 +653,39 @@ public sealed class MailNotificationTests : DatabaseTestBase
     }
 
     [Fact]
+    public void MailServerSettingsTab_GroupsTheFormInTabs_BelowTheSwitchCard()
+    {
+        using var ctx = PageContext(ManagementPermission.ManageMailServer);
+        var cut = ctx.Render<Kaimo_File_Server.Web.Components.Pages.Settings.Components.MailServerSettings>();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("#smtp-host")), TimeSpan.FromSeconds(5));
+
+        // The on/off switch and the connection status share one card above the tabs.
+        var card = cut.Find(".mail-server__card");
+        Assert.NotNull(card.QuerySelector(".toggle-switch input[type=checkbox]"));
+        Assert.NotNull(card.QuerySelector(".status-badge"));
+
+        // Server tab first: host/port/security only; the other groups are one click away.
+        var tabs = cut.FindAll(".mail-server__tabs .detail-tab");
+        Assert.Equal(4, tabs.Count);
+        Assert.NotEmpty(cut.FindAll("#smtp-security"));
+        Assert.Empty(cut.FindAll("#smtp-from"));
+
+        cut.FindAll(".mail-server__tabs .detail-tab")[1].Click();
+        Assert.NotEmpty(cut.FindAll("#smtp-auth"));
+        Assert.Empty(cut.FindAll("#smtp-host"));
+
+        cut.FindAll(".mail-server__tabs .detail-tab")[2].Click();
+        Assert.NotEmpty(cut.FindAll("#smtp-from"));
+
+        cut.FindAll(".mail-server__tabs .detail-tab")[3].Click();
+        Assert.NotEmpty(cut.FindAll("#smtp-rate"));
+
+        // Save and the test mail stay reachable on every tab.
+        Assert.NotEmpty(cut.FindAll(".settings-actions .btn-primary"));
+        Assert.NotEmpty(cut.FindAll("#smtp-test-to"));
+    }
+
+    [Fact]
     public async Task MailServerSettings_TestMail_GoesToTheEnteredAddress()
     {
         var vm = MailServerVm(ManagementPermission.ManageMailServer, out _);

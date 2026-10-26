@@ -3090,9 +3090,6 @@
   <data name="Web_Jobs_ItemCounter" xml:space="preserve">
     <value>{0} / {1}</value>
   </data>
-  <data name="Web_Transfer_Items" xml:space="preserve">
-    <value>{0} Elemente</value>
-  </data>
   <data name="Web_CloudAccess_Title" xml:space="preserve">
     <value>Cloud-Zugriff</value>
   </data>
@@ -3423,8 +3420,92 @@
   <data name="Web_CloudAccess_Error_ReadOnly" xml:space="preserve">
     <value>Dieser virtuelle Share ist schreibgeschützt.</value>
   </data>
+  <data name="Web_Transfer_Error_NoSelection" xml:space="preserve">
+    <value>Wähle mindestens ein Element aus.</value>
+  </data>
+  <data name="Web_Transfer_Error_RemoteCut" xml:space="preserve">
+    <value>Elemente aus einer virtuellen Freigabe können nur kopiert werden.</value>
+  </data>
+  <data name="Web_Transfer_Error_InvalidPath" xml:space="preserve">
+    <value>Der Zielordner ist ungültig.</value>
+  </data>
+  <data name="Web_Transfer_Error_SignInRequired" xml:space="preserve">
+    <value>Eine Anmeldung ist erforderlich.</value>
+  </data>
+  <data name="Web_Transfer_Error_AccessDenied" xml:space="preserve">
+    <value>Du hast keine Berechtigung, diese Elemente zu übertragen.</value>
+  </data>
+  <data name="Web_Transfer_Error_Cancelled" xml:space="preserve">
+    <value>Die Übertragung wurde abgebrochen.</value>
+  </data>
+  <data name="Web_Transfer_Error_Failed" xml:space="preserve">
+    <value>Die Elemente konnten nicht übertragen werden.</value>
+  </data>
   <data name="Web_Transfer_PartialFailure" xml:space="preserve">
     <value>{0} von {1} Elementen übertragen. Die übrigen konnten nicht übertragen werden.</value>
+  </data>
+  <data name="Web_Transfer_CopySuccess" xml:space="preserve">
+    <value>Elemente erfolgreich kopiert.</value>
+  </data>
+  <data name="Web_Transfer_CutSuccess" xml:space="preserve">
+    <value>Elemente erfolgreich verschoben.</value>
+  </data>
+  <data name="Web_Transfer_Copy" xml:space="preserve">
+    <value>Kopieren</value>
+  </data>
+  <data name="Web_Transfer_Cut" xml:space="preserve">
+    <value>Ausschneiden</value>
+  </data>
+  <data name="Web_Transfer_Paste" xml:space="preserve">
+    <value>Einfügen</value>
+  </data>
+  <data name="Web_Undo_Button" xml:space="preserve">
+    <value>Rückgängig</value>
+  </data>
+  <data name="Web_Undo_Tooltip" xml:space="preserve">
+    <value>Letzte Aktion in diesem Ordner rückgängig machen (Strg+Z)</value>
+  </data>
+  <data name="Web_Undo_Done" xml:space="preserve">
+    <value>Aktion rückgängig gemacht.</value>
+  </data>
+  <data name="Web_Undo_Failed" xml:space="preserve">
+    <value>Die Aktion konnte nicht rückgängig gemacht werden. Das Element wurde zwischenzeitlich möglicherweise geändert oder entfernt.</value>
+  </data>
+  <data name="Web_Undo_Partial" xml:space="preserve">
+    <value>Teilweise rückgängig gemacht: {0} von {1} Elementen konnten nicht wiederhergestellt werden. Sie wurden zwischenzeitlich möglicherweise geändert oder entfernt.</value>
+  </data>
+  <data name="Web_Transfer_CopyingOne" xml:space="preserve">
+    <value>Kopieren: {0}</value>
+  </data>
+  <data name="Web_Transfer_CopyingMany" xml:space="preserve">
+    <value>{0} Elemente kopieren</value>
+  </data>
+  <data name="Web_Transfer_CuttingOne" xml:space="preserve">
+    <value>Ausschneiden: {0}</value>
+  </data>
+  <data name="Web_Transfer_CuttingMany" xml:space="preserve">
+    <value>{0} Elemente ausschneiden</value>
+  </data>
+  <data name="Web_Jobs_FileTransfer_Title" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="Web_Transfer_JobCopy" xml:space="preserve">
+    <value>Kopieren</value>
+  </data>
+  <data name="Web_Transfer_JobCut" xml:space="preserve">
+    <value>Verschieben</value>
+  </data>
+  <data name="Web_Transfer_Items" xml:space="preserve">
+    <value>{0} Elemente</value>
+  </data>
+  <data name="Web_Transfer_Progress" xml:space="preserve">
+    <value>Übertragung wird vorbereitet…</value>
+  </data>
+  <data name="Web_Transfer_ProgressItem" xml:space="preserve">
+    <value>Übertrage: {0}</value>
+  </data>
+  <data name="Web_Properties_SizeUnavailable" xml:space="preserve">
+    <value>Nicht verfügbar</value>
   </data>
   <data name="Web_Settings_Tab_CloudAccess" xml:space="preserve">
     <value>Verzeichnis-Cache</value>
@@ -5109,9 +5190,6 @@
   <data name="Notification_Event_certificate_renewal_failed_Desc" xml:space="preserve">
     <value>Die automatische Erneuerung des HTTPS-Zertifikats ist fehlgeschlagen.</value>
   </data>
-  <data name="Web_MailServer_Description" xml:space="preserve">
-    <value>Der SMTP-Server, über den Benachrichtigungen versendet werden. Das Passwort wird verschlüsselt gespeichert und nie wieder angezeigt.</value>
-  </data>
   <data name="Web_MailServer_ConnectionStatus" xml:space="preserve">
     <value>Verbindungsstatus</value>
   </data>
@@ -5126,6 +5204,18 @@
   </data>
   <data name="Web_MailServer_Enabled" xml:space="preserve">
     <value>E-Mails versenden</value>
+  </data>
+  <data name="Web_MailServer_Tab_Server" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="Web_MailServer_Tab_Auth" xml:space="preserve">
+    <value>Anmeldung</value>
+  </data>
+  <data name="Web_MailServer_Tab_Sender" xml:space="preserve">
+    <value>Absender</value>
+  </data>
+  <data name="Web_MailServer_Tab_Delivery" xml:space="preserve">
+    <value>Zustellung</value>
   </data>
   <data name="Web_MailServer_Host" xml:space="preserve">
     <value>SMTP-Server</value>
@@ -5638,7 +5728,7 @@
     <value>Indexierung gestartet. Der Fortschritt wird unten angezeigt.</value>
   </data>
   <data name="Web_Settings_Search_ReindexStartedShare" xml:space="preserve">
-    <value>Indexierung für Share &apos;{0}&apos; gestartet. Der Fortschritt wird unten angezeigt.</value>
+    <value>Indexierung für Share '{0}' gestartet. Der Fortschritt wird unten angezeigt.</value>
   </data>
   <data name="Web_Settings_Search_ReindexAlreadyRunning" xml:space="preserve">
     <value>Es läuft bereits eine Indexierung.</value>
@@ -6883,87 +6973,6 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Backup_Activity_DumpBroken" xml:space="preserve">
     <value>NICHT lesbar - der neueste Datenbank-Dump ist beschädigt</value>
   </data>
-  <data name="Web_Transfer_Error_NoSelection" xml:space="preserve">
-    <value>Wähle mindestens ein Element aus.</value>
-  </data>
-  <data name="Web_Transfer_Error_RemoteCut" xml:space="preserve">
-    <value>Elemente aus einer virtuellen Freigabe können nur kopiert werden.</value>
-  </data>
-  <data name="Web_Transfer_Error_InvalidPath" xml:space="preserve">
-    <value>Der Zielordner ist ungültig.</value>
-  </data>
-  <data name="Web_Transfer_Error_SignInRequired" xml:space="preserve">
-    <value>Eine Anmeldung ist erforderlich.</value>
-  </data>
-  <data name="Web_Transfer_Error_AccessDenied" xml:space="preserve">
-    <value>Du hast keine Berechtigung, diese Elemente zu übertragen.</value>
-  </data>
-  <data name="Web_Transfer_Error_Cancelled" xml:space="preserve">
-    <value>Die Übertragung wurde abgebrochen.</value>
-  </data>
-  <data name="Web_Transfer_Error_Failed" xml:space="preserve">
-    <value>Die Elemente konnten nicht übertragen werden.</value>
-  </data>
-  <data name="Web_Transfer_CopySuccess" xml:space="preserve">
-    <value>Elemente erfolgreich kopiert.</value>
-  </data>
-  <data name="Web_Transfer_CutSuccess" xml:space="preserve">
-    <value>Elemente erfolgreich verschoben.</value>
-  </data>
-  <data name="Web_Transfer_Copy" xml:space="preserve">
-    <value>Kopieren</value>
-  </data>
-  <data name="Web_Transfer_Cut" xml:space="preserve">
-    <value>Ausschneiden</value>
-  </data>
-  <data name="Web_Transfer_Paste" xml:space="preserve">
-    <value>Einfügen</value>
-  </data>
-  <data name="Web_Undo_Button" xml:space="preserve">
-    <value>Rückgängig</value>
-  </data>
-  <data name="Web_Undo_Tooltip" xml:space="preserve">
-    <value>Letzte Aktion in diesem Ordner rückgängig machen (Strg+Z)</value>
-  </data>
-  <data name="Web_Undo_Done" xml:space="preserve">
-    <value>Aktion rückgängig gemacht.</value>
-  </data>
-  <data name="Web_Undo_Failed" xml:space="preserve">
-    <value>Die Aktion konnte nicht rückgängig gemacht werden. Das Element wurde zwischenzeitlich möglicherweise geändert oder entfernt.</value>
-  </data>
-  <data name="Web_Undo_Partial" xml:space="preserve">
-    <value>Teilweise rückgängig gemacht: {0} von {1} Elementen konnten nicht wiederhergestellt werden. Sie wurden zwischenzeitlich möglicherweise geändert oder entfernt.</value>
-  </data>
-  <data name="Web_Transfer_CopyingOne" xml:space="preserve">
-    <value>Kopieren: {0}</value>
-  </data>
-  <data name="Web_Transfer_CopyingMany" xml:space="preserve">
-    <value>{0} Elemente kopieren</value>
-  </data>
-  <data name="Web_Transfer_CuttingOne" xml:space="preserve">
-    <value>Ausschneiden: {0}</value>
-  </data>
-  <data name="Web_Transfer_CuttingMany" xml:space="preserve">
-    <value>{0} Elemente ausschneiden</value>
-  </data>
-  <data name="Web_Jobs_FileTransfer_Title" xml:space="preserve">
-    <value>{0}: {1}</value>
-  </data>
-  <data name="Web_Transfer_JobCopy" xml:space="preserve">
-    <value>Kopieren</value>
-  </data>
-  <data name="Web_Transfer_JobCut" xml:space="preserve">
-    <value>Verschieben</value>
-  </data>
-  <data name="Web_Transfer_Progress" xml:space="preserve">
-    <value>Übertragung wird vorbereitet…</value>
-  </data>
-  <data name="Web_Transfer_ProgressItem" xml:space="preserve">
-    <value>Übertrage: {0}</value>
-  </data>
-  <data name="Web_Properties_SizeUnavailable" xml:space="preserve">
-    <value>Nicht verfügbar</value>
-  </data>
   <data name="Web_Backup_Backend_B2" xml:space="preserve">
     <value>Backblaze B2</value>
   </data>
@@ -7695,5 +7704,8 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   </data>
   <data name="Web_Backup_Error_ssh_password_missing" xml:space="preserve">
     <value>Die SSH-Verbindung hat kein Kennwort.</value>
+  </data>
+  <data name="Web_Settings_Group_General_Settings" xml:space="preserve">
+    <value>Globale Konfiguration</value>
   </data>
 </root>

@@ -5190,9 +5190,6 @@
   <data name="Notification_Event_certificate_renewal_failed_Desc" xml:space="preserve">
     <value>The automatic HTTPS certificate renewal failed.</value>
   </data>
-  <data name="Web_MailServer_Description" xml:space="preserve">
-    <value>The SMTP server that sends notification mails. The password is stored encrypted and never shown again.</value>
-  </data>
   <data name="Web_MailServer_ConnectionStatus" xml:space="preserve">
     <value>Connection status</value>
   </data>
@@ -5207,6 +5204,18 @@
   </data>
   <data name="Web_MailServer_Enabled" xml:space="preserve">
     <value>Send mails</value>
+  </data>
+  <data name="Web_MailServer_Tab_Server" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="Web_MailServer_Tab_Auth" xml:space="preserve">
+    <value>Sign-in</value>
+  </data>
+  <data name="Web_MailServer_Tab_Sender" xml:space="preserve">
+    <value>Sender</value>
+  </data>
+  <data name="Web_MailServer_Tab_Delivery" xml:space="preserve">
+    <value>Delivery</value>
   </data>
   <data name="Web_MailServer_Host" xml:space="preserve">
     <value>SMTP server</value>
@@ -5719,7 +5728,7 @@
     <value>Indexing started. Progress is shown below.</value>
   </data>
   <data name="Web_Settings_Search_ReindexStartedShare" xml:space="preserve">
-    <value>Indexing for share &apos;{0}&apos; started. Progress is shown below.</value>
+    <value>Indexing for share '{0}' started. Progress is shown below.</value>
   </data>
   <data name="Web_Settings_Search_ReindexAlreadyRunning" xml:space="preserve">
     <value>An indexing run is already in progress.</value>
@@ -7695,5 +7704,8 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   </data>
   <data name="Web_Backup_Error_ssh_password_missing" xml:space="preserve">
     <value>The SSH connection has no password.</value>
+  </data>
+  <data name="Web_Settings_Group_General_Settings" xml:space="preserve">
+    <value>Global configuration</value>
   </data>
 </root>

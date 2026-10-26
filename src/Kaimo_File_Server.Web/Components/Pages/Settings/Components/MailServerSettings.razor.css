@@ -8,12 +8,61 @@
     max-width: 220px;
 }
 
+/* -- Master switch card (same recipe as the file-service cards) -- */
+.mail-server__card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin: var(--space-3) 0 0;
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-tertiary);
+}
+
+.mail-server__card-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.mail-server__card-icon {
+    display: inline-flex;
+    color: var(--text-secondary);
+}
+
+.mail-server__card-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.mail-server__card-hint {
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--text-tertiary);
+}
+
+.mail-server__card--off .mail-server__card-icon,
+.mail-server__card--off .mail-server__card-name {
+    color: var(--text-tertiary);
+}
+
 .mail-server__status {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: var(--space-2);
-    margin-bottom: var(--space-4);
+    min-height: 22px;
+    margin-top: var(--space-1);
+}
+
+.mail-server__status-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
 }
 
 .mail-server__status-text {

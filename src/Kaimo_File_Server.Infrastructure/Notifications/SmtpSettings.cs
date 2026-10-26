@@ -81,6 +81,22 @@ public sealed record SmtpSettings
     }
 
     /// <summary>
+    /// Moves <see cref="Port"/> to the conventional port of <see cref="Security"/> (25 plain,
+    /// 465 implicit TLS, 587 otherwise) when it is one of those well-known ports; a custom port
+    /// is left alone. Called when the security choice changes, never the other way round.
+    /// </summary>
+    public void ApplySecurityDefaultPort()
+    {
+        if (Port is not (25 or 465 or 587)) return;
+        Port = Security switch
+        {
+            SmtpSecurity.None => 25,
+            SmtpSecurity.SslOnConnect => 465,
+            _ => 587,
+        };
+    }
+
+    /// <summary>
     /// Whether the stored password may be used with these settings: only while the server,
     /// port, transport security and user name are unchanged. Otherwise whoever can edit the
     /// settings could send the stored password to a server of their choice (or in plain text).
