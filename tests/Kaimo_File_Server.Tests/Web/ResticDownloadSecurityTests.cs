@@ -1,4 +1,5 @@
 using System.Text;
+using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Backup;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
@@ -6,6 +7,7 @@ using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Infrastructure.Backup;
 using Kaimo_File_Server.Infrastructure.Backup.Restic;
+using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Tests.Infrastructure;
 using Kaimo_File_Server.Web.Controllers;
 using Kaimo_File_Server.Web.Services;
@@ -40,7 +42,12 @@ public sealed class ResticDownloadSecurityTests : DatabaseTestBase
     private readonly Mock<IUserContextFactory> _contexts = new();
     private readonly Mock<IManagementAuthService> _auth = new();
     private readonly User _admin = new(Guid.NewGuid(), "Admin", "admin", "hash", "nt");
-    private readonly IConfiguration _config = new ConfigurationBuilder().Build();
+    // Resolving an SMB repository writes its rclone.conf into the temp directory.
+    private readonly IConfiguration _config = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Backup:Restic:TempDirectory"] = Path.Combine(Path.GetTempPath(), "kaimo-kit-" + Guid.NewGuid().ToString("N")),
+        }).Build();
 
     public ResticDownloadSecurityTests()
     {
@@ -207,6 +214,44 @@ public sealed class ResticDownloadSecurityTests : DatabaseTestBase
         Assert.DoesNotContain("AKIAEXAMPLE", content);
         await using var db = NewContext();
         Assert.NotNull((await db.BackupRepositories.SingleAsync()).KitDownloadedAtUtc);
+    }
+
+    [Fact]
+    public async Task Kit_Smb_ListsTheConnectionParameters_ButNeverTheSmbPassword()
+    {
+        const string smbPassword = "smb-secret-password";
+        var connection = new StorageConnection
+        {
+            ProviderId = "smb",
+            Name = "NAS",
+            AuthorizationMode = StorageAuthorizationMode.UsernamePassword,
+            SettingsJson = System.Text.Json.JsonSerializer.Serialize(
+                new SmbConnectionSettings("nas.example.com", 1445, "CORP")),
+            State = StorageConnectionState.Ready,
+        };
+        connection.EncryptedCredentialPayload = _vault.ProtectConnectionCredentials(connection,
+            new Dictionary<string, string> { ["username"] = "backup", ["password"] = smbPassword });
+        var repo = new BackupRepository
+        {
+            Name = "NAS",
+            Backend = BackupBackend.Smb,
+            SettingsJson = new ResticRepositorySettings { StorageConnectionId = connection.Id, Path = "backup/kaimo-repo" }.Serialize(),
+        };
+        repo.EncryptedPassword = Resolver.ProtectPassword(repo.Id, RepoPassword);
+        await using (var db = NewContext())
+        {
+            db.StorageConnections.Add(connection);
+            db.BackupRepositories.Add(repo);
+            await db.SaveChangesAsync();
+        }
+
+        var (_, content) = await Catalog().BuildRecoveryKitAsync(new UserContext(_admin, [], [], new HashSet<string>()), repo.Id);
+
+        Assert.Contains("RESTIC_REPOSITORY=rclone:kaimo:backup/kaimo-repo", content);
+        Assert.Contains("SMB backup@nas.example.com:1445, domain CORP, path backup/kaimo-repo", content);
+        Assert.Contains("type smb", content);
+        Assert.Contains("RCLONE_CONFIG=", content);
+        Assert.DoesNotContain(smbPassword, content);
     }
 
     [Fact]

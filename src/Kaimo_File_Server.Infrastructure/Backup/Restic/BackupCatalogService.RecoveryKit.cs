@@ -46,6 +46,13 @@ public partial class BackupCatalogService
                 catch (ExternalStorage.ProtocolConfigurationException) { }
             }
         }
+        if (repository.Backend == BackupBackend.Smb && settings.StorageConnectionId is { } smbConnectionId)
+        {
+            // Resolving above already validated the connection; the password stays out of the kit.
+            var (smb, credentials) = await resolver.LoadSmbConnectionAsync(smbConnectionId, ct);
+            var domain = string.IsNullOrWhiteSpace(credentials.Domain) ? "WORKGROUP" : credentials.Domain;
+            parameters.AppendLine($"SMB {credentials.Username}@{smb.Server}:{smb.Port}, domain {domain}, path {settings.Path!.Trim().Trim('/')}");
+        }
         if (repository.Backend is BackupBackend.Rest && !string.IsNullOrEmpty(resolver.ReadSecrets(repository).RestUsername))
             parameters.AppendLine("RESTIC_REST_USERNAME / RESTIC_REST_PASSWORD");
         if (repository.Backend is BackupBackend.S3)
@@ -75,6 +82,10 @@ public partial class BackupCatalogService
                 break;
             case BackupBackend.Rclone:
                 parameters.AppendLine($"rclone remote [{ResticBackend.RcloneRemoteName}], type {ResticBackend.ParseRcloneConfig(secrets.RcloneConfig).Type} (rclone must be installed)");
+                parameters.AppendLine("RCLONE_CONFIG=<rclone.conf with that remote>");
+                break;
+            case BackupBackend.Smb:
+                parameters.AppendLine($"rclone remote [{ResticBackend.RcloneRemoteName}], type smb with host, port, user, domain above and pass = output of \"rclone obscure <SMB password>\" (rclone must be installed)");
                 parameters.AppendLine("RCLONE_CONFIG=<rclone.conf with that remote>");
                 break;
         }

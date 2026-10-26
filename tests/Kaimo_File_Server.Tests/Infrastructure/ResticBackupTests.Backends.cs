@@ -235,6 +235,144 @@ public partial class ResticBackupTests
             ResticBackend.Validate(BackupBackend.Rclone, new ResticRepositorySettings(), secrets, [])).Code);
     }
 
+    private static readonly Guid SmbConnectionId = Guid.Parse("6f1c2a4e-0d1b-4c55-9a51-3f8f0b9d2c11");
+
+    [Theory]
+    [InlineData("backup/kaimo-repo", "rclone:kaimo:backup/kaimo-repo")]
+    [InlineData("/backup/kaimo-repo/", "rclone:kaimo:backup/kaimo-repo")]
+    [InlineData("backup", "rclone:kaimo:backup")]
+    public void Smb_BuildsRcloneUrl(string path, string expectedUrl)
+    {
+        var settings = new ResticRepositorySettings { StorageConnectionId = SmbConnectionId, Path = path };
+        ResticBackend.Validate(BackupBackend.Smb, settings, new ResticBackendSecrets(), []);
+
+        Assert.Equal(expectedUrl, ResticBackend.BuildUrl(BackupBackend.Smb, settings));
+    }
+
+    [Fact]
+    public void Smb_RequiresConnectionAndShare()
+    {
+        string Code(ResticRepositorySettings settings)
+            => Assert.Throws<ResticException>(() => ResticBackend.Validate(BackupBackend.Smb, settings, new(), [])).Code;
+
+        Assert.Equal("connection_required", Code(new ResticRepositorySettings { Path = "backup/kaimo" }));
+        Assert.Equal("connection_required", Code(new ResticRepositorySettings { StorageConnectionId = Guid.Empty, Path = "backup/kaimo" }));
+        Assert.Equal("path_invalid", Code(new ResticRepositorySettings { StorageConnectionId = SmbConnectionId }));
+        Assert.Equal("smb_share_required", Code(new ResticRepositorySettings { StorageConnectionId = SmbConnectionId, Path = "/" }));
+        Assert.Equal("smb_share_required", Code(new ResticRepositorySettings { StorageConnectionId = SmbConnectionId, Path = "//" }));
+    }
+
+    [Theory]
+    [InlineData("backup/../etc")]
+    [InlineData("../backup")]
+    [InlineData("backup/./x")]
+    [InlineData("backup\nhost = evil")]
+    [InlineData("backup\0x")]
+    [InlineData("other:backup")]
+    [InlineData("backup\\kaimo")]
+    public void Smb_RejectsTraversalAndControlChars(string path)
+        => Assert.Equal("path_invalid", Assert.Throws<ResticException>(() =>
+            ResticBackend.Validate(BackupBackend.Smb, new ResticRepositorySettings { StorageConnectionId = SmbConnectionId, Path = path }, new(), [])).Code);
+
+    [Fact]
+    public void BuildSmbRcloneConfig_WritesTheKaimoSmbRemote_WithAnObscuredPassword()
+    {
+        var config = ResticBackend.BuildSmbRcloneConfig(new SmbConnectionSettings("nas.example.com", 1445), "backup", "Pässwort#1 mit=Leer", "WORKGROUP");
+        var lines = config.Split('\n');
+
+        Assert.Equal("[kaimo]", lines[0]);
+        Assert.Contains("type = smb", lines);
+        Assert.Contains("host = nas.example.com", lines);
+        Assert.Contains("port = 1445", lines);
+        Assert.Contains("user = backup", lines);
+        Assert.Contains("domain = WORKGROUP", lines);
+        Assert.Contains("hide_special_share = true", lines);
+        Assert.DoesNotContain("Pässwort", config);
+        var pass = Assert.Single(lines, l => l.StartsWith("pass = ", StringComparison.Ordinal))["pass = ".Length..];
+        Assert.Matches("^[A-Za-z0-9_-]+$", pass);
+        Assert.EndsWith("\n", config);
+
+        // Without a domain the option is left out (rclone's default WORKGROUP applies).
+        Assert.DoesNotContain("domain", ResticBackend.BuildSmbRcloneConfig(new SmbConnectionSettings("nas.example.com"), "backup", "pw", null));
+        Assert.DoesNotContain("domain", ResticBackend.BuildSmbRcloneConfig(new SmbConnectionSettings("nas.example.com"), "backup", "pw", " "));
+    }
+
+    [Theory]
+    [InlineData("backup\nhost = evil.example.com", "pw", null)]
+    [InlineData("backup", "pw", "CORP\r\nuse_kerberos = true")]
+    [InlineData("back\tup", "pw", null)]
+    [InlineData("backup\0", "pw", null)]
+    [InlineData(" ", "pw", null)]
+    [InlineData("backup", "pw\u0085", null)]
+    public void BuildSmbRcloneConfig_RejectsLineBreaksAndControlCharacters(string user, string password, string? domain)
+        => Assert.Equal("credentials_invalid", Assert.Throws<ResticException>(() =>
+            ResticBackend.BuildSmbRcloneConfig(new SmbConnectionSettings("nas.example.com"), user, password, domain)).Code);
+
+    [Fact]
+    public void RcloneObscure_ReproducesRcloneOutput_WithItsInitializationVector()
+    {
+        // Produced by "rclone obscure 'Pässwort#1 mit=Leer'" (rclone 1.75.2): base64url(IV ‖ AES-256-CTR ciphertext).
+        const string fromRclone = "JNmZDuDofh1DqiAPCe0YDUstEDQTAFkVLUsaB1k6i1k6WJsn";
+        var iv = System.Buffers.Text.Base64Url.DecodeFromChars(fromRclone)[..16];
+
+        Assert.Equal(fromRclone, ResticBackend.RcloneObscure("Pässwort#1 mit=Leer", iv));
+    }
+
+    [Fact]
+    public void RcloneObscure_UsesAFreshInitializationVectorEveryTime()
+    {
+        var first = ResticBackend.RcloneObscure("secret");
+        var second = ResticBackend.RcloneObscure("secret");
+
+        Assert.NotEqual(first, second);
+        // 16 bytes IV + 6 bytes ciphertext, base64url without padding.
+        Assert.Equal(30, first.Length);
+        Assert.Equal(ResticBackend.RcloneObscure("secret", System.Buffers.Text.Base64Url.DecodeFromChars(first)[..16]), first);
+    }
+
+    [Fact]
+    public void RepositoryForm_Smb_SendsTheConnectionAndPath()
+    {
+        var form = new Web.Components.ViewModels.Backup.BackupRepositoryForm
+        {
+            Name = "NAS", Backend = BackupBackend.Smb, ConnectionId = SmbConnectionId, Path = " backup/kaimo ", Bucket = "ignored",
+        };
+
+        var draft = form.ToDraft();
+
+        Assert.Equal(SmbConnectionId, draft.Settings.StorageConnectionId);
+        Assert.Equal("backup/kaimo", draft.Settings.Path);
+        Assert.Null(draft.Settings.Bucket);
+    }
+
+    [Fact]
+    public void ValidateMirror_SmbSameConnection_Ok_OtherConnectionConflicts()
+    {
+        var a = new ResticRepositorySettings { StorageConnectionId = SmbConnectionId, Path = "backup/a" };
+        var b = new ResticRepositorySettings { StorageConnectionId = SmbConnectionId, Path = "archive/b" };
+        var other = new ResticRepositorySettings { StorageConnectionId = Guid.NewGuid(), Path = "backup/b" };
+
+        ResticBackend.ValidateMirror(Repo(BackupBackend.Smb, a), new(), Repo(BackupBackend.Smb, b), new());
+        Assert.Equal("mirror_conflict", Assert.Throws<ResticException>(() =>
+            ResticBackend.ValidateMirror(Repo(BackupBackend.Smb, a), new(), Repo(BackupBackend.Smb, other), new())).Code);
+    }
+
+    [Fact]
+    public void ValidateMirror_SmbVsRclone_Conflicts()
+    {
+        // Both backends point RCLONE_CONFIG to their own file; one restic copy process can only see one.
+        var smb = Repo(BackupBackend.Smb, new ResticRepositorySettings { StorageConnectionId = SmbConnectionId, Path = "backup/a" });
+        var rclone = Repo(BackupBackend.Rclone, new ResticRepositorySettings { Path = "bucket/b" });
+        var rcloneSecrets = new ResticBackendSecrets { RcloneConfig = "type = s3\naccess_key_id = a" };
+
+        Assert.Equal("mirror_conflict", Assert.Throws<ResticException>(() =>
+            ResticBackend.ValidateMirror(smb, new(), rclone, rcloneSecrets)).Code);
+        Assert.Equal("mirror_conflict", Assert.Throws<ResticException>(() =>
+            ResticBackend.ValidateMirror(rclone, rcloneSecrets, smb, new())).Code);
+        // Any other backend can still be paired with SMB.
+        ResticBackend.ValidateMirror(smb, new(), Repo(BackupBackend.Local, new ResticRepositorySettings { Path = "/data/kaimo-backups/restic/a" }), new());
+    }
+
     [Fact]
     public void ValidateMirror_NewBackendsNeedTheSameAccess()
     {

@@ -61,6 +61,7 @@ A repository is created on the Repositories tab: backend, location, credentials,
 |---|---|---|
 | Local | Path below one of `Backup:Restic:LocalRoots` (default `/data/kaimo-backups/restic`) | – |
 | SFTP | Existing SFTP or rsync-over-SSH connection (pinned host key required) plus remote path | SSH key or password of the connection (password via a private `SSH_ASKPASS` helper in the restic temp directory, never as argument or environment value) |
+| SMB | Existing External Storage SMB connection plus `share/folder` (URL `rclone:kaimo:<share>/<folder>`) | User, password and domain of the connection |
 | REST server | `https://host[:port]`, optional path; optional CA certificate | Optional user and password (`RESTIC_REST_USERNAME/PASSWORD`) |
 | S3 | Endpoint, bucket, optional path, region, path-style flag; optional CA certificate | Access key and secret key |
 | Backblaze B2 | Bucket, optional path (`b2:<bucket>:/<path>`) | Key ID and application key (`B2_ACCOUNT_ID/KEY`) |
@@ -74,6 +75,27 @@ files in `Backup:Restic:TempDirectory` per restic process (`GOOGLE_APPLICATION_C
 `RCLONE_CONFIG`) and deleted afterwards. SFTP password connections also place their `SSH_ASKPASS`
 helper there, which ssh executes: the directory must not be on a `noexec` mount, and the OpenSSH
 client must be 8.4 or newer (`SSH_ASKPASS_REQUIRE=force`).
+
+**SMB** reuses a connection from *External Storage* (provider `smb`), so server and credentials are
+entered only once. Nothing is mounted (the Web container runs without `CAP_SYS_ADMIN` and
+`cifs-utils`): restic starts the bundled rclone, whose native SMB client talks to the server. For
+every restic process `ResticTargetResolver` builds the remote `[kaimo]` from the connection —
+`type = smb`, `host`, `port`, `user`, `domain`, `hide_special_share = true` and the password in
+rclone's obscured form (`ResticBackend.RcloneObscure`, same output as `rclone obscure`; computed in
+process, never on a command line) — writes it to an owner-only `rclone.conf` and deletes it after
+the run. Values with line breaks or control characters are rejected, so no further config lines can
+be injected. The connection is read on every run: a password changed under External Storage applies
+to the next run; a deleted, disabled or non-SMB connection fails with `connection_missing`,
+`connection_disabled` or `connection_invalid`. The path starts with the share name
+(`smb_share_required` otherwise); a share the server does not know fails with
+`smb_share_not_found`, rejected credentials with `access_denied`.
+
+rclone (1.75.2) has no option to require SMB signing, encryption or a minimum dialect, unlike the
+External Storage SMB provider (`smbclient`, which always requires SMB 3 with signing and
+encryption). rclone signs and encrypts when the server requires it — verified against Samba 4 with
+`smb encrypt = required` and `server signing = mandatory`: SMB 3.1.1, AES-128-GCM, AES-128-CMAC.
+**Require encryption on the server for the backup share**; otherwise the server may accept an
+unencrypted session. The repository content itself is always encrypted by restic.
 
 **rclone** reaches any storage rclone supports (OneDrive, Google Drive, Dropbox, WebDAV, …) with the
 bundled, checksum-pinned rclone binary (`/usr/local/bin/rclone`). The pasted section is always
@@ -89,7 +111,9 @@ edited credentials never writes anything back.
 
 Mirrors between two repositories of the same backend type need identical credentials (restic's
 backend variables are process-wide): same B2 key, same Azure account and key/SAS, same GCS key,
-same Swift variables, same rclone section.
+same Swift variables, same rclone section, same SSH or SMB connection. rclone and SMB repositories
+cannot mirror into each other at all: both need their own `RCLONE_CONFIG` file, and one
+`restic copy` process sees only one (`mirror_conflict`).
 
 "Test" probes the location. **Initialize new** creates a repository with a generated 32-byte
 password; **Connect existing** attaches a repository with its known password (disaster recovery).
@@ -102,8 +126,10 @@ downloaded and confirmed by typing the kit code printed in it. The kit (`.txt`) 
 repository URL, the password, non-secret parameters, the snapshot layout and the CLI and
 disaster-recovery steps. It never contains backend credentials (access keys, REST password, SSH
 key, service account key, Swift password, rclone section) — only the names of the variables to
-set; keep the credentials separately. For rclone repositories, restoring with the CLI needs rclone
-installed and the remote available as `[kaimo]` in the rclone.conf (or adjust the URL). Every kit download is logged. **Without the password nobody can restore the
+set; keep the credentials separately. For rclone and SMB repositories, restoring with the CLI needs rclone
+installed and the remote available as `[kaimo]` in the rclone.conf (or adjust the URL); for SMB the
+kit lists server, port, user, domain and path, and the password is set with
+`pass = $(rclone obscure '<SMB password>')`. Every kit download is logged. **Without the password nobody can restore the
 repository.**
 
 ### Further settings
@@ -298,7 +324,7 @@ Without a Full job, restore the share backup points the same way and set permiss
 | `Backup:Restic:Binary` | `restic` | restic executable |
 | `Backup:Restic:LocalRoots` | `/data/kaimo-backups/restic` | Folders local repositories may be created in (list or comma-separated) |
 | `Backup:Restic:CacheDirectory` | `/data/kaimo-system/.kaimo-restic-cache` | restic cache (grows with repository size) |
-| `Backup:Restic:TempDirectory` | `/data/kaimo-system/.kaimo-restic-tmp` | Owner-only SSH keys, SSH password helpers, CA files, GCS keys and rclone configs of running processes (must not be `noexec`) |
+| `Backup:Restic:TempDirectory` | `/data/kaimo-system/.kaimo-restic-tmp` | Owner-only SSH keys, SSH password helpers, CA files, GCS keys and rclone configs (incl. those built for SMB repositories) of running processes (must not be `noexec`) |
 | `Backup:Restic:MetaDirectory` | `/data/kaimo-backups/restic-meta` | Staging of manifests, dump and run info (part of the snapshot paths; keep stable) |
 | `Backup:Restic:RestoreDirectory` | `/data/kaimo-backups/restic-restore` | Target of system and pool restores |
 | `Storage:RootPath` | `/data/storage` | Pools are its direct child folders |

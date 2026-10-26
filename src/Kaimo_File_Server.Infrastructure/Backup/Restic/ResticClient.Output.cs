@@ -126,6 +126,9 @@ public partial class ResticClient
             || stderr.Contains("i/o timeout", StringComparison.OrdinalIgnoreCase)
             || stderr.Contains("ssh command exited", StringComparison.OrdinalIgnoreCase) => "repo_unreachable",
         1 when stderr.Contains("certificate", StringComparison.OrdinalIgnoreCase) => "tls_error",
+        // SMB status texts as rclone's SMB client prints them (STATUS_BAD_NETWORK_NAME, STATUS_LOGON_FAILURE).
+        1 when stderr.Contains("{Network Name Not Found}", StringComparison.OrdinalIgnoreCase) => "smb_share_not_found",
+        1 when stderr.Contains("The attempted logon is invalid", StringComparison.OrdinalIgnoreCase) => "access_denied",
         1 when stderr.Contains("Access Denied", StringComparison.OrdinalIgnoreCase)
             || stderr.Contains("401 Unauthorized", StringComparison.OrdinalIgnoreCase)
             || stderr.Contains("403 Forbidden", StringComparison.OrdinalIgnoreCase) => "access_denied",

@@ -6350,10 +6350,10 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>The SSH key path contains unsupported characters.</value>
   </data>
   <data name="Web_Backup_Error_connection_missing" xml:space="preserve">
-    <value>The SSH connection no longer exists.</value>
+    <value>The connection no longer exists.</value>
   </data>
   <data name="Web_Backup_Error_connection_invalid" xml:space="preserve">
-    <value>Only SFTP or rsync/SSH connections can be used.</value>
+    <value>The connection has the wrong type (SFTP repositories need an SFTP or rsync/SSH connection, SMB repositories an SMB connection).</value>
   </data>
   <data name="Web_Backup_Error_unexpected_output" xml:space="preserve">
     <value>restic returned unexpected output.</value>
@@ -7053,6 +7053,39 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   </data>
   <data name="Web_Backup_Error_rclone_type_blocked" xml:space="preserve">
     <value>This rclone remote type is not allowed (local, alias, crypt, union, …).</value>
+  </data>
+  <data name="Web_Backup_Backend_Smb" xml:space="preserve">
+    <value>SMB (External Storage connection)</value>
+  </data>
+  <data name="Web_Backup_Repos_SmbConnection" xml:space="preserve">
+    <value>SMB connection</value>
+  </data>
+  <data name="Web_Backup_Repos_SmbConnectionHelp" xml:space="preserve">
+    <value>An existing SMB connection from External Storage; server and credentials are reused. Nothing is mounted: the bundled rclone talks SMB directly. rclone cannot require signing or encryption itself, it uses both when the server requires them – so set the share to require encryption on the server.</value>
+  </data>
+  <data name="Web_Backup_Repos_SmbPath" xml:space="preserve">
+    <value>Share and folder</value>
+  </data>
+  <data name="Web_Backup_Repos_SmbPathHelp" xml:space="preserve">
+    <value>Share name first, then the folder of the repository, e.g. backup/kaimo-repo. Letters, digits, '.', '_', '-' and '/' only.</value>
+  </data>
+  <data name="Web_Backup_Repos_NoSmbConnection" xml:space="preserve">
+    <value>There is no SMB connection yet.</value>
+  </data>
+  <data name="Web_Backup_Repos_NoSmbConnectionLink" xml:space="preserve">
+    <value>Create one under External Storage</value>
+  </data>
+  <data name="Web_Backup_Error_smb_share_required" xml:space="preserve">
+    <value>The path must start with the share name (share/folder).</value>
+  </data>
+  <data name="Web_Backup_Error_smb_share_not_found" xml:space="preserve">
+    <value>The SMB share does not exist on the server.</value>
+  </data>
+  <data name="Web_Backup_Error_connection_disabled" xml:space="preserve">
+    <value>The connection is disabled under External Storage.</value>
+  </data>
+  <data name="Web_Backup_Error_credentials_invalid" xml:space="preserve">
+    <value>The credentials stored with the connection are invalid.</value>
   </data>
   <data name="Web_Detail_MoreActions" xml:space="preserve">
     <value>More actions</value>

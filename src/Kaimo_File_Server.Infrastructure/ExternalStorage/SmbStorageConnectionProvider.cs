@@ -21,6 +21,20 @@ public sealed class SmbStorageConnectionProvider(
     {
         cancellationToken.ThrowIfCancellationRequested();
         SmbConnectionSettings settings = ParseAndValidate(connection);
+        IRemoteFileStore files = new SmbCommandRemoteFileStore(
+            settings,
+            ReadCredentials(credentialVault, connection, settings),
+            commandRunner);
+        return Task.FromResult<IStorageSession>(new ProtocolStorageSession(connection.Id, Capabilities, files));
+    }
+
+    /// <summary>
+    /// Decrypts and validates the connection's user name, password and domain (the domain of the
+    /// settings wins over the one stored with the credentials). Shared with restic SMB repositories.
+    /// </summary>
+    internal static SmbCredentials ReadCredentials(
+        ICredentialVault credentialVault, StorageConnection connection, SmbConnectionSettings settings)
+    {
         Dictionary<string, string> credentials = credentialVault.UnprotectConnectionCredentials(connection);
         if (!credentials.TryGetValue("username", out string? username)
             || string.IsNullOrWhiteSpace(username)
@@ -33,11 +47,7 @@ public sealed class SmbStorageConnectionProvider(
         credentials.TryGetValue("domain", out string? credentialDomain);
         if (credentialDomain is { Length: > 256 } || credentialDomain?.IndexOfAny(['\r', '\n']) >= 0)
             throw new ProtocolConfigurationException("credentials_invalid", "The SMB credentials are invalid.");
-        IRemoteFileStore files = new SmbCommandRemoteFileStore(
-            settings,
-            new SmbCredentials(username, password, settings.Domain ?? credentialDomain),
-            commandRunner);
-        return Task.FromResult<IStorageSession>(new ProtocolStorageSession(connection.Id, Capabilities, files));
+        return new SmbCredentials(username, password, settings.Domain ?? credentialDomain);
     }
 
     public async Task<StorageConnectionHealthResult> TestAsync(

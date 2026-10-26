@@ -112,11 +112,18 @@ public partial class BackupCatalogService
     }
 
     /// <summary>SSH connections (sftp, rsync-ssh) an SFTP repository can reuse (Global).</summary>
-    public async Task<IReadOnlyList<(Guid Id, string Name)>> ListSshConnectionsAsync(UserContext actor)
+    public Task<IReadOnlyList<(Guid Id, string Name)>> ListSshConnectionsAsync(UserContext actor)
+        => ListConnectionsAsync(actor, ResticBackend.SshProviderIds);
+
+    /// <summary>External Storage SMB connections an SMB repository can reuse (Global).</summary>
+    public Task<IReadOnlyList<(Guid Id, string Name)>> ListSmbConnectionsAsync(UserContext actor)
+        => ListConnectionsAsync(actor, ResticBackend.SmbProviderIds);
+
+    private async Task<IReadOnlyList<(Guid Id, string Name)>> ListConnectionsAsync(UserContext actor, IReadOnlySet<string> providerIds)
     {
         await RequireRepositoriesAsync(actor);
         await using var db = await dbFactory.CreateDbContextAsync();
-        var ids = ResticBackend.SshProviderIds.ToList();
+        var ids = providerIds.ToList();
         return (await db.StorageConnections.AsNoTracking()
                 .Where(c => ids.Contains(c.ProviderId))
                 .OrderBy(c => c.Name)

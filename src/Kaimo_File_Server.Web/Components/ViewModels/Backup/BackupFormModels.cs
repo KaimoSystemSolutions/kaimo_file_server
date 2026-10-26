@@ -53,7 +53,7 @@ public sealed class BackupRepositoryForm
             Bucket = Backend is BackupBackend.S3 or BackupBackend.B2 or BackupBackend.Azure or BackupBackend.Gcs or BackupBackend.Swift ? Blank(Bucket) : null,
             Region = Backend == BackupBackend.S3 ? Blank(Region) : null,
             S3PathStyle = Backend == BackupBackend.S3 && S3PathStyle,
-            StorageConnectionId = Backend == BackupBackend.Sftp && ConnectionId != Guid.Empty ? ConnectionId : null,
+            StorageConnectionId = Backend is BackupBackend.Sftp or BackupBackend.Smb && ConnectionId != Guid.Empty ? ConnectionId : null,
             CaCertificatePem = Backend is BackupBackend.Rest or BackupBackend.S3 or BackupBackend.Swift ? Blank(CaCertificatePem) : null,
             AzureAccountName = Backend == BackupBackend.Azure ? Blank(AzureAccountName) : null,
             AzureEndpointSuffix = Backend == BackupBackend.Azure ? Blank(AzureEndpointSuffix) : null,

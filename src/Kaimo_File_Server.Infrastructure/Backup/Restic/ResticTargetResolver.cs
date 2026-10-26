@@ -13,9 +13,9 @@ namespace Kaimo_File_Server.Infrastructure.Backup.Restic;
 /// <summary>
 /// Turns a stored repository into a runnable <see cref="ResticTarget"/>: decrypts the
 /// password and backend secrets (Web process only — the vault lives there), loads the SSH
-/// connection of SFTP repositories and writes key / CA files (or, for password connections,
-/// the password and an <c>SSH_ASKPASS</c> helper) into a private temp directory that the
-/// target deletes on dispose.
+/// connection of SFTP repositories or the SMB connection of SMB repositories and writes key /
+/// CA / rclone config files (or, for SSH password connections, the password and an
+/// <c>SSH_ASKPASS</c> helper) into a private temp directory that the target deletes on dispose.
 /// </summary>
 public sealed class ResticTargetResolver(
     IDbContextFactory<ApplicationDbContext> dbFactory,
@@ -105,7 +105,7 @@ public sealed class ResticTargetResolver(
 
             if (repository.Backend == BackupBackend.Sftp)
             {
-                var connection = await LoadConnectionAsync(settings.StorageConnectionId!.Value, ct);
+                var connection = await LoadConnectionAsync(settings.StorageConnectionId!.Value, ResticBackend.SshProviderIds, ct);
                 ssh = ParseSshSettings(connection);
                 var usePassword = connection.AuthorizationMode == Core.Domain.StorageAuthorizationMode.UsernamePassword;
                 if (usePassword)
@@ -170,6 +170,16 @@ public sealed class ResticTargetResolver(
                 env["RCLONE_CONFIG"] = configPath;
                 if (storeRcloneUpdates)
                     beforeCleanup = () => StoreRcloneUpdate(repository.Id, configPath, written);
+            }
+            if (repository.Backend == BackupBackend.Smb)
+            {
+                // Built from the connection on every run; nothing to store back (no tokens).
+                var (smb, credentials) = await LoadSmbConnectionAsync(settings.StorageConnectionId!.Value, ct);
+                tempDir ??= CreateTempDirectory();
+                var configPath = Path.Combine(tempDir, "rclone.conf");
+                await ProtocolTemporaryFile.WriteRestrictedTextAsync(configPath,
+                    ResticBackend.BuildSmbRcloneConfig(smb, credentials.Username, credentials.Password, credentials.Domain), ct);
+                env["RCLONE_CONFIG"] = configPath;
             }
             return new ResticTarget(url, env, arguments, tempDir, beforeCleanup);
         }
@@ -236,6 +246,32 @@ public sealed class ResticTargetResolver(
         return path;
     }
 
+    /// <summary>
+    /// Loads an External Storage SMB connection with its decrypted credentials, validated like the
+    /// SMB provider does. A disabled connection is not used.
+    /// </summary>
+    internal async Task<(SmbConnectionSettings Settings, SmbCredentials Credentials)> LoadSmbConnectionAsync(
+        Guid connectionId, CancellationToken ct)
+    {
+        var connection = await LoadConnectionAsync(connectionId, ResticBackend.SmbProviderIds, ct);
+        if (connection.State == Core.Domain.StorageConnectionState.Disabled)
+            throw new ResticException("connection_disabled", "The SMB connection is disabled.");
+        try
+        {
+            var settings = SmbStorageConnectionProvider.ParseAndValidate(connection);
+            return (settings, SmbStorageConnectionProvider.ReadCredentials(vault, connection, settings));
+        }
+        catch (ProtocolConfigurationException ex)
+        {
+            throw new ResticException(ex.Code, ex.Message, ex);
+        }
+        catch (InvalidOperationException ex) when (ex is not ResticException)
+        {
+            // No or undecryptable credentials.
+            throw new ResticException("credentials_invalid", "The SMB credentials are invalid.", ex);
+        }
+    }
+
     private static RsyncSshConnectionSettings ParseSshSettings(Core.Domain.StorageConnection connection)
     {
         try
@@ -268,13 +304,16 @@ public sealed class ResticTargetResolver(
         return helperPath;
     }
 
-    private async Task<Core.Domain.StorageConnection> LoadConnectionAsync(Guid connectionId, CancellationToken ct)
+    /// <summary>Loads the storage connection a repository reuses; its provider must be one of <paramref name="providerIds"/>.</summary>
+    private async Task<Core.Domain.StorageConnection> LoadConnectionAsync(
+        Guid connectionId, IReadOnlySet<string> providerIds, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var connection = await db.StorageConnections.AsNoTracking().FirstOrDefaultAsync(c => c.Id == connectionId, ct)
-                         ?? throw new ResticException("connection_missing", "The SSH connection no longer exists.");
-        if (!ResticBackend.SshProviderIds.Contains(connection.ProviderId))
-            throw new ResticException("connection_invalid", "Only SFTP or rsync/SSH connections can be used.");
+                         ?? throw new ResticException("connection_missing", "The storage connection no longer exists.");
+        if (!providerIds.Contains(connection.ProviderId))
+            throw new ResticException("connection_invalid",
+                $"The connection type '{connection.ProviderId}' cannot be used for this repository ({string.Join(", ", providerIds)}).");
         return connection;
     }
 }

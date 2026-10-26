@@ -120,6 +120,9 @@ public partial class ResticBackupTests
     [InlineData(130, "", "cancelled")]
     [InlineData(1, "Fatal: create key in repository at /r failed: repository master key and config already initialized", "repo_exists")]
     [InlineData(1, "Fatal: unable to open repository: dial tcp: lookup nas: no such host", "repo_unreachable")]
+    // SMB messages as rclone 1.75.2 (go-smb2) prints them against Samba 4.
+    [InlineData(1, "couldn't connect SMB: response error: The attempted logon is invalid. This is either due to a bad username or authentication information.", "access_denied")]
+    [InlineData(1, "couldn't initialize SMB: response error: {Network Name Not Found} The specified share name cannot be found on the remote server.", "smb_share_not_found")]
     [InlineData(1, "something else", "restic_failed")]
     public async Task Failures_MapToStableCodes(int exitCode, string stderr, string expected)
     {

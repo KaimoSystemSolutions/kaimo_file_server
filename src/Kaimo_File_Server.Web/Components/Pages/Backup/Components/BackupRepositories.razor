@@ -244,6 +244,31 @@
                             <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" placeholder="kaimo-backup" />
                         </label>
                         break;
+                    case BackupBackend.Smb:
+                        if (VM.SmbConnections.Count == 0)
+                        {
+                            <p class="form-hint">
+                                @R("Web_Backup_Repos_NoSmbConnection")
+                                <a href="/external-storage?tab=connections">@R("Web_Backup_Repos_NoSmbConnectionLink")</a>
+                            </p>
+                        }
+                        <label>
+                            <span>@R("Web_Backup_Repos_SmbConnection")</span>
+                            <select class="edit-input" @bind="form.ConnectionId" @bind:after="Changed">
+                                <option value="@Guid.Empty">@R("Web_Backup_Select")</option>
+                                @foreach (var (id, name) in VM.SmbConnections)
+                                {
+                                    <option value="@id">@name</option>
+                                }
+                            </select>
+                            <small>@R("Web_Backup_Repos_SmbConnectionHelp")</small>
+                        </label>
+                        <label>
+                            <span>@R("Web_Backup_Repos_SmbPath")</span>
+                            <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" placeholder="backup/kaimo-repo" />
+                            <small>@R("Web_Backup_Repos_SmbPathHelp")</small>
+                        </label>
+                        break;
                 }
 
                 @if (form.Backend is BackupBackend.Rest or BackupBackend.S3 or BackupBackend.Swift)

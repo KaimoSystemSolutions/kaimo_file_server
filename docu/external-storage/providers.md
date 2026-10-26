@@ -81,6 +81,9 @@ credential payload.
   version.
 - Implements `IRemoteFileStore` and therefore backs virtual shares and syncs
   (`RemoteFileStoreSyncAdapter`).
+- Restic backup repositories of type SMB reuse the connection: `ParseAndValidate` and
+  `ReadCredentials` are shared with `ResticTargetResolver`, which turns the connection into an rclone
+  SMB remote (see [File backup](../operations/file-backup-restic.md#repositories)).
 
 ### SFTP (`SftpStorageConnectionProvider.cs`)
 

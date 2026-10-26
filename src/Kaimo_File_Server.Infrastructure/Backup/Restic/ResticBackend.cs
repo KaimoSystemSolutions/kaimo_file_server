@@ -20,7 +20,7 @@ public sealed class ResticRepositorySettings
 {
     /// <summary>
     /// Local: absolute directory. SFTP: path below the connection's remote root. rclone: path
-    /// on the remote (incl. bucket). Others: optional sub path / prefix.
+    /// on the remote (incl. bucket). SMB: <c>share/folder/…</c>. Others: optional sub path / prefix.
     /// </summary>
     public string? Path { get; set; }
 
@@ -40,7 +40,10 @@ public sealed class ResticRepositorySettings
     /// <summary>S3 path-style bucket lookup (MinIO and most self-hosted S3 servers).</summary>
     public bool S3PathStyle { get; set; }
 
-    /// <summary>SFTP: the existing pinned-SSH storage connection (sftp or rsync-ssh) to reuse.</summary>
+    /// <summary>
+    /// SFTP: the existing pinned-SSH storage connection (sftp or rsync-ssh) to reuse.
+    /// SMB: the existing External Storage SMB connection to reuse.
+    /// </summary>
     public Guid? StorageConnectionId { get; set; }
 
     /// <summary>Optional PEM CA certificate for a REST/S3 endpoint with a private CA.</summary>
@@ -124,6 +127,9 @@ public static partial class ResticBackend
     /// <summary>The SSH-capable connection providers SFTP repositories may reuse.</summary>
     public static readonly IReadOnlySet<string> SshProviderIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "sftp", "rsync-ssh" };
 
+    /// <summary>The connection providers SMB repositories may reuse.</summary>
+    public static readonly IReadOnlySet<string> SmbProviderIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "smb" };
+
     /// <summary>Validates settings and secrets of a repository; throws <see cref="ResticException"/>.</summary>
     public static void Validate(
         BackupBackend backend,
@@ -195,12 +201,23 @@ public static partial class ResticBackend
                 ValidateRelativePath(settings.Path, required: true);
                 ParseRcloneConfig(secrets.RcloneConfig);
                 break;
+            case BackupBackend.Smb:
+                if (settings.StorageConnectionId is null || settings.StorageConnectionId == Guid.Empty)
+                    throw new ResticException("connection_required", "An SMB connection is required.");
+                ValidateRelativePath(settings.Path, required: true);
+                // rclone's SMB remote addresses "share/path"; the server root only lists shares.
+                if (settings.Path!.Split('/', StringSplitOptions.RemoveEmptyEntries).Length == 0)
+                    throw new ResticException("smb_share_required", "The path must start with the share name.");
+                break;
             default:
                 throw new ResticException("backend_unsupported", "This backend is not supported.");
         }
     }
 
-    /// <summary>Repository URL for every backend except SFTP (which needs the SSH connection).</summary>
+    /// <summary>
+    /// Repository URL for every backend except SFTP (which needs the SSH connection). SMB
+    /// repositories use the rclone remote the resolver writes from the SMB connection.
+    /// </summary>
     public static string BuildUrl(BackupBackend backend, ResticRepositorySettings settings, RsyncSshConnectionSettings? ssh = null)
         => backend switch
         {
@@ -216,6 +233,7 @@ public static partial class ResticBackend
             BackupBackend.Swift => $"swift:{settings.Bucket}:/{Suffix(settings.Path).TrimStart('/')}",
             // The pasted section is always written as [kaimo], whatever it was called before.
             BackupBackend.Rclone => $"rclone:{RcloneRemoteName}:{settings.Path!.Trim()}",
+            BackupBackend.Smb => $"rclone:{RcloneRemoteName}:{settings.Path!.Trim().Trim('/')}",
             _ => throw new ResticException("backend_unsupported", "This backend is not supported."),
         };
 
@@ -269,20 +287,25 @@ public static partial class ResticBackend
     /// <summary>
     /// Rejects a mirror pairing that one <c>restic copy</c> call cannot serve: backend credentials
     /// and options are process-wide (not per repository), so two repositories of the same
-    /// backend type must share them (SFTP: the same SSH connection).
+    /// backend type must share them (SFTP and SMB: the same connection). rclone and SMB
+    /// repositories never pair: both need their own <c>RCLONE_CONFIG</c> file.
     /// </summary>
     public static void ValidateMirror(
         BackupRepository source, ResticBackendSecrets sourceSecrets, BackupRepository mirror, ResticBackendSecrets mirrorSecrets)
     {
         if (source.Id == mirror.Id)
             throw new ResticException("mirror_invalid", "A repository cannot mirror into itself.");
+        if (source.Backend is BackupBackend.Rclone or BackupBackend.Smb
+            && mirror.Backend is BackupBackend.Rclone or BackupBackend.Smb
+            && source.Backend != mirror.Backend)
+            throw new ResticException("mirror_conflict", "rclone and SMB repositories cannot mirror into each other.");
         if (source.Backend != mirror.Backend)
             return;
         var a = ResticRepositorySettings.Parse(source.SettingsJson);
         var b = ResticRepositorySettings.Parse(mirror.SettingsJson);
         var compatible = source.Backend switch
         {
-            BackupBackend.Sftp => a.StorageConnectionId == b.StorageConnectionId,
+            BackupBackend.Sftp or BackupBackend.Smb => a.StorageConnectionId == b.StorageConnectionId,
             BackupBackend.Rest => (sourceSecrets.RestUsername ?? "") == (mirrorSecrets.RestUsername ?? "")
                                   && (sourceSecrets.RestPassword ?? "") == (mirrorSecrets.RestPassword ?? ""),
             BackupBackend.S3 => sourceSecrets.S3AccessKeyId == mirrorSecrets.S3AccessKeyId
@@ -401,6 +424,69 @@ public static partial class ResticBackend
             throw new ResticException("rclone_type_blocked", $"rclone remotes of type '{type}' are not allowed.");
         return new RcloneRemote(type, $"[{RcloneRemoteName}]\n{string.Join('\n', lines)}\n");
     }
+
+    /// <summary>
+    /// The rclone remote <c>[kaimo]</c> of an SMB repository, built from the External Storage SMB
+    /// connection. The password is stored obscured (rclone's format, see <see cref="RcloneObscure"/>);
+    /// a value with a line break or control character is rejected, as it could add config lines.
+    /// rclone has no option to require signing or encryption: it uses both when the server requires them.
+    /// </summary>
+    public static string BuildSmbRcloneConfig(SmbConnectionSettings settings, string user, string password, string? domain)
+    {
+        if (string.IsNullOrWhiteSpace(user) || HasControlCharacter(user) || HasControlCharacter(password)
+            || (domain is not null && HasControlCharacter(domain)) || HasControlCharacter(settings.Server))
+            throw new ResticException("credentials_invalid", "The SMB credentials are invalid.");
+        var config = new System.Text.StringBuilder()
+            .Append('[').Append(RcloneRemoteName).Append("]\n")
+            .Append("type = smb\n")
+            .Append("host = ").Append(settings.Server.Trim()).Append('\n')
+            .Append("port = ").Append(settings.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append('\n')
+            .Append("user = ").Append(user.Trim()).Append('\n')
+            .Append("pass = ").Append(RcloneObscure(password)).Append('\n');
+        if (!string.IsNullOrWhiteSpace(domain))
+            config.Append("domain = ").Append(domain.Trim()).Append('\n');
+        // The administrative shares (IPC$, ADMIN$, …) are no backup target.
+        return config.Append("hide_special_share = true\n").ToString();
+    }
+
+    // The fixed, public key of "rclone obscure" (rclone fs/config/obscure). Obscuring only keeps
+    // the password from being readable at a glance; the file itself is owner-only and short-lived.
+    private static readonly byte[] RcloneObscureKey =
+    [
+        0x9c, 0x93, 0x5b, 0x48, 0x73, 0x0a, 0x55, 0x4d, 0x6b, 0xfd, 0x7c, 0x63, 0xc8, 0x86, 0xa9, 0x2b,
+        0xd3, 0x90, 0x19, 0x8e, 0xb8, 0x12, 0x8a, 0xfb, 0xf4, 0xde, 0x16, 0x2b, 0x8b, 0x95, 0xf6, 0x38,
+    ];
+
+    /// <summary>
+    /// Same output as <c>rclone obscure</c>: base64url (no padding) of a random 16-byte IV followed
+    /// by the UTF-8 value encrypted with AES-256-CTR under rclone's fixed key. In process, so the
+    /// password never appears on a command line.
+    /// </summary>
+    public static string RcloneObscure(string plain) => RcloneObscure(plain, RandomNumberGenerator.GetBytes(16));
+
+    /// <summary><see cref="RcloneObscure(string)"/> with a given IV (reproducible output for tests).</summary>
+    internal static string RcloneObscure(string plain, byte[] iv)
+    {
+        var data = System.Text.Encoding.UTF8.GetBytes(plain);
+        var output = new byte[16 + data.Length];
+        iv.AsSpan(0, 16).CopyTo(output);
+        // .NET has no CTR mode: encrypt the big-endian counter block with ECB and XOR the key stream.
+        using var aes = Aes.Create();
+        aes.Key = RcloneObscureKey;
+        var counter = iv[..16];
+        var keyStream = new byte[16];
+        for (var offset = 0; offset < data.Length; offset += 16)
+        {
+            aes.EncryptEcb(counter, keyStream, PaddingMode.None);
+            for (var i = 0; i < 16 && offset + i < data.Length; i++)
+                output[16 + offset + i] = (byte)(data[offset + i] ^ keyStream[i]);
+            for (var i = 15; i >= 0 && ++counter[i] == 0; i--) { }
+        }
+        CryptographicOperations.ZeroMemory(data);
+        return System.Buffers.Text.Base64Url.EncodeToString(output);
+    }
+
+    private static bool HasControlCharacter(string value) => value.Any(char.IsControl);
 
     /// <summary>
     /// Parses the Swift variables (openrc style: <c>export OS_X="y"</c>, comments and shell lines

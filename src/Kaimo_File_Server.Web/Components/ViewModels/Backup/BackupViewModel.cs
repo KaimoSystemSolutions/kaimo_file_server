@@ -45,6 +45,7 @@ public sealed partial class BackupViewModel(
     public BackupRepositoryChoices RepositoryChoices { get; private set; } = new([], new Dictionary<Guid, IReadOnlySet<Guid>>());
     public IReadOnlyList<Department> AllDepartments { get; private set; } = [];
     public IReadOnlyList<(Guid Id, string Name)> SshConnections { get; private set; } = [];
+    public IReadOnlyList<(Guid Id, string Name)> SmbConnections { get; private set; } = [];
     public IReadOnlyList<string> LocalRoots => catalog.LocalRoots;
     public IReadOnlyList<BackupRunSnapshot> ActiveRuns => runner.Runs;
 
@@ -105,6 +106,7 @@ public sealed partial class BackupViewModel(
             Repositories = await catalog.ListRepositoriesAsync(_actor);
             AllDepartments = (await departments.GetAllAsync()).OrderByGlobalFirst().ToList();
             SshConnections = await catalog.ListSshConnectionsAsync(_actor);
+            SmbConnections = await catalog.ListSmbConnectionsAsync(_actor);
             ServerPoints = await catalog.ListServerBackupPointsAsync(_actor);
         }
         if (Access.CanRestore)

@@ -6269,10 +6269,10 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Der Pfad des SSH-Schlüssels enthält nicht unterstützte Zeichen.</value>
   </data>
   <data name="Web_Backup_Error_connection_missing" xml:space="preserve">
-    <value>Die SSH-Verbindung existiert nicht mehr.</value>
+    <value>Die Verbindung existiert nicht mehr.</value>
   </data>
   <data name="Web_Backup_Error_connection_invalid" xml:space="preserve">
-    <value>Nur SFTP- oder rsync/SSH-Verbindungen sind möglich.</value>
+    <value>Die Verbindung hat den falschen Typ (SFTP-Repositorys brauchen eine SFTP- oder rsync/SSH-Verbindung, SMB-Repositorys eine SMB-Verbindung).</value>
   </data>
   <data name="Web_Backup_Error_unexpected_output" xml:space="preserve">
     <value>restic hat eine unerwartete Ausgabe geliefert.</value>
@@ -7053,6 +7053,39 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   </data>
   <data name="Web_Backup_Error_rclone_type_blocked" xml:space="preserve">
     <value>Dieser rclone-Remote-Typ ist nicht erlaubt (local, alias, crypt, union, …).</value>
+  </data>
+  <data name="Web_Backup_Backend_Smb" xml:space="preserve">
+    <value>SMB (Verbindung aus „Externer Speicher“)</value>
+  </data>
+  <data name="Web_Backup_Repos_SmbConnection" xml:space="preserve">
+    <value>SMB-Verbindung</value>
+  </data>
+  <data name="Web_Backup_Repos_SmbConnectionHelp" xml:space="preserve">
+    <value>Eine vorhandene SMB-Verbindung aus „Externer Speicher“; Server und Zugangsdaten werden übernommen. Es wird nichts eingebunden: das mitgelieferte rclone spricht SMB direkt. rclone kann Signierung und Verschlüsselung nicht selbst erzwingen, nutzt beides aber, wenn der Server es verlangt – Verschlüsselung daher serverseitig für die Freigabe erzwingen.</value>
+  </data>
+  <data name="Web_Backup_Repos_SmbPath" xml:space="preserve">
+    <value>Freigabe und Ordner</value>
+  </data>
+  <data name="Web_Backup_Repos_SmbPathHelp" xml:space="preserve">
+    <value>Zuerst der Freigabename, dann der Ordner des Repositorys, z. B. backup/kaimo-repo. Nur Buchstaben, Ziffern, '.', '_', '-' und '/'.</value>
+  </data>
+  <data name="Web_Backup_Repos_NoSmbConnection" xml:space="preserve">
+    <value>Es gibt noch keine SMB-Verbindung.</value>
+  </data>
+  <data name="Web_Backup_Repos_NoSmbConnectionLink" xml:space="preserve">
+    <value>Unter „Externer Speicher“ anlegen</value>
+  </data>
+  <data name="Web_Backup_Error_smb_share_required" xml:space="preserve">
+    <value>Der Pfad muss mit dem Freigabenamen beginnen (freigabe/ordner).</value>
+  </data>
+  <data name="Web_Backup_Error_smb_share_not_found" xml:space="preserve">
+    <value>Die SMB-Freigabe existiert auf dem Server nicht.</value>
+  </data>
+  <data name="Web_Backup_Error_connection_disabled" xml:space="preserve">
+    <value>Die Verbindung ist unter „Externer Speicher“ deaktiviert.</value>
+  </data>
+  <data name="Web_Backup_Error_credentials_invalid" xml:space="preserve">
+    <value>Die bei der Verbindung hinterlegten Zugangsdaten sind ungültig.</value>
   </data>
   <data name="Web_Detail_MoreActions" xml:space="preserve">
     <value>Weitere Aktionen</value>

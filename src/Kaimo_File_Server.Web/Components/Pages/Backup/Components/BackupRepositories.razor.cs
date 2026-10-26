@@ -57,6 +57,7 @@ public partial class BackupRepositories
                 BackupBackend.Azure => !string.IsNullOrWhiteSpace(f.AzureAccountName) && !string.IsNullOrWhiteSpace(f.Bucket),
                 BackupBackend.B2 or BackupBackend.Gcs or BackupBackend.Swift => !string.IsNullOrWhiteSpace(f.Bucket),
                 BackupBackend.Rclone => !string.IsNullOrWhiteSpace(f.Path),
+                BackupBackend.Smb => f.ConnectionId != Guid.Empty && !string.IsNullOrWhiteSpace(f.Path),
                 _ => false,
             };
         }
@@ -150,6 +151,7 @@ public partial class BackupRepositories
         {
             BackupBackend.Local => s.Path ?? "–",
             BackupBackend.Sftp => "sftp: " + s.Path,
+            BackupBackend.Smb => "smb: " + s.Path,
             BackupBackend.Rest => s.Endpoint + (string.IsNullOrEmpty(s.Path) ? "" : "/" + s.Path.Trim('/')),
             BackupBackend.S3 => s.Endpoint + "/" + s.Bucket + (string.IsNullOrEmpty(s.Path) ? "" : "/" + s.Path.Trim('/')),
             // The URL of the remaining backends holds no secret.

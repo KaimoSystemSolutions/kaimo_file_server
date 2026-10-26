@@ -16,6 +16,12 @@ public enum BackupBackend
 
     /// <summary>Any rclone remote (pasted rclone.conf section); restic starts the bundled rclone binary.</summary>
     Rclone = 8,
+
+    /// <summary>
+    /// A share of an existing External Storage SMB connection, reached through rclone's native
+    /// SMB client (no mount); restic starts the bundled rclone binary as for <see cref="Rclone"/>.
+    /// </summary>
+    Smb = 9,
 }
 
 /// <summary>
