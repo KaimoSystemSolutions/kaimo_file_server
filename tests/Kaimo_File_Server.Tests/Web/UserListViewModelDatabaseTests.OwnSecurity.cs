@@ -89,7 +89,7 @@ public partial class UserListViewModelDatabaseTests
     [Fact]
     public async Task SaveUserAsync_AdminEditsSelf_HomeFolderToggleApplies()
     {
-        // The home folder is not a sign-in setting (it is switchable on /home-folders too),
+        // The home folder is not a sign-in setting (it is switchable in Settings → Home folders too),
         // so it stays editable on one's own account.
         var admin = SeedUser("admin");
         var sut = BuildGlobalAdminSut(admin, HomesService());

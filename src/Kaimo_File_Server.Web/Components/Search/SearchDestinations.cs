@@ -74,10 +74,6 @@ public static class SearchDestinations
 
     private const ManagementPermission Settings = ManagementPermission.ManageSystemSettings;
 
-    // /home-folders: Overview (ManageHomes) or Settings tab (system settings).
-    private const ManagementPermission HomeFoldersGate =
-        ManagementPermission.ManageHomes | ManagementPermission.ManageSystemSettings;
-
     public static readonly IReadOnlyList<SearchDestination> All = new List<SearchDestination>
     {
         // ── Top-level tabs ──
@@ -130,7 +126,11 @@ public static class SearchDestinations
         // "users", its web label "user".
         new("Web_Nav_HomeFolders",
             ["home", "homes", "users", "user", "home folder", "home-ordner", "heimverzeichnis", "benutzerordner"],
-            "/home-folders", "user.svg", HomeFoldersGate),
+            "/home-folders", "user.svg", ManagementPermission.ManageHomes),
+        new("Web_Nav_HomeFolders",
+            ["home", "homes", "home folder", "home-ordner", "heimverzeichnis", "benutzerordner",
+             "home folder settings", "home-ordner einstellungen"],
+            "/settings?tab=homefolders", "user.svg", Settings),
         new("Web_Recycle_SectionLabel",
             ["recycle bin", "papierkorb", "trash", "retention", "aufbewahrung"],
             "/settings?tab=storage", "folder.svg", Settings),

@@ -249,7 +249,7 @@ public partial class ShareListViewModel
 
             foreach (var share in allShares)
             {
-                // The home-folder share is system-managed (/home-folders) and is
+                // The home-folder share is system-managed (Settings → Home folders) and is
                 // never renamed, moved, disabled or re-permissioned from share management.
                 if (share.IsUserHomes)
                     continue;

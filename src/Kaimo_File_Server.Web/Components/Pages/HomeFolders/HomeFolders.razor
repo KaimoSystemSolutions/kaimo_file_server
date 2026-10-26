@@ -2,13 +2,10 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.HomeFolders.Components
 @inject HomesAdminViewModel HomesVM
-@inject SettingsViewModel SettingsVM
-@inject NavigationManager Nav
 
 @*
-    User home folders: the metadata overview of every home (ManageHomes) and the setup,
-    pool, global switch and recycle limits (system settings). Each tab keeps the permission
-    it had before; the page is reachable with either of them.
+    User home folders: the metadata overview of every home (ManageHomes). Setup, pool,
+    global switch and recycle limits live on /settings?tab=homefolders.
 *@
 
 <PageTitle>@T("Web_Nav_HomeFolders", "Home folders") - Kaimo File Server</PageTitle>
@@ -24,40 +21,11 @@
 {
     <div class="loading-state"><div class="spinner"></div><p>@Resources.Web_Common_Loading</p></div>
 }
-else if (_tab is null)
+else if (!HomesVM.CanAccessPage)
 {
     <div class="error-banner">@Resources.Web_Error_NoPermission</div>
 }
 else
 {
-    <div class="homes-tabs">
-        <Tabs aria-label="@T("Web_Nav_HomeFolders", "Home folders")">
-            @if (HomesVM.CanAccessPage)
-            {
-                <Tab Active="@(_tab == HomeFoldersTab.Overview)" Icon="compass.svg"
-                     Label="@T("Web_HomeFolders_Tab_Overview", "Overview")" OnClick="() => SwitchTab(HomeFoldersTab.Overview)" />
-            }
-            @if (SettingsVM.CanManageSettings)
-            {
-                <Tab Active="@(_tab == HomeFoldersTab.Settings)" Icon="settings.svg"
-                     Label="@T("Web_HomeFolders_Tab_Settings", "Settings")" OnClick="() => SwitchTab(HomeFoldersTab.Settings)" />
-            }
-        </Tabs>
-    </div>
-
-    @if (_tab == HomeFoldersTab.Settings)
-    {
-        <div class="homes-settings">
-            @* Load failures only; action results are shown inline by HomeFolderSettings. *@
-            @if (_settingsLoadError is not null)
-            {
-                <div class="error-banner">@_settingsLoadError</div>
-            }
-            <HomeFolderSettings VM="SettingsVM" />
-        </div>
-    }
-    else
-    {
-        <HomeFolderOverview />
-    }
+    <HomeFolderOverview />
 }

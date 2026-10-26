@@ -13048,24 +13048,6 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Overview ähnelt.
-        /// </summary>
-        public static string Web_HomeFolders_Tab_Overview {
-            get {
-                return ResourceManager.GetString("Web_HomeFolders_Tab_Overview", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Settings ähnelt.
-        /// </summary>
-        public static string Web_HomeFolders_Tab_Settings {
-            get {
-                return ResourceManager.GetString("Web_HomeFolders_Tab_Settings", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Links ähnelt.
         /// </summary>
         public static string Web_Homes_Col_Links {

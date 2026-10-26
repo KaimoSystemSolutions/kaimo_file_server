@@ -1,49 +1,39 @@
 using Kaimo_File_Server.Core.Security;
-using Kaimo_File_Server.Web.Components.Pages.HomeFolders;
+using Kaimo_File_Server.Web.Components.Pages.Settings;
 using Kaimo_File_Server.Web.Components.Search;
 using Xunit;
 
 namespace Kaimo_File_Server.Tests;
 
 /// <summary>
-/// The home-folder administration page (/home-folders): tab selection per permission and
-/// the global-search entry that leads there instead of the former Settings tab.
+/// Home folders: the metadata overview lives on /home-folders (ManageHomes), the setup,
+/// pool, global switch and recycle limits on the "Home folders" tab of /settings.
 /// </summary>
 public class HomeFoldersPageTests
 {
+    [Fact]
+    public void SearchDestination_ForHomeFolderOverview_RequiresManageHomesOnly()
+    {
+        var destination = Assert.Single(SearchDestinations.All, d => d.Url == "/home-folders");
+
+        Assert.Equal(ManagementPermission.ManageHomes, destination.RequiredAny);
+        Assert.DoesNotContain(SearchDestinations.All, d => d.Url.StartsWith("/home-folders?tab="));
+    }
+
+    [Fact]
+    public void SearchDestination_ForHomeFolderSettings_OpensTheSettingsTab()
+    {
+        var destination = Assert.Single(SearchDestinations.All, d => d.Url == "/settings?tab=homefolders");
+
+        Assert.Equal(ManagementPermission.ManageSystemSettings, destination.RequiredAny);
+    }
+
     [Theory]
-    [InlineData(null, true, true, HomeFoldersTab.Overview)]
-    [InlineData("settings", true, true, HomeFoldersTab.Settings)]
-    [InlineData("SETTINGS", true, true, HomeFoldersTab.Settings)]
-    [InlineData("overview", true, true, HomeFoldersTab.Overview)]
-    [InlineData("unknown", true, true, HomeFoldersTab.Overview)]
-    // Only the settings permission: the overview is not offered.
-    [InlineData(null, false, true, HomeFoldersTab.Settings)]
-    [InlineData("overview", false, true, HomeFoldersTab.Settings)]
-    // Only ManageHomes: a settings deep link falls back to the overview.
-    [InlineData("settings", true, false, HomeFoldersTab.Overview)]
-    public void ResolveTab_PicksRequestedTabWhenPermitted(
-        string? query, bool canOverview, bool canSettings, HomeFoldersTab expected)
+    [InlineData("homefolders")]
+    [InlineData("HomeFolders")]
+    public void SettingsTab_HomeFoldersDeepLink_IsRecognized(string query)
     {
-        Assert.Equal(expected, HomeFolders.ResolveTab(query, canOverview, canSettings));
-    }
-
-    [Fact]
-    public void ResolveTab_WithoutAnyPermission_ReturnsNull()
-    {
-        Assert.Null(HomeFolders.ResolveTab("overview", canOverview: false, canSettings: false));
-    }
-
-    [Fact]
-    public void SearchDestination_ForHomeFolders_OpensTheHomeFoldersPage()
-    {
-        var destination = Assert.Single(SearchDestinations.All, d => d.Keywords.Contains("home-ordner"));
-
-        Assert.StartsWith("/home-folders", destination.Url);
-        Assert.DoesNotContain(SearchDestinations.All, d => d.Url.Contains("tab=homes"));
-        // Both holders of the page see the entry: ManageHomes (overview) and system settings (settings tab).
-        Assert.Equal(
-            ManagementPermission.ManageHomes | ManagementPermission.ManageSystemSettings,
-            destination.RequiredAny);
+        Assert.True(Settings.TryParseTab(query, out var tab));
+        Assert.Equal(SettingsTab.HomeFolders, tab);
     }
 }

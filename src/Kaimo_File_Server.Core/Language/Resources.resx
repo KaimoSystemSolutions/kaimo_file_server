@@ -4951,7 +4951,7 @@
     <value>Size, status and public links of every home folder. Contents stay private.</value>
   </data>
   <data name="Web_Homes_NotConfigured" xml:space="preserve">
-    <value>Home folders are not set up yet. Choose a storage pool on the Settings tab.</value>
+    <value>Home folders are not set up yet. Choose a storage pool under Settings → Home folders.</value>
   </data>
   <data name="Web_Homes_Empty" xml:space="preserve">
     <value>No home folders exist yet.</value>
@@ -5026,7 +5026,7 @@
     <value>Home folders are disabled for all users.</value>
   </data>
   <data name="Web_Homes_GloballyDisabled" xml:space="preserve">
-    <value>Home folders are disabled for all users (Settings tab). Files are kept.</value>
+    <value>Home folders are disabled for all users (Settings → Home folders). Files are kept.</value>
   </data>
   <data name="Web_Homes_Delete" xml:space="preserve">
     <value>Delete home folder</value>
@@ -7578,12 +7578,6 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   </data>
   <data name="Web_ShareLinks_DownloadsDisabled" xml:space="preserve">
     <value>Download links are disabled in the settings; this link currently does not open.</value>
-  </data>
-  <data name="Web_HomeFolders_Tab_Overview" xml:space="preserve">
-    <value>Overview</value>
-  </data>
-  <data name="Web_HomeFolders_Tab_Settings" xml:space="preserve">
-    <value>Settings</value>
   </data>
   <data name="Web_Security_Outcome_ServiceDisabled" xml:space="preserve">
     <value>Service switched off</value>

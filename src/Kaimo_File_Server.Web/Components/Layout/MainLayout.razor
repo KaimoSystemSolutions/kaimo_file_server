@@ -407,11 +407,11 @@
             _canManageSettings = _currentUser != null
                                  && await ManagementAuthService.HasAnyPermissionAsync(
                                         _currentUser, ManagementPermission.ManageSystemSettings);
-            // Mirror the /home-folders tabs: Overview (Global ManageHomes) or Settings (system settings).
-            _canManageHomeFolders = _canManageSettings
-                                    || (_currentUser != null
-                                        && await ManagementAuthService.HasGlobalPermissionAsync(
-                                               _currentUser, ManagementPermission.ManageHomes));
+            // Mirror HomesAdminViewModel.CanAccessPage (Global ManageHomes); the home-folder
+            // settings live on the Settings page.
+            _canManageHomeFolders = _currentUser != null
+                                    && await ManagementAuthService.HasGlobalPermissionAsync(
+                                           _currentUser, ManagementPermission.ManageHomes);
             // Mirror UserListViewModel.CanAccessPage — show the tab only if the user
             // can reach the page behind it.
             _canManageUsers = _currentUser != null

@@ -59,6 +59,7 @@ else
                 {
                     <span class="ui-label settings-tab-group" aria-hidden="true">@R("Web_Settings_Group_StorageFiles")</span>
                     <Tab Active="@(_activeTab == SettingsTab.Storage)" Icon="folder.svg" Label="@Resources.Web_Settings_Tab_Storage" OnClick="() => SwitchTab(SettingsTab.Storage)" />
+                    <Tab Active="@(_activeTab == SettingsTab.HomeFolders)" Icon="user.svg" Label="@R("Web_Nav_HomeFolders")" OnClick="() => SwitchTab(SettingsTab.HomeFolders)" />
                     <Tab Active="@(_activeTab == SettingsTab.Search)" Icon="search.svg" Label="@Resources.Web_Settings_Tab_Search" OnClick="() => SwitchTab(SettingsTab.Search)" />
                     <Tab Active="@(_activeTab == SettingsTab.CloudAccess)" Icon="cloud-download.svg" Label="@R("Web_Settings_Tab_CloudAccess")" OnClick="() => SwitchTab(SettingsTab.CloudAccess)" />
                     <Tab Active="@(_activeTab == SettingsTab.ShareLinks)" Icon="share.svg" Label="@R("Web_Settings_Tab_ShareLinks")" OnClick="() => SwitchTab(SettingsTab.ShareLinks)" />
@@ -105,6 +106,7 @@ else
                     case SettingsTab.ContextMenu when VM.CanManageSettings: <ContextMenuSettings VM="VM" /> break;
                     case SettingsTab.PasswordPolicy when VM.CanManageSettings: <PasswordPolicySettings VM="VM" /> break;
                     case SettingsTab.Storage when VM.CanManageSettings: <StorageSettings VM="VM" /> break;
+                    case SettingsTab.HomeFolders when VM.CanManageSettings: <HomeFolderSettings VM="VM" /> break;
                     case SettingsTab.SystemStatus when VM.CanManageSettings: <NetworkSettings VM="VM" /><MemorySettings VM="VM" /> break;
                     case SettingsTab.Search when VM.CanManageSettings: <SearchSettings VM="VM" /> break;
                     case SettingsTab.CloudAccess when VM.CanManageSettings: <CloudAccessSettings VM="VM" /> break;

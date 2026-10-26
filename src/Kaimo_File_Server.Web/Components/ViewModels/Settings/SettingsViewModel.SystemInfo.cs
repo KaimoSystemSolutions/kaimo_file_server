@@ -223,35 +223,6 @@ public partial class SettingsViewModel
         HomesRecycleLimits = share?.GetRecycleLimits();
     }
 
-    /// <summary>
-    /// Loads only what the home-folder settings need (permissions, pools and their names, the
-    /// home share, the recycle default). Used by the /home-folders page instead of <see cref="LoadAsync"/>.
-    /// </summary>
-    public async Task LoadHomeFolderSettingsAsync()
-    {
-        IsLoading = true;
-        ErrorMessage = null;
-        try
-        {
-            await LoadPermissionsAsync();
-            if (!CanManageSettings)
-                return;
-            RefreshStorageInfo();
-            await LoadPoolNamesAsync();
-            await LoadHomesAsync();
-            await LoadRecycleAsync();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to load the home-folder settings");
-            ErrorMessage = Resources.Web_Settings_LoadFailed;
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
-
     /// <summary>Enables or disables home folders for every user at once.</summary>
     public async Task<bool> SetHomesEnabledAsync(bool enabled)
     {

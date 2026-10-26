@@ -27,7 +27,7 @@ else if (!VM.IsConfigured)
 {
     <div class="empty-state">
         @Assets.SVG("users.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
-        <p>@T("Web_Homes_NotConfigured", "Home folders are not set up yet. Choose a storage pool on the Settings tab.")</p>
+        <p>@T("Web_Homes_NotConfigured", "Home folders are not set up yet. Choose a storage pool under Settings → Home folders.")</p>
     </div>
 }
 else if (!VM.Rows.Any())
@@ -45,7 +45,7 @@ else
     }
     @if (!VM.IsGloballyEnabled)
     {
-        <div class="warning-banner">@T("Web_Homes_GloballyDisabled", "Home folders are disabled for all users (Settings tab). Files are kept.")</div>
+        <div class="warning-banner">@T("Web_Homes_GloballyDisabled", "Home folders are disabled for all users (Settings → Home folders). Files are kept.")</div>
     }
     <div class="admin-content homes-workspace admin-compact">
         <section class="homes-list" aria-label="@T("Web_Homes_Title", "User home folders")">

@@ -63,7 +63,7 @@ public partial class Settings
             await SwitchTab(requested);
     }
 
-    private static bool TryParseTab(string? value, out SettingsTab tab)
+    internal static bool TryParseTab(string? value, out SettingsTab tab)
     {
         tab = default;
         if (string.IsNullOrWhiteSpace(value))
@@ -130,5 +130,6 @@ internal enum SettingsTab
     ClientDevices,
     MailServer,
     Domains,
-    AccessRestrictions
+    AccessRestrictions,
+    HomeFolders
 }
