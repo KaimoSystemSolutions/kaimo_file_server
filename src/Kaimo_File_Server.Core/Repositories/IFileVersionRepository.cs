@@ -131,9 +131,30 @@ namespace Kaimo_File_Server.Core.Repositories
         Task<List<(Guid ShareId, string StoragePath)>> GetAllBlobReferencesAsync(
             CancellationToken cancellationToken = default);
 
+        /// <summary>Deletes the given version rows and returns them for blob garbage collection.</summary>
+        Task<List<FileVersion>> DeleteByIdsAsync(IReadOnlyCollection<Guid> ids);
+
+        /// <summary>Every share id that still has version rows (including legacy <see cref="Guid.Empty"/>).</summary>
+        Task<List<Guid>> GetShareIdsWithVersionsAsync(CancellationToken cancellationToken = default);
+
         /// <summary>
-        /// Checks whether a version with the given content hash already exists.
-        /// Enables skipping version creation when the file content has not changed.
+        /// One page of the distinct versioned file paths of a share in ordinal order, starting
+        /// after <paramref name="afterPath"/> (<c>null</c> for the first page).
+        /// </summary>
+        Task<List<string>> GetVersionedPathsPageAsync(
+            Guid shareId, string? afterPath, int take, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// The oldest versions of the given shares that are not the newest version of their
+        /// file, oldest first. Used to bring a pool back under its version-storage budget.
+        /// </summary>
+        Task<List<FileVersion>> GetBudgetPruneCandidatesAsync(
+            IReadOnlyCollection<Guid> shareIds, int take, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Checks whether the newest version of a file already has the given content hash.
+        /// Enables skipping version creation when the file content has not changed; older
+        /// versions with the same hash do not count.
         /// </summary>
         /// <param name="shareId">The share the file belongs to.</param>
         /// <param name="filePath">The normalised relative file path.</param>

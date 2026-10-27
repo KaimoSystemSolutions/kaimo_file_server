@@ -131,12 +131,29 @@ Implemented by `FileVersionService` (`src/Kaimo_File_Server.Core/Services/File/F
   with that hash exists, it is reused.
 - **Isolation.** Each `file_versions` row carries its `ShareId`, so histories of files with the same
   relative path in different shares never mix.
-- **Retention.** Defaults are 64 versions and 90 days per file, applied after each new version.
+- **Policy.** One global `VersioningPolicy` (config key `versioning.policy`, Settings → Versioning)
+  applies to every share. `VersioningPolicyStore` holds it per process and re-reads it every 30 s, so
+  Web, SMB bridge and Host converge without a restart.
+- **What is versioned.** `CaptureVersionAsync` checks, before hashing: the global switch, the exclusion
+  patterns (globs, case-insensitive; without `/` matched against the file name, with `/` against the
+  share-relative path; defaults cover Office lock files, temp and partial downloads, `Thumbs.db`,
+  `.DS_Store`, `desktop.ini`) and the size limit (default 512 MB, 0 = unlimited). Files pulled in by an
+  external-storage sync do not create versions.
+- **Retention.** `VersionRetentionPlanner` keeps every version of the last 24 h, then one per hour up to
+  7 days, one per day up to 30 days and one per week after that; hard limits are 100 versions and
+  90 days per file (all configurable). The newest version of an existing file is never removed by any
+  rule, because snapshots are taken after a write and it is the only copy of the current content.
 - **Space guard.** A version is skipped (never the file operation itself) when writing the blob would
-  leave less than `max(2 GiB, 5 %)` free in the pool.
-- **Exclusions.** Files pulled in by an external-storage sync do not create versions.
-- **Reconciliation.** `VersionStorageReconcilerService` (Host) moves blobs from the legacy location
+  leave less than `max(2 GiB, 5 %)` free in the pool. A restore whose current content cannot be kept as
+  a version is refused (`VersionBackupUnavailableException`) unless the user confirms it a second time.
+- **Retention sweep.** `VersionStorageReconcilerService` (Host only) runs every 6 h. It first runs
+  `VersionRetentionSweeper`: removes legacy rows without a share and rows of deleted shares, applies the
+  policy to unchanged files, removes histories of files that no longer exist (after a 1 h grace, and
+  never while the share root is missing or empty), and enforces the pool budget (default 15 % of the
+  pool capacity) by pruning the oldest non-newest versions. It then moves blobs from the legacy location
   `<appdata>/.versions` into their pools and follows shares that moved to another pool.
+- **Blob collection across processes.** Before deleting a blob, the collector moves it aside and checks
+  the references again; a version committed by another process in the meantime gets its blob back.
 
 ## Snapshot cache
 

@@ -348,6 +348,66 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             return rows.Select(r => (r.ShareId, r.StoragePath)).ToList();
         }
 
+        public async Task<List<FileVersion>> DeleteByIdsAsync(IReadOnlyCollection<Guid> ids)
+        {
+            if (ids.Count == 0) return [];
+            await using var db = await _dbFactory.CreateDbContextAsync();
+
+            var idList = ids.ToList();
+            var removed = await db.Set<FileVersion>().Where(v => idList.Contains(v.Id)).ToListAsync();
+            if (removed.Count == 0) return removed;
+
+            db.Set<FileVersion>().RemoveRange(removed);
+            await db.SaveChangesAsync();
+            return removed;
+        }
+
+        public async Task<List<Guid>> GetShareIdsWithVersionsAsync(CancellationToken cancellationToken = default)
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+            return await db.Set<FileVersion>()
+                .Select(v => v.ShareId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<List<string>> GetVersionedPathsPageAsync(
+            Guid shareId, string? afterPath, int take, CancellationToken cancellationToken = default)
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+            var query = db.Set<FileVersion>().Where(v => v.ShareId == shareId);
+            if (afterPath is not null)
+                query = query.Where(v => string.Compare(v.FilePath, afterPath) > 0);
+
+            // Comparison and ordering both run in the database, so the cursor follows one
+            // collation consistently whatever that collation is.
+            return await query
+                .Select(v => v.FilePath)
+                .Distinct()
+                .OrderBy(p => p)
+                .Take(take)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<List<FileVersion>> GetBudgetPruneCandidatesAsync(
+            IReadOnlyCollection<Guid> shareIds, int take, CancellationToken cancellationToken = default)
+        {
+            if (shareIds.Count == 0 || take <= 0) return [];
+            await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+            var ids = shareIds.ToList();
+            var versions = db.Set<FileVersion>();
+            return await versions
+                .Where(v => ids.Contains(v.ShareId)
+                            && versions.Any(newer => newer.ShareId == v.ShareId
+                                                     && newer.FilePath == v.FilePath
+                                                     && newer.SnapshotTimestampUtc > v.SnapshotTimestampUtc))
+                .OrderBy(v => v.SnapshotTimestampUtc)
+                .Take(take)
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<bool> ExistsWithHashAsync(Guid shareId, string filePath, string contentHash)
         {
             await using var db = await _dbFactory.CreateDbContextAsync();

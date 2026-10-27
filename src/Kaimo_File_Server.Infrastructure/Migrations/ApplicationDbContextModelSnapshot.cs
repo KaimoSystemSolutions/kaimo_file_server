@@ -795,6 +795,8 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
 
                     b.HasIndex("SnapshotTimestampUtc");
 
+                    b.HasIndex("StoragePath");
+
                     b.HasIndex("ShareId", "FilePath", "ContentHash");
 
                     b.HasIndex("ShareId", "FilePath", "SnapshotTimestampUtc")

@@ -246,6 +246,14 @@ public interface IFileBrowserViewModel
     Task<OperationResult> RestoreVersionAsync(FileMetadata file, DateTime snapshotTimestampUtc)
         => Task.FromResult(OperationResult.Fail("File versions are not supported by this backend."));
 
+    /// <summary>
+    /// As <see cref="RestoreVersionAsync(FileMetadata, DateTime)"/>; with
+    /// <paramref name="allowWithoutBackup"/> the restore proceeds even when the current content
+    /// cannot be kept as a version (after the user confirmed a <c>RequiresBackupConsent</c> result).
+    /// </summary>
+    Task<OperationResult> RestoreVersionAsync(FileMetadata file, DateTime snapshotTimestampUtc, bool allowWithoutBackup)
+        => RestoreVersionAsync(file, snapshotTimestampUtc);
+
     Task<(Guid Id, Guid OwnerId)?> GetPersistedMetadataAsync(FileMetadata item)
         => Task.FromResult<(Guid Id, Guid OwnerId)?>(null);
 

@@ -23,7 +23,7 @@ namespace Kaimo_File_Server.Tests;
 /// replays the inverses of the last entry (LIFO), batches undo as one entry, and anything
 /// that cannot be reverted without data loss is never recorded. The history is per folder.
 /// </summary>
-public sealed class FileBrowserViewModelUndoTests : IDisposable
+public sealed partial class FileBrowserViewModelUndoTests : IDisposable
 {
     // Copy targets are probed on disk, so share paths map into this temp folder.
     private readonly string _root = Directory.CreateTempSubdirectory("kaimo-undo-").FullName;

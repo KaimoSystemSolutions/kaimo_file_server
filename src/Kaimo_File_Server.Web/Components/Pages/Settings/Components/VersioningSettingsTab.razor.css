@@ -1,0 +1,51 @@
+.versioning-row {
+    margin-bottom: var(--space-3);
+}
+
+/* One extra class so this beats the page-wide 200px from Settings.razor.css (same
+   specificity otherwise, and that file comes later in the bundle). */
+.versioning-settings .versioning-row .settings-field-label {
+    min-width: 260px;
+}
+
+/* edit-input has no shared disabled look; use the DESIGN_SPEC convention for disabled
+   controls (50 % opacity, not-allowed), e.g. the thinning tiers while thinning is off. */
+.versioning-settings .edit-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.versioning-storage-link {
+    margin-top: var(--space-2);
+}
+
+.versioning-patterns {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+    max-width: 520px;
+}
+
+.versioning-patterns-input {
+    width: 100%;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12px;
+    resize: vertical;
+}
+
+.versioning-patterns-actions {
+    display: flex;
+    justify-content: flex-start;
+}
+
+@media (max-width: 640px) {
+    .versioning-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .versioning-settings .versioning-row .settings-field-label {
+        min-width: 0;
+    }
+}

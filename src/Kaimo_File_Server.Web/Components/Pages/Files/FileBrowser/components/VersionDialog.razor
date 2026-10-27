@@ -147,10 +147,29 @@
     </div>
 }
 
+@* -- Second confirmation: the current content cannot be kept as a version -- *@
+@if (_noBackupConfirm is { } noBackup)
+{
+    <div class="modal-backdrop" @onclick="CancelNoBackup">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <h3 class="modal-title">@T("Web_Version_NoBackup_Title", "Restore without keeping the current content?")</h3>
+            <p class="modal-warning">@noBackup.Reason</p>
+            <p class="modal-text">@T("Web_Version_NoBackup_Text", "Restoring replaces the current content of the file permanently. It cannot be restored afterwards.")</p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" @onclick="CancelNoBackup">@Resources.Web_Button_Cancel</button>
+                <button class="btn btn-danger version-restore-anyway" @onclick="ConfirmNoBackup">@T("Web_Version_NoBackup_Confirm", "Restore anyway")</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter, EditorRequired] public IFileBrowserViewModel VM { get; set; } = default!;
     [Parameter] public FilePreview FilePreviewComponent { get; set; } = default!;
     [Parameter] public EventCallback OnRestored { get; set; }
+
+    private static string T(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
 
     private bool _show;
     public bool IsOpen => _show;
@@ -169,6 +188,7 @@
     private List<FileVersion> _folderEntries = new();
 
     private DateTime? _restoreConfirm;
+    private (DateTime Timestamp, string Reason)? _noBackupConfirm;
 
     private string _title = "";
 
@@ -185,6 +205,7 @@
         _folderEntries = new();
         _snapshots = new();
         _restoreConfirm = null;
+        _noBackupConfirm = null;
 
         _title = string.Format(
             _isFolder ? Resources.Web_Version_TitleFolder : Resources.Web_Version_TitleFile,
@@ -223,6 +244,7 @@
     {
         _show = false;
         _restoreConfirm = null;
+        _noBackupConfirm = null;
         StateHasChanged();
     }
 
@@ -293,9 +315,30 @@
         if (_target is null || _restoreConfirm is null) return;
         var ts = _restoreConfirm.Value;
         _restoreConfirm = null;
+        await RestoreAsync(ts, allowWithoutBackup: false);
+    }
 
-        var result = await VM.RestoreVersionAsync(_target, ts);
-        if (result.Success)
+    private void CancelNoBackup() { _noBackupConfirm = null; StateHasChanged(); }
+
+    private async Task ConfirmNoBackup()
+    {
+        if (_target is null || _noBackupConfirm is null) return;
+        var ts = _noBackupConfirm.Value.Timestamp;
+        _noBackupConfirm = null;
+        await RestoreAsync(ts, allowWithoutBackup: true);
+    }
+
+    private async Task RestoreAsync(DateTime ts, bool allowWithoutBackup)
+    {
+        if (_target is null) return;
+
+        var result = await VM.RestoreVersionAsync(_target, ts, allowWithoutBackup);
+        if (result.RequiresBackupConsent)
+        {
+            // The live file is untouched; ask once more before it is overwritten for good.
+            _noBackupConfirm = (ts, result.Error ?? Resources.Web_Version_RestoreFailed);
+        }
+        else if (result.Success)
         {
             Toast.Show(string.Format(Resources.Web_Version_RestoreSuccess, _target.Name), ToastType.Success);
             // Refresh the version list (the previous "current" state is now a version)

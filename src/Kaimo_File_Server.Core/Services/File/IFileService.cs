@@ -179,9 +179,19 @@ namespace Kaimo_File_Server.Core.Services.File
         /// <summary>
         /// Restores a file to the content of an earlier version. The current content
         /// is snapshotted as its own version first, so a restore is itself undoable.
-        /// Requires write access.
+        /// Throws <see cref="VersionBackupUnavailableException"/> without touching the file
+        /// when that snapshot cannot be stored (policy, low space). Requires write access.
         /// </summary>
         Task RestoreFileVersionAsync(string path, DateTime snapshotTimestampUtc, UserContext user);
+
+        /// <summary>
+        /// As <see cref="RestoreFileVersionAsync(string, DateTime, UserContext)"/>; with
+        /// <paramref name="allowWithoutBackup"/> the restore proceeds even when the current
+        /// content cannot be preserved (the user confirmed losing it).
+        /// </summary>
+        Task RestoreFileVersionAsync(
+            string path, DateTime snapshotTimestampUtc, UserContext user, bool allowWithoutBackup)
+            => RestoreFileVersionAsync(path, snapshotTimestampUtc, user);
 
         /// <summary>
         /// Distinct snapshot timestamps of any file inside a folder (newest first).

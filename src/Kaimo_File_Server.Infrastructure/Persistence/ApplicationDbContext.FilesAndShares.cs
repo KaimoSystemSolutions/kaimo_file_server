@@ -93,6 +93,8 @@ public partial class ApplicationDbContext
             entity.HasIndex(e => new { e.ShareId, e.FilePath, e.SnapshotTimestampUtc }).IsUnique();
             entity.HasIndex(e => e.SnapshotTimestampUtc);
             entity.HasIndex(e => new { e.ShareId, e.FilePath, e.ContentHash });
+            // Blob garbage collection asks "does any row still reference this blob?".
+            entity.HasIndex(e => e.StoragePath);
         });
 
         modelBuilder.Entity<SambaLifecycleEventReceipt>(entity =>

@@ -6,10 +6,12 @@ using Microsoft.Extensions.Logging;
 namespace Kaimo_File_Server.Infrastructure.Services;
 
 /// <summary>
-/// Periodically runs <see cref="FileVersionService.ReconcileStorageAsync"/>: moves
-/// version blobs from the former application-data store into the pools of their
-/// shares, follows shares moved to another pool and removes unneeded copies.
-/// Registered in the Host only, so a single process does this work.
+/// Periodically runs the <see cref="VersionRetentionSweeper"/> (global versioning policy,
+/// missing files, deleted shares, pool budgets) and then
+/// <see cref="FileVersionService.ReconcileStorageAsync"/>: moves version blobs from the
+/// former application-data store into the pools of their shares, follows shares moved to
+/// another pool and removes unneeded copies. Registered in the Host only, so a single
+/// process does this work.
 /// </summary>
 public sealed class VersionStorageReconcilerService(
     IServiceScopeFactory scopeFactory,
@@ -17,7 +19,7 @@ public sealed class VersionStorageReconcilerService(
 {
     // Let startup (migrations, SMB, first requests) settle before the first pass.
     private static readonly TimeSpan InitialDelay = TimeSpan.FromMinutes(2);
-    private static readonly TimeSpan Interval = TimeSpan.FromHours(24);
+    private static readonly TimeSpan Interval = TimeSpan.FromHours(6);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -26,6 +28,18 @@ public sealed class VersionStorageReconcilerService(
             await Task.Delay(InitialDelay, stoppingToken);
             while (true)
             {
+                // Independent steps: a failed sweep must not block blob reconciliation.
+                try
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    await scope.ServiceProvider.GetRequiredService<VersionRetentionSweeper>()
+                        .RunOnceAsync(stoppingToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogError(ex, "Version retention sweep failed; retrying on the next run.");
+                }
+
                 try
                 {
                     using var scope = scopeFactory.CreateScope();

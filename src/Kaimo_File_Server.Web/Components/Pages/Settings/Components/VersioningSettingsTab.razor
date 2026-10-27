@@ -1,0 +1,141 @@
+@using Kaimo_File_Server.Core.Services.File
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+
+@*
+    Settings → Versioning: the global policy for every share. What is versioned (switch, size
+    limit, exclusion patterns), how long versions are kept (thinning tiers, count and age
+    limits) and how much of a pool they may occupy. Applied on every write and by the
+    retention sweep in the background service.
+*@
+
+<div class="detail-section versioning-settings">
+    <span class="detail-label">@T("Web_VersioningSettings_WhatTitle", "What is versioned")</span>
+    <p class="settings-description">
+        @T("Web_VersioningSettings_WhatDescription", "Every write stores the new content as a version, so earlier states can be restored. These rules apply to all shares.")
+    </p>
+
+    @if (_error is not null) { <div class="error-banner">@_error</div> }
+    @if (_success) { <div class="success-banner">@T("Web_VersioningSettings_Saved", "Versioning settings saved.")</div> }
+
+    <div class="toggle-row">
+        <span class="toggle-label-text label-with-info">
+            @T("Web_VersioningSettings_Enabled", "Versioning enabled")
+            <InfoButton Text="@T("Web_VersioningSettings_EnabledHint", "When off, no new versions are created. Existing versions stay available and are still cleaned up by the rules below.")" />
+        </span>
+        <label class="toggle-switch">
+            <input id="versioning-enabled" type="checkbox" @bind="_policy.Enabled" disabled="@Locked"
+                   aria-label="@T("Web_VersioningSettings_Enabled", "Versioning enabled")" />
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
+
+    <div class="settings-row versioning-row">
+        <label class="settings-field-label label-with-info" for="versioning-max-size">
+            @T("Web_VersioningSettings_MaxSize", "Max. file size (MB)")
+            <InfoButton Text="@T("Web_VersioningSettings_MaxSizeHint", "Larger files are not versioned: every version is a full copy, so large videos, images or archives would quickly fill the pool. 0 = no limit.")" />
+        </label>
+        <input id="versioning-max-size" type="number" min="0" class="edit-input settings-number"
+               @bind="_maxFileSizeMb" disabled="@Locked" />
+    </div>
+
+    <div class="versioning-patterns">
+        <label class="settings-field-label label-with-info" for="versioning-patterns">
+            @T("Web_VersioningSettings_Patterns", "Excluded files")
+            <InfoButton Text="@T("Web_VersioningSettings_PatternsHint", "One pattern per line. * matches any characters, ? one character, ** also across folders. Without / the pattern matches the file name, with / the path inside the share. Case is ignored.")" />
+        </label>
+        <textarea id="versioning-patterns" class="edit-input versioning-patterns-input" rows="8" spellcheck="false"
+                  @bind="_patternsText" @bind:event="oninput" disabled="@Locked"></textarea>
+        <div class="versioning-patterns-actions">
+            <button type="button" class="btn-secondary btn-secondary--sm versioning-default-patterns"
+                    disabled="@Locked" @onclick="RestoreDefaultPatterns">
+                @T("Web_VersioningSettings_DefaultPatterns", "Restore default patterns")
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="detail-section versioning-settings">
+    <span class="detail-label">@T("Web_VersioningSettings_KeepTitle", "How long versions are kept")</span>
+    <p class="settings-description">
+        @T("Web_VersioningSettings_KeepDescription", "Older versions are thinned out step by step. The newest version of a file is always kept, whatever the limits say.")
+    </p>
+
+    <div class="toggle-row">
+        <span class="toggle-label-text label-with-info">
+            @T("Web_VersioningSettings_Thinning", "Thin out older versions")
+            <InfoButton Text="@T("Web_VersioningSettings_ThinningHint", "Keeps every version of the most recent hours, then one per hour, then one per day and finally one per week. Without thinning only the count and age limits apply.")" />
+        </span>
+        <label class="toggle-switch">
+            <input id="versioning-thinning" type="checkbox" @bind="_policy.ThinningEnabled" disabled="@Locked"
+                   aria-label="@T("Web_VersioningSettings_Thinning", "Thin out older versions")" />
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
+
+    <div class="settings-row versioning-row">
+        <label class="settings-field-label" for="versioning-keep-all">@T("Web_VersioningSettings_KeepAll", "Keep all versions for (hours)")</label>
+        <input id="versioning-keep-all" type="number" min="0" class="edit-input settings-number"
+               @bind="_policy.KeepAllHours" disabled="@(Locked || !_policy.ThinningEnabled)" />
+    </div>
+    <div class="settings-row versioning-row">
+        <label class="settings-field-label" for="versioning-hourly">@T("Web_VersioningSettings_Hourly", "Then one per hour for (days)")</label>
+        <input id="versioning-hourly" type="number" min="0" max="@VersioningPolicy.MaxDays" class="edit-input settings-number"
+               @bind="_policy.HourlyForDays" disabled="@(Locked || !_policy.ThinningEnabled)" />
+    </div>
+    <div class="settings-row versioning-row">
+        <label class="settings-field-label label-with-info" for="versioning-daily">
+            @T("Web_VersioningSettings_Daily", "Then one per day for (days)")
+            <InfoButton Text="@T("Web_VersioningSettings_DailyHint", "Counted from the time of the version. Older versions keep one per week until the maximum age.")" />
+        </label>
+        <input id="versioning-daily" type="number" min="0" max="@VersioningPolicy.MaxDays" class="edit-input settings-number"
+               @bind="_policy.DailyForDays" disabled="@(Locked || !_policy.ThinningEnabled)" />
+    </div>
+
+    <div class="settings-row versioning-row">
+        <label class="settings-field-label label-with-info" for="versioning-max-versions">
+            @T("Web_VersioningSettings_MaxVersions", "Max. versions per file")
+            <InfoButton Text="@T("Web_VersioningSettings_MaxVersionsHint", "The oldest versions are removed first. 0 = no limit.")" />
+        </label>
+        <input id="versioning-max-versions" type="number" min="0" max="@VersioningPolicy.MaxVersionsLimit" class="edit-input settings-number"
+               @bind="_policy.MaxVersionsPerFile" disabled="@Locked" />
+    </div>
+    <div class="settings-row versioning-row">
+        <label class="settings-field-label label-with-info" for="versioning-max-age">
+            @T("Web_VersioningSettings_MaxAge", "Max. age (days)")
+            <InfoButton Text="@T("Web_VersioningSettings_MaxAgeHint", "Older versions are removed, also for files that are no longer changed. 0 = no limit.")" />
+        </label>
+        <input id="versioning-max-age" type="number" min="0" max="@VersioningPolicy.MaxDays" class="edit-input settings-number"
+               @bind="_policy.MaxAgeDays" disabled="@Locked" />
+    </div>
+</div>
+
+<div class="detail-section versioning-settings">
+    <span class="detail-label">@T("Web_VersioningSettings_BudgetTitle", "Storage budget")</span>
+    <p class="settings-description">
+        @T("Web_VersioningSettings_BudgetDescription", "Versions are stored in the storage pool of their share. If they take up more than this share of a pool, the oldest versions are removed first.")
+    </p>
+
+    <div class="settings-row versioning-row">
+        <label class="settings-field-label label-with-info" for="versioning-budget">
+            @T("Web_VersioningSettings_Budget", "Max. share of a pool (%)")
+            <InfoButton Text="@T("Web_VersioningSettings_BudgetHint", "Up to 90 %. 0 = no budget; then only the free-space reserve of the pool limits new versions.")" />
+        </label>
+        <input id="versioning-budget" type="number" min="0" max="@VersioningPolicy.MaxBudgetPercent" class="edit-input settings-number"
+               @bind="_policy.PoolBudgetPercent" disabled="@Locked" />
+    </div>
+
+    <p class="settings-hint">
+        @T("Web_VersioningSettings_ApplyHint", "Changes apply to new writes right away and to existing versions within six hours. The Storage tab shows the current usage.")
+    </p>
+    <a class="btn-secondary btn-secondary--sm versioning-storage-link" href="/settings?tab=storage">
+        @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+        <span>@T("Web_Settings_Tab_Storage", "Storage")</span>
+    </a>
+
+    <div class="settings-actions">
+        <button type="button" class="btn-primary versioning-save" disabled="@Locked" @onclick="SaveAsync">
+            @(_busy ? "…" : T("Web_Button_Save", "Save"))
+        </button>
+    </div>
+</div>

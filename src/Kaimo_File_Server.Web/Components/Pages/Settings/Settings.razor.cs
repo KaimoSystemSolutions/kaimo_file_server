@@ -131,5 +131,6 @@ internal enum SettingsTab
     MailServer,
     Domains,
     AccessRestrictions,
-    HomeFolders
+    HomeFolders,
+    Versioning
 }

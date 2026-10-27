@@ -122,6 +122,10 @@ public static class SearchDestinations
         new("Web_Settings_Tab_Storage",
             ["storage", "speicher", "speicherpool", "pool", "festplatte", "disk"],
             "/settings?tab=storage", "folder.svg", Settings),
+        new("Web_Settings_Tab_Versioning",
+            ["versioning", "versionierung", "versions", "versionen", "version history", "versionsverlauf",
+             "snapshot", "snapshots", "retention", "aufbewahrung"],
+            "/settings?tab=versioning", "history.svg", Settings),
         // "users"/"user" deliberately overlap with the Users page: the share is named
         // "users", its web label "user".
         new("Web_Nav_HomeFolders",

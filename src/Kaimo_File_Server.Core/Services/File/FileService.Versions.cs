@@ -42,8 +42,12 @@ public partial class FileService
         return await _versionService.ReadVersionAsync(_shareId, normalized, snapshotTimestampUtc);
     }
 
-    public async Task RestoreFileVersionAsync(
+    public Task RestoreFileVersionAsync(
         string path, DateTime snapshotTimestampUtc, UserContext user)
+        => RestoreFileVersionAsync(path, snapshotTimestampUtc, user, allowWithoutBackup: false);
+
+    public async Task RestoreFileVersionAsync(
+        string path, DateTime snapshotTimestampUtc, UserContext user, bool allowWithoutBackup)
     {
         if (_versionService == null)
             throw new NotSupportedException("Versioning is not configured.");
@@ -52,11 +56,16 @@ public partial class FileService
         await EnsureAccessAsync(user, normalized, false, FilePermission.CreateWriteData);
 
         // Snapshot the current content first so restoring is itself undoable.
-        // Content-addressable dedup skips this if it equals the latest version.
+        // Content-addressable dedup skips this if it equals the latest version. When the
+        // policy or a full pool prevents the snapshot, the overwrite would destroy the
+        // current content for good, so it needs the caller's explicit consent.
         if (await _storage.ExistsAsync(normalized))
         {
             await using var current = await _storage.ReadAsync(normalized, preserveAccessTime: true);
-            await _versionService.CreateVersionAsync(_shareId, normalized, current, user.User.Id.ToString());
+            var capture = await _versionService.CaptureVersionAsync(
+                _shareId, normalized, current, user.User.Id.ToString());
+            if (!capture.PreservesContent && !allowWithoutBackup)
+                throw new VersionBackupUnavailableException(capture.Outcome);
         }
 
         // ReadVersionAsync fully decompresses and verifies size/hash before it

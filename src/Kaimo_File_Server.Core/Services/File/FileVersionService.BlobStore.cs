@@ -135,7 +135,23 @@ public partial class FileVersionService
         try
         {
             if (await IsBlobNeededInRootAsync(storageRoot, storagePath)) return false;
-            System.IO.File.Delete(fullPath);
+
+            // The blob lock only covers this process. Move the blob aside and check again,
+            // so a version row another process committed meanwhile gets its blob back. A
+            // writer that already found the blob missing has rewritten it; then the parked
+            // copy is surplus. The ".tmp" suffix lets reconciliation remove crash leftovers.
+            var parked = $"{fullPath}.{Guid.NewGuid():N}.gc.tmp";
+            System.IO.File.Move(fullPath, parked);
+            if (await IsBlobNeededInRootAsync(storageRoot, storagePath))
+            {
+                if (System.IO.File.Exists(fullPath))
+                    System.IO.File.Delete(parked);
+                else
+                    System.IO.File.Move(parked, fullPath, overwrite: false);
+                return false;
+            }
+
+            System.IO.File.Delete(parked);
             RemoveEmptyParentDirectories(Path.GetDirectoryName(fullPath), root);
             return true;
         }

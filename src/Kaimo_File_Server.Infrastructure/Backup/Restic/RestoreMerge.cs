@@ -61,21 +61,35 @@ internal sealed class RestoreMerge(
         // A folder cannot replace a file (and vice versa) without deleting it: restore beside it.
         if (conflict == BackupRestoreConflict.Rename || sourceIsDirectory || Directory.Exists(destination))
         {
-            var renamed = Absolute(RenamedPath(relativeDestination, !sourceIsDirectory));
-            if (sourceIsDirectory) Directory.Move(source, renamed);
-            else File.Move(source, renamed);
-            outcome.Renamed++;
-            Untouched.Add(relativeDestination);
+            RestoreBeside(source, relativeDestination, sourceIsDirectory);
             return;
         }
 
+        VersionCaptureResult capture;
         await using (var current = new FileStream(destination, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            capture = await versions.CaptureVersionAsync(shareId, relativeDestination, current, userId);
+
+        // Overwriting is only safe when the live content stays recoverable from its history;
+        // otherwise (policy, full pool) keep it and restore the backup copy beside it.
+        if (!capture.PreservesContent)
         {
-            if (await versions.CreateVersionAsync(shareId, relativeDestination, current, userId) is not null)
-                outcome.VersionsCreated++;
+            RestoreBeside(source, relativeDestination, sourceIsDirectory: false);
+            return;
         }
+
+        if (capture.Outcome == VersionCaptureOutcome.Created)
+            outcome.VersionsCreated++;
         File.Move(source, destination, overwrite: true);
         outcome.Overwritten++;
+    }
+
+    private void RestoreBeside(string source, string relativeDestination, bool sourceIsDirectory)
+    {
+        var renamed = Absolute(RenamedPath(relativeDestination, !sourceIsDirectory));
+        if (sourceIsDirectory) Directory.Move(source, renamed);
+        else File.Move(source, renamed);
+        outcome.Renamed++;
+        Untouched.Add(relativeDestination);
     }
 
     private static async Task<bool> SameContentAsync(string a, string b)

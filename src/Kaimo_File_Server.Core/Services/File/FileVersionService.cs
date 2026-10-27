@@ -67,12 +67,19 @@ public partial class FileVersionService : IFileVersionService
     private readonly ILogger<FileVersionService> _logger;
     private readonly IVersionStorageLocator? _locator;
     private readonly Func<string, (long Free, long Total)> _diskSpace;
+    private readonly IVersioningPolicyProvider? _policyProvider;
 
     /// <param name="versionStorageRoot">
     /// The blob store without a <paramref name="storageLocator"/>; with one, the legacy
     /// location that is only read from and drained.
     /// </param>
+    /// <param name="defaultMaxVersions">Retention cap used only without a <paramref name="policyProvider"/>.</param>
+    /// <param name="defaultMaxAge">Retention age used only without a <paramref name="policyProvider"/>.</param>
     /// <param name="diskSpaceProbe">Free/total bytes of the volume holding a path (tests).</param>
+    /// <param name="policyProvider">
+    /// The global <see cref="VersioningPolicy"/>. Without one, every file is versioned and
+    /// only <paramref name="defaultMaxVersions"/>/<paramref name="defaultMaxAge"/> apply.
+    /// </param>
     public FileVersionService(
         IFileVersionRepository versionRepo,
         string versionStorageRoot,
@@ -81,8 +88,10 @@ public partial class FileVersionService : IFileVersionService
         TimeProvider? timeProvider = null,
         ILogger<FileVersionService>? logger = null,
         IVersionStorageLocator? storageLocator = null,
-        Func<string, (long Free, long Total)>? diskSpaceProbe = null)
+        Func<string, (long Free, long Total)>? diskSpaceProbe = null,
+        IVersioningPolicyProvider? policyProvider = null)
     {
+        _policyProvider = policyProvider;
         _versionRepo = versionRepo;
         _versionStorageRoot = versionStorageRoot;
         _defaultMaxVersions = defaultMaxVersions;
@@ -99,8 +108,17 @@ public partial class FileVersionService : IFileVersionService
 
     public async Task<FileVersion?> CreateVersionAsync(
         Guid shareId, string filePath, Stream content, string? userId = null)
+        => (await CaptureVersionAsync(shareId, filePath, content, userId)).Version;
+
+    public async Task<VersionCaptureResult> CaptureVersionAsync(
+        Guid shareId, string filePath, Stream content, string? userId = null)
     {
         var normalizedPath = ShareRelativePath.Normalize(filePath);
+
+        // 0. Global policy: checked before hashing so skipped files cost no I/O.
+        var policy = _policyProvider is null ? null : await _policyProvider.GetAsync();
+        if (policy is not null && SkipByPolicy(policy, normalizedPath, content) is { } skipped)
+            return new VersionCaptureResult(skipped);
 
         var root = await ResolveRootAsync(shareId);
         if (root is null)
@@ -109,7 +127,7 @@ public partial class FileVersionService : IFileVersionService
                 _logger.LogWarning(
                     "Share {ShareId} is not located in a storage pool; file versions are not stored for it.",
                     shareId);
-            return null;
+            return new VersionCaptureResult(VersionCaptureOutcome.NoPool);
         }
         Directory.CreateDirectory(root);
 
@@ -150,7 +168,7 @@ public partial class FileVersionService : IFileVersionService
                         _logger.LogWarning(
                             "Version storage {Root} is low on free space; new file versions are skipped until space is freed.",
                             root);
-                    return null;
+                    return new VersionCaptureResult(VersionCaptureOutcome.LowSpace);
                 }
 
                 if (blobExisted)
@@ -170,7 +188,7 @@ public partial class FileVersionService : IFileVersionService
             content.Position = 0;
 
             if (versionAlreadyExists)
-                return null;
+                return new VersionCaptureResult(VersionCaptureOutcome.Unchanged);
 
             // 3. Create version record while holding the blob stripe. A concurrent
             // delete cannot reclaim the blob between the existence check and insert.
@@ -192,6 +210,19 @@ public partial class FileVersionService : IFileVersionService
                 versionNumber: versionNumber);
 
             await _versionRepo.CreateAsync(version);
+
+            // Another process may have collected the blob between our validation and the
+            // insert (its reference check could not see this row yet). The row now protects
+            // the blob, so restoring it here closes that window for good.
+            if (!System.IO.File.Exists(blobFullPath))
+            {
+                _logger.LogWarning(
+                    "Version blob {StoragePath} vanished before its row was committed; rewriting it.",
+                    blobRelativePath);
+                content.Position = 0;
+                await WriteValidatedBlobAsync(blobFullPath, content, hash, contentSize);
+                content.Position = 0;
+            }
         }
         catch
         {
@@ -212,9 +243,12 @@ public partial class FileVersionService : IFileVersionService
                 ((double)compressedSize / Math.Max(contentSize, 1)).ToString("P0"));
 
         // 4. Enforce retention
-        await ApplyRetentionAsync(shareId, normalizedPath, _defaultMaxVersions, _defaultMaxAge);
+        if (policy is not null)
+            await ApplyPolicyRetentionAsync(shareId, normalizedPath, policy);
+        else
+            await ApplyRetentionAsync(shareId, normalizedPath, _defaultMaxVersions, _defaultMaxAge);
 
-        return version!;
+        return new VersionCaptureResult(VersionCaptureOutcome.Created, version);
     }
 
     public async Task<Stream> ReadVersionAsync(
@@ -318,6 +352,11 @@ public partial class FileVersionService : IFileVersionService
         Guid shareId, string filePath, int? maxVersions = null, TimeSpan? maxAge = null)
     {
         var normalizedPath = ShareRelativePath.Normalize(filePath);
+
+        if (maxVersions is null && maxAge is null && _policyProvider is not null)
+            return await ApplyPolicyRetentionAsync(
+                shareId, normalizedPath, await _policyProvider.GetAsync());
+
         var removed = new List<FileVersion>();
 
         var effectiveMax = maxVersions ?? _defaultMaxVersions;

@@ -7711,4 +7711,115 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Settings_Group_General_Settings" xml:space="preserve">
     <value>Global configuration</value>
   </data>
+  <data name="Web_Settings_Tab_Versioning" xml:space="preserve">
+    <value>Versioning</value>
+  </data>
+  <data name="Web_VersioningSettings_WhatTitle" xml:space="preserve">
+    <value>What is versioned</value>
+  </data>
+  <data name="Web_VersioningSettings_WhatDescription" xml:space="preserve">
+    <value>Every write stores the new content as a version, so earlier states can be restored. These rules apply to all shares.</value>
+  </data>
+  <data name="Web_VersioningSettings_Saved" xml:space="preserve">
+    <value>Versioning settings saved.</value>
+  </data>
+  <data name="Web_VersioningSettings_SaveFailed" xml:space="preserve">
+    <value>The versioning settings could not be saved.</value>
+  </data>
+  <data name="Web_VersioningSettings_Enabled" xml:space="preserve">
+    <value>Versioning enabled</value>
+  </data>
+  <data name="Web_VersioningSettings_EnabledHint" xml:space="preserve">
+    <value>When off, no new versions are created. Existing versions stay available and are still cleaned up by the rules below.</value>
+  </data>
+  <data name="Web_VersioningSettings_MaxSize" xml:space="preserve">
+    <value>Max. file size (MB)</value>
+  </data>
+  <data name="Web_VersioningSettings_MaxSizeHint" xml:space="preserve">
+    <value>Larger files are not versioned: every version is a full copy, so large videos, images or archives would quickly fill the pool. 0 = no limit.</value>
+  </data>
+  <data name="Web_VersioningSettings_Patterns" xml:space="preserve">
+    <value>Excluded files</value>
+  </data>
+  <data name="Web_VersioningSettings_PatternsHint" xml:space="preserve">
+    <value>One pattern per line. * matches any characters, ? one character, ** also across folders. Without / the pattern matches the file name, with / the path inside the share. Case is ignored.</value>
+  </data>
+  <data name="Web_VersioningSettings_DefaultPatterns" xml:space="preserve">
+    <value>Restore default patterns</value>
+  </data>
+  <data name="Web_VersioningSettings_KeepTitle" xml:space="preserve">
+    <value>How long versions are kept</value>
+  </data>
+  <data name="Web_VersioningSettings_KeepDescription" xml:space="preserve">
+    <value>Older versions are thinned out step by step. The newest version of a file is always kept, whatever the limits say.</value>
+  </data>
+  <data name="Web_VersioningSettings_Thinning" xml:space="preserve">
+    <value>Thin out older versions</value>
+  </data>
+  <data name="Web_VersioningSettings_ThinningHint" xml:space="preserve">
+    <value>Keeps every version of the most recent hours, then one per hour, then one per day and finally one per week. Without thinning only the count and age limits apply.</value>
+  </data>
+  <data name="Web_VersioningSettings_KeepAll" xml:space="preserve">
+    <value>Keep all versions for (hours)</value>
+  </data>
+  <data name="Web_VersioningSettings_Hourly" xml:space="preserve">
+    <value>Then one per hour for (days)</value>
+  </data>
+  <data name="Web_VersioningSettings_Daily" xml:space="preserve">
+    <value>Then one per day for (days)</value>
+  </data>
+  <data name="Web_VersioningSettings_DailyHint" xml:space="preserve">
+    <value>Counted from the time of the version. Older versions keep one per week until the maximum age.</value>
+  </data>
+  <data name="Web_VersioningSettings_MaxVersions" xml:space="preserve">
+    <value>Max. versions per file</value>
+  </data>
+  <data name="Web_VersioningSettings_MaxVersionsHint" xml:space="preserve">
+    <value>The oldest versions are removed first. 0 = no limit.</value>
+  </data>
+  <data name="Web_VersioningSettings_MaxAge" xml:space="preserve">
+    <value>Max. age (days)</value>
+  </data>
+  <data name="Web_VersioningSettings_MaxAgeHint" xml:space="preserve">
+    <value>Older versions are removed, also for files that are no longer changed. 0 = no limit.</value>
+  </data>
+  <data name="Web_VersioningSettings_BudgetTitle" xml:space="preserve">
+    <value>Storage budget</value>
+  </data>
+  <data name="Web_VersioningSettings_BudgetDescription" xml:space="preserve">
+    <value>Versions are stored in the storage pool of their share. If they take up more than this share of a pool, the oldest versions are removed first.</value>
+  </data>
+  <data name="Web_VersioningSettings_Budget" xml:space="preserve">
+    <value>Max. share of a pool (%)</value>
+  </data>
+  <data name="Web_VersioningSettings_BudgetHint" xml:space="preserve">
+    <value>Up to 90 %. 0 = no budget; then only the free-space reserve of the pool limits new versions.</value>
+  </data>
+  <data name="Web_VersioningSettings_ApplyHint" xml:space="preserve">
+    <value>Changes apply to new writes right away and to existing versions within six hours. The Storage tab shows the current usage.</value>
+  </data>
+  <data name="Web_Version_NoBackup_Title" xml:space="preserve">
+    <value>Restore without keeping the current content?</value>
+  </data>
+  <data name="Web_Version_NoBackup_Text" xml:space="preserve">
+    <value>Restoring replaces the current content of the file permanently. It cannot be restored afterwards.</value>
+  </data>
+  <data name="Web_Version_NoBackup_Confirm" xml:space="preserve">
+    <value>Restore anyway</value>
+  </data>
+  <data name="Web_Version_NoBackup_TooLarge" xml:space="preserve">
+    <value>The current file is larger than the versioning size limit, so its content cannot be kept as a version.</value>
+  </data>
+  <data name="Web_Version_NoBackup_Excluded" xml:space="preserve">
+    <value>This file is excluded from versioning, so its current content cannot be kept as a version.</value>
+  </data>
+  <data name="Web_Version_NoBackup_Disabled" xml:space="preserve">
+    <value>Versioning is switched off, so the current content cannot be kept as a version.</value>
+  </data>
+  <data name="Web_Version_NoBackup_LowSpace" xml:space="preserve">
+    <value>The storage pool is low on free space, so the current content cannot be kept as a version.</value>
+  </data>
+  <data name="Web_Version_NoBackup_Other" xml:space="preserve">
+    <value>The current content cannot be kept as a version.</value>
+  </data>
 </root>

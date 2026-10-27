@@ -218,15 +218,28 @@ namespace Kaimo_File_Server.Infrastructure
                 new PoolVersionStorageLocator(
                     sp.GetRequiredService<IShareRepository>(), poolStoragePaths));
 
+            // The global versioning policy (settings page) decides what is versioned and how
+            // long; every process holds its own refreshing copy.
+            services.AddSingleton<IVersioningPolicyStore, VersioningPolicyStore>();
+            services.AddSingleton<IVersioningPolicyProvider>(sp => sp.GetRequiredService<IVersioningPolicyStore>());
+
             services.AddScoped(sp =>
                 new FileVersionService(
                     sp.GetRequiredService<IFileVersionRepository>(),
                     legacyVersionStoragePath,
-                    defaultMaxVersions: 64,
-                    defaultMaxAge: TimeSpan.FromDays(90),
                     logger: sp.GetRequiredService<ILogger<FileVersionService>>(),
-                    storageLocator: sp.GetRequiredService<IVersionStorageLocator>()));
+                    storageLocator: sp.GetRequiredService<IVersionStorageLocator>(),
+                    policyProvider: sp.GetRequiredService<IVersioningPolicyProvider>()));
             services.AddScoped<IFileVersionService>(sp => sp.GetRequiredService<FileVersionService>());
+            // Policy retention for unchanged files, orphan cleanup and pool budgets (Host job).
+            services.AddScoped(sp => new VersionRetentionSweeper(
+                sp.GetRequiredService<IFileVersionRepository>(),
+                sp.GetRequiredService<FileVersionService>(),
+                sp.GetRequiredService<IShareRepository>(),
+                sp.GetRequiredService<IVersioningPolicyProvider>(),
+                sp.GetRequiredService<IVersionStorageLocator>(),
+                sp.GetRequiredService<ILogger<VersionRetentionSweeper>>(),
+                sp.GetRequiredService<TimeProvider>()));
 
             // -- Share Lock Manager (in-memory, single instance) --
             services.AddSingleton<ShareLockManager>();

@@ -35,6 +35,21 @@ namespace Kaimo_File_Server.Core.Services.File
         Task<FileVersion?> CreateVersionAsync(Guid shareId, string filePath, Stream content, string? userId = null);
 
         /// <summary>
+        /// Like <see cref="CreateVersionAsync"/>, but reports why no version was stored
+        /// (unchanged content, disabled, excluded, too large, low space, no pool). Callers
+        /// that are about to overwrite a file use <see cref="VersionCaptureResult.PreservesContent"/>
+        /// to decide whether the current content is safe.
+        /// </summary>
+        async Task<VersionCaptureResult> CaptureVersionAsync(
+            Guid shareId, string filePath, Stream content, string? userId = null)
+        {
+            var version = await CreateVersionAsync(shareId, filePath, content, userId);
+            return version is null
+                ? new VersionCaptureResult(VersionCaptureOutcome.Unchanged)
+                : new VersionCaptureResult(VersionCaptureOutcome.Created, version);
+        }
+
+        /// <summary>
         /// Read the content of a specific version.
         /// Returns a readonly stream.
         /// </summary>
@@ -80,8 +95,9 @@ namespace Kaimo_File_Server.Core.Services.File
         Task<FileVersion?> GetVersionAtAsync(Guid shareId, string filePath, DateTime snapshotTimestampUtc);
 
         /// <summary>
-        /// Apply retention policy: delete versions older than maxAge or exceeding maxCount.
-        /// Can be called periodically by a background job.
+        /// Apply retention to one file. With explicit <paramref name="maxVersions"/> or
+        /// <paramref name="maxAge"/> only those limits apply; without arguments the global
+        /// <see cref="VersioningPolicy"/> (thinning, cap, age) is used when one is configured.
         /// </summary>
         Task<int> ApplyRetentionAsync(Guid shareId, string filePath, int? maxVersions = null, TimeSpan? maxAge = null);
 

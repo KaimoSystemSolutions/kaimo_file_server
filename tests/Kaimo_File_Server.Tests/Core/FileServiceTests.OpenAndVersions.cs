@@ -96,9 +96,9 @@ public partial class FileServiceTests
         _storageMock.Setup(s => s.ReadAsync("document.txt", true))
             .ReturnsAsync(new MemoryStream([1, 2, 3]));
         versionService
-            .Setup(v => v.CreateVersionAsync(
+            .Setup(v => v.CaptureVersionAsync(
                 _shareId, "document.txt", It.IsAny<Stream>(), It.IsAny<string?>()))
-            .ReturnsAsync((FileVersion?)null);
+            .ReturnsAsync(new VersionCaptureResult(VersionCaptureOutcome.Unchanged));
         versionService
             .Setup(v => v.ReadVersionAsync(_shareId, "document.txt", timestamp))
             .ThrowsAsync(new InvalidDataException("corrupt version blob"));

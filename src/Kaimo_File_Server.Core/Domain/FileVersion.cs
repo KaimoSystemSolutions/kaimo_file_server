@@ -47,9 +47,9 @@ namespace Kaimo_File_Server.Core.Domain
         public DateTime SnapshotTimestampUtc { get; set; }
 
         /// <summary>
-        /// On-disk location of the version blob, relative to the
-        /// version storage root (e.g.
-        /// "versions/ab/cd/abcdef12-…-567890.bin").
+        /// On-disk location of the gzip-compressed version blob, relative to
+        /// the version storage root of the share's pool (e.g.
+        /// "AB/CD/ABCDEF12…7890.bin.gz", named after the content hash).
         /// </summary>
         public string StoragePath { get; set; } = string.Empty;
 

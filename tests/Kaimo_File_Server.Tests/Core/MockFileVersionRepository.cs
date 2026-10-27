@@ -73,7 +73,7 @@ public class MockFileVersionRepository : IFileVersionRepository
         return Task.FromResult(result);
     }
 
-    public Task<FileVersion> CreateAsync(FileVersion version)
+    public virtual Task<FileVersion> CreateAsync(FileVersion version)
     {
         _versions.Add(version);
         return Task.FromResult(version);
@@ -144,7 +144,7 @@ public class MockFileVersionRepository : IFileVersionRepository
     public Task<List<FileVersion>> DeleteShareAsync(Guid shareId)
         => DeletePathAsync(shareId, "");
 
-    public Task<bool> IsStoragePathReferencedAsync(string storagePath)
+    public virtual Task<bool> IsStoragePathReferencedAsync(string storagePath)
         => Task.FromResult(_versions.Any(v => v.StoragePath == storagePath));
 
     public Task<List<Guid>> GetShareIdsReferencingStoragePathAsync(string storagePath)
@@ -154,6 +154,36 @@ public class MockFileVersionRepository : IFileVersionRepository
     public Task<List<(Guid ShareId, string StoragePath)>> GetAllBlobReferencesAsync(
         CancellationToken cancellationToken = default)
         => Task.FromResult(_versions.Select(v => (v.ShareId, v.StoragePath)).Distinct().ToList());
+
+    public Task<List<FileVersion>> DeleteByIdsAsync(IReadOnlyCollection<Guid> ids)
+    {
+        var removed = _versions.Where(v => ids.Contains(v.Id)).ToList();
+        foreach (var version in removed) _versions.Remove(version);
+        return Task.FromResult(removed);
+    }
+
+    public Task<List<Guid>> GetShareIdsWithVersionsAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(_versions.Select(v => v.ShareId).Distinct().ToList());
+
+    public Task<List<string>> GetVersionedPathsPageAsync(
+        Guid shareId, string? afterPath, int take, CancellationToken cancellationToken = default)
+        => Task.FromResult(_versions
+            .Where(v => v.ShareId == shareId && (afterPath is null || string.CompareOrdinal(v.FilePath, afterPath) > 0))
+            .Select(v => v.FilePath)
+            .Distinct()
+            .Order(StringComparer.Ordinal)
+            .Take(take)
+            .ToList());
+
+    public Task<List<FileVersion>> GetBudgetPruneCandidatesAsync(
+        IReadOnlyCollection<Guid> shareIds, int take, CancellationToken cancellationToken = default)
+        => Task.FromResult(_versions
+            .Where(v => shareIds.Contains(v.ShareId)
+                        && _versions.Any(n => n.ShareId == v.ShareId && n.FilePath == v.FilePath
+                                              && n.SnapshotTimestampUtc > v.SnapshotTimestampUtc))
+            .OrderBy(v => v.SnapshotTimestampUtc)
+            .Take(take)
+            .ToList());
 
     public Task<bool> ExistsWithHashAsync(Guid shareId, string filePath, string contentHash)
     {

@@ -74,16 +74,23 @@ public partial class ResticBackupTests
         private readonly Moq.Mock<Kaimo_File_Server.Core.Services.File.IFileVersionService> _mock = new();
 
         public CountingVersions()
-            => _mock.Setup(v => v.CreateVersionAsync(Moq.It.IsAny<Guid>(), Moq.It.IsAny<string>(), Moq.It.IsAny<Stream>(), Moq.It.IsAny<string?>()))
+            => _mock.Setup(v => v.CaptureVersionAsync(Moq.It.IsAny<Guid>(), Moq.It.IsAny<string>(), Moq.It.IsAny<Stream>(), Moq.It.IsAny<string?>()))
                 .Returns<Guid, string, Stream, string?>(async (_, path, content, _) =>
                 {
+                    if (SkipWith is { } skipped)
+                        return new Kaimo_File_Server.Core.Services.File.VersionCaptureResult(skipped);
                     using var reader = new StreamReader(content, leaveOpen: true);
                     var text = await reader.ReadToEndAsync();
                     Created.Add((path, text));
-                    return new FileVersion(Guid.NewGuid(), path, DateTime.UtcNow, "hash", "blob", text.Length, null, 1);
+                    return new Kaimo_File_Server.Core.Services.File.VersionCaptureResult(
+                        Kaimo_File_Server.Core.Services.File.VersionCaptureOutcome.Created,
+                        new FileVersion(Guid.NewGuid(), path, DateTime.UtcNow, "hash", "blob", text.Length, null, 1));
                 });
 
         public List<(string Path, string Content)> Created { get; } = [];
+
+        /// <summary>When set, every capture is refused with this outcome (e.g. a full pool).</summary>
+        public Kaimo_File_Server.Core.Services.File.VersionCaptureOutcome? SkipWith { get; set; }
 
         public Kaimo_File_Server.Core.Services.File.IFileVersionService Service => _mock.Object;
     }
@@ -127,6 +134,33 @@ public partial class ResticBackupTests
             Assert.Equal(2, outcome.Overwritten);
             Assert.Equal(2, outcome.VersionsCreated);
             Assert.Empty(merge.Untouched);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Merge_Overwrite_WhenCurrentContentCannotBeVersioned_RestoresBesideIt()
+    {
+        var (root, staged, share) = MergeFixture();
+        try
+        {
+            var versions = new CountingVersions
+            {
+                SkipWith = Kaimo_File_Server.Core.Services.File.VersionCaptureOutcome.LowSpace,
+            };
+            var outcome = new BackupRestoreOutcome();
+            var merge = new RestoreMerge(share, Guid.NewGuid(), BackupRestoreConflict.Overwrite, versions.Service, "u1", " (restored)", outcome);
+
+            await merge.MoveAsync(Path.Combine(staged, "docs", "a.txt"), "docs/a.txt");
+
+            Assert.Equal("live-a", Read(share, "docs/a.txt"));
+            Assert.Equal("backup-a", Read(share, "docs/a (restored).txt"));
+            Assert.Equal(0, outcome.Overwritten);
+            Assert.Equal(1, outcome.Renamed);
+            Assert.Equal(["docs/a.txt"], merge.Untouched);
         }
         finally
         {

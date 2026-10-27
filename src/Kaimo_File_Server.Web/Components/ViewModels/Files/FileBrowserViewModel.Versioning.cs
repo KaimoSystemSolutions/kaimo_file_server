@@ -1,6 +1,7 @@
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Web.Helpers;
 using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Core.Services.File;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -138,7 +139,16 @@ public partial class FileBrowserViewModel
     /// Restores a file to an earlier version. The current content is snapshotted
     /// first (via the file service), so the restore is itself reversible.
     /// </summary>
-    public async Task<OperationResult> RestoreVersionAsync(FileMetadata file, DateTime snapshotTimestampUtc)
+    public Task<OperationResult> RestoreVersionAsync(FileMetadata file, DateTime snapshotTimestampUtc)
+        => RestoreVersionAsync(file, snapshotTimestampUtc, allowWithoutBackup: false);
+
+    /// <summary>
+    /// Restores a file to an earlier version. Without <paramref name="allowWithoutBackup"/> the
+    /// restore is refused (<see cref="OperationResult.RequiresBackupConsent"/>) when the current
+    /// content cannot be kept as a version first.
+    /// </summary>
+    public async Task<OperationResult> RestoreVersionAsync(
+        FileMetadata file, DateTime snapshotTimestampUtc, bool allowWithoutBackup)
     {
         if (_fileService is null || CurrentShare is null)
             return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
@@ -151,10 +161,16 @@ public partial class FileBrowserViewModel
         ClearUndo();
         try
         {
-            await _fileService.RestoreFileVersionAsync(ToShareRelative(file.Path), snapshotTimestampUtc, userContext);
-            _logger.LogInformation("Restored '{Path}' to version {Ts} by {User}",
-                file.Path, snapshotTimestampUtc, userContext.User.Username);
+            await _fileService.RestoreFileVersionAsync(
+                ToShareRelative(file.Path), snapshotTimestampUtc, userContext, allowWithoutBackup);
+            _logger.LogInformation("Restored '{Path}' to version {Ts} by {User}{WithoutBackup}",
+                file.Path, snapshotTimestampUtc, userContext.User.Username,
+                allowWithoutBackup ? " (current content not kept)" : "");
             return OperationResult.Ok();
+        }
+        catch (VersionBackupUnavailableException ex)
+        {
+            return new OperationResult(false, BackupUnavailableReason(ex.Outcome)) { RequiresBackupConsent = true };
         }
         catch (UnauthorizedAccessException)
         {
@@ -166,6 +182,22 @@ public partial class FileBrowserViewModel
             return OperationResult.Fail(Resources.Web_Version_RestoreFailed);
         }
     }
+
+    private static string BackupUnavailableReason(VersionCaptureOutcome outcome) => outcome switch
+    {
+        VersionCaptureOutcome.TooLarge => R("Web_Version_NoBackup_TooLarge",
+            "The current file is larger than the versioning size limit, so its content cannot be kept as a version."),
+        VersionCaptureOutcome.Excluded => R("Web_Version_NoBackup_Excluded",
+            "This file is excluded from versioning, so its current content cannot be kept as a version."),
+        VersionCaptureOutcome.Disabled => R("Web_Version_NoBackup_Disabled",
+            "Versioning is switched off, so the current content cannot be kept as a version."),
+        VersionCaptureOutcome.LowSpace => R("Web_Version_NoBackup_LowSpace",
+            "The storage pool is low on free space, so the current content cannot be kept as a version."),
+        _ => R("Web_Version_NoBackup_Other", "The current content cannot be kept as a version."),
+    };
+
+    private static string R(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
 
     /// <summary>Display name relative to a folder prefix (for point-in-time folder listings).</summary>
     public static string RelativeName(string shareRelativeFilePath, string folderShareRelativePath)
