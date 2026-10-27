@@ -137,7 +137,7 @@ Implemented by `FileVersionService` (`src/Kaimo_File_Server.Core/Services/File/F
 - **What is versioned.** `CaptureVersionAsync` checks, before hashing: the global switch, the exclusion
   patterns (globs, case-insensitive; without `/` matched against the file name, with `/` against the
   share-relative path; `**/` matches zero or more folders, so `**/node_modules/**` also hits the share root; defaults cover Office/LibreOffice lock files, editor swap files, `Thumbs.db`,
-  `.DS_Store`, `desktop.ini`, plus write-once bulk data: video, disk images, archives, executables and
+  `.DS_Store`, `desktop.ini`, plus write-once bulk data: video, photos, audio, PDF, disk images, archives, executables and
   installers, which would otherwise be stored twice) and the size limit (default 256 MB, 0 = unlimited). Files pulled in by an
   external-storage sync do not create versions. Temporary names (`*.tmp`, `*.part`, …) are
   deliberately not excluded: safe-save editors and browsers write the new content under such a name and

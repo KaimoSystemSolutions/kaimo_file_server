@@ -200,6 +200,13 @@ namespace Kaimo_File_Server.Core.Services.File
         Task<List<DateTime>> GetFolderSnapshotTimestampsAsync(string folderPath, UserContext user);
 
         /// <summary>
+        /// As <see cref="GetFolderSnapshotTimestampsAsync(string, UserContext)"/>, but only the
+        /// newest <paramref name="limit"/> timestamps, cut off in the database.
+        /// </summary>
+        async Task<List<DateTime>> GetFolderSnapshotTimestampsAsync(string folderPath, UserContext user, int limit)
+            => (await GetFolderSnapshotTimestampsAsync(folderPath, user)).Take(limit).ToList();
+
+        /// <summary>
         /// Point-in-time state of a folder: for every versioned file the user may
         /// read, the newest version at or before <paramref name="asOfUtc"/>.
         /// Requires list access on the folder.

@@ -44,7 +44,8 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <param name="pathPrefix">
         /// A path prefix to filter by, or an empty string for the whole share.
         /// </param>
-        Task<List<DateTime>> GetAllSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "");
+        /// <param name="limit">Return only the newest this many timestamps; <c>null</c> = all.</param>
+        Task<List<DateTime>> GetAllSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "", int? limit = null);
 
         /// <summary>
         /// Returns, for every distinct file under <paramref name="pathPrefix"/>,

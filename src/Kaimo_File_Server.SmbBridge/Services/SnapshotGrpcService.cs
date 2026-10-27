@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using Grpc.Core;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
@@ -32,6 +32,8 @@ public sealed partial class SnapshotGrpcService : SnapshotService.SnapshotServic
     // Must match KAIMO_LOCAL_MAX_SNAPSHOT_LABELS. Samba's shadow-copy
     // enumeration is not paginated, so the contract returns the newest labels.
     internal const int MaxEnumerationLabels = 2_048;
+    // One extra row tells the enumeration that labels were omitted (logged below).
+    private const int DatabaseLabelLimit = MaxEnumerationLabels + 1;
 
     private readonly IShareRepository _shares;
     private readonly IAuthenticationLookup _auth;
@@ -121,7 +123,7 @@ public sealed partial class SnapshotGrpcService : SnapshotService.SnapshotServic
                 {
                     timestamps = await _fileServices
                         .CreateForShare(share)
-                        .GetFolderSnapshotTimestampsAsync(normalized, user)
+                        .GetFolderSnapshotTimestampsAsync(normalized, user, DatabaseLabelLimit)
                         .WaitAsync(cancellationToken);
                 }
                 catch (UnauthorizedAccessException)
@@ -136,7 +138,7 @@ public sealed partial class SnapshotGrpcService : SnapshotService.SnapshotServic
             {
                 timestamps = await _fileServices
                     .CreateForShare(share)
-                    .GetFolderSnapshotTimestampsAsync("", user)
+                    .GetFolderSnapshotTimestampsAsync("", user, DatabaseLabelLimit)
                     .WaitAsync(cancellationToken);
             }
             catch (UnauthorizedAccessException)
@@ -158,10 +160,8 @@ public sealed partial class SnapshotGrpcService : SnapshotService.SnapshotServic
         if (orderedLabels.Count > MaxEnumerationLabels)
         {
             _logger.LogWarning(
-                "EnumerateSnapshots: user={User} share={Share} path=[{Path}] has {Available} labels; returning newest {Maximum} and omitting {Omitted}",
-                request.Username, request.Share, request.Path,
-                orderedLabels.Count, MaxEnumerationLabels,
-                orderedLabels.Count - MaxEnumerationLabels);
+                "EnumerateSnapshots: user={User} share={Share} path=[{Path}] has more than {Maximum} labels; returning the newest {Maximum}",
+                request.Username, request.Share, request.Path, MaxEnumerationLabels);
         }
         reply.GmtTokens.AddRange(
             orderedLabels.Take(MaxEnumerationLabels));

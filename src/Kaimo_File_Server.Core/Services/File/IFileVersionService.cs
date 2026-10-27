@@ -78,8 +78,9 @@ namespace Kaimo_File_Server.Core.Services.File
         /// Get all distinct snapshot timestamps across all files in a share.
         /// This is what SMB's FSCTL_SRV_ENUMERATE_SNAPSHOTS returns.
         /// Also useful for HTTP API "list all snapshots" endpoint.
+        /// <paramref name="limit"/> keeps only the newest timestamps (<c>null</c> = all).
         /// </summary>
-        Task<List<DateTime>> GetSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "");
+        Task<List<DateTime>> GetSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "", int? limit = null);
 
         /// <summary>
         /// Point-in-time state of a folder: for every versioned file under

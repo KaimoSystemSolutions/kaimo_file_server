@@ -58,7 +58,7 @@ public class MockFileVersionRepository : IFileVersionRepository
         return Task.FromResult(result);
     }
 
-    public Task<List<DateTime>> GetAllSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "")
+    public Task<List<DateTime>> GetAllSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "", int? limit = null)
     {
         var query = _versions.Where(v => v.ShareId == shareId);
         if (!string.IsNullOrEmpty(pathPrefix))
@@ -68,6 +68,7 @@ public class MockFileVersionRepository : IFileVersionRepository
             .Select(v => v.SnapshotTimestampUtc)
             .Distinct()
             .OrderByDescending(t => t)
+            .Take(limit ?? int.MaxValue)
             .ToList();
         return Task.FromResult(result);
     }

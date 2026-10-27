@@ -149,4 +149,17 @@ public partial class FileVersionServiceTests
 
         Assert.Equal(2, timestamps.Count);
     }
+
+    [Fact]
+    public async Task GetSnapshotTimestampsAsync_WithLimit_ReturnsOnlyTheNewest()
+    {
+        await _sut.CreateVersionAsync(ShareA, "folder/a.txt", ToStream("A1"));
+        _time.Advance(TimeSpan.FromSeconds(1));
+        await _sut.CreateVersionAsync(ShareA, "folder/b.txt", ToStream("B1"));
+        var newest = _time.GetUtcNow().UtcDateTime;
+
+        var timestamps = await _sut.GetSnapshotTimestampsAsync(ShareA, "folder", limit: 1);
+
+        Assert.Equal(newest, Assert.Single(timestamps), TimeSpan.FromSeconds(1));
+    }
 }

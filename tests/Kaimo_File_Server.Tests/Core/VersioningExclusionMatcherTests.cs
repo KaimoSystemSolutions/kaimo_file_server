@@ -28,6 +28,12 @@ public class VersioningExclusionMatcherTests
     [InlineData("backup/logs.tar.gz")]
     [InlineData("tools/setup.exe")]
     [InlineData("tools/installer.msi")]
+    [InlineData("photos/IMG_0001.jpg")]
+    [InlineData("photos/IMG_0002.HEIC")]
+    [InlineData("raw/DSC_0001.nef")]
+    [InlineData("music/song.mp3")]
+    [InlineData("music/track.flac")]
+    [InlineData("docs/invoice.pdf")]
     public void DefaultPatterns_ExcludeBulkMediaArchivesAndExecutables(string path)
         => Assert.True(Defaults.IsExcluded(path));
 
@@ -37,8 +43,7 @@ public class VersioningExclusionMatcherTests
     [InlineData("temp/report.docx")]
     [InlineData("my~$file.docx")]
     [InlineData("report.tmp.docx")]
-    [InlineData("photos/IMG_0001.jpg")]
-    [InlineData("music/song.mp3")]
+    [InlineData("design/poster.psd")]
     [InlineData("~WRD0000.tmp")]
     [InlineData("docs/lu12345abc.tmp")]
     [InlineData("video.mp4.part")]

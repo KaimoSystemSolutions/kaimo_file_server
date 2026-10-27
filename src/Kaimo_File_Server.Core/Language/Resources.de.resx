@@ -7804,6 +7804,9 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Version_NoBackup_Text" xml:space="preserve">
     <value>Das Wiederherstellen ersetzt den aktuellen Inhalt der Datei endgültig. Er kann danach nicht wiederhergestellt werden.</value>
   </data>
+  <data name="Web_Version_FolderSnapshotScope" xml:space="preserve">
+    <value>Zeigt nur Dateien mit gespeicherten Versionen. Umbenennen oder Löschen einer Datei wirkt sich auch auf ihre früheren Stände aus.</value>
+  </data>
   <data name="Web_Version_NoBackup_Confirm" xml:space="preserve">
     <value>Trotzdem wiederherstellen</value>
   </data>

@@ -57,6 +57,7 @@
                         </button>
                         <span class="version-asof">@string.Format(Resources.Web_Version_FolderAsOf, DateFmt.FormatDateTime(_selectedSnapshot!.Value))</span>
                     </div>
+                    <p class="version-hint">@T("Web_Version_FolderSnapshotScope", "Shows only files with stored versions. Renaming or deleting a file also changes its earlier states.")</p>
                     @if (_folderEntries.Count == 0)
                     {
                         <div class="version-empty">@Resources.Web_Version_FolderNoFiles</div>

@@ -7804,6 +7804,9 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Version_NoBackup_Text" xml:space="preserve">
     <value>Restoring replaces the current content of the file permanently. It cannot be restored afterwards.</value>
   </data>
+  <data name="Web_Version_FolderSnapshotScope" xml:space="preserve">
+    <value>Shows only files with stored versions. Renaming or deleting a file also changes its earlier states.</value>
+  </data>
   <data name="Web_Version_NoBackup_Confirm" xml:space="preserve">
     <value>Restore anyway</value>
   </data>

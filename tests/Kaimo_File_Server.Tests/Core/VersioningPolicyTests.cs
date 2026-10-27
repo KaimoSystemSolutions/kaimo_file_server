@@ -20,12 +20,15 @@ public class VersioningPolicyTests
         Assert.Equal(90, policy.MaxAgeDays);
         Assert.Equal(10, policy.PoolBudgetPercent);
         Assert.Contains("~$*", policy.ExcludePatterns);
-        // Write-once bulk data (video, disk images, archives, installers) is excluded:
+        // Write-once bulk data (video, photos, audio, PDF, disk images, archives, installers) is excluded:
         // snapshots are taken after a write, so every versioned file is stored twice.
         Assert.Contains("*.mp4", policy.ExcludePatterns);
         Assert.Contains("*.iso", policy.ExcludePatterns);
         Assert.Contains("*.zip", policy.ExcludePatterns);
         Assert.Contains("*.exe", policy.ExcludePatterns);
+        Assert.Contains("*.jpg", policy.ExcludePatterns);
+        Assert.Contains("*.mp3", policy.ExcludePatterns);
+        Assert.Contains("*.pdf", policy.ExcludePatterns);
         // Safe-save editors (Word, LibreOffice) and browsers write the new content to a
         // temporary name and rename it into place; excluding those names loses the version.
         Assert.DoesNotContain("*.tmp", policy.ExcludePatterns);

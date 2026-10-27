@@ -47,7 +47,8 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
                 .ToListAsync();
         }
 
-        public async Task<List<DateTime>> GetAllSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "")
+        public async Task<List<DateTime>> GetAllSnapshotTimestampsAsync(
+            Guid shareId, string pathPrefix = "", int? limit = null)
         {
             await using var db = await _dbFactory.CreateDbContextAsync();
 
@@ -57,11 +58,14 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             if (!string.IsNullOrEmpty(pathPrefix))
                 query = query.Where(v => v.FilePath.StartsWith(pathPrefix));
 
-            return await query
+            var timestamps = query
                 .Select(v => v.SnapshotTimestampUtc)
                 .Distinct()
-                .OrderByDescending(t => t)
-                .ToListAsync();
+                .OrderByDescending(t => t);
+
+            return limit is { } take
+                ? await timestamps.Take(take).ToListAsync()
+                : await timestamps.ToListAsync();
         }
 
         public async Task<List<FileVersion>> GetLatestVersionsUnderPrefixAsync(
@@ -81,13 +85,14 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             if (!string.IsNullOrEmpty(pathPrefix))
                 query = query.Where(v => v.FilePath.StartsWith(pathPrefix));
 
-            // Retention caps versions per file, so the candidate set stays small.
-            // Group in memory to pick the newest snapshot at-or-before the cutoff.
-            var candidates = await query.ToListAsync(cancellationToken);
-
-            return candidates
+            // Pick the newest snapshot per file in SQL (a ROW_NUMBER window), so a share root
+            // with many files and long histories loads one row per file, not every version.
+            var latest = await query
                 .GroupBy(v => v.FilePath)
                 .Select(g => g.OrderByDescending(v => v.SnapshotTimestampUtc).First())
+                .ToListAsync(cancellationToken);
+
+            return latest
                 .OrderBy(v => v.FilePath, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }

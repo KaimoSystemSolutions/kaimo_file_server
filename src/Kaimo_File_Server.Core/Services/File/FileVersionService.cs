@@ -319,9 +319,10 @@ public partial class FileVersionService : IFileVersionService
         return await _versionRepo.GetVersionsAsync(shareId, ShareRelativePath.Normalize(filePath));
     }
 
-    public async Task<List<DateTime>> GetSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "")
+    public async Task<List<DateTime>> GetSnapshotTimestampsAsync(
+        Guid shareId, string pathPrefix = "", int? limit = null)
     {
-        return await _versionRepo.GetAllSnapshotTimestampsAsync(shareId, FolderPrefix(pathPrefix));
+        return await _versionRepo.GetAllSnapshotTimestampsAsync(shareId, FolderPrefix(pathPrefix), limit);
     }
 
     public async Task<List<FileVersion>> GetFolderSnapshotAsync(Guid shareId, string folderPath, DateTime asOfUtc)

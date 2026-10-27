@@ -1,4 +1,4 @@
-﻿using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
@@ -96,15 +96,23 @@ public partial class FileService
         await OnFileCreated(ToAbsolutePath(normalized), _storage.ReadAsync(normalized, preserveAccessTime: true));
     }
 
-    public async Task<List<DateTime>> GetFolderSnapshotTimestampsAsync(
+    public Task<List<DateTime>> GetFolderSnapshotTimestampsAsync(
         string folderPath, UserContext user)
+        => LoadFolderSnapshotTimestampsAsync(folderPath, user, limit: null);
+
+    public Task<List<DateTime>> GetFolderSnapshotTimestampsAsync(
+        string folderPath, UserContext user, int limit)
+        => LoadFolderSnapshotTimestampsAsync(folderPath, user, limit);
+
+    private async Task<List<DateTime>> LoadFolderSnapshotTimestampsAsync(
+        string folderPath, UserContext user, int? limit)
     {
         if (_versionService == null) return new List<DateTime>();
 
         var normalized = ShareRelativePath.Normalize(folderPath);
         await EnsureAccessAsync(user, normalized, true, FilePermission.ListReadData);
 
-        return await _versionService.GetSnapshotTimestampsAsync(_shareId, normalized);
+        return await _versionService.GetSnapshotTimestampsAsync(_shareId, normalized, limit);
     }
 
     public async Task<List<FileVersion>> GetFolderSnapshotAsync(

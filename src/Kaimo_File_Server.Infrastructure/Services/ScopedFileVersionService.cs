@@ -78,11 +78,12 @@ namespace Kaimo_File_Server.Infrastructure.Services
             return await svc.GetVersionsAsync(shareId, filePath);
         }
 
-        public async Task<List<DateTime>> GetSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "")
+        public async Task<List<DateTime>> GetSnapshotTimestampsAsync(
+            Guid shareId, string pathPrefix = "", int? limit = null)
         {
             using var scope = _serviceProvider.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
-            return await svc.GetSnapshotTimestampsAsync(shareId, pathPrefix);
+            return await svc.GetSnapshotTimestampsAsync(shareId, pathPrefix, limit);
         }
 
         public async Task<List<FileVersion>> GetFolderSnapshotAsync(Guid shareId, string folderPath, DateTime asOfUtc)

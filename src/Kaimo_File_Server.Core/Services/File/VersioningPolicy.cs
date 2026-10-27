@@ -28,14 +28,22 @@ public sealed class VersioningPolicy
     /// (Word, LibreOffice) and browsers write the new content under such a name and rename
     /// it into place, and only that temporary file's snapshot carries the content over.
     ///
-    /// Video, disk images, archives and installers are excluded as well: they are written
-    /// once and rarely edited, yet a snapshot taken after the write stores each of them twice.
+    /// Video, photos, audio, PDF, disk images, archives and installers are excluded as well: they
+    /// are written once and rarely edited, yet a snapshot taken after the write stores each of
+    /// them twice. Layered editor formats (*.psd) stay versioned.
     /// </summary>
     public static IReadOnlyList<string> DefaultExcludePatterns { get; } =
     [
         "~$*", ".~lock.*#", "*.swp", "*.swx", "Thumbs.db", ".DS_Store", "desktop.ini",
         // Video
         "*.mp4", "*.m4v", "*.mkv", "*.mov", "*.avi", "*.wmv", "*.webm", "*.mpg", "*.mpeg", "*.mts", "*.m2ts",
+        // Photos (incl. camera RAW)
+        "*.jpg", "*.jpeg", "*.png", "*.gif", "*.bmp", "*.tif", "*.tiff", "*.webp", "*.heic", "*.heif",
+        "*.raw", "*.cr2", "*.cr3", "*.nef", "*.arw", "*.dng", "*.orf", "*.rw2",
+        // Audio
+        "*.mp3", "*.wav", "*.flac", "*.aac", "*.ogg", "*.m4a", "*.wma", "*.opus",
+        // PDF
+        "*.pdf",
         // Disk images
         "*.iso", "*.img", "*.vhd", "*.vhdx", "*.vmdk", "*.qcow2", "*.dmg",
         // Archives

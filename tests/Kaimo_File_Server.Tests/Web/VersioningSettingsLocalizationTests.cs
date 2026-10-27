@@ -22,8 +22,16 @@ public partial class VersioningSettingsLocalizationTests
         "src/Kaimo_File_Server.Web/Components/ViewModels/Files/FileBrowserViewModel.Versioning.cs",
     ];
 
-    [GeneratedRegex("\"(Web_VersioningSettings_\\w+|Web_Version_NoBackup_\\w+|Web_Settings_Tab_Versioning)\"")]
+    [GeneratedRegex("\"(Web_VersioningSettings_\\w+|Web_Version_NoBackup_\\w+|Web_Version_FolderSnapshotScope|Web_Settings_Tab_Versioning)\"")]
     private static partial Regex VersioningKey();
+
+    [Fact]
+    public void FolderSnapshotView_ExplainsWhatAnEarlierStateContains()
+    {
+        var dialog = File.ReadAllText(Path.Combine(FindRepoRoot(), SourceFiles[3]));
+
+        Assert.Contains("\"Web_Version_FolderSnapshotScope\"", dialog);
+    }
 
     [Fact]
     public void SearchDestination_ForVersioningSettings_OpensTheSettingsTab()

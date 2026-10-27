@@ -199,9 +199,13 @@ static inline bool kaimo_close_capture(
 	if (directory_fd < 0)
 		goto done;
 	names_ready = true;
+	/* Created owner-writable and made read-only by the fchmod below: 9p
+	 * (Docker Desktop bind mounts) re-checks the mode on ftruncate and
+	 * returns EACCES for a file created 0440, which suppressed every
+	 * capture there. */
 	capture_fd = openat(
 		directory_fd, temporary_name,
-		O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0440);
+		O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
 	if (capture_fd < 0)
 		goto done;
 

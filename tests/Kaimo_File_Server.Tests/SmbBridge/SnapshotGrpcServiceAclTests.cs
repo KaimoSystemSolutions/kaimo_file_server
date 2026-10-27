@@ -70,7 +70,7 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
     public async Task EnumerateSnapshots_Folder_UsesDirectoryAwareFileService()
     {
         DateTime at = new(2026, 7, 20, 10, 11, 12, DateTimeKind.Utc);
-        _files.Setup(f => f.GetFolderSnapshotTimestampsAsync("docs", _user))
+        _files.Setup(f => f.GetFolderSnapshotTimestampsAsync("docs", _user, SnapshotGrpcService.MaxEnumerationLabels + 1))
             .ReturnsAsync([at]);
 
         var reply = await _sut.EnumerateSnapshots(
@@ -98,7 +98,7 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
         // A sub-second duplicate formats to an already represented @GMT label
         // and must not consume one of the bounded wire slots.
         timestamps.Add(oldest.AddMilliseconds(500));
-        _files.Setup(f => f.GetFolderSnapshotTimestampsAsync("docs", _user))
+        _files.Setup(f => f.GetFolderSnapshotTimestampsAsync("docs", _user, SnapshotGrpcService.MaxEnumerationLabels + 1))
             .ReturnsAsync(timestamps);
 
         var reply = await _sut.EnumerateSnapshots(
