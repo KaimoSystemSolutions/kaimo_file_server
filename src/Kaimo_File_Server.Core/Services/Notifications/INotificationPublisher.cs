@@ -76,6 +76,20 @@ public static class NotificationEvents
             [("job.name", jobName), ("repository.name", repositoryName), ("errorCode", errorCode), ("failedSources", Truncate(failedSources, 500))],
             "filebackup-failed:" + jobId.ToString("N"));
 
+    /// <remarks>
+    /// Keyed per job: the default rule is not throttled, so every run mails, but a throttle an
+    /// administrator sets on the rule limits the mails per job.
+    /// </remarks>
+    public static NotificationEvent FileBackupSucceeded(Guid jobId, string jobName, string repositoryName, Guid? creatorId, string trigger,
+        long filesNew, long filesChanged, long bytesAdded, TimeSpan duration)
+        => Build(C.FileBackupSucceeded, null, Roles((R.JobCreator, creatorId)),
+            [("job.name", jobName), ("repository.name", repositoryName), ("backup.trigger", trigger),
+             ("filesNew", filesNew.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+             ("filesChanged", filesChanged.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+             ("dataAdded", FormatSize(bytesAdded)),
+             ("duration", FormatDuration(duration))],
+            "filebackup-succeeded:" + jobId.ToString("N"));
+
     public static NotificationEvent FileBackupWarnings(Guid jobId, string jobName, string repositoryName, Guid? creatorId, int warningCount)
         => Build(C.FileBackupWarnings, null, Roles((R.JobCreator, creatorId)),
             [("job.name", jobName), ("repository.name", repositoryName), ("warningCount", warningCount.ToString(System.Globalization.CultureInfo.InvariantCulture))],
@@ -135,6 +149,13 @@ public static class NotificationEvents
         => roles.Where(r => r.UserId is { } id && id != Guid.Empty).ToDictionary(r => r.Role, r => r.UserId!.Value);
 
     private static string Truncate(string value, int max) => value.Length <= max ? value : value[..max];
+
+    /// <summary><c>hh:mm:ss</c>; runs of a day or longer keep counting the hours.</summary>
+    public static string FormatDuration(TimeSpan duration)
+    {
+        var seconds = Math.Max(0, (long)duration.TotalSeconds);
+        return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{seconds / 3600:00}:{seconds / 60 % 60:00}:{seconds % 60:00}");
+    }
 
     public static string FormatSize(long bytes)
     {

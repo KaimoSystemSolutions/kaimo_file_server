@@ -43,7 +43,7 @@ window.kaimoAvatarCrop = (function () {
                         try {
                             canvas.setPointerCapture(e.pointerId);
                         }
-                        catch (_a) { }
+                        catch { }
                     };
                     canvas.onpointermove = (e) => {
                         if (!st.dragging)
@@ -59,7 +59,7 @@ window.kaimoAvatarCrop = (function () {
                         try {
                             canvas.releasePointerCapture(e.pointerId);
                         }
-                        catch (_a) { }
+                        catch { }
                     };
                     canvas.onpointerup = stop;
                     canvas.onpointercancel = stop;

@@ -421,6 +421,24 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die File backup succeeded ähnelt.
+        /// </summary>
+        public static string Notification_Event_backup_restic_succeeded {
+            get {
+                return ResourceManager.GetString("Notification_Event_backup_restic_succeeded", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die A backup job finished without errors or warnings. Runs with warnings raise &quot;File backup with warnings&quot; instead. ähnelt.
+        /// </summary>
+        public static string Notification_Event_backup_restic_succeeded_Desc {
+            get {
+                return ResourceManager.GetString("Notification_Event_backup_restic_succeeded_Desc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Test restore does not match ähnelt.
         /// </summary>
         public static string Notification_Event_backup_restic_test_restore_mismatch {
@@ -678,6 +696,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Notification_Role_backup_restic_failed_jobCreator {
             get {
                 return ResourceManager.GetString("Notification_Role_backup_restic_failed_jobCreator", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Creator of the backup job ähnelt.
+        /// </summary>
+        public static string Notification_Role_backup_restic_succeeded_jobCreator {
+            get {
+                return ResourceManager.GetString("Notification_Role_backup_restic_succeeded_jobCreator", resourceCulture);
             }
         }
         

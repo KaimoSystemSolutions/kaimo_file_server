@@ -5769,6 +5769,15 @@
   <data name="Notification_Event_backup_restic_warnings_Desc" xml:space="preserve">
     <value>Ein Sicherungsauftrag wurde abgeschlossen, einige Dateien konnten aber nicht gelesen werden.</value>
   </data>
+  <data name="Notification_Event_backup_restic_succeeded" xml:space="preserve">
+    <value>Dateisicherung erfolgreich</value>
+  </data>
+  <data name="Notification_Event_backup_restic_succeeded_Desc" xml:space="preserve">
+    <value>Ein Sicherungsauftrag wurde ohne Fehler und Warnungen abgeschlossen. Läufe mit Warnungen lösen stattdessen „Dateisicherung mit Warnungen“ aus.</value>
+  </data>
+  <data name="Notification_Role_backup_restic_succeeded_jobCreator" xml:space="preserve">
+    <value>Ersteller des Sicherungsauftrags</value>
+  </data>
   <data name="Notification_Role_backup_restic_failed_jobCreator" xml:space="preserve">
     <value>Ersteller des Sicherungsauftrags</value>
   </data>

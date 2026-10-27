@@ -61,6 +61,7 @@ public static class NotificationEventCatalog
     public const string BackupFailed = "backup.failed";
     public const string BackupSucceeded = "backup.succeeded";
     public const string FileBackupFailed = "backup.restic.failed";
+    public const string FileBackupSucceeded = "backup.restic.succeeded";
     public const string FileBackupWarnings = "backup.restic.warnings";
     public const string FileBackupStale = "backup.restic.stale";
     public const string FileBackupCheckFailed = "backup.restic.check_failed";
@@ -126,6 +127,10 @@ public static class NotificationEventCatalog
             [P("job.name", "Projekte nachts"), P("repository.name", "NAS Keller"), P("errorCode", "repo_unreachable"), P("failedSources", "Projekte")],
             [Role(NotificationContextRoles.JobCreator), Holders("ManageBackupJobs")],
             DefaultThrottleMinutes: 360),
+        new(FileBackupSucceeded, "filebackup", [NotificationContextRoles.JobCreator],
+            [P("job.name", "Projekte nachts"), P("repository.name", "NAS Keller"), P("backup.trigger", "Scheduled"),
+             P("filesNew", "128"), P("filesChanged", "17"), P("dataAdded", "1.4 GB"), P("duration", "00:12:34")],
+            [Role(NotificationContextRoles.JobCreator), Holders("ManageBackupJobs")]),
         new(FileBackupWarnings, "filebackup", [NotificationContextRoles.JobCreator],
             [P("job.name", "Projekte nachts"), P("repository.name", "NAS Keller"), P("warningCount", "3")],
             [Role(NotificationContextRoles.JobCreator), Holders("ManageBackupJobs")],

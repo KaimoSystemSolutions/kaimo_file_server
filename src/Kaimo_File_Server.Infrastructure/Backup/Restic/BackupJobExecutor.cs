@@ -314,6 +314,13 @@ public sealed partial class BackupJobExecutor(
             await notifications.PublishAsync(NotificationEvents.FileBackupWarnings(
                 job.Id, job.Name, repository.Name, job.CreatedByUserId, run.WarningCount));
         }
+        else if (run.Status == BackupRunStatus.Succeeded)
+        {
+            // Both timestamps are set by ExecuteAsync before a run reaches this point.
+            await notifications.PublishAsync(NotificationEvents.FileBackupSucceeded(
+                job.Id, job.Name, repository.Name, job.CreatedByUserId, run.Trigger.ToString(),
+                run.FilesNew, run.FilesChanged, run.BytesAdded, run.FinishedAtUtc!.Value - run.StartedAtUtc!.Value));
+        }
     }
 
     internal static string LevelTag(BackupContentLevel level) => level switch

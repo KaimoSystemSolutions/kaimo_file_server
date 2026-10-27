@@ -274,9 +274,12 @@ manually.
 ## Notifications
 
 Category `filebackup` (rules are seeded disabled; enable them on the Notifications page):
-`backup.restic.failed`, `.warnings`, `.stale`, `.check_failed`, `.test_restore_mismatch`,
+`backup.restic.succeeded`, `.failed`, `.warnings`, `.stale`, `.check_failed`, `.test_restore_mismatch`,
 `.repo_unreachable`, `.maintenance_failed`. Job events go to the job creator and holders of
-`ManageBackupJobs`, repository events to holders of `ManageBackupRepositories`.
+`ManageBackupJobs`, repository events to holders of `ManageBackupRepositories`. Each finished run
+that was not cancelled raises exactly one of `succeeded`, `warnings` or `failed`; cancelled runs
+raise none. `succeeded` carries the run summary (trigger, new/changed files, data added, duration);
+its default rule is not throttled, but a throttle set on the rule applies per job.
 
 ## Disaster recovery
 

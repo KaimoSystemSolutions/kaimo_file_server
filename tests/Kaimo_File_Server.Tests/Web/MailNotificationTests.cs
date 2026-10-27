@@ -409,6 +409,80 @@ public sealed class MailNotificationTests : DatabaseTestBase
         Assert.Null(MailTemplateRenderer.Validate(DefaultMailTemplates.Layout));
     }
 
+    [Theory]
+    [InlineData("de")]
+    [InlineData("en")]
+    public void EveryCatalogEvent_HasANameAndDescriptionInEveryLanguage(string language)
+    {
+        var resources = ResourcesOf(language);
+        foreach (var definition in NotificationEventCatalog.All)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(resources.GetString(definition.NameKey)), definition.NameKey);
+            Assert.False(string.IsNullOrWhiteSpace(resources.GetString(definition.DescriptionKey)), definition.DescriptionKey);
+        }
+    }
+
+    [Theory]
+    [InlineData("de")]
+    [InlineData("en")]
+    public void EveryCatalogContextRole_HasALabelInEveryLanguage(string language)
+    {
+        var resources = ResourcesOf(language);
+        foreach (var definition in NotificationEventCatalog.All)
+            foreach (var role in definition.ContextRoles)
+            {
+                // Same lookup as NotificationsViewModel.RoleLabel: event-specific label, else the generic role name.
+                var specific = $"Notification_Role_{definition.Type.Replace('.', '_')}_{role}";
+                var label = resources.GetString(specific) ?? resources.GetString("Web_Notifications_Role_" + role);
+                Assert.False(string.IsNullOrWhiteSpace(label), specific);
+            }
+    }
+
+    [Fact]
+    public void EventSpecificRoleLabels_ExistInBothLanguages()
+    {
+        var keys = ResourceKeys("de").Concat(ResourceKeys("en"))
+            .Where(k => k.StartsWith("Notification_Role_", StringComparison.Ordinal)).ToHashSet();
+        foreach (var key in keys)
+        {
+            Assert.Contains(key, ResourceKeys("de"));
+            Assert.Contains(key, ResourceKeys("en"));
+        }
+    }
+
+    /// <summary>
+    /// The resources of exactly one language, without falling back to the neutral (English) set,
+    /// so an entry missing from Resources.de.resx is not hidden by its English counterpart.
+    /// </summary>
+    private static System.Resources.ResourceSet ResourcesOf(string language)
+        => Kaimo_File_Server.Core.Language.Resources.ResourceManager.GetResourceSet(
+            language == "en" ? System.Globalization.CultureInfo.InvariantCulture : System.Globalization.CultureInfo.GetCultureInfo(language),
+            createIfNotExists: true, tryParents: false)!;
+
+    private static HashSet<string> ResourceKeys(string language)
+        => ResourcesOf(language).Cast<System.Collections.DictionaryEntry>().Select(e => (string)e.Key).ToHashSet();
+
+    [Theory]
+    [InlineData("de", "Manual", "manuell")]
+    [InlineData("de", "Scheduled", "geplant")]
+    [InlineData("de", "CatchUp", "nachgeholt")]
+    [InlineData("en", "Manual", "manual")]
+    [InlineData("en", "Scheduled", "scheduled")]
+    [InlineData("en", "CatchUp", "caught up")]
+    public async Task FileBackupSucceeded_DefaultTemplate_ShowsTheTriggerInTheMailLanguage(string language, string trigger, string expected)
+    {
+        var definition = NotificationEventCatalog.Find(NotificationEventCatalog.FileBackupSucceeded)!;
+        var values = definition.Placeholders.ToDictionary(p => p.Name, p => p.SampleValue);
+        values["backup.trigger"] = trigger;
+
+        var mail = await Renderer.RenderAsync(
+            DefaultMailTemplates.Get(definition.Type, language), MailLayoutSettings.Default(), values, language, null);
+
+        Assert.Contains($"({expected})", mail.Text);
+        if (trigger != expected)
+            Assert.DoesNotContain(trigger, mail.Text);
+    }
+
     [Fact]
     public void Layout_RejectsUnsafeAccentAndOversizedLogo()
     {

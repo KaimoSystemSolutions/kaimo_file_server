@@ -77,6 +77,7 @@ builders in `NotificationEvents` keep every call site to one line.
 | `sync.needs_reauthorization` | `CloudSyncExecutionService` | syncCreator | Sync creator + sync administrators, 24 h throttle |
 | `backup.failed` / `backup.succeeded` | `DatabaseBackupService` (Host and Web) | – | `ManageBackups` holders |
 | `backup.restic.failed` / `backup.restic.warnings` | `BackupJobExecutor` (file backup run) | jobCreator | Job creator + `ManageBackupJobs` holders, 6 h / 24 h throttle |
+| `backup.restic.succeeded` | `BackupJobExecutor` (file backup run without errors or warnings) | jobCreator | Job creator + `ManageBackupJobs` holders, no throttle by default (dedup key per job) |
 | `backup.restic.stale` | `BackupSchedulerService` (scheduled job without success for `AlertAfterDays`) | jobCreator | Job creator + `ManageBackupJobs` holders, 24 h throttle |
 | `backup.restic.repo_unreachable` | `BackupJobExecutor` / `BackupMaintenanceExecutor` (only when a repository turns unreachable) | – | `ManageBackupRepositories` holders, 6 h throttle |
 | `backup.restic.check_failed` / `backup.restic.test_restore_mismatch` / `backup.restic.maintenance_failed` | `BackupMaintenanceExecutor` | – | `ManageBackupRepositories` holders, 24 h throttle |

@@ -39,6 +39,10 @@ public static class DefaultMailTemplates
 
     private const string LoginLink = """<p><a href="{{ server.url }}" style="color:{{ layout.accent }};font-weight:600;">{{ server.url }}</a></p>""";
 
+    // backup.trigger carries the language-neutral BackupRunTrigger name; the mail shows it in its own language.
+    private const string DeTrigger = """{% case backup.trigger %}{% when "Scheduled" %}geplant{% when "CatchUp" %}nachgeholt{% else %}manuell{% endcase %}""";
+    private const string EnTrigger = """{% case backup.trigger %}{% when "Scheduled" %}scheduled{% when "CatchUp" %}caught up{% else %}manual{% endcase %}""";
+
     private static readonly Dictionary<(string Type, string Language), MailTemplateSource> Templates = new()
     {
         [(C.UserCreated, "de")] = new("Willkommen bei {{ server.name }}",
@@ -95,6 +99,11 @@ public static class DefaultMailTemplates
             "<p>Der Sicherungsauftrag <strong>{{ job.name }}</strong> in das Repository <strong>{{ repository.name }}</strong> ist fehlgeschlagen.</p><p>Fehlercode: <code>{{ errorCode }}</code><br>Betroffene Quellen: {{ failedSources }}<br>Zeitpunkt: {{ event.time }}</p>" + LoginLink),
         [(C.FileBackupFailed, "en")] = new("File backup \"{{ job.name }}\" failed",
             "<p>The backup job <strong>{{ job.name }}</strong> into the repository <strong>{{ repository.name }}</strong> failed.</p><p>Error code: <code>{{ errorCode }}</code><br>Affected sources: {{ failedSources }}<br>Time: {{ event.time }}</p>" + LoginLink),
+
+        [(C.FileBackupSucceeded, "de")] = new("Datensicherung „{{ job.name }}“ erfolgreich",
+            "<p>Der Sicherungsauftrag <strong>{{ job.name }}</strong> (" + DeTrigger + ") in das Repository <strong>{{ repository.name }}</strong> wurde erfolgreich abgeschlossen.</p><p>Neue Dateien: {{ filesNew }}<br>Geänderte Dateien: {{ filesChanged }}<br>Hinzugefügte Daten: {{ dataAdded }}<br>Dauer: {{ duration }}</p>" + LoginLink),
+        [(C.FileBackupSucceeded, "en")] = new("File backup \"{{ job.name }}\" succeeded",
+            "<p>The backup job <strong>{{ job.name }}</strong> (" + EnTrigger + ") into the repository <strong>{{ repository.name }}</strong> completed successfully.</p><p>New files: {{ filesNew }}<br>Changed files: {{ filesChanged }}<br>Data added: {{ dataAdded }}<br>Duration: {{ duration }}</p>" + LoginLink),
 
         [(C.FileBackupWarnings, "de")] = new("Datensicherung „{{ job.name }}“ mit Warnungen",
             "<p>Der Sicherungsauftrag <strong>{{ job.name }}</strong> wurde abgeschlossen, aber {{ warningCount }} Dateien konnten nicht gelesen werden (z. B. weil sie während der Sicherung geändert oder gesperrt waren). Details stehen im Verlauf der Sicherung.</p>" + LoginLink),

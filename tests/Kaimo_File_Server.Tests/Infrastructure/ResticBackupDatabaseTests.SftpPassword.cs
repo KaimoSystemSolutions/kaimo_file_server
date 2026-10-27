@@ -53,7 +53,10 @@ public partial class ResticBackupDatabaseTests
             var hostKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(51);
             var fingerprint = PinnedSshSettings.ComputeFingerprint(hostKey);
             var knownHosts = Path.Combine(root, "known_hosts");
-            await File.WriteAllTextAsync(knownHosts, $"nas.example.test ssh-ed25519 {Convert.ToBase64String(hostKey)}\n");
+            // Owner-only like the production known_hosts (RsyncSshSetupService), so the umask of the
+            // machine running the tests cannot make the file group-writable and fail the secret check.
+            await ProtocolTemporaryFile.WriteRestrictedTextAsync(
+                knownHosts, $"nas.example.test ssh-ed25519 {Convert.ToBase64String(hostKey)}\n", CancellationToken.None);
 
             var connection = new StorageConnection
             {
@@ -125,7 +128,10 @@ public partial class ResticBackupDatabaseTests
         {
             var hostKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(51);
             var knownHosts = Path.Combine(root, "known_hosts");
-            await File.WriteAllTextAsync(knownHosts, $"nas.example.test ssh-ed25519 {Convert.ToBase64String(hostKey)}\n");
+            // Owner-only like the production known_hosts (RsyncSshSetupService), so the umask of the
+            // machine running the tests cannot make the file group-writable and fail the secret check.
+            await ProtocolTemporaryFile.WriteRestrictedTextAsync(
+                knownHosts, $"nas.example.test ssh-ed25519 {Convert.ToBase64String(hostKey)}\n", CancellationToken.None);
             var connection = new StorageConnection
             {
                 ProviderId = "sftp",

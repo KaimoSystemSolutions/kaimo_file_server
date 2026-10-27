@@ -5769,6 +5769,15 @@
   <data name="Notification_Event_backup_restic_warnings_Desc" xml:space="preserve">
     <value>A backup job finished, but some files could not be read.</value>
   </data>
+  <data name="Notification_Event_backup_restic_succeeded" xml:space="preserve">
+    <value>File backup succeeded</value>
+  </data>
+  <data name="Notification_Event_backup_restic_succeeded_Desc" xml:space="preserve">
+    <value>A backup job finished without errors or warnings. Runs with warnings raise "File backup with warnings" instead.</value>
+  </data>
+  <data name="Notification_Role_backup_restic_succeeded_jobCreator" xml:space="preserve">
+    <value>Creator of the backup job</value>
+  </data>
   <data name="Notification_Role_backup_restic_failed_jobCreator" xml:space="preserve">
     <value>Creator of the backup job</value>
   </data>
