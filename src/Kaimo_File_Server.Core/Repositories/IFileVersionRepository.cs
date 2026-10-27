@@ -108,9 +108,10 @@ namespace Kaimo_File_Server.Core.Repositories
         Task<List<FileVersion>> DeletePathAsync(Guid shareId, string path);
 
         /// <summary>
-        /// Renames a file or directory version-history prefix. Existing destination
-        /// history is removed and returned because a replace-style filesystem rename
-        /// has displaced that object.
+        /// Renames a file or directory version-history prefix. History already at the
+        /// destination is merged, not discarded (see <c>VersionHistoryMerge</c>): only rows in
+        /// the same second as a moved row of the same file are removed, and they are returned
+        /// so their blobs can be garbage-collected.
         /// </summary>
         Task<List<FileVersion>> RenamePathAsync(
             Guid shareId,
@@ -152,6 +153,21 @@ namespace Kaimo_File_Server.Core.Repositories
             IReadOnlyCollection<Guid> shareIds, int take, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Every version of the given files of a share, so a sweep loads a whole page of
+        /// histories in one query instead of one per file.
+        /// </summary>
+        Task<List<FileVersion>> GetVersionsForPathsAsync(
+            Guid shareId, IReadOnlyCollection<string> filePaths, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Distinct blob paths of the given shares that only older versions reference. Blobs of
+        /// a file's newest version duplicate live content and can never be pruned, so they do
+        /// not count against a pool's version-storage budget.
+        /// </summary>
+        Task<List<string>> GetHistoryOnlyStoragePathsAsync(
+            IReadOnlyCollection<Guid> shareIds, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Checks whether the newest version of a file already has the given content hash.
         /// Enables skipping version creation when the file content has not changed; older
         /// versions with the same hash do not count.
@@ -160,5 +176,20 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <param name="filePath">The normalised relative file path.</param>
         /// <param name="contentHash">The SHA-256 (or equivalent) hash of the file content.</param>
         Task<bool> ExistsWithHashAsync(Guid shareId, string filePath, string contentHash);
+
+        /// <summary>
+        /// Versioned paths of a share whose file the retention sweep found missing, with the
+        /// time it first did. Persisted so the orphan grace period survives restarts.
+        /// </summary>
+        Task<Dictionary<string, DateTime>> GetMissingSinceAsync(
+            Guid shareId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Replaces the missing-path record of a share with <paramref name="missingSince"/>;
+        /// an empty map clears it.
+        /// </summary>
+        Task ReplaceMissingSinceAsync(
+            Guid shareId, IReadOnlyDictionary<string, DateTime> missingSince,
+            CancellationToken cancellationToken = default);
     }
 }

@@ -11,10 +11,6 @@ public class VersioningExclusionMatcherTests
     [Theory]
     [InlineData("~$report.docx")]
     [InlineData("projects/2026/~$plan.xlsx")]
-    [InlineData("upload.TMP")]
-    [InlineData("a/b/c.temp")]
-    [InlineData("video.mp4.part")]
-    [InlineData("setup.exe.crdownload")]
     [InlineData("docs/.~lock.letter.odt#")]
     [InlineData(".notes.txt.swp")]
     [InlineData("photos/Thumbs.db")]
@@ -24,11 +20,29 @@ public class VersioningExclusionMatcherTests
         => Assert.True(Defaults.IsExcluded(path));
 
     [Theory]
+    [InlineData("videos/Holiday.MP4")]
+    [InlineData("clips/talk.mkv")]
+    [InlineData("vm/disk.vhdx")]
+    [InlineData("install/ubuntu.iso")]
+    [InlineData("downloads/archive.zip")]
+    [InlineData("backup/logs.tar.gz")]
+    [InlineData("tools/setup.exe")]
+    [InlineData("tools/installer.msi")]
+    public void DefaultPatterns_ExcludeBulkMediaArchivesAndExecutables(string path)
+        => Assert.True(Defaults.IsExcluded(path));
+
+    [Theory]
     [InlineData("tmpfile.txt")]
     [InlineData("report.docx")]
     [InlineData("temp/report.docx")]
     [InlineData("my~$file.docx")]
-    [InlineData("archive.tmp.zip")]
+    [InlineData("report.tmp.docx")]
+    [InlineData("photos/IMG_0001.jpg")]
+    [InlineData("music/song.mp3")]
+    [InlineData("~WRD0000.tmp")]
+    [InlineData("docs/lu12345abc.tmp")]
+    [InlineData("video.mp4.part")]
+    [InlineData("setup.exe.crdownload")]
     public void DefaultPatterns_DoNotExcludeRegularFiles(string path)
         => Assert.False(Defaults.IsExcluded(path));
 
@@ -42,6 +56,21 @@ public class VersioningExclusionMatcherTests
         Assert.False(matcher.IsExcluded("src/build/output.dll"));
         Assert.True(matcher.IsExcluded("cache/a/b/c.bin"));
     }
+
+    [Theory]
+    [InlineData("node_modules/lib/index.js", true)]
+    [InlineData("web/node_modules/lib/index.js", true)]
+    [InlineData("my_node_modules/index.js", false)]
+    [InlineData("web/my_node_modules/index.js", false)]
+    public void LeadingDoubleStarSlash_AlsoMatchesAtTheShareRoot(string path, bool expected)
+        => Assert.Equal(expected, new VersioningExclusionMatcher(["**/node_modules/**"]).IsExcluded(path));
+
+    [Theory]
+    [InlineData("docs/a.bak", true)]
+    [InlineData("docs/x/y/a.bak", true)]
+    [InlineData("docsa.bak", false)]
+    public void InnerDoubleStarSlash_MatchesZeroOrMoreFolders(string path, bool expected)
+        => Assert.Equal(expected, new VersioningExclusionMatcher(["docs/**/*.bak"]).IsExcluded(path));
 
     [Fact]
     public void QuestionMark_MatchesExactlyOneCharacter()

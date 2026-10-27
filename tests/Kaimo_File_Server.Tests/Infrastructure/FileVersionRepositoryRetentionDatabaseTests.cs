@@ -88,6 +88,40 @@ public class FileVersionRepositoryRetentionDatabaseTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task GetVersionsForPathsAsync_ReturnsTheHistoriesOfTheGivenPathsOnly()
+    {
+        var share = Guid.NewGuid();
+        var a1 = Version(share, "a.txt", 1);
+        var a2 = Version(share, "a.txt", 2);
+        var b1 = Version(share, "b.txt", 3);
+        await SeedAsync(a1, a2, b1, Version(share, "c.txt", 4), Version(Guid.NewGuid(), "a.txt", 5));
+
+        var histories = await Repo().GetVersionsForPathsAsync(share, ["a.txt", "b.txt", "missing.txt"]);
+
+        Assert.Equal(
+            new[] { a1.Id, a2.Id, b1.Id }.Order(),
+            histories.Select(v => v.Id).Order());
+    }
+
+    [Fact]
+    public async Task GetHistoryOnlyStoragePathsAsync_SkipsBlobsOfNewestVersions()
+    {
+        var share = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        await SeedAsync(
+            Version(share, "a.txt", 1, blob: "X"), Version(share, "a.txt", 2, blob: "Y"),
+            // Old version of b, but its blob is the newest content of a: still protected.
+            Version(share, "b.txt", 1, blob: "Y"), Version(share, "b.txt", 2, blob: "Z"),
+            Version(share, "c.txt", 1, blob: "W"),
+            Version(other, "a.txt", 1, blob: "V"), Version(other, "a.txt", 2, blob: "U"));
+
+        var paths = await Repo().GetHistoryOnlyStoragePathsAsync([share]);
+
+        Assert.Equal(["AA/BB/X.bin.gz"], paths);
+        Assert.Empty(await Repo().GetHistoryOnlyStoragePathsAsync([]));
+    }
+
+    [Fact]
     public async Task GetBudgetPruneCandidatesAsync_HonoursTake()
     {
         var share = Guid.NewGuid();

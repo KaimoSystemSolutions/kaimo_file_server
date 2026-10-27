@@ -805,6 +805,23 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.ToTable("file_versions", (string)null);
                 });
 
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.FileVersionMissingPath", b =>
+                {
+                    b.Property<Guid>("ShareId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FilePath")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("MissingSinceUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("ShareId", "FilePath");
+
+                    b.ToTable("file_version_missing_paths", (string)null);
+                });
+
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.ClientActivityBucket", b =>
                 {
                     b.Property<long>("Id")

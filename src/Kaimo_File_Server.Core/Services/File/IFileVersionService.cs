@@ -50,6 +50,14 @@ namespace Kaimo_File_Server.Core.Services.File
         }
 
         /// <summary>
+        /// Whether <paramref name="content"/> is already kept, intact, as the newest version of
+        /// the file. Lets an overwrite proceed safely when the policy refuses a new snapshot
+        /// (disabled, excluded, too large) but the current content is preserved anyway.
+        /// </summary>
+        Task<bool> IsNewestVersionAsync(Guid shareId, string filePath, Stream content)
+            => Task.FromResult(false);
+
+        /// <summary>
         /// Read the content of a specific version.
         /// Returns a readonly stream.
         /// </summary>

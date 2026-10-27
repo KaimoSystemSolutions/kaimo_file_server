@@ -80,6 +80,45 @@ public class VersioningPolicyStoreTests
     }
 
     [Fact]
+    public async Task GetAsync_PolicySavedBeforeRevision1_DropsTheOldTemporaryFileDefaults()
+    {
+        // A policy saved with the revision-0 defaults: JSON without "Revision".
+        var stored = System.Text.Json.JsonSerializer.Deserialize<VersioningPolicy>(
+            """{"ExcludePatterns":["~$*","*.TMP","*.temp","*.part","*.partial","*.crdownload","*.download","*.bak"]}""")!;
+        _config.Setup(c => c.GetFreshAsync(VersioningPolicy.ConfigKey, It.IsAny<VersioningPolicy>()))
+            .ReturnsAsync(stored);
+
+        var policy = await _sut.GetAsync();
+
+        Assert.Equal(["~$*", "*.bak"], policy.ExcludePatterns);
+        Assert.Equal(VersioningPolicy.CurrentRevision, policy.Revision);
+    }
+
+    [Fact]
+    public async Task GetAsync_CurrentRevision_KeepsTemporaryPatternsTheAdminChose()
+    {
+        _config.Setup(c => c.GetFreshAsync(VersioningPolicy.ConfigKey, It.IsAny<VersioningPolicy>()))
+            .ReturnsAsync(new VersioningPolicy { Revision = VersioningPolicy.CurrentRevision, ExcludePatterns = ["*.tmp"] });
+
+        Assert.Equal(["*.tmp"], (await _sut.GetAsync()).ExcludePatterns);
+    }
+
+    [Fact]
+    public async Task SetAsync_StampsTheCurrentRevisionSoTheAdminsListIsKept()
+    {
+        VersioningPolicy? stored = null;
+        _config.Setup(c => c.SetAsync(VersioningPolicy.ConfigKey, It.IsAny<VersioningPolicy>()))
+            .Callback<string, VersioningPolicy>((_, p) => stored = p)
+            .Returns(Task.CompletedTask);
+
+        await _sut.SetAsync(new VersioningPolicy { ExcludePatterns = ["*.tmp"] });
+
+        Assert.Equal(VersioningPolicy.CurrentRevision, stored!.Revision);
+        Assert.Equal(["*.tmp"], stored.ExcludePatterns);
+        Assert.Equal(["*.tmp"], (await _sut.GetAsync()).ExcludePatterns);
+    }
+
+    [Fact]
     public async Task SetAsync_DoesNotKeepAReferenceToTheCallersInstance()
     {
         var policy = VersioningPolicy.Default();

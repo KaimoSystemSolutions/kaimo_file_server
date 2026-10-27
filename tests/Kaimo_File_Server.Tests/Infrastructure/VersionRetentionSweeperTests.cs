@@ -59,6 +59,14 @@ public sealed class VersionRetentionSweeperTests : IDisposable
         NullLogger<VersionRetentionSweeper>.Instance, _time,
         diskSpaceProbe: _ => (1L << 50, _poolCapacity));
 
+    /// <summary>One sweep that notices missing files, then one after the grace period.</summary>
+    private async Task SweepPastGraceAsync()
+    {
+        await CreateSweeper().RunOnceAsync();
+        _time.Advance(VersionRetentionSweeper.OrphanGrace + TimeSpan.FromHours(1));
+        await CreateSweeper().RunOnceAsync();
+    }
+
     /// <summary>Writes the live file and snapshots it, as an upload would.</summary>
     private async Task WriteAsync(string path, byte[] content)
     {
@@ -102,9 +110,8 @@ public sealed class VersionRetentionSweeperTests : IDisposable
         await WriteAsync("keep.txt", "keep");
         await WriteAsync("gone.txt", "gone");
         File.Delete(Path.Combine(_share.Path, "gone.txt"));
-        _time.Advance(TimeSpan.FromHours(2));
 
-        await CreateSweeper().RunOnceAsync();
+        await SweepPastGraceAsync();
 
         Assert.Empty(await _repo.GetVersionsAsync(_share.Id, "gone.txt"));
         Assert.Single(await _repo.GetVersionsAsync(_share.Id, "keep.txt"));
@@ -119,8 +126,67 @@ public sealed class VersionRetentionSweeperTests : IDisposable
         File.Delete(Path.Combine(_share.Path, "moving.txt"));
 
         await CreateSweeper().RunOnceAsync();
+        _time.Advance(VersionRetentionSweeper.OrphanGrace - TimeSpan.FromHours(1));
+        await CreateSweeper().RunOnceAsync();
 
         Assert.Single(await _repo.GetVersionsAsync(_share.Id, "moving.txt"));
+    }
+
+    [Fact]
+    public async Task Orphan_GraceCountsFromDisappearance_NotFromTheLastSnapshot()
+    {
+        // A file untouched for a year and then deleted outside the server still gets the
+        // full grace period; the age of its newest snapshot says nothing about the deletion.
+        await WriteAsync("keep.txt", "keep");
+        await WriteAsync("old.txt", "old");
+        _time.Advance(TimeSpan.FromDays(365));
+        File.Delete(Path.Combine(_share.Path, "old.txt"));
+
+        await CreateSweeper().RunOnceAsync();
+        Assert.Single(await _repo.GetVersionsAsync(_share.Id, "old.txt"));
+
+        _time.Advance(VersionRetentionSweeper.OrphanGrace + TimeSpan.FromHours(1));
+        await CreateSweeper().RunOnceAsync();
+        Assert.Empty(await _repo.GetVersionsAsync(_share.Id, "old.txt"));
+    }
+
+    [Fact]
+    public async Task Orphan_FileReappears_RestartsTheGracePeriod()
+    {
+        await WriteAsync("keep.txt", "keep");
+        await WriteAsync("back.txt", "data");
+        var full = Path.Combine(_share.Path, "back.txt");
+        File.Delete(full);
+        await CreateSweeper().RunOnceAsync();
+
+        _time.Advance(VersionRetentionSweeper.OrphanGrace - TimeSpan.FromDays(1));
+        await File.WriteAllTextAsync(full, "data");
+        await CreateSweeper().RunOnceAsync();
+        File.Delete(full);
+        _time.Advance(TimeSpan.FromDays(2));
+        await CreateSweeper().RunOnceAsync();
+
+        Assert.Single(await _repo.GetVersionsAsync(_share.Id, "back.txt"));
+    }
+
+    [Fact]
+    public async Task Orphan_FirstMissingTime_IsPersistedSoARestartKeepsIt()
+    {
+        // The sweeper is scoped per run and the Host restarts on every update: the time a
+        // file was first found missing lives in the database, not in the process.
+        await WriteAsync("keep.txt", "keep");
+        await WriteAsync("gone.txt", "gone");
+        File.Delete(Path.Combine(_share.Path, "gone.txt"));
+        var firstSeen = _time.GetUtcNow().UtcDateTime;
+
+        await CreateSweeper().RunOnceAsync();
+
+        Assert.Equal(firstSeen, (await _repo.GetMissingSinceAsync(_share.Id))["gone.txt"]);
+        _time.Advance(VersionRetentionSweeper.OrphanGrace + TimeSpan.FromHours(1));
+        await CreateSweeper().RunOnceAsync();
+        Assert.Empty(await _repo.GetMissingSinceAsync(_share.Id));
+
+        Assert.Empty(await _repo.GetVersionsAsync(_share.Id, "gone.txt"));
     }
 
     [Fact]
@@ -128,9 +194,8 @@ public sealed class VersionRetentionSweeperTests : IDisposable
     {
         await WriteAsync("a.txt", "a");
         Directory.Delete(_share.Path, recursive: true);
-        _time.Advance(TimeSpan.FromHours(2));
 
-        await CreateSweeper().RunOnceAsync();
+        await SweepPastGraceAsync();
 
         Assert.Single(await _repo.GetVersionsAsync(_share.Id, "a.txt"));
     }
@@ -143,9 +208,8 @@ public sealed class VersionRetentionSweeperTests : IDisposable
         await WriteAsync("sub/b.txt", "b");
         Directory.Delete(_share.Path, recursive: true);
         Directory.CreateDirectory(_share.Path);
-        _time.Advance(TimeSpan.FromHours(2));
 
-        await CreateSweeper().RunOnceAsync();
+        await SweepPastGraceAsync();
 
         Assert.Single(await _repo.GetVersionsAsync(_share.Id, "a.txt"));
         Assert.Single(await _repo.GetVersionsAsync(_share.Id, "sub/b.txt"));
@@ -156,9 +220,8 @@ public sealed class VersionRetentionSweeperTests : IDisposable
     {
         await WriteAsync("Report.TXT", "r");
         File.Move(Path.Combine(_share.Path, "Report.TXT"), Path.Combine(_share.Path, "report.txt"));
-        _time.Advance(TimeSpan.FromHours(2));
 
-        await CreateSweeper().RunOnceAsync();
+        await SweepPastGraceAsync();
 
         Assert.Single(await _repo.GetVersionsAsync(_share.Id, "Report.TXT"));
     }
@@ -179,19 +242,53 @@ public sealed class VersionRetentionSweeperTests : IDisposable
     }
 
     [Fact]
-    public async Task Budget_Exceeded_RemovesOldestVersionsButKeepsNewestPerFile()
+    public async Task Budget_Exceeded_RemovesOldestHistoryButKeepsNewestPerFile()
     {
         for (var round = 0; round < 3; round++)
             foreach (var name in new[] { "a.bin", "b.bin", "c.bin" })
                 await WriteAsync(name, Random(4096));
-        // 9 incompressible 4 KB blobs; a 15 % budget of 100 KB fits only three of them.
-        _poolCapacity = 100 * 1024;
+        // 6 incompressible 4 KB history blobs (the 3 newest do not count); a 10 % budget
+        // of 150 KB fits three of them, so the oldest round goes.
+        _poolCapacity = 150 * 1024;
 
         await CreateSweeper().RunOnceAsync();
 
         foreach (var name in new[] { "a.bin", "b.bin", "c.bin" })
-            Assert.Equal(3, Assert.Single(await _repo.GetVersionsAsync(_share.Id, name)).VersionNumber);
-        Assert.Equal(3, BlobCount());
+            Assert.Equal([3, 2], (await _repo.GetVersionsAsync(_share.Id, name)).Select(v => v.VersionNumber));
+        Assert.Equal(6, BlobCount());
+    }
+
+    [Fact]
+    public async Task Budget_NewestVersionsDoNotCount()
+    {
+        // The newest version duplicates the live file and can never be pruned; counting it
+        // would wipe every history as soon as the live data alone exceeds the budget.
+        for (var i = 0; i < 5; i++)
+            await WriteAsync($"f{i}.bin", Random(4096));
+        await WriteAsync("a.bin", Random(4096));
+        await WriteAsync("a.bin", Random(4096));
+        // 7 blobs ≈ 28 KB in total, but only one 4 KB history blob; budget 10 KB.
+        _poolCapacity = 100 * 1024;
+
+        await CreateSweeper().RunOnceAsync();
+
+        Assert.Equal(2, (await _repo.GetVersionsAsync(_share.Id, "a.bin")).Count);
+    }
+
+    [Fact]
+    public async Task Budget_UnreferencedBlobsDoNotCount()
+    {
+        // Leftovers no row references are removed by reconciliation, not by pruning history.
+        await WriteAsync("a.bin", Random(4096));
+        await WriteAsync("a.bin", Random(4096));
+        var junk = Path.Combine(_versionRoot, "FF", "FF", "FFFF.bin.gz");
+        Directory.CreateDirectory(Path.GetDirectoryName(junk)!);
+        await File.WriteAllBytesAsync(junk, Random(20 * 1024));
+        _poolCapacity = 100 * 1024;
+
+        await CreateSweeper().RunOnceAsync();
+
+        Assert.Equal(2, (await _repo.GetVersionsAsync(_share.Id, "a.bin")).Count);
     }
 
     [Fact]
@@ -200,8 +297,8 @@ public sealed class VersionRetentionSweeperTests : IDisposable
         await WriteAsync("a.bin", Random(4096));
         await WriteAsync("a.bin", Random(4096));
         await WriteAsync("a.bin", Random(4096));
-        // Budget 15 % of 70 KB ≈ 10.5 KB: two of the three blobs fit.
-        _poolCapacity = 70 * 1024;
+        // Two 4 KB history blobs; budget 10 % of 60 KB = 6 KB: one of them fits.
+        _poolCapacity = 60 * 1024;
 
         await CreateSweeper().RunOnceAsync();
 
@@ -250,5 +347,51 @@ public sealed class VersionRetentionSweeperTests : IDisposable
 
         for (var i = 0; i < 7; i++)
             Assert.Single(await _repo.GetVersionsAsync(_share.Id, $"f{i}.txt"));
+    }
+
+    private VersionRetentionSweeper CreateSweeper(int pageSize) => new(
+        _repo, Service, _shares.Object, _policy, new SingleRootLocator(_share.Id, _versionRoot),
+        NullLogger<VersionRetentionSweeper>.Instance, _time,
+        diskSpaceProbe: _ => (1L << 50, _poolCapacity), pageSize: pageSize);
+
+    [Fact]
+    public async Task Sweep_DeletesInBoundedBatches_AndLoadsHistoriesPerPage()
+    {
+        // The first sweep after an upgrade may remove millions of rows: never in one call.
+        for (var i = 0; i < 7; i++)
+            for (var v = 0; v < 3; v++)
+                await WriteAsync($"f{i}.txt", $"v{v}");
+        _time.Advance(TimeSpan.FromDays(120));
+        _repo.ResetCallCounters();
+
+        await CreateSweeper(pageSize: 3).RunOnceAsync();
+
+        Assert.Equal(0, _repo.SinglePathHistoryLoads);
+        Assert.Equal(14, _repo.DeleteByIdsBatchSizes.Sum());
+        Assert.All(_repo.DeleteByIdsBatchSizes, size => Assert.InRange(size, 1, 3));
+        for (var i = 0; i < 7; i++)
+            Assert.Single(await _repo.GetVersionsAsync(_share.Id, $"f{i}.txt"));
+    }
+
+    [Fact]
+    public async Task Orphans_AreDeletedInBoundedBatches()
+    {
+        await WriteAsync("keep.txt", "keep");
+        for (var i = 0; i < 5; i++)
+        {
+            await WriteAsync($"gone{i}.txt", "a");
+            await WriteAsync($"gone{i}.txt", "b");
+            File.Delete(Path.Combine(_share.Path, $"gone{i}.txt"));
+        }
+        await CreateSweeper(pageSize: 3).RunOnceAsync();
+        _time.Advance(VersionRetentionSweeper.OrphanGrace + TimeSpan.FromHours(1));
+        _repo.ResetCallCounters();
+
+        await CreateSweeper(pageSize: 3).RunOnceAsync();
+
+        Assert.Equal(10, _repo.DeleteByIdsBatchSizes.Sum());
+        Assert.All(_repo.DeleteByIdsBatchSizes, size => Assert.InRange(size, 1, 3));
+        for (var i = 0; i < 5; i++)
+            Assert.Empty(await _repo.GetVersionsAsync(_share.Id, $"gone{i}.txt"));
     }
 }

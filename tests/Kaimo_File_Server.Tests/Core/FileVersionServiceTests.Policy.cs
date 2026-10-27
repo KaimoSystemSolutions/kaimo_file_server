@@ -66,7 +66,7 @@ public partial class FileVersionServiceTests
 
     [Theory]
     [InlineData("~$report.docx")]
-    [InlineData("folder/upload.tmp")]
+    [InlineData("folder/.~lock.letter.odt#")]
     public async Task CaptureVersionAsync_ExcludedName_StoresNothing(string path)
     {
         var service = CreatePolicyService(VersioningPolicy.Default());
@@ -150,6 +150,52 @@ public partial class FileVersionServiceTests
         provider.Policy = new VersioningPolicy { Enabled = false };
 
         Assert.Null(await service.CreateVersionAsync(ShareA, "doc.txt", ToStream("v2")));
+    }
+
+    [Fact]
+    public async Task IsNewestVersionAsync_ContentEqualsNewestVersion_IsTrueEvenWhenVersioningIsOff()
+    {
+        var provider = new FakePolicyProvider(VersioningPolicy.Default());
+        var service = new FileVersionService(_repo, _versionRoot, timeProvider: _time,
+            diskSpaceProbe: _ => (1L << 50, 1L << 50), policyProvider: provider);
+        await service.CaptureVersionAsync(ShareA, "doc.txt", ToStream("v1"));
+        _time.Advance(TimeSpan.FromSeconds(1));
+        await service.CaptureVersionAsync(ShareA, "doc.txt", ToStream("v2"));
+        provider.Policy = new VersioningPolicy { Enabled = false };
+
+        Assert.True(await service.IsNewestVersionAsync(ShareA, "doc.txt", ToStream("v2")));
+        // Only the newest version mirrors the live file; an older match is no backup.
+        Assert.False(await service.IsNewestVersionAsync(ShareA, "doc.txt", ToStream("v1")));
+        Assert.False(await service.IsNewestVersionAsync(ShareA, "other.txt", ToStream("v2")));
+    }
+
+    [Fact]
+    public async Task IsNewestVersionAsync_BlobMissing_IsFalse()
+    {
+        var service = CreatePolicyService(VersioningPolicy.Default());
+        var version = (await service.CaptureVersionAsync(ShareA, "doc.txt", ToStream("v1"))).Version!;
+        File.Delete(Path.Combine(_versionRoot, version.StoragePath));
+
+        Assert.False(await service.IsNewestVersionAsync(ShareA, "doc.txt", ToStream("v1")));
+    }
+
+    [Fact]
+    public async Task CaptureVersionAsync_RestoredOlderContent_BecomesTheNewestVersion()
+    {
+        // After a restore the live content equals an older version; snapshotting it again
+        // must add a newest row (sharing the blob) so retention protects it.
+        var service = CreatePolicyService(VersioningPolicy.Default());
+        await service.CaptureVersionAsync(ShareA, "doc.txt", ToStream("v1"));
+        _time.Advance(TimeSpan.FromSeconds(1));
+        await service.CaptureVersionAsync(ShareA, "doc.txt", ToStream("v2"));
+        _time.Advance(TimeSpan.FromSeconds(1));
+        var blobs = BlobCount();
+
+        var result = await service.CaptureVersionAsync(ShareA, "doc.txt", ToStream("v1"));
+
+        Assert.Equal(VersionCaptureOutcome.Created, result.Outcome);
+        Assert.Equal(3, (await _repo.GetVersionsAsync(ShareA, "doc.txt")).Count);
+        Assert.Equal(blobs, BlobCount());
     }
 
     [Fact]

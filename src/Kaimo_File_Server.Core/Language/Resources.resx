@@ -7742,7 +7742,7 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>Excluded files</value>
   </data>
   <data name="Web_VersioningSettings_PatternsHint" xml:space="preserve">
-    <value>One pattern per line. * matches any characters, ? one character, ** also across folders. Without / the pattern matches the file name, with / the path inside the share. Case is ignored.</value>
+    <value>One pattern per line. * matches any characters, ? one character, ** also across folders. Without / the pattern matches the file name, with / the path inside the share. Case is ignored. Do not exclude temporary files such as *.tmp: Office and many other programs save into a temporary file and then rename it, so the document would get no version.</value>
   </data>
   <data name="Web_VersioningSettings_DefaultPatterns" xml:space="preserve">
     <value>Restore default patterns</value>
@@ -7787,7 +7787,7 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>Storage budget</value>
   </data>
   <data name="Web_VersioningSettings_BudgetDescription" xml:space="preserve">
-    <value>Versions are stored in the storage pool of their share. If they take up more than this share of a pool, the oldest versions are removed first.</value>
+    <value>Versions are stored in the storage pool of their share. If older versions take up more than this share of a pool, the oldest are removed first. The newest version of each file mirrors its current content and does not count.</value>
   </data>
   <data name="Web_VersioningSettings_Budget" xml:space="preserve">
     <value>Max. share of a pool (%)</value>

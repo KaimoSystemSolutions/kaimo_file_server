@@ -57,6 +57,59 @@ public partial class FileServiceTests
             Times.Never);
     }
 
+    [Theory]
+    [InlineData(VersionCaptureOutcome.Disabled)]
+    [InlineData(VersionCaptureOutcome.Excluded)]
+    [InlineData(VersionCaptureOutcome.TooLarge)]
+    public async Task RestoreFileVersionAsync_SnapshotSkippedButContentIsNewestVersion_RestoresWithoutConsent(
+        VersionCaptureOutcome outcome)
+    {
+        var (service, versions, timestamp) = SetupRestore(outcome);
+        versions.Setup(v => v.IsNewestVersionAsync(_shareId, "document.txt", It.IsAny<Stream>()))
+            .ReturnsAsync(true);
+
+        await service.RestoreFileVersionAsync("document.txt", timestamp, CreateContext());
+
+        VerifyLiveFileWritten(Times.Once());
+    }
+
+    [Fact]
+    public async Task RestoreFileVersionAsync_SnapshotsTheRestoredContent()
+    {
+        // Retention treats the newest version as the live content; without this snapshot the
+        // restored (older) version could be thinned away while it is the live file.
+        var (service, versions, timestamp) = SetupRestore(VersionCaptureOutcome.Created);
+        var captured = new List<byte[]>();
+        versions
+            .Setup(v => v.CaptureVersionAsync(_shareId, "document.txt", It.IsAny<Stream>(), It.IsAny<string?>()))
+            .Callback<Guid, string, Stream, string?>((_, _, s, _) =>
+            {
+                s.Position = 0;
+                var copy = new MemoryStream();
+                s.CopyTo(copy);
+                captured.Add(copy.ToArray());
+            })
+            .ReturnsAsync(new VersionCaptureResult(VersionCaptureOutcome.Created));
+
+        await service.RestoreFileVersionAsync("document.txt", timestamp, CreateContext());
+
+        Assert.Equal([[1, 2, 3], [9, 9]], captured);
+    }
+
+    [Fact]
+    public async Task RestoreFileVersionAsync_SnapshotAfterRestoreFails_RestoreStillSucceeds()
+    {
+        var (service, versions, timestamp) = SetupRestore(VersionCaptureOutcome.Created);
+        versions
+            .SetupSequence(v => v.CaptureVersionAsync(_shareId, "document.txt", It.IsAny<Stream>(), It.IsAny<string?>()))
+            .ReturnsAsync(new VersionCaptureResult(VersionCaptureOutcome.Created))
+            .ThrowsAsync(new IOException("disk"));
+
+        await service.RestoreFileVersionAsync("document.txt", timestamp, CreateContext());
+
+        VerifyLiveFileWritten(Times.Once());
+    }
+
     [Fact]
     public async Task RestoreFileVersionAsync_AllowWithoutBackup_RestoresAnyway()
     {
@@ -87,7 +140,8 @@ public partial class FileServiceTests
         await service.RestoreFileVersionAsync("document.txt", timestamp, CreateContext());
 
         VerifyLiveFileWritten(Times.Once());
+        // Nothing to back up before the write; only the restored content is snapshotted.
         versions.Verify(v => v.CaptureVersionAsync(
-            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string?>()), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string?>()), Times.Once);
     }
 }

@@ -223,13 +223,16 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddSingleton<IVersioningPolicyStore, VersioningPolicyStore>();
             services.AddSingleton<IVersioningPolicyProvider>(sp => sp.GetRequiredService<IVersioningPolicyStore>());
 
+            // Outlives the scoped service: a safe-save rename sequence spans several calls.
+            services.AddSingleton<RecentVersionRenames>();
             services.AddScoped(sp =>
                 new FileVersionService(
                     sp.GetRequiredService<IFileVersionRepository>(),
                     legacyVersionStoragePath,
                     logger: sp.GetRequiredService<ILogger<FileVersionService>>(),
                     storageLocator: sp.GetRequiredService<IVersionStorageLocator>(),
-                    policyProvider: sp.GetRequiredService<IVersioningPolicyProvider>()));
+                    policyProvider: sp.GetRequiredService<IVersioningPolicyProvider>(),
+                    recentRenames: sp.GetRequiredService<RecentVersionRenames>()));
             services.AddScoped<IFileVersionService>(sp => sp.GetRequiredService<FileVersionService>());
             // Policy retention for unchanged files, orphan cleanup and pool budgets (Host job).
             services.AddScoped(sp => new VersionRetentionSweeper(

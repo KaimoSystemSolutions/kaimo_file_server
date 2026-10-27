@@ -169,6 +169,36 @@ public partial class ResticBackupTests
     }
 
     [Theory]
+    [InlineData(Kaimo_File_Server.Core.Services.File.VersionCaptureOutcome.NoPool)]
+    [InlineData(Kaimo_File_Server.Core.Services.File.VersionCaptureOutcome.Disabled)]
+    public async Task Merge_Overwrite_WhenShareIsNotVersionedAtAll_OverwritesAsChosen(
+        Kaimo_File_Server.Core.Services.File.VersionCaptureOutcome outcomeOfCapture)
+    {
+        // Without versioning for the share there is no history to protect; the admin's
+        // explicit "Overwrite" choice applies as it did before versioning policies existed.
+        var (root, staged, share) = MergeFixture();
+        try
+        {
+            var versions = new CountingVersions { SkipWith = outcomeOfCapture };
+            var outcome = new BackupRestoreOutcome();
+            var merge = new RestoreMerge(share, Guid.NewGuid(), BackupRestoreConflict.Overwrite, versions.Service, "u1", " (restored)", outcome);
+
+            await merge.MoveAsync(Path.Combine(staged, "docs", "a.txt"), "docs/a.txt");
+
+            Assert.Equal("backup-a", Read(share, "docs/a.txt"));
+            Assert.False(File.Exists(Path.Combine(share, "docs", "a (restored).txt")));
+            Assert.Equal(1, outcome.Overwritten);
+            Assert.Equal(0, outcome.Renamed);
+            Assert.Equal(0, outcome.VersionsCreated);
+            Assert.Empty(merge.Untouched);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
     [InlineData(BackupRestoreConflict.Overwrite)]
     [InlineData(BackupRestoreConflict.Rename)]
     public async Task Merge_IdenticalFile_IsLeftAlone_WithoutVersionOrCopy(BackupRestoreConflict conflict)

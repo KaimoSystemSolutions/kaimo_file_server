@@ -105,6 +105,61 @@ public sealed class DatabaseCloudSyncOperationCoordinatorTests
         await sync.DisposeAsync();
     }
 
+    [Fact]
+    public async Task ExternalReservations_ForDifferentPaths_Coexist()
+    {
+        // Word safe-save: the second rename is authorized before the first one's
+        // NotifyRename has completed its reservation.
+        Guid shareId = Guid.NewGuid();
+        var authorization = CreateCoordinator();
+        var eventHandler = CreateCoordinator();
+        var scheduler = CreateCoordinator();
+
+        Assert.True(await authorization.TryReserveExternalPathMutationAsync(
+            shareId, "doc.docx", "~WRL0001.tmp", TimeSpan.FromMinutes(2)));
+        Assert.True(await authorization.TryReserveExternalPathMutationAsync(
+            shareId, "~WRD0000.tmp", "doc.docx", TimeSpan.FromMinutes(2)));
+
+        // The first event renews and completes its own reservation only.
+        Assert.True(await eventHandler.TryReserveExternalPathMutationAsync(
+            shareId, "doc.docx", "~WRL0001.tmp", TimeSpan.FromMinutes(2)));
+        await eventHandler.CompleteExternalPathMutationAsync(
+            shareId, "doc.docx", "~WRL0001.tmp");
+        Assert.Null(await scheduler.TryBeginSyncAsync(shareId, "folder"));
+
+        await eventHandler.CompleteExternalPathMutationAsync(
+            shareId, "~WRD0000.tmp", "doc.docx");
+        var sync = await scheduler.TryBeginSyncAsync(shareId, "folder");
+        Assert.NotNull(sync);
+
+        // A running sync still blocks SMB renames.
+        Assert.False(await authorization.TryReserveExternalPathMutationAsync(
+            shareId, "a", "b", TimeSpan.FromMinutes(2)));
+        await sync.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ExpiredExternalReservation_DoesNotKeepTheShareBusy()
+    {
+        Guid shareId = Guid.NewGuid();
+        var start = new DateTimeOffset(2026, 10, 27, 12, 0, 0, TimeSpan.Zero);
+        var time = new MutableTimeProvider(start);
+        var coordinator = new DatabaseCloudSyncOperationCoordinator(DbFactory, time);
+
+        Assert.True(await coordinator.TryReserveExternalPathMutationAsync(
+            shareId, "lost", "event", TimeSpan.FromMinutes(2)));
+        time.Set(start + TimeSpan.FromMinutes(1));
+        Assert.True(await coordinator.TryReserveExternalPathMutationAsync(
+            shareId, "a", "b", TimeSpan.FromMinutes(2)));
+        await coordinator.CompleteExternalPathMutationAsync(shareId, "a", "b");
+
+        // "lost" never completes; once it expires the share is free again.
+        time.Set(start + TimeSpan.FromMinutes(3));
+        var sync = await coordinator.TryBeginSyncAsync(shareId, "folder");
+        Assert.NotNull(sync);
+        await sync.DisposeAsync();
+    }
+
     private DatabaseCloudSyncOperationCoordinator CreateCoordinator()
         => new(DbFactory, TimeProvider.System);
 }

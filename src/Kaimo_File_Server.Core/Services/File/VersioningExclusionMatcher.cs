@@ -77,8 +77,18 @@ public sealed class VersioningExclusionMatcher
             var c = glob[i];
             if (c == '*' && i + 1 < glob.Length && glob[i + 1] == '*')
             {
-                sb.Append(".*");
-                i++;
+                // "**/" matches zero or more folders (as in gitignore), so "**/x/**" also
+                // matches x directly at the share root.
+                if (i + 2 < glob.Length && glob[i + 2] == '/')
+                {
+                    sb.Append("(?:.*/)?");
+                    i += 2;
+                }
+                else
+                {
+                    sb.Append(".*");
+                    i++;
+                }
             }
             else if (c == '*') sb.Append("[^/]*");
             else if (c == '?') sb.Append("[^/]");

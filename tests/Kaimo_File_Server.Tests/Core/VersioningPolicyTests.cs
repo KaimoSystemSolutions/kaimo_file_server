@@ -11,17 +11,41 @@ public class VersioningPolicyTests
         var policy = VersioningPolicy.Default();
 
         Assert.True(policy.Enabled);
-        Assert.Equal(512L * 1024 * 1024, policy.MaxFileSizeBytes);
+        Assert.Equal(256L * 1024 * 1024, policy.MaxFileSizeBytes);
         Assert.True(policy.ThinningEnabled);
         Assert.Equal(24, policy.KeepAllHours);
-        Assert.Equal(7, policy.HourlyForDays);
+        Assert.Equal(2, policy.HourlyForDays);
         Assert.Equal(30, policy.DailyForDays);
         Assert.Equal(100, policy.MaxVersionsPerFile);
         Assert.Equal(90, policy.MaxAgeDays);
-        Assert.Equal(15, policy.PoolBudgetPercent);
+        Assert.Equal(10, policy.PoolBudgetPercent);
         Assert.Contains("~$*", policy.ExcludePatterns);
-        Assert.Contains("*.tmp", policy.ExcludePatterns);
+        // Write-once bulk data (video, disk images, archives, installers) is excluded:
+        // snapshots are taken after a write, so every versioned file is stored twice.
+        Assert.Contains("*.mp4", policy.ExcludePatterns);
+        Assert.Contains("*.iso", policy.ExcludePatterns);
+        Assert.Contains("*.zip", policy.ExcludePatterns);
+        Assert.Contains("*.exe", policy.ExcludePatterns);
+        // Safe-save editors (Word, LibreOffice) and browsers write the new content to a
+        // temporary name and rename it into place; excluding those names loses the version.
+        Assert.DoesNotContain("*.tmp", policy.ExcludePatterns);
+        Assert.DoesNotContain("*.part", policy.ExcludePatterns);
+        Assert.DoesNotContain("*.crdownload", policy.ExcludePatterns);
         Assert.Contains(".~lock.*#", policy.ExcludePatterns);
+    }
+
+    [Fact]
+    public void Default_ThinningFitsWithinTheVersionCap()
+    {
+        // A file saved at least hourly must keep its daily and weekly tiers: keep-all
+        // (24) + hourly + daily + weekly slots up to MaxAgeDays stay within the cap.
+        var p = VersioningPolicy.Default();
+        var slots = p.KeepAllHours
+            + (p.HourlyForDays * 24 - p.KeepAllHours)
+            + (p.DailyForDays - p.HourlyForDays)
+            + (p.MaxAgeDays - p.DailyForDays + 6) / 7;
+
+        Assert.True(slots <= p.MaxVersionsPerFile, $"{slots} slots exceed the cap of {p.MaxVersionsPerFile}.");
     }
 
     [Fact]

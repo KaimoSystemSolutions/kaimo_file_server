@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
+using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Core.Services.File;
 
@@ -58,13 +59,15 @@ public partial class FileService
         // Snapshot the current content first so restoring is itself undoable.
         // Content-addressable dedup skips this if it equals the latest version. When the
         // policy or a full pool prevents the snapshot, the overwrite would destroy the
-        // current content for good, so it needs the caller's explicit consent.
+        // current content for good, so it needs the caller's explicit consent, unless
+        // that content already is the newest version.
         if (await _storage.ExistsAsync(normalized))
         {
             await using var current = await _storage.ReadAsync(normalized, preserveAccessTime: true);
             var capture = await _versionService.CaptureVersionAsync(
                 _shareId, normalized, current, user.User.Id.ToString());
-            if (!capture.PreservesContent && !allowWithoutBackup)
+            if (!capture.PreservesContent && !allowWithoutBackup
+                && !await _versionService.IsNewestVersionAsync(_shareId, normalized, current))
                 throw new VersionBackupUnavailableException(capture.Outcome);
         }
 
@@ -74,6 +77,19 @@ public partial class FileService
         // untouched.
         await using var restored = await _versionService.ReadVersionAsync(_shareId, normalized, snapshotTimestampUtc);
         await _storage.WriteAsync(normalized, restored);
+
+        // Retention treats the newest version as the live content: snapshot the restored
+        // content (a new row sharing the existing blob) so it is not thinned away.
+        try
+        {
+            restored.Position = 0;
+            await _versionService.CaptureVersionAsync(_shareId, normalized, restored, user.User.Id.ToString());
+        }
+        catch (Exception ex)
+        {
+            // The live file is already restored; reporting the restore as failed would mislead.
+            _logger.LogWarning(ex, "Restored '{Path}' but could not snapshot the restored content.", normalized);
+        }
 
         await AppendFileUpsertAsync(FileChangeType.Modified, normalized);
 

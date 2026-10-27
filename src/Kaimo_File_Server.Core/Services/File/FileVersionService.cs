@@ -68,6 +68,7 @@ public partial class FileVersionService : IFileVersionService
     private readonly IVersionStorageLocator? _locator;
     private readonly Func<string, (long Free, long Total)> _diskSpace;
     private readonly IVersioningPolicyProvider? _policyProvider;
+    private readonly RecentVersionRenames _recentRenames;
 
     /// <param name="versionStorageRoot">
     /// The blob store without a <paramref name="storageLocator"/>; with one, the legacy
@@ -80,6 +81,9 @@ public partial class FileVersionService : IFileVersionService
     /// The global <see cref="VersioningPolicy"/>. Without one, every file is versioned and
     /// only <paramref name="defaultMaxVersions"/>/<paramref name="defaultMaxAge"/> apply.
     /// </param>
+    /// <param name="recentRenames">
+    /// Process-wide rename memory for safe-save sequences; a private one without it.
+    /// </param>
     public FileVersionService(
         IFileVersionRepository versionRepo,
         string versionStorageRoot,
@@ -89,9 +93,11 @@ public partial class FileVersionService : IFileVersionService
         ILogger<FileVersionService>? logger = null,
         IVersionStorageLocator? storageLocator = null,
         Func<string, (long Free, long Total)>? diskSpaceProbe = null,
-        IVersioningPolicyProvider? policyProvider = null)
+        IVersioningPolicyProvider? policyProvider = null,
+        RecentVersionRenames? recentRenames = null)
     {
         _policyProvider = policyProvider;
+        _recentRenames = recentRenames ?? new RecentVersionRenames();
         _versionRepo = versionRepo;
         _versionStorageRoot = versionStorageRoot;
         _defaultMaxVersions = defaultMaxVersions;
@@ -387,8 +393,25 @@ public partial class FileVersionService : IFileVersionService
         var newNormalized = ShareRelativePath.Normalize(newPath);
         if (string.Equals(oldNormalized, newNormalized, StringComparison.Ordinal)) return;
 
-        var displaced = await _versionRepo.RenamePathAsync(
-            shareId, oldNormalized, newNormalized, sambaLifecycleEventId);
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var displaced = new List<FileVersion>();
+
+        // Safe-save (Word): the target name's history was just moved aside with the original
+        // document. Bring it back first, so the new content lands on top of it. Files only:
+        // a folder moved aside keeps its contents, and with them its history.
+        if (_recentRenames.MovedAwayTo(shareId, newNormalized, now) is { } movedAside
+            && !string.Equals(movedAside, oldNormalized, StringComparison.Ordinal)
+            && (await _versionRepo.GetVersionsAsync(shareId, movedAside)).Count > 0)
+        {
+            displaced.AddRange(await _versionRepo.RenamePathAsync(shareId, movedAside, newNormalized));
+            _logger.LogDebug(
+                "Safe-save detected: history of {Path} returned from {MovedAside}.", newNormalized, movedAside);
+        }
+        _recentRenames.Forget(shareId, newNormalized);
+
+        displaced.AddRange(await _versionRepo.RenamePathAsync(
+            shareId, oldNormalized, newNormalized, sambaLifecycleEventId));
+        _recentRenames.Record(shareId, oldNormalized, newNormalized, now);
         await DeleteUnreferencedBlobsAsync(displaced);
     }
 

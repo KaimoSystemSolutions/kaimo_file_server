@@ -7742,7 +7742,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Ausgeschlossene Dateien</value>
   </data>
   <data name="Web_VersioningSettings_PatternsHint" xml:space="preserve">
-    <value>Ein Muster pro Zeile. * steht für beliebige Zeichen, ? für ein Zeichen, ** auch über Ordnergrenzen hinweg. Ohne / wird der Dateiname geprüft, mit / der Pfad innerhalb des Shares. Groß- und Kleinschreibung wird ignoriert.</value>
+    <value>Ein Muster pro Zeile. * steht für beliebige Zeichen, ? für ein Zeichen, ** auch über Ordnergrenzen hinweg. Ohne / wird der Dateiname geprüft, mit / der Pfad innerhalb des Shares. Groß- und Kleinschreibung wird ignoriert. Temporäre Dateien wie *.tmp nicht ausschließen: Office und viele andere Programme speichern in eine temporäre Datei und benennen sie dann um, sodass das Dokument keine Version erhielte.</value>
   </data>
   <data name="Web_VersioningSettings_DefaultPatterns" xml:space="preserve">
     <value>Standardmuster wiederherstellen</value>
@@ -7787,7 +7787,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Speicherbudget</value>
   </data>
   <data name="Web_VersioningSettings_BudgetDescription" xml:space="preserve">
-    <value>Versionen liegen im Speicherpool ihres Shares. Belegen sie mehr als diesen Anteil eines Pools, werden die ältesten Versionen zuerst entfernt.</value>
+    <value>Versionen liegen im Speicherpool ihres Shares. Belegen ältere Versionen mehr als diesen Anteil eines Pools, werden die ältesten zuerst entfernt. Die neueste Version jeder Datei entspricht ihrem aktuellen Inhalt und zählt nicht mit.</value>
   </data>
   <data name="Web_VersioningSettings_Budget" xml:space="preserve">
     <value>Max. Anteil eines Pools (%)</value>

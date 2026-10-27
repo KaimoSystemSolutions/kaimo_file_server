@@ -35,6 +35,7 @@ public sealed class VersioningPolicyStore(
                 using var scope = scopeFactory.CreateScope();
                 var config = scope.ServiceProvider.GetRequiredService<IConfigRepository>();
                 var loaded = await config.GetFreshAsync(VersioningPolicy.ConfigKey, VersioningPolicy.Default());
+                loaded.UpgradeStored();
                 loaded.Normalize();
                 _current = loaded;
             }
@@ -59,6 +60,7 @@ public sealed class VersioningPolicyStore(
     {
         var normalized = policy.Clone();
         normalized.Normalize();
+        normalized.Revision = VersioningPolicy.CurrentRevision;
 
         using (var scope = scopeFactory.CreateScope())
         {

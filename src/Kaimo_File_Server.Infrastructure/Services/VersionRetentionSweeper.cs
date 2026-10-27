@@ -11,10 +11,11 @@ namespace Kaimo_File_Server.Infrastructure.Services;
 /// <list type="number">
 /// <item>removes rows of legacy (<see cref="Guid.Empty"/>) and deleted shares;</item>
 /// <item>removes the history of files that no longer exist (missed cleanups, deletions
-/// outside the server) once it is older than <see cref="OrphanGrace"/>;</item>
+/// outside the server) once they have been missing for <see cref="OrphanGrace"/>;</item>
 /// <item>applies thinning, age and count rules (<see cref="VersionRetentionPlanner"/>);</item>
-/// <item>brings every pool back under <see cref="VersioningPolicy.PoolBudgetPercent"/> by
-/// removing its oldest versions, never the newest version of a file.</item>
+/// <item>brings the older versions of every pool back under
+/// <see cref="VersioningPolicy.PoolBudgetPercent"/> by removing the oldest first; the newest
+/// version of a file is neither counted nor removed.</item>
 /// </list>
 /// Run by <see cref="VersionStorageReconcilerService"/> in the Host only (single owner).
 /// </summary>
@@ -29,8 +30,11 @@ public sealed class VersionRetentionSweeper(
     Func<string, (long Free, long Total)>? diskSpaceProbe = null,
     int pageSize = 500)
 {
-    /// <summary>A missing file's history survives this long, covering renames still in flight.</summary>
-    public static readonly TimeSpan OrphanGrace = TimeSpan.FromHours(1);
+    /// <summary>
+    /// A missing file's history survives this long after a sweep first finds the file
+    /// missing, so deletions outside the server stay recoverable for a while.
+    /// </summary>
+    public static readonly TimeSpan OrphanGrace = TimeSpan.FromDays(7);
 
     // Mass orphaning looks like a mount problem rather than a real deletion: hold off.
     private const int MassOrphanMinPaths = 100;
@@ -52,6 +56,7 @@ public sealed class VersionRetentionSweeper(
             if (share is null)
             {
                 foreign += await versionService.DeleteShareAsync(shareId);
+                await versions.ReplaceMissingSinceAsync(shareId, new Dictionary<string, DateTime>(), ct);
                 continue;
             }
 
@@ -74,9 +79,15 @@ public sealed class VersionRetentionSweeper(
     {
         var now = _time.GetUtcNow().UtcDateTime;
         var rootUsable = IsShareRootUsable(share.Path);
+        // Orphans wait for the mass-orphan check at the end; retention deletes page by page,
+        // so neither list grows with the size of the share.
         var orphanIds = new List<Guid>();
-        var retentionIds = new List<Guid>();
-        int scannedPaths = 0, orphanPaths = 0;
+        var orphanedPaths = new List<string>();
+        int scannedPaths = 0, retention = 0;
+        // When each file was first found missing, persisted so a restart keeps the clock.
+        // Rebuilt every pass: paths found again (or skipped with an unusable root) start over.
+        var previouslyMissing = await versions.GetMissingSinceAsync(share.Id, ct);
+        var stillMissing = new Dictionary<string, DateTime>(StringComparer.Ordinal);
 
         string? cursor = null;
         while (true)
@@ -85,28 +96,37 @@ public sealed class VersionRetentionSweeper(
             if (page.Count == 0) break;
             cursor = page[^1];
 
+            var histories = (await versions.GetVersionsForPathsAsync(share.Id, page, ct))
+                .ToLookup(v => v.FilePath, StringComparer.Ordinal);
+            var retentionIds = new List<Guid>();
             foreach (var path in page)
             {
                 ct.ThrowIfCancellationRequested();
-                var history = await versions.GetVersionsAsync(share.Id, path);
+                var history = histories[path].ToList();
                 if (history.Count == 0) continue;
                 scannedPaths++;
 
-                if (rootUsable
-                    && history.Max(v => v.SnapshotTimestampUtc) < now - OrphanGrace
-                    && !FileExists(share.Path, path))
+                if (rootUsable && !FileExists(share.Path, path))
                 {
-                    orphanPaths++;
-                    orphanIds.AddRange(history.Select(v => v.Id));
-                    continue;
+                    var since = previouslyMissing.GetValueOrDefault(path, now);
+                    stillMissing[path] = since;
+                    // The snapshot check covers a file recreated and removed again between passes.
+                    if (since <= now - OrphanGrace && history.Max(v => v.SnapshotTimestampUtc) < now - OrphanGrace)
+                    {
+                        orphanedPaths.Add(path);
+                        orphanIds.AddRange(history.Select(v => v.Id));
+                        continue;
+                    }
                 }
 
                 retentionIds.AddRange(VersionRetentionPlanner.SelectForDeletion(history, policy, now).Select(v => v.Id));
             }
 
+            retention += await DeleteInBatchesAsync(retentionIds);
             if (page.Count < pageSize) break;
         }
 
+        var orphanPaths = orphanedPaths.Count;
         if (orphanPaths >= MassOrphanMinPaths && orphanPaths >= scannedPaths * MassOrphanRatio)
         {
             logger.LogWarning(
@@ -115,10 +135,24 @@ public sealed class VersionRetentionSweeper(
                 orphanPaths, scannedPaths, share.Name);
             orphanIds.Clear();
         }
+        else
+        {
+            // Their history goes now, so there is nothing left to wait for.
+            foreach (var path in orphanedPaths) stillMissing.Remove(path);
+        }
 
-        var orphans = await versionService.DeleteVersionsAsync(orphanIds);
-        var retention = await versionService.DeleteVersionsAsync(retentionIds);
+        var orphans = await DeleteInBatchesAsync(orphanIds);
+        await versions.ReplaceMissingSinceAsync(share.Id, stillMissing, ct);
         return (orphans, retention);
+    }
+
+    /// <summary>Deletes at most <c>pageSize</c> rows per call: one bounded context and transaction each.</summary>
+    private async Task<int> DeleteInBatchesAsync(List<Guid> ids)
+    {
+        var removed = 0;
+        foreach (var chunk in ids.Chunk(pageSize))
+            removed += await versionService.DeleteVersionsAsync(chunk);
+        return removed;
     }
 
     /// <summary>
@@ -186,7 +220,14 @@ public sealed class VersionRetentionSweeper(
         string root, List<Guid> shareIds, VersioningPolicy policy, CancellationToken ct)
     {
         var budget = (long)(_diskSpace(root).Total * (policy.PoolBudgetPercent / 100.0));
-        var used = BlobBytes(root);
+
+        // Only history counts: the newest version of a file duplicates live content and can
+        // never be pruned, and unreferenced leftovers are reconciliation's job. Counting
+        // either would prune every history once the live data alone exceeds the budget.
+        var historyBlobs = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (var storagePath in await versions.GetHistoryOnlyStoragePathsAsync(shareIds, ct))
+            historyBlobs[storagePath] = BlobSize(root, storagePath);
+        var used = historyBlobs.Values.Sum();
         var removed = 0;
 
         while (used > budget)
@@ -202,23 +243,26 @@ public sealed class VersionRetentionSweeper(
             }
 
             // Oldest first, only as many as the excess needs (shared blobs may free less).
-            var batch = new List<FileVersion>();
-            var sizes = new Dictionary<string, long>(StringComparer.Ordinal);
+            var batch = new List<Guid>();
+            var touched = new HashSet<string>(StringComparer.Ordinal);
             long expected = 0;
             foreach (var candidate in candidates)
             {
-                batch.Add(candidate);
-                if (!sizes.ContainsKey(candidate.StoragePath))
-                {
-                    var size = BlobSize(root, candidate.StoragePath);
-                    sizes[candidate.StoragePath] = size;
-                    expected += size;
-                }
+                batch.Add(candidate.Id);
+                if (touched.Add(candidate.StoragePath))
+                    expected += historyBlobs.GetValueOrDefault(candidate.StoragePath);
                 if (expected >= used - budget) break;
             }
 
-            removed += await versionService.DeleteVersionsAsync(batch.Select(v => v.Id).ToList());
-            used -= sizes.Where(s => !File.Exists(Path.Combine(root, s.Key))).Sum(s => s.Value);
+            removed += await DeleteInBatchesAsync(batch);
+            foreach (var storagePath in touched)
+            {
+                if (historyBlobs.TryGetValue(storagePath, out var size) && !File.Exists(Path.Combine(root, storagePath)))
+                {
+                    used -= size;
+                    historyBlobs.Remove(storagePath);
+                }
+            }
         }
 
         return removed;
@@ -229,10 +273,6 @@ public sealed class VersionRetentionSweeper(
         var info = new FileInfo(Path.Combine(root, storagePath));
         return info.Exists ? info.Length : 0;
     }
-
-    private static long BlobBytes(string root)
-        => Directory.EnumerateFiles(root, "*.bin.gz", SearchOption.AllDirectories)
-            .Sum(f => new FileInfo(f).Length);
 
     private static (long Free, long Total) ProbeDiskSpace(string path)
     {

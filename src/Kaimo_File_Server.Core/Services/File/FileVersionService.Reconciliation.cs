@@ -121,11 +121,24 @@ public partial class FileVersionService
         }
     }
 
-    /// <summary>Removes write/read temp files a crashed process left behind.</summary>
+    /// <summary>
+    /// Removes write/read temp files a crashed process left behind. A blob parked by an
+    /// interrupted garbage collection may still be referenced: it goes back instead (parking
+    /// keeps the blob's old timestamp, so it is "stale" right away).
+    /// </summary>
     private void DeleteStaleTempFiles(string root, DateTime olderThanUtc)
     {
         foreach (var file in Directory.EnumerateFiles(root, "*.tmp", SearchOption.AllDirectories).ToList())
         {
+            if (OriginalOfParkedBlob(file) is { } original)
+            {
+                var blobLock = GetBlobLock(Path.GetFullPath(original));
+                if (!blobLock.Wait(0)) continue; // collection in progress in this process
+                try { RestoreOrDeleteParkedBlob(file, original); }
+                finally { blobLock.Release(); }
+                continue;
+            }
+
             try
             {
                 if (System.IO.File.GetLastWriteTimeUtc(file) < olderThanUtc)

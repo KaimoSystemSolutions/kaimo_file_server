@@ -79,15 +79,19 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
 
         Guid leaseId = Guid.NewGuid();
         DateTimeOffset now = timeProvider.GetUtcNow();
+        string normalizedOld = ShareRelativePath.Normalize(oldPath);
+        string normalizedNew = ShareRelativePath.Normalize(newPath);
+        DateTimeOffset expiresAt = now.Add(lifetime);
         return await TryAcquireAsync(
             shareId,
             new LeasePayload(
                 leaseId,
                 LeaseKind.ExternalPathMutation,
-                ShareRelativePath.Normalize(oldPath),
-                ShareRelativePath.Normalize(newPath),
-                now.Add(lifetime),
-                now),
+                normalizedOld,
+                normalizedNew,
+                expiresAt,
+                now,
+                [new ExternalReservation(normalizedOld, normalizedNew, expiresAt)]),
             cancellationToken);
     }
 
@@ -100,20 +104,35 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
         string normalizedOld = ShareRelativePath.Normalize(oldPath);
         string normalizedNew = ShareRelativePath.Normalize(newPath);
         string key = GetKey(shareId);
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var setting = await db.ConfigSettings.AsNoTracking()
-            .SingleOrDefaultAsync(entry => entry.Key == key, cancellationToken);
-        if (setting is null || !TryParse(setting.Value, out var payload) ||
-            payload.Kind != LeaseKind.ExternalPathMutation ||
-            !string.Equals(
-                payload.OldPath, normalizedOld,
-                StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(
-                payload.NewPath, normalizedNew,
-                StringComparison.OrdinalIgnoreCase))
-            return;
+        // Concurrent SMB renames share the row; a lost compare-and-swap is retried on the
+        // fresh value. Giving up only leaves the reservation to expire after its lifetime.
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            var setting = await db.ConfigSettings.AsNoTracking()
+                .SingleOrDefaultAsync(entry => entry.Key == key, cancellationToken);
+            if (setting is null || !TryParse(setting.Value, out var payload) ||
+                payload.Kind != LeaseKind.ExternalPathMutation)
+                return;
 
-        await DeleteIfUnchangedAsync(db, key, setting.Value, cancellationToken);
+            var reservations = ExternalReservationsOf(payload);
+            var remaining = reservations
+                .Where(entry => !entry.Matches(normalizedOld, normalizedNew))
+                .ToList();
+            if (remaining.Count == reservations.Count)
+                return;
+
+            DateTimeOffset now = timeProvider.GetUtcNow();
+            remaining.RemoveAll(entry => entry.ExpiresAt <= now);
+            int changed = remaining.Count == 0
+                ? await DeleteIfUnchangedAsync(db, key, setting.Value, cancellationToken)
+                : await ReplaceIfUnchangedAsync(
+                    db, key, setting.Value,
+                    JsonSerializer.Serialize(WithReservations(payload, remaining)),
+                    now, cancellationToken);
+            if (changed == 1)
+                return;
+        }
     }
 
     private async Task<ICloudSyncOperationLease?> TryBeginRenewableAsync(
@@ -210,20 +229,23 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
 
         if (leaseAlive)
         {
-            bool renewsSameExternalReservation =
-                existing!.Kind == LeaseKind.ExternalPathMutation &&
-                requested.Kind == LeaseKind.ExternalPathMutation &&
-                string.Equals(
-                    existing.OldPath, requested.OldPath,
-                    StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(
-                    existing.NewPath, requested.NewPath,
-                    StringComparison.OrdinalIgnoreCase);
-            if (!renewsSameExternalReservation)
+            // SMB renames only exclude syncs and Kaimo's own mutations, not each other:
+            // Word's safe-save authorizes its next rename before the previous rename's
+            // event has completed. Further reservations join the row (renewing their own
+            // entry); the share stays busy until the last one completes or expires.
+            if (existing!.Kind != LeaseKind.ExternalPathMutation ||
+                requested.Kind != LeaseKind.ExternalPathMutation)
             {
                 await transaction.RollbackAsync(cancellationToken);
                 return false;
             }
+
+            var joined = ExternalReservationsOf(existing)
+                .Where(entry => entry.ExpiresAt > now &&
+                    !entry.Matches(requested.OldPath, requested.NewPath))
+                .Concat(ExternalReservationsOf(requested))
+                .ToList();
+            requested = WithReservations(requested, joined);
         }
 
         if (setting is null)
@@ -330,6 +352,40 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
         => db.ConfigSettings
             .Where(entry => entry.Key == key && entry.Value == expectedValue)
             .ExecuteDeleteAsync(cancellationToken);
+
+    private static Task<int> ReplaceIfUnchangedAsync(
+        ApplicationDbContext db,
+        string key,
+        string expectedValue,
+        string newValue,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        DateTime updatedAt = now.UtcDateTime;
+        return db.ConfigSettings
+            .Where(entry => entry.Key == key && entry.Value == expectedValue)
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(entry => entry.Value, newValue)
+                .SetProperty(entry => entry.UpdatedAt, updatedAt),
+                cancellationToken);
+    }
+
+    /// <summary>
+    /// The SMB renames an external payload holds. A payload written before
+    /// <see cref="LeasePayload.Reservations"/> existed holds exactly its own paths.
+    /// </summary>
+    private static IReadOnlyList<ExternalReservation> ExternalReservationsOf(LeasePayload payload)
+        => payload.Reservations ??
+           [new ExternalReservation(payload.OldPath, payload.NewPath, payload.ExpiresAt)];
+
+    /// <summary>The row expires with its longest-living reservation.</summary>
+    private static LeasePayload WithReservations(
+        LeasePayload payload, IReadOnlyList<ExternalReservation> reservations)
+        => payload with
+        {
+            ExpiresAt = reservations.Max(entry => entry.ExpiresAt),
+            Reservations = reservations
+        };
 
     // A competing acquisition, not a broken connection: serialization failure or duplicate
     // key (SaveChanges wraps them in DbUpdateException). Other database errors, transient
@@ -506,5 +562,17 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
         string OldPath,
         string? NewPath,
         DateTimeOffset ExpiresAt,
-        DateTimeOffset CreatedAt = default);
+        DateTimeOffset CreatedAt = default,
+        IReadOnlyList<ExternalReservation>? Reservations = null);
+
+    /// <summary>One SMB rename between its authorization and its completed event.</summary>
+    internal sealed record ExternalReservation(
+        string OldPath,
+        string? NewPath,
+        DateTimeOffset ExpiresAt)
+    {
+        public bool Matches(string oldPath, string? newPath)
+            => string.Equals(OldPath, oldPath, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(NewPath, newPath, StringComparison.OrdinalIgnoreCase);
+    }
 }

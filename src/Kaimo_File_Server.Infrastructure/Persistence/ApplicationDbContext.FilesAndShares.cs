@@ -97,6 +97,13 @@ public partial class ApplicationDbContext
             entity.HasIndex(e => e.StoragePath);
         });
 
+        modelBuilder.Entity<FileVersionMissingPath>(entity =>
+        {
+            entity.ToTable("file_version_missing_paths");
+            entity.HasKey(e => new { e.ShareId, e.FilePath });
+            entity.Property(e => e.FilePath).HasMaxLength(1000);
+        });
+
         modelBuilder.Entity<SambaLifecycleEventReceipt>(entity =>
         {
             entity.ToTable("samba_lifecycle_event_receipts");

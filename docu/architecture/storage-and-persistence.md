@@ -136,24 +136,49 @@ Implemented by `FileVersionService` (`src/Kaimo_File_Server.Core/Services/File/F
   Web, SMB bridge and Host converge without a restart.
 - **What is versioned.** `CaptureVersionAsync` checks, before hashing: the global switch, the exclusion
   patterns (globs, case-insensitive; without `/` matched against the file name, with `/` against the
-  share-relative path; defaults cover Office lock files, temp and partial downloads, `Thumbs.db`,
-  `.DS_Store`, `desktop.ini`) and the size limit (default 512 MB, 0 = unlimited). Files pulled in by an
-  external-storage sync do not create versions.
+  share-relative path; `**/` matches zero or more folders, so `**/node_modules/**` also hits the share root; defaults cover Office/LibreOffice lock files, editor swap files, `Thumbs.db`,
+  `.DS_Store`, `desktop.ini`, plus write-once bulk data: video, disk images, archives, executables and
+  installers, which would otherwise be stored twice) and the size limit (default 256 MB, 0 = unlimited). Files pulled in by an
+  external-storage sync do not create versions. Temporary names (`*.tmp`, `*.part`, …) are
+  deliberately not excluded: safe-save editors and browsers write the new content under such a name and
+  rename it into place, and the history moves with the rename.
+- **Renames and safe-save.** History follows a rename. When the destination already has history (a
+  replace-style rename), `VersionHistoryMerge` merges both instead of discarding the destination's:
+  versions are renumbered by time, a destination row in the same second as a moved row is displaced,
+  and if the replaced file had newer rows, a copy of the moved content's newest row (sharing its blob)
+  becomes the newest version, so retention keeps protecting the live content. This keeps the history of
+  editors that rename a temporary file over the document (LibreOffice and others). Word and Excel instead
+  move the document aside first (`report.docx → ~WRL0001.tmp`, then `~WRD0000.tmp → report.docx`, then
+  delete the moved-aside file): `RecentVersionRenames` remembers for 30 s where a file's history went,
+  and a rename onto that name brings the history back before the new content lands on top. It applies
+  to files only and lives per process (a save sequence arrives through one transport).
 - **Retention.** `VersionRetentionPlanner` keeps every version of the last 24 h, then one per hour up to
-  7 days, one per day up to 30 days and one per week after that; hard limits are 100 versions and
-  90 days per file (all configurable). The newest version of an existing file is never removed by any
+  2 days, one per day up to 30 days and one per week after that; hard limits are 100 versions and
+  90 days per file (all configurable). With these defaults a file saved hourly keeps about 85 versions,
+  so the cap never cuts the daily and weekly tiers. The newest version of an existing file is never removed by any
   rule, because snapshots are taken after a write and it is the only copy of the current content.
 - **Space guard.** A version is skipped (never the file operation itself) when writing the blob would
   leave less than `max(2 GiB, 5 %)` free in the pool. A restore whose current content cannot be kept as
-  a version is refused (`VersionBackupUnavailableException`) unless the user confirms it a second time.
+  a version is refused (`VersionBackupUnavailableException`) unless that content already is the newest
+  intact version (`IsNewestVersionAsync`) or the user confirms it a second time. After the write the
+  restored content is snapshotted again (a new newest row sharing the existing blob), so retention never
+  thins away the version that is now live.
 - **Retention sweep.** `VersionStorageReconcilerService` (Host only) runs every 6 h. It first runs
   `VersionRetentionSweeper`: removes legacy rows without a share and rows of deleted shares, applies the
-  policy to unchanged files, removes histories of files that no longer exist (after a 1 h grace, and
-  never while the share root is missing or empty), and enforces the pool budget (default 15 % of the
-  pool capacity) by pruning the oldest non-newest versions. It then moves blobs from the legacy location
+  policy to unchanged files page by page (one query per page of paths, deletes in bounded batches),
+  removes histories of files that no longer exist (7 days after a sweep first finds the file missing,
+  recorded in `file_version_missing_paths` so the grace period survives restarts; never while the share
+  root is missing or empty), and enforces the pool budget (default 10 % of the
+  pool capacity) by pruning the oldest non-newest versions. Only blobs referenced solely by older
+  versions count against the budget; the newest version of each file mirrors live content and
+  unreferenced leftovers are reconciliation's job. Restic restores with "Overwrite" restore beside the
+  live file only when that file's content cannot be versioned (excluded, too large, low space); shares
+  without versioning (outside every pool, versioning off) are overwritten as chosen. It then moves blobs from the legacy location
   `<appdata>/.versions` into their pools and follows shares that moved to another pool.
 - **Blob collection across processes.** Before deleting a blob, the collector moves it aside and checks
-  the references again; a version committed by another process in the meantime gets its blob back.
+  the references again; a version committed by another process in the meantime gets its blob back. If
+  that check fails, the parked blob is put back; reconciliation restores parked blobs (`*.gc.tmp`)
+  whose original is missing, e.g. after a crash, instead of deleting them as stale temp files.
 
 ## Snapshot cache
 

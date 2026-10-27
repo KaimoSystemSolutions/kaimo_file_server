@@ -70,8 +70,11 @@ internal sealed class RestoreMerge(
             capture = await versions.CaptureVersionAsync(shareId, relativeDestination, current, userId);
 
         // Overwriting is only safe when the live content stays recoverable from its history;
-        // otherwise (policy, full pool) keep it and restore the backup copy beside it.
-        if (!capture.PreservesContent)
+        // otherwise (excluded, too large, full pool) keep it and restore the backup copy beside
+        // it. A share that is not versioned at all (outside every pool, versioning switched
+        // off) has no history to protect: the explicit "Overwrite" choice applies.
+        if (!capture.PreservesContent
+            && capture.Outcome is not (VersionCaptureOutcome.NoPool or VersionCaptureOutcome.Disabled))
         {
             RestoreBeside(source, relativeDestination, sourceIsDirectory: false);
             return;

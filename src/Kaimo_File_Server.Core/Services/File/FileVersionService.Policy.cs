@@ -1,3 +1,5 @@
+using Kaimo_File_Server.Core.Helpers;
+
 namespace Kaimo_File_Server.Core.Services.File;
 
 public partial class FileVersionService
@@ -17,6 +19,25 @@ public partial class FileVersionService
         if (policy.MaxFileSizeBytes > 0 && content.Length > policy.MaxFileSizeBytes)
             return VersionCaptureOutcome.TooLarge;
         return null;
+    }
+
+    /// <summary>
+    /// Whether the content is already the newest version with an intact blob. Hashes the
+    /// content, so it is meant for rare callers (restore), not the write path.
+    /// </summary>
+    public async Task<bool> IsNewestVersionAsync(Guid shareId, string filePath, Stream content)
+    {
+        var normalizedPath = ShareRelativePath.Normalize(filePath);
+        content.Position = 0;
+        var hash = await ComputeHashAsync(content);
+        content.Position = 0;
+
+        if (!await _versionRepo.ExistsWithHashAsync(shareId, normalizedPath, hash))
+            return false;
+
+        var blob = FindBlob(await ResolveRootAsync(shareId), HashToPath(hash));
+        return blob is not null
+            && await ValidateBlobAsync(blob.Value.FullPath, hash, content.Length, Stream.Null);
     }
 
     /// <summary>

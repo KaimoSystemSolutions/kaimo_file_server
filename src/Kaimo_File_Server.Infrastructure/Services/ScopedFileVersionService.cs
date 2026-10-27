@@ -45,6 +45,13 @@ namespace Kaimo_File_Server.Infrastructure.Services
             return await svc.CaptureVersionAsync(shareId, filePath, content, userId);
         }
 
+        public async Task<bool> IsNewestVersionAsync(Guid shareId, string filePath, Stream content)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
+            return await svc.IsNewestVersionAsync(shareId, filePath, content);
+        }
+
         public async Task<Stream> ReadVersionAsync(Guid shareId, string filePath, DateTime snapshotTimestampUtc)
         {
             using var scope = _serviceProvider.CreateScope();

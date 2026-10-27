@@ -132,6 +132,7 @@ public partial class FileVersionService
 
         var blobLock = GetBlobLock(fullPath);
         await blobLock.WaitAsync();
+        string? parked = null;
         try
         {
             if (await IsBlobNeededInRootAsync(storageRoot, storagePath)) return false;
@@ -139,8 +140,9 @@ public partial class FileVersionService
             // The blob lock only covers this process. Move the blob aside and check again,
             // so a version row another process committed meanwhile gets its blob back. A
             // writer that already found the blob missing has rewritten it; then the parked
-            // copy is surplus. The ".tmp" suffix lets reconciliation remove crash leftovers.
-            var parked = $"{fullPath}.{Guid.NewGuid():N}.gc.tmp";
+            // copy is surplus. Reconciliation puts back crash leftovers (see
+            // RestoreOrDeleteParkedBlob).
+            parked = ParkedBlobPath(fullPath);
             System.IO.File.Move(fullPath, parked);
             if (await IsBlobNeededInRootAsync(storageRoot, storagePath))
             {
@@ -159,12 +161,52 @@ public partial class FileVersionService
         {
             // The DB is authoritative. Do not turn an already completed user-file
             // operation into a failure when an external process temporarily locks a blob.
+            // Whether the blob is still needed is unknown now, so a parked copy goes back.
+            if (parked is not null)
+                RestoreOrDeleteParkedBlob(parked, fullPath);
             _logger.LogWarning(ex, "Failed to delete unreferenced version blob {StoragePath}", storagePath);
             return false;
         }
         finally
         {
             blobLock.Release();
+        }
+    }
+
+    private const string ParkedBlobSuffix = ".gc.tmp";
+
+    /// <summary>"…/HASH.bin.gz" → "…/HASH.bin.gz.{guid}.gc.tmp".</summary>
+    private static string ParkedBlobPath(string blobFullPath)
+        => $"{blobFullPath}.{Guid.NewGuid():N}{ParkedBlobSuffix}";
+
+    /// <summary>The blob a parked copy belongs to, or <c>null</c> for any other file name.</summary>
+    private static string? OriginalOfParkedBlob(string parkedPath)
+    {
+        // ".{32 hex digits}.gc.tmp"
+        var tailLength = 1 + 32 + ParkedBlobSuffix.Length;
+        if (!parkedPath.EndsWith(ParkedBlobSuffix, StringComparison.Ordinal) || parkedPath.Length <= tailLength)
+            return null;
+        var original = parkedPath[..^tailLength];
+        return original.EndsWith(".bin.gz", StringComparison.Ordinal) ? original : null;
+    }
+
+    /// <summary>
+    /// Puts a parked blob back when its original is missing (a reference may still exist; a
+    /// later collection decides again), otherwise drops the surplus copy. Best effort.
+    /// </summary>
+    private void RestoreOrDeleteParkedBlob(string parkedPath, string originalPath)
+    {
+        try
+        {
+            if (!System.IO.File.Exists(parkedPath)) return;
+            if (System.IO.File.Exists(originalPath))
+                System.IO.File.Delete(parkedPath);
+            else
+                System.IO.File.Move(parkedPath, originalPath, overwrite: false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Could not put back parked version blob {Blob}", parkedPath);
         }
     }
 

@@ -161,6 +161,26 @@ public sealed class PostgresDatabaseCommunicationTests : PostgresTestBase
     }
 
     [PostgresFact]
+    public async Task ConcurrentExternalReservations_BothSucceedAndBothMustComplete()
+    {
+        var shareId = Guid.NewGuid();
+        var first = new DatabaseCloudSyncOperationCoordinator(DbFactory, TimeProvider.System);
+        var second = new DatabaseCloudSyncOperationCoordinator(DbFactory, TimeProvider.System);
+
+        // Word's renames arrive back to back; the serializable race must not deny either.
+        var reserved = await Task.WhenAll(
+            first.TryReserveExternalPathMutationAsync(shareId, "doc.docx", "~WRL0001.tmp", TimeSpan.FromMinutes(2)),
+            second.TryReserveExternalPathMutationAsync(shareId, "~WRD0000.tmp", "doc.docx", TimeSpan.FromMinutes(2)));
+        Assert.Equal([true, true], reserved);
+
+        await Task.WhenAll(
+            first.CompleteExternalPathMutationAsync(shareId, "doc.docx", "~WRL0001.tmp"),
+            second.CompleteExternalPathMutationAsync(shareId, "~WRD0000.tmp", "doc.docx"));
+        await using var db = NewContext();
+        Assert.Empty(await db.ConfigSettings.ToListAsync());
+    }
+
+    [PostgresFact]
     public async Task LeaseRenewal_StatementReplayedAfterLostAck_KeepsTheLease()
     {
         var shareId = Guid.NewGuid();
@@ -189,10 +209,12 @@ public sealed class PostgresDatabaseCommunicationTests : PostgresTestBase
     public async Task RenameWithoutEvent_ReplayedAfterLostCommitAck_KeepsTheMovedHistory()
     {
         var shareId = Guid.NewGuid();
+        var at = new DateTime(2026, 5, 1, 8, 0, 0, DateTimeKind.Utc);
         var version = new FileVersion(
-            shareId, "old.txt", DateTime.UtcNow, "AA/BB/SOURCE.bin.gz", "SOURCE", 10, null, 1);
+            shareId, "old.txt", at, "AA/BB/SOURCE.bin.gz", "SOURCE", 10, null, 1);
+        // Newer than the moved file, so the merge also inserts a live copy of it.
         var replaced = new FileVersion(
-            shareId, "new.txt", DateTime.UtcNow, "CC/DD/TARGET.bin.gz", "TARGET", 10, null, 1);
+            shareId, "new.txt", at.AddMinutes(1), "CC/DD/TARGET.bin.gz", "TARGET", 10, null, 1);
         await using (var db = NewContext())
         {
             db.FileVersions.AddRange(version, replaced);
@@ -202,36 +224,43 @@ public sealed class PostgresDatabaseCommunicationTests : PostgresTestBase
         var displaced = await new FileVersionRepository(FactoryWith(new LoseFirstCommitAcknowledgement()))
             .RenamePathAsync(shareId, "old.txt", "new.txt");
 
-        // Before the fix the replay took the moved versions for displaced ones and deleted them.
-        // The replaced version is still reported, so its blob is removed.
-        Assert.Equal(replaced.Id, Assert.Single(displaced).Id);
+        // The replay re-applies the first attempt's plan by row id: the merged history keeps
+        // every row once and the live copy is not inserted twice.
+        Assert.Empty(displaced);
         await using var assertionDb = NewContext();
-        var remaining = await assertionDb.FileVersions.SingleAsync();
-        Assert.Equal(version.Id, remaining.Id);
-        Assert.Equal("new.txt", remaining.FilePath);
+        var history = await assertionDb.FileVersions.OrderByDescending(v => v.SnapshotTimestampUtc).ToListAsync();
+        Assert.Equal(["SOURCE", "TARGET", "SOURCE"], history.Select(v => v.ContentHash));
+        Assert.All(history, v => Assert.Equal("new.txt", v.FilePath));
+        Assert.Equal([3, 2, 1], history.Select(v => v.VersionNumber));
     }
 
     [PostgresFact]
-    public async Task RenameWithoutEvent_ReplayedAfterRolledBackCommit_RemovesTheDisplacedHistory()
+    public async Task RenameWithoutEvent_ReplayedAfterRolledBackCommit_AppliesTheMergeOnce()
     {
-        // No source versions, only versions of the file the rename replaces.
         var shareId = Guid.NewGuid();
+        var at = new DateTime(2026, 5, 1, 8, 0, 0, DateTimeKind.Utc);
         var replaced = new FileVersion(
-            shareId, "new.txt", DateTime.UtcNow, "CC/DD/TARGET.bin.gz", "TARGET", 10, null, 1);
+            shareId, "new.txt", at, "CC/DD/TARGET.bin.gz", "TARGET", 10, null, 1);
+        var clash = new FileVersion(
+            shareId, "new.txt", at.AddMinutes(1), "EE/FF/CLASH.bin.gz", "CLASH", 10, null, 2);
+        var version = new FileVersion(
+            shareId, "old.txt", at.AddMinutes(1), "AA/BB/SOURCE.bin.gz", "SOURCE", 10, null, 1);
         await using (var db = NewContext())
         {
-            db.FileVersions.Add(replaced);
+            db.FileVersions.AddRange(replaced, clash, version);
             await db.SaveChangesAsync();
         }
 
         var displaced = await new FileVersionRepository(FactoryWith(new FailFirstCommit()))
             .RenamePathAsync(shareId, "old.txt", "new.txt");
 
-        // Before the fix the replay found an empty source, assumed a committed first attempt
-        // and left the replaced file's history attached to the renamed one.
-        Assert.Equal(replaced.Id, Assert.Single(displaced).Id);
+        // Only the row in the same second as a moved one is displaced; the replay after the
+        // rollback applies the same plan again.
+        Assert.Equal(clash.Id, Assert.Single(displaced).Id);
         await using var assertionDb = NewContext();
-        Assert.Empty(await assertionDb.FileVersions.ToListAsync());
+        var history = await assertionDb.FileVersions.OrderBy(v => v.SnapshotTimestampUtc).ToListAsync();
+        Assert.Equal([replaced.Id, version.Id], history.Select(v => v.Id));
+        Assert.Equal([1, 2], history.Select(v => v.VersionNumber));
     }
 
     [PostgresFact]

@@ -16,8 +16,21 @@ public class MockFileVersionRepository : IFileVersionRepository
 {
     private readonly List<FileVersion> _versions = new();
 
+    /// <summary>Ids per <see cref="DeleteByIdsAsync"/> call since the last reset.</summary>
+    public List<int> DeleteByIdsBatchSizes { get; } = [];
+
+    /// <summary><see cref="GetVersionsAsync"/> calls since the last reset.</summary>
+    public int SinglePathHistoryLoads { get; private set; }
+
+    public void ResetCallCounters()
+    {
+        DeleteByIdsBatchSizes.Clear();
+        SinglePathHistoryLoads = 0;
+    }
+
     public Task<List<FileVersion>> GetVersionsAsync(Guid shareId, string filePath)
     {
+        SinglePathHistoryLoads++;
         var result = _versions
             .Where(v => v.ShareId == shareId && v.FilePath == filePath)
             .OrderByDescending(v => v.SnapshotTimestampUtc)
@@ -130,15 +143,19 @@ public class MockFileVersionRepository : IFileVersionRepository
         var newPrefix = newPath + "/";
         var source = _versions.Where(v => v.ShareId == shareId
             && (v.FilePath == oldPath || v.FilePath.StartsWith(oldPrefix))).ToList();
-        var displaced = _versions.Where(v => v.ShareId == shareId
+        var destination = _versions.Where(v => v.ShareId == shareId
             && (v.FilePath == newPath || v.FilePath.StartsWith(newPrefix))
             && !source.Contains(v)).ToList();
-        foreach (var version in displaced) _versions.Remove(version);
-        foreach (var version in source)
-            version.FilePath = version.FilePath == oldPath
-                ? newPath
-                : newPath + version.FilePath.Substring(oldPath.Length);
-        return Task.FromResult(displaced);
+        var plan = VersionHistoryMerge.Plan(oldPath, newPath, source, destination, DateTime.UtcNow);
+
+        foreach (var version in plan.Displaced) _versions.Remove(version);
+        foreach (var version in _versions)
+        {
+            if (plan.NewPaths.TryGetValue(version.Id, out var path)) version.FilePath = path;
+            if (plan.VersionNumbers.TryGetValue(version.Id, out var number)) version.VersionNumber = number;
+        }
+        _versions.AddRange(plan.LiveCopies);
+        return Task.FromResult(plan.Displaced.ToList());
     }
 
     public Task<List<FileVersion>> DeleteShareAsync(Guid shareId)
@@ -157,6 +174,7 @@ public class MockFileVersionRepository : IFileVersionRepository
 
     public Task<List<FileVersion>> DeleteByIdsAsync(IReadOnlyCollection<Guid> ids)
     {
+        DeleteByIdsBatchSizes.Add(ids.Count);
         var removed = _versions.Where(v => ids.Contains(v.Id)).ToList();
         foreach (var version in removed) _versions.Remove(version);
         return Task.FromResult(removed);
@@ -184,6 +202,44 @@ public class MockFileVersionRepository : IFileVersionRepository
             .OrderBy(v => v.SnapshotTimestampUtc)
             .Take(take)
             .ToList());
+
+    public Task<List<FileVersion>> GetVersionsForPathsAsync(
+        Guid shareId, IReadOnlyCollection<string> filePaths, CancellationToken cancellationToken = default)
+        => Task.FromResult(_versions
+            .Where(v => v.ShareId == shareId && filePaths.Contains(v.FilePath))
+            .OrderBy(v => v.FilePath, StringComparer.Ordinal)
+            .ThenByDescending(v => v.SnapshotTimestampUtc)
+            .ToList());
+
+    public Task<List<string>> GetHistoryOnlyStoragePathsAsync(
+        IReadOnlyCollection<Guid> shareIds, CancellationToken cancellationToken = default)
+    {
+        bool IsNewest(FileVersion v) => !_versions.Any(n => n.ShareId == v.ShareId && n.FilePath == v.FilePath
+                                                            && n.SnapshotTimestampUtc > v.SnapshotTimestampUtc);
+        var inShares = _versions.Where(v => shareIds.Contains(v.ShareId)).ToList();
+        var newest = inShares.Where(IsNewest).Select(v => v.StoragePath).ToHashSet(StringComparer.Ordinal);
+        return Task.FromResult(inShares
+            .Where(v => !IsNewest(v) && !newest.Contains(v.StoragePath))
+            .Select(v => v.StoragePath)
+            .Distinct(StringComparer.Ordinal)
+            .ToList());
+    }
+
+    private readonly Dictionary<Guid, Dictionary<string, DateTime>> _missingSince = new();
+
+    public Task<Dictionary<string, DateTime>> GetMissingSinceAsync(
+        Guid shareId, CancellationToken cancellationToken = default)
+        => Task.FromResult(new Dictionary<string, DateTime>(
+            _missingSince.GetValueOrDefault(shareId) ?? [], StringComparer.Ordinal));
+
+    public Task ReplaceMissingSinceAsync(
+        Guid shareId, IReadOnlyDictionary<string, DateTime> missingSince,
+        CancellationToken cancellationToken = default)
+    {
+        if (missingSince.Count == 0) _missingSince.Remove(shareId);
+        else _missingSince[shareId] = new Dictionary<string, DateTime>(missingSince, StringComparer.Ordinal);
+        return Task.CompletedTask;
+    }
 
     public Task<bool> ExistsWithHashAsync(Guid shareId, string filePath, string contentHash)
     {
