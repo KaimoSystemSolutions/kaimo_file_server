@@ -98,7 +98,6 @@ else
             </Tabs>
 
             <div class="settings-content">
-                @if (VM.SuccessMessage is not null) { <div class="success-banner">@VM.SuccessMessage</div> }
                 @if (VM.ErrorMessage is not null) { <div class="error-banner">@VM.ErrorMessage</div> }
 
                 @switch (_activeTab)

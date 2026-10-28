@@ -28,7 +28,8 @@ public sealed class AccessSettingsViewModel(
     IGroupRepository groups,
     IDepartmentRepository departments,
     ClientConnectionInfo client,
-    ILogger<AccessSettingsViewModel> logger)
+    ILogger<AccessSettingsViewModel> logger,
+    ToastService? toasts = null)
 {
     private UserContext? _actor;
     private bool _loaded;
@@ -36,8 +37,9 @@ public sealed class AccessSettingsViewModel(
     public bool IsLoading { get; private set; } = true;
     public bool CanManage { get; private set; }
     public bool IsSaving { get; private set; }
-    public string? SuccessMessage { get; private set; }
-    public string? ErrorMessage { get; private set; }
+    // Also raised as toasts: the tab's banners scroll out of view on long settings pages.
+    public string? SuccessMessage { get; private set { field = value; if (value is not null) toasts?.Show(value, ToastType.Success); } }
+    public string? ErrorMessage { get; private set { field = value; if (value is not null) toasts?.Show(value, ToastType.Error); } }
 
     /// <summary>Address and host of the admin's own connection (shown, and used for the lockout check).</summary>
     public string ClientAddress => client.RemoteAddress ?? "–";

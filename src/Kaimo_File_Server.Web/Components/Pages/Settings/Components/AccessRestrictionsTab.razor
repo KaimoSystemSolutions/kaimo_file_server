@@ -21,7 +21,6 @@ else if (!VM.CanManage)
 }
 else
 {
-    @if (VM.SuccessMessage is not null) { <div class="success-banner">@VM.SuccessMessage</div> }
     @if (VM.ErrorMessage is not null) { <div class="error-banner" role="alert">@VM.ErrorMessage</div> }
 
     <div class="detail-section">

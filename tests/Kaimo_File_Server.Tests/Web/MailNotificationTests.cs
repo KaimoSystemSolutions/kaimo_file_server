@@ -541,7 +541,8 @@ public sealed class MailNotificationTests : DatabaseTestBase
 
     // ───────────────────────── Mail-server settings page ─────────────────────────
 
-    private MailServerSettingsViewModel MailServerVm(ManagementPermission permissions, out ICredentialVault vault)
+    private MailServerSettingsViewModel MailServerVm(ManagementPermission permissions, out ICredentialVault vault,
+        ToastService? toasts = null)
     {
         var actor = SeedMailUser("admin" + Guid.NewGuid().ToString("N")[..6], "admin@example.com");
         var mgmt = new Mock<IManagementAuthService>();
@@ -550,7 +551,22 @@ public sealed class MailNotificationTests : DatabaseTestBase
         vault = new DataProtectionCredentialVault(new EphemeralDataProtectionProvider());
         return new MailServerSettingsViewModel(
             AuthStateFor(actor.Username), UserContextFactoryFor((actor.Username, ContextFor(actor))).Object,
-            mgmt.Object, _smtp, _sender, vault, _composer, NullLogger<MailServerSettingsViewModel>.Instance);
+            mgmt.Object, _smtp, _sender, vault, _composer, NullLogger<MailServerSettingsViewModel>.Instance, toasts);
+    }
+
+    [Fact]
+    public async Task MailServerSettings_SaveFeedback_IsShownAsToast()
+    {
+        var toasts = new ToastService();
+        var vm = MailServerVm(ManagementPermission.ManageMailServer, out _, toasts);
+        await vm.LoadAsync();
+
+        vm.Settings.Host = "smtp.example.test";
+        await vm.SaveAsync();
+
+        var toast = Assert.Single(toasts.Toasts);
+        Assert.Equal(ToastType.Success, toast.Type);
+        Assert.Equal(vm.SuccessMessage, toast.Text);
     }
 
     [Fact]

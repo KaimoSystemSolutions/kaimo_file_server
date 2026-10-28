@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Infrastructure.Notifications;
 using Kaimo_File_Server.Web.Services.Notifications;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
@@ -23,7 +24,8 @@ public sealed class MailServerSettingsViewModel(
     ISmtpMailSender sender,
     ICredentialVault vault,
     NotificationMailComposer composer,
-    ILogger<MailServerSettingsViewModel> logger)
+    ILogger<MailServerSettingsViewModel> logger,
+    ToastService? toasts = null)
 {
     private UserContext? _actor;
 
@@ -45,8 +47,9 @@ public sealed class MailServerSettingsViewModel(
     public string TestAddress { get; set; } = string.Empty;
     public SmtpTestResult? TestResult { get; private set; }
 
-    public string? SuccessMessage { get; private set; }
-    public string? ErrorMessage { get; private set; }
+    // Also raised as toasts: the tab's banners scroll out of view on long settings pages.
+    public string? SuccessMessage { get; private set { field = value; if (value is not null) toasts?.Show(value, ToastType.Success); } }
+    public string? ErrorMessage { get; private set { field = value; if (value is not null) toasts?.Show(value, ToastType.Error); } }
 
     public async Task LoadAsync()
     {

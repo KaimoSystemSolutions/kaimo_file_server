@@ -126,7 +126,6 @@
     <p class="settings-description">@T("Web_Recycle_GlobalDescription", "Deleted items stay in the recycle bin of their share until they are restored or removed. Retention and individual limits are set per share and for home folders.")</p>
     @* Inline feedback: this child re-renders on its own, the page-level banners would stay stale. *@
     @if (_recycleError is not null) { <div class="error-banner">@_recycleError</div> }
-    @if (_recycleSuccess is not null) { <div class="success-banner">@_recycleSuccess</div> }
     <RecycleLimitFields IsGlobalDefault="true"
                         Value="GlobalLimits"
                         OnSave="SaveRecycleDefault" />
@@ -181,7 +180,6 @@
     private static string T(string key, string fallback) => Resources.ResourceManager.GetString(key) ?? fallback;
 
     private string? _recycleError;
-    private string? _recycleSuccess;
 
     private RecycleLimits GlobalLimits => VM.RecycleGlobalMaxSizeBytes > 0
         ? new RecycleLimits(RecycleLimitMode.Custom, VM.RecycleGlobalMaxSizeBytes, null)
@@ -191,7 +189,6 @@
     {
         var ok = await VM.SaveRecycleGlobalMaxSizeAsync(limits.MaxSizeBytes);
         _recycleError = ok ? null : VM.ErrorMessage;
-        _recycleSuccess = ok ? VM.SuccessMessage : null;
     }
 
     // Per-pool inline rename: only one pool edits at a time.

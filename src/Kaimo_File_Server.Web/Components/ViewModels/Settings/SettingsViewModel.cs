@@ -36,6 +36,7 @@ public partial class SettingsViewModel
     private readonly HomeDirectoryService? _homes;
     private readonly DateFormatService? _dateFormat;
     private readonly PoolUsageService? _poolUsage;
+    private readonly ToastService? _toasts;
     private readonly ISystemInfoService _sysInfo;
     private readonly ISearchAdminService _searchAdmin;
     private readonly IShareRepository _shareRepo;
@@ -66,7 +67,8 @@ public partial class SettingsViewModel
         ILogger<SettingsViewModel> logger,
         HomeDirectoryService? homes = null,
         DateFormatService? dateFormat = null,
-        PoolUsageService? poolUsage = null)
+        PoolUsageService? poolUsage = null,
+        ToastService? toasts = null)
     {
         _config = config;
         _mgmtAuth = mgmtAuth;
@@ -86,13 +88,16 @@ public partial class SettingsViewModel
         _homes = homes;
         _dateFormat = dateFormat;
         _poolUsage = poolUsage;
+        _toasts = toasts;
     }
 
     // ── State ──
 
     public bool IsLoading { get; private set; }
-    public string? ErrorMessage { get; private set; }
-    public string? SuccessMessage { get; private set; }
+    // Every non-null message is also raised as a toast: the page banners are out of view once the
+    // settings pane is scrolled down and are not re-rendered when a tab component saves.
+    public string? ErrorMessage { get; private set { field = value; if (value is not null) _toasts?.Show(value, ToastType.Error); } }
+    public string? SuccessMessage { get; private set { field = value; if (value is not null) _toasts?.Show(value, ToastType.Success); } }
 
     // ── Permissions ──
 

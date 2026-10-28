@@ -84,7 +84,11 @@
 
 /* -- Styled file picker (replaces the browser-default file input) -- */
 
+/* position: relative anchors the hidden absolute input inside the label. Without it the
+   input's containing block lies outside the settings scroll pane, so focusing it on click
+   scrolled the whole layout (page jump, MainLayout left scrollable). */
 .file-picker {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 10px;

@@ -3,6 +3,7 @@
 @using Kaimo_File_Server.Web.Services
 @inherits AppComponentBase
 @inject ShareLinkService ShareLinks
+@inject ToastService Toasts
 
 @*
     Settings tab for public share links: the default-domain restriction, the global switch for
@@ -20,10 +21,6 @@
         <span>@T("Web_Settings_Tab_Domains", "Domains")</span>
     </a>
 
-    @if (_saved)
-    {
-        <div class="success-banner">@Resources.Web_ChangesSaved</div>
-    }
     @if (_notPermitted)
     {
         <div class="error-banner">@Resources.Web_Settings_NoPermissionChange</div>
@@ -86,7 +83,6 @@
     private bool _allowDownloadLinks = true;
     private bool _restrictToDefaultDomain = true;
     private long _maxUploadMb = ShareLinkSettings.DefaultMaxUploadFileSizeBytes / Mb;
-    private bool _saved;
     private bool _notPermitted;
 
     private const long Mb = 1024 * 1024;
@@ -107,7 +103,6 @@
 
     private async Task SaveAsync()
     {
-        _saved = false;
         _notPermitted = false;
         try
         {
@@ -121,11 +116,12 @@
                 RestrictToDefaultDomain = _restrictToDefaultDomain,
                 MaxUploadFileSizeBytes = _maxUploadMb * Mb,
             });
-            _saved = true;
+            Toasts.Show(Resources.Web_ChangesSaved, ToastType.Success);
         }
         catch (UnauthorizedAccessException)
         {
             _notPermitted = true;
+            Toasts.Show(Resources.Web_Settings_NoPermissionChange, ToastType.Error);
         }
         Apply(await ShareLinks.GetSettingsAsync());
     }

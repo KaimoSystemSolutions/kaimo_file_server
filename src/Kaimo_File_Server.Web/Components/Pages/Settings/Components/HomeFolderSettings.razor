@@ -9,7 +9,6 @@
     <p class="settings-description">@T("Web_Settings_Homes_Description", "Every user gets a private folder users/<user id> that only they can access. Users see it as \"user\" in the web UI and app; administrators only see its size, status and links.")</p>
     @* Inline feedback: this child re-renders on its own, the page-level banners would stay stale. *@
     @if (_error is not null) { <div class="error-banner">@_error</div> }
-    @if (_success is not null) { <div class="success-banner">@_success</div> }
     @if (VM.HomesPoolPath is not null)
     {
         <div class="homes-fields">
@@ -116,7 +115,6 @@
     private bool _busy;
     private bool _confirmMove;
     private string? _error;
-    private string? _success;
 
     private bool Busy => _busy || VM.IsMovingHomes;
 
@@ -141,7 +139,6 @@
         {
             var ok = await action();
             _error = ok ? null : VM.ErrorMessage;
-            _success = ok ? VM.SuccessMessage : null;
         }
         finally { _busy = false; }
     }

@@ -14,6 +14,7 @@ public class VersioningSettingsTabTests
 {
     private readonly Mock<IVersioningPolicyStore> _store = new();
     private VersioningPolicy? _saved;
+    private readonly ToastService _toasts = new();
 
     private BunitContext CreateContext(VersioningPolicy? stored = null)
     {
@@ -26,6 +27,7 @@ public class VersioningSettingsTabTests
             .Callback<VersioningPolicy>(p => { _saved = p; stored = p; })
             .Returns(Task.CompletedTask);
         ctx.Services.AddSingleton(_store.Object);
+        ctx.Services.AddSingleton(_toasts);
         return ctx;
     }
 
@@ -60,7 +62,22 @@ public class VersioningSettingsTabTests
         Assert.Equal(12, _saved.MaxVersionsPerFile);
         Assert.Equal(25, _saved.PoolBudgetPercent);
         Assert.Equal(["*.bak", "*.log"], _saved.ExcludePatterns);
-        Assert.NotEmpty(cut.FindAll(".success-banner"));
+        // Feedback is a toast: an in-tab banner sits above the fold once the page is scrolled down.
+        Assert.Equal(ToastType.Success, Assert.Single(_toasts.Toasts).Type);
+        Assert.Empty(cut.FindAll(".success-banner"));
+    }
+
+    [Fact]
+    public void Save_Failure_ShowsErrorToastAndBanner()
+    {
+        using var ctx = CreateContext();
+        _store.Setup(s => s.SetAsync(It.IsAny<VersioningPolicy>())).ThrowsAsync(new IOException("disk full"));
+        var cut = ctx.Render<VersioningSettingsTab>(p => p.Add(c => c.CanManage, true));
+
+        cut.Find(".versioning-save").Click();
+
+        Assert.Equal(ToastType.Error, Assert.Single(_toasts.Toasts).Type);
+        Assert.NotEmpty(cut.FindAll(".error-banner"));
     }
 
     [Fact]

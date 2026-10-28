@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Services;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 
@@ -12,6 +13,7 @@ public partial class VersioningSettingsTab
 
     [Inject] private IVersioningPolicyStore Store { get; set; } = default!;
     [Inject] private ILogger<VersioningSettingsTab> Logger { get; set; } = default!;
+    [Inject] private ToastService Toasts { get; set; } = default!;
 
     /// <summary>Whether the viewer may change global settings; the page only renders this tab for them.</summary>
     [Parameter] public bool CanManage { get; set; }
@@ -20,7 +22,6 @@ public partial class VersioningSettingsTab
     private long _maxFileSizeMb;
     private string _patternsText = "";
     private bool _busy;
-    private bool _success;
     private string? _error;
 
     private bool Locked => _busy || !CanManage;
@@ -46,7 +47,6 @@ public partial class VersioningSettingsTab
         if (!CanManage) return;
 
         _busy = true;
-        _success = false;
         _error = null;
         try
         {
@@ -57,12 +57,14 @@ public partial class VersioningSettingsTab
             policy.Normalize();
             await Store.SetAsync(policy);
             Apply(await Store.GetAsync());
-            _success = true;
+            // Toast, not a banner: the save button sits far below the tab's top edge.
+            Toasts.Show(T("Web_VersioningSettings_Saved", "Versioning settings saved."), ToastType.Success);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Saving the versioning policy failed");
             _error = T("Web_VersioningSettings_SaveFailed", "The versioning settings could not be saved.");
+            Toasts.Show(_error, ToastType.Error);
         }
         finally
         {

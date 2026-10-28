@@ -544,6 +544,7 @@ public partial class SettingsViewModelSmbTests
         public Mock<IConfigRepository> Config { get; } = new();
         public Mock<ISearchAdminService> SearchAdmin { get; } = new();
         public Mock<ICloudAccessSettingsStore> CloudAccessSettings { get; } = new();
+        public ToastService Toasts { get; } = new();
         public SettingsViewModel Vm { get; }
 
         /// <summary>The <see cref="SmbProtocolSettings"/> captured on the last SetAsync write.</summary>
@@ -620,7 +621,8 @@ public partial class SettingsViewModelSmbTests
                 new Kaimo_File_Server.Web.Services.BackupDownloadTokenService(
                     Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("KaimoTests")),
                 NullLogger<SettingsViewModel>.Instance,
-                poolUsage: poolUsage);
+                poolUsage: poolUsage,
+                toasts: Toasts);
         }
 
         private static UserContext MakeActor()
