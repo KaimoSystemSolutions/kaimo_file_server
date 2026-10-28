@@ -15,11 +15,18 @@ public enum TileColor
     Group,
     Role,
     Department,
+    Pool,
     Info,
     Accent,
     Success,
     Warning,
     Danger
+}
+
+public static class TileColorExtensions
+{
+    /// <summary>The <c>tile-icon--*</c> class, also usable on list and detail-header icon tiles.</summary>
+    public static string IconClass(this TileColor color) => "tile-icon--" + color.ToString().ToLowerInvariant();
 }
 
 /// <summary>One part of a <see cref="FactTile"/> distribution bar, e.g. "6 healthy".</summary>

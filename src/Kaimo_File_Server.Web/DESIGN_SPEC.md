@@ -133,6 +133,7 @@ Both naming sets are valid; the short legacy aliases (`--bg-*`, `--text-*`, `--b
 | `--entity-group` / `-soft` | `#B59AE7` | `#6F4EAA` | groups |
 | `--entity-role` / `-soft` | `#E2B769` | `#986313` | roles |
 | `--entity-department` / `-soft` | `#E28A84` | `#A3453F` | departments |
+| `--entity-pool` / `-soft` | `#6CC7BD` | `#1F7A72` | storage pools and the system backup source (`pool.svg` / `gear.svg`) |
 | `--folder-fill` / `--folder-stroke` | amber | amber | folder icons |
 
 Semantic backgrounds are tinted (`*-subtle`); solid fills are reserved for badges, small indicators and important actions. Entity colors identify principal types consistently (picker, chips, tree, lists) and are independent of the chosen accent. Disabled is neutral with `opacity: 0.5` — never faded to illegibility.
@@ -245,14 +246,14 @@ Reuse these before writing anything new. New patterns that will be needed more t
 |---|---|
 | `Tabs` / `Tab` | All tab strips. Variants: horizontal underline (default), vertical (settings nav), `detail-tabs--panel` (full-bleed bar inside detail panes). Active = accent underline/indicator. Keyboard focus ring is drawn inset (`outline-offset: -2px`) because the strip scrolls and would clip an outside ring. |
 | `MultiSelect<T>` | Compact checkbox dropdown for small option sets (e.g. context-menu settings). |
-| `PrincipalPickerField` | Single/multi selection of users, groups, roles, departments, shares: modal with search, type tabs, scrollable list, selected chips. Always use it for principal selection. |
+| `PrincipalPickerField` | Single/multi selection of users, groups, roles, departments, shares and storage pools: modal with search, type tabs, scrollable list, selected chips. Always use it for principal and pool selection (`ToPoolItems`; `Disabled` while a save/move runs). |
 | `StatusBadge` | Every entity status pill; `Tone` = Positive/Negative/Warning/Neutral. See §10.4. |
 | `InfoButton` | Inline "i" button that reveals an explanation (e.g. password rules) instead of static hint walls. Always a hover/focus tooltip (tap pins it on touch); `Text` for a short hint, `ChildContent` + `Title` for rich, non-interactive content in the same look. Safe inside `<label>` (trigger is not a labelable element). |
-| `DetailHeader` | Header of a detail pane: icon, title, subtitle, `Status`, `Actions` and the "⋯" `MoreActions` menu (§9.2). |
+| `DetailHeader` | Header of a detail pane: icon, title, subtitle, `Status`, `Actions` and the "⋯" `MoreActions` menu (§9.2); `IconClass` colours the icon tile (`TileColor.IconClass()`). |
 | `MenuItem` | Entry of a dropdown menu (icon, label, `Danger`, `Disabled` + `Tooltip` reason, `Separator`). |
 | `FactTile` | Key fact tile (label, value, optional hint, `Tone`, `Compact` for dates, `Tooltip`, optional arrow link) inside `.fact-tiles`. Overview pages only (not detail panes): `Icon` + `IconColor` (category colour) and `Segments` (distribution bar, e.g. healthy / warning / failed / inactive, with a text legend so colour is never the only carrier). |
 | `ActionTile` | Large quick-access link on overview pages: coloured icon, title, one-line description, arrow. Navigates only; at most one `Primary` (accent surface) per row. |
-| `TileColor` | Colour vocabulary for tile icons and segments: categories `Folder` (storage), `User` (people/devices), `Group`, `Role`, `Department`, `Info` (cloud/sync), `Accent`, `Neutral`, plus `Success`/`Warning`/`Danger` for health segments. Maps to existing tokens via `.tile-icon--*` / `.tile-segment--*`. |
+| `TileColor` | Colour vocabulary for tile icons and segments: categories `Folder` (storage), `User` (people/devices), `Group`, `Role`, `Department`, `Pool` (storage pools, system backup source), `Info` (cloud/sync, backup repositories), `Accent`, `Neutral`, plus `Success`/`Warning`/`Danger` for health segments. Maps to existing tokens via `.tile-icon--*` / `.tile-segment--*`. |
 | `DetailSection` | Titled property group, collapsible via its title band (native `<details>`), `InitiallyCollapsed` for secondary groups; `TitleInfo` for an `InfoButton` in the title band (explanations go there, not as hint text in the body); `Body` for free content below the rows. |
 | `PropertyRow` | Read-only label/value row; `Mono`, `Copyable`, `Entity` (semibold for object names), "–" for empty values. |
 

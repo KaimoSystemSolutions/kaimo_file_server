@@ -1,5 +1,7 @@
 @using Kaimo_File_Server.Core.Domain.Backup
+@using Kaimo_File_Server.Infrastructure.Backup.Restic
 @using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.Components.ViewModels.Backup
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inherits AppComponentBase
@@ -7,84 +9,93 @@
 @inject BackupViewModel VM
 @inject DateFormatService DateFmt
 
-@* Health at a glance: one row per job (last result, last success, next start) and, for
-   repository administrators, one row per repository (state, recovery kit, reachability). *@
+@* Status at a glance: one banner, one plain sentence per job or repository that needs
+   attention (BackupOverviewStatus), what is running right now, then the key numbers. *@
 
-@foreach (var pending in VM.Repositories.Where(r => r.Repository.State == BackupRepositoryState.PendingRecoveryKit))
-{
-    <div class="warning-banner backup-banner">
-        <span>@string.Format(R("Web_Backup_Overview_KitPending"), pending.Repository.Name)</span>
-        <button type="button" class="btn-secondary btn-secondary--sm" @onclick="() => OnOpenRepository.InvokeAsync(pending.Repository.Id)">
-            @R("Web_Backup_Overview_OpenRepository")
-        </button>
-    </div>
+@{
+    var now = DateTime.UtcNow;
+    var attention = BackupOverviewStatus.Attention(VM.Jobs, VM.Access.CanManageRepositories ? VM.Repositories : null, VM.Access.CanManageJobs, now);
+    var lastSuccess = VM.Jobs.Select(v => v.Job).Where(j => j.LastSuccessAtUtc is not null).MaxBy(j => j.LastSuccessAtUtc);
+    var next = VM.Jobs.Select(v => (v.Job, At: VM.NextRunUtc(v.Job))).Where(x => x.At is not null).OrderBy(x => x.At).FirstOrDefault();
 }
 
-<section class="backup-overview-section" aria-label="@R("Web_Backup_Tab_Jobs")">
-    <div class="workspace-list-header">
-        <span>@R("Web_Backup_Tab_Jobs")</span>
-        <span class="form-hint">@string.Format(R("Web_Backup_Overview_JobCount"), VM.Jobs.Count)</span>
-    </div>
-    @if (VM.Jobs.Count == 0)
+<section class="backup-overview-status" aria-label="@R("Web_Backup_Overview_Attention")">
+    @if (attention.Count == 0)
     {
-        <div class="empty-state"><p>@R("Web_Backup_Jobs_Empty")</p></div>
+        <div class="success-banner" role="status">@R("Web_Backup_Overview_AllGood")</div>
     }
-    @foreach (var view in VM.Jobs)
+    else
     {
-        var job = view.Job;
-        var active = VM.ActiveRuns.FirstOrDefault(r => r.JobId == job.Id);
-        <button type="button" class="workspace-row backup-overview-row" disabled="@(!VM.Access.CanManageJobs)"
-                @onclick="() => OnOpenJob.InvokeAsync(job.Id)">
-            <span class="workspace-row-icon">@Assets.SVG("history.svg", new SvgOptions(Width: 16, Height: 16))</span>
-            <span class="workspace-row-text">
-                <strong>@job.Name</strong>
-                <small>@BackupUi.SourcesText(view) → @view.RepositoryName</small>
-            </span>
-            <span class="backup-overview-meta">
-                <span>@R("Web_Backup_LastSuccess"): @DateFmt.FormatDateTime(job.LastSuccessAtUtc, R("Web_Backup_Never"))</span>
-                <span>@R("Web_Backup_NextRun"): @DateFmt.FormatDateTime(VM.NextRunUtc(job), R("Web_Backup_NoSchedule"))</span>
-            </span>
-            @if (active is not null)
+        <div class="@(attention.Any(i => i.Tone == StatusTone.Negative) ? "error-banner" : "warning-banner")" role="status">
+            @string.Format(R("Web_Backup_Overview_AttentionCount"), attention.Count)
+        </div>
+        <ul class="backup-overview-list">
+            @foreach (var item in attention)
             {
-                <StatusBadge Tone="StatusTone.Neutral" Label="@(active.IsRunning ? string.Format(R("Web_Backup_Running"), active.Progress) : R("Web_Backup_Queued"))" />
+                <li class="backup-overview-item">
+                    <span class="workspace-row-icon @(item.IsRepository ? BackupUi.RepositoryIconClass : BackupUi.JobIconClass)">
+                        @Assets.SVG(item.IsRepository ? "archive.svg" : "history.svg", new SvgOptions(Width: 16, Height: 16))
+                    </span>
+                    <span class="backup-overview-text">
+                        <strong>@Title(item)</strong>
+                        <small>@Message(item)</small>
+                    </span>
+                    @if (Badge(item) is { } badge)
+                    {
+                        <StatusBadge Tone="item.Tone" Label="@badge" />
+                    }
+                    @if (OpenCallback(item) is { HasDelegate: true } open)
+                    {
+                        <button type="button" class="btn-icon btn-icon--small" title="@R("Web_Detail_Open")"
+                                aria-label="@($"{R("Web_Detail_Open")}: {Title(item)}")" @onclick="() => open.InvokeAsync(item.Id ?? Guid.Empty)">
+                            @Assets.SVG("arrow_up_right.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2f))
+                        </button>
+                    }
+                </li>
             }
-            else
-            {
-                <StatusBadge Tone="@BackupUi.JobTone(job)" Label="@BackupUi.JobStatusLabel(job)" />
-            }
-        </button>
+        </ul>
     }
 </section>
 
-@if (VM.Access.CanManageRepositories)
+@if (VM.ActiveRuns.Count > 0)
 {
-    <section class="backup-overview-section" aria-label="@R("Web_Backup_Tab_Repositories")">
-        <div class="workspace-list-header">
-            <span>@R("Web_Backup_Tab_Repositories")</span>
-            <span class="form-hint">@string.Format(R("Web_Backup_Overview_RepositoryCount"), VM.Repositories.Count)</span>
-        </div>
-        @if (VM.Repositories.Count == 0)
-        {
-            <div class="empty-state"><p>@R("Web_Backup_Repos_Empty")</p></div>
-        }
-        @foreach (var view in VM.Repositories)
-        {
-            var repo = view.Repository;
-            <button type="button" class="workspace-row backup-overview-row" @onclick="() => OnOpenRepository.InvokeAsync(repo.Id)">
-                <span class="workspace-row-icon">@Assets.SVG("archive.svg", new SvgOptions(Width: 16, Height: 16))</span>
-                <span class="workspace-row-text">
-                    <strong>@repo.Name</strong>
-                    <small>@BackupUi.BackendLabel(repo.Backend) · @string.Format(R("Web_Backup_Overview_JobCount"), view.JobCount)</small>
-                </span>
-                <span class="backup-overview-meta">
-                    <span>@R("Web_Backup_LastReachable"): @DateFmt.FormatDateTime(repo.LastReachableAtUtc, R("Web_Backup_Never"))</span>
-                    <span>@R("Web_Backup_Maintenance_LastCheck"): @DateFmt.FormatDateTime(repo.LastCheckAtUtc, R("Web_Backup_Never"))</span>
-                </span>
-                <StatusBadge Tone="@BackupUi.RepositoryTone(repo)" Label="@BackupUi.RepositoryStateLabel(repo)" />
-            </button>
-        }
+    <section class="backup-overview-section" aria-label="@R("Web_Backup_Overview_Running")">
+        <div class="workspace-list-header"><span>@R("Web_Backup_Overview_Running")</span></div>
+        <ul class="backup-overview-list backup-overview-list--flat">
+            @foreach (var run in VM.ActiveRuns)
+            {
+                <li class="backup-overview-item backup-overview-item--run">
+                    <span class="workspace-row-icon @RunIconClass(run)">@Assets.SVG(RunIcon(run), new SvgOptions(Width: 16, Height: 16))</span>
+                    <span class="backup-overview-text">
+                        <strong>@run.Title</strong>
+                        <small>
+                            @(run.IsCancellationRequested ? R("Web_Jobs_Cancelling")
+                                : run.IsRunning ? string.Format(R("Web_Backup_Running"), run.Progress) + (run.Detail is null ? "" : " · " + run.Detail)
+                                : R("Web_Backup_Queued"))
+                        </small>
+                    </span>
+                    <div class="job-progress backup-overview-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@run.Progress">
+                        <div class="job-progress-fill" style="width: @(run.Progress)%"></div>
+                    </div>
+                </li>
+            }
+        </ul>
     </section>
 }
+
+<div class="fact-tiles backup-overview-tiles">
+    <FactTile Icon="history.svg" IconColor="TileColor.Group" Label="@R("Web_Backup_Tab_Jobs")" Value="@VM.Jobs.Count.ToString()"
+              Segments="@Segments(BackupOverviewStatus.JobHealth(VM.Jobs, now))" />
+    @if (VM.Access.CanManageRepositories)
+    {
+        <FactTile Icon="archive.svg" IconColor="TileColor.Info" Label="@R("Web_Backup_Tab_Repositories")" Value="@VM.Repositories.Count.ToString()"
+                  Segments="@Segments(BackupOverviewStatus.RepositoryHealth(VM.Repositories))" />
+    }
+    <FactTile Icon="check.svg" IconColor="TileColor.Success" Label="@R("Web_Backup_Overview_LastSuccess")" Compact
+              Value="@DateFmt.FormatDateTime(lastSuccess?.LastSuccessAtUtc, R("Web_Backup_Never"))" Hint="@lastSuccess?.Name" />
+    <FactTile Icon="play.svg" IconColor="TileColor.Info" Label="@R("Web_Backup_Overview_NextRun")" Compact
+              Value="@DateFmt.FormatDateTime(next.At, R("Web_Backup_NoSchedule"))" Hint="@next.Job?.Name" />
+</div>
 
 @code {
     // Results and runner progress are announced by the view model; the page does not
@@ -95,6 +106,62 @@
 
     [Parameter] public EventCallback<Guid> OnOpenJob { get; set; }
     [Parameter] public EventCallback<Guid> OnOpenRepository { get; set; }
+
+    private BackupJob? JobOf(BackupAttention item) => VM.Jobs.FirstOrDefault(v => v.Job.Id == item.Id)?.Job;
+    private BackupRepository? RepositoryOf(BackupAttention item) => VM.Repositories.FirstOrDefault(v => v.Repository.Id == item.Id)?.Repository;
+
+    private static string Title(BackupAttention item) => item.Reason switch
+    {
+        BackupAttentionReason.NoRepositories => R("Web_Backup_Overview_NoRepositories"),
+        BackupAttentionReason.NoJobs => R("Web_Backup_Overview_NoJobs"),
+        _ => item.Name,
+    };
+
+    private string Message(BackupAttention item)
+    {
+        var job = JobOf(item);
+        var repo = RepositoryOf(item);
+        return item.Reason switch
+        {
+            BackupAttentionReason.JobFailed => string.Format(R("Web_Backup_Overview_JobFailed"), DateFmt.FormatDateTime(job?.LastRunAtUtc))
+                                               + (LastError(item.Id) is { } error ? " " + BackupViewModel.ErrorText(error) : ""),
+            BackupAttentionReason.JobOverdue => job?.LastSuccessAtUtc is { } success
+                ? string.Format(R("Web_Backup_Overview_JobOverdue"), (int)(DateTime.UtcNow - success).TotalDays, DateFmt.FormatDateTime(success))
+                : R("Web_Backup_Overview_JobOverdueNever"),
+            BackupAttentionReason.JobWarnings => string.Format(R("Web_Backup_Overview_JobWarnings"), DateFmt.FormatDateTime(job?.LastRunAtUtc)),
+            BackupAttentionReason.RepositoryKitPending => R("Web_Backup_Overview_RepositoryKitPending"),
+            BackupAttentionReason.RepositoryError => BackupViewModel.ErrorText(repo?.LastErrorCode),
+            BackupAttentionReason.RepositoryCheckFailed => string.Format(R("Web_Backup_Overview_RepositoryCheckFailed"), DateFmt.FormatDateTime(repo?.LastCheckAtUtc)),
+            BackupAttentionReason.NoRepositories => R("Web_Backup_Overview_NoRepositoriesHelp"),
+            _ => R("Web_Backup_Overview_NoJobsHelp"),
+        };
+    }
+
+    // Runs are listed newest first; the latest failed run of the job names the cause.
+    private string? LastError(Guid? jobId) => VM.Runs.FirstOrDefault(r => r.JobId == jobId && !string.IsNullOrEmpty(r.ErrorCode))?.ErrorCode;
+
+    private string? Badge(BackupAttention item)
+        => item.Reason == BackupAttentionReason.JobOverdue ? R("Web_Home_Backup_Overdue")
+            : JobOf(item) is { } job ? BackupUi.JobStatusLabel(job)
+            : RepositoryOf(item) is { } repo ? BackupUi.RepositoryStateLabel(repo)
+            : null;
+
+    private EventCallback<Guid> OpenCallback(BackupAttention item)
+        => item.IsRepository ? OnOpenRepository : VM.Access.CanManageJobs ? OnOpenJob : default;
+
+    private static string RunIcon(BackupRunSnapshot run)
+        => BackupUi.RunIcon(run.IsRestore ? BackupRunType.Restore : run.IsMaintenance ? BackupRunType.Check : BackupRunType.Backup);
+
+    private static string RunIconClass(BackupRunSnapshot run)
+        => BackupUi.RunIconClass(run.IsRestore ? BackupRunType.Restore : run.IsMaintenance ? BackupRunType.Check : BackupRunType.Backup);
+
+    private static IReadOnlyList<FactTileSegment> Segments(HealthCounts health) =>
+    [
+        new(health.Ok, R("Web_Home_Health_Ok"), TileColor.Success),
+        new(health.Warning, R("Web_Home_Health_Warning"), TileColor.Warning),
+        new(health.Failed, R("Web_Home_Health_Failed"), TileColor.Danger),
+        new(health.Inactive, R("Web_Home_Health_Inactive"), TileColor.Neutral),
+    ];
 
     private static string R(string key) => BackupViewModel.R(key);
 }

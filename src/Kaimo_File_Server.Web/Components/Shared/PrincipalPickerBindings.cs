@@ -57,6 +57,24 @@ public static class PrincipalPickerBindings
             .Concat(groups.Select(g => new PrincipalPickerItem(g.Id, g.Name, PrincipalKind.Group)))
             .ToList();
 
+    // -- Storage pools: identified by their path, so the picker gets a stable id derived from it --
+
+    /// <summary>Stable picker id for a pool path.</summary>
+    public static Guid PoolId(string poolPath) =>
+        new(System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes(poolPath)));
+
+    /// <summary>Pools as picker items: the given display name, the path as hint.</summary>
+    public static IReadOnlyList<PrincipalPickerItem> ToPoolItems<T>(this IEnumerable<T> pools, Func<T, string> path, Func<T, string> name) =>
+        pools.Select(p => new PrincipalPickerItem(PoolId(path(p)), name(p), PrincipalKind.Pool, path(p))).ToList();
+
+    /// <summary>The pool path behind the first selected id, or null when nothing (known) is selected.</summary>
+    public static string? PoolPathFor(this IEnumerable<string> poolPaths, IReadOnlyList<Guid> ids) =>
+        ids.Count == 0 ? null : poolPaths.FirstOrDefault(p => PoolId(p) == ids[0]);
+
+    /// <summary>A pool path as a single-element selection (empty when blank).</summary>
+    public static IReadOnlyCollection<Guid> AsPoolSelection(this string? poolPath) =>
+        string.IsNullOrEmpty(poolPath) ? Array.Empty<Guid>() : new[] { PoolId(poolPath) };
+
     /// <summary>Wraps an optional id as a single-element selection (empty when null).</summary>
     public static IReadOnlyCollection<Guid> AsSelection(this Guid? id) =>
         id is { } g ? new[] { g } : Array.Empty<Guid>();

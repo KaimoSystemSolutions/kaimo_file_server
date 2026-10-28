@@ -28,12 +28,13 @@
         }
         <div class="form-group">
             <label>@Resources.Web_ShareList_Label_StoragePool</label>
-            <select class="edit-input" @bind="VM.NewSharePoolPath">
-                @foreach (var pool in VM.StoragePools)
-                {
-                    <option value="@pool.Path">@pool.Name — @pool.Path</option>
-                }
-            </select>
+            <PrincipalPickerField Mode="SelectionMode.Single"
+                                  Items="VM.StoragePools.ToPoolItems(p => p.Path, p => p.Name)"
+                                  SelectedIds="VM.NewSharePoolPath.AsPoolSelection()"
+                                  SelectedIdsChanged="ids => VM.NewSharePoolPath =
+                                      VM.StoragePools.Select(p => p.Path).PoolPathFor(ids) ?? VM.NewSharePoolPath"
+                                  AllowClear="false"
+                                  Title="@Resources.Web_ShareList_Label_StoragePool" />
         </div>
     </div>
     @if (VM.CreateErrorMessage is not null)

@@ -40,7 +40,7 @@
             var selected = VM.RestoreShare?.ShareId == item.ShareId;
             <button type="button" class="workspace-row @(selected ? "workspace-row--selected" : "")"
                     aria-pressed="@(selected ? "true" : "false")" disabled="@VM.IsBusy" @onclick="() => VM.SelectRestoreShareAsync(item.ShareId)">
-                <span class="workspace-row-icon">@Assets.SVG("folder.svg", new SvgOptions(Width: 16, Height: 16))</span>
+                <span class="workspace-row-icon @BackupUi.ShareIconClass">@Assets.SVG("folder.svg", new SvgOptions(Width: 16, Height: 16))</span>
                 <span class="workspace-row-text">
                     <strong>@item.Name</strong>
                     <small>@string.Format(R("Web_Backup_Restore_PointCount"), item.BackupPointCount, DateFmt.FormatDateTime(item.LatestUtc))</small>
@@ -65,7 +65,7 @@
                 var selected = VM.ServerSource == group.Key;
                 <button type="button" class="workspace-row @(selected ? "workspace-row--selected" : "")"
                         aria-pressed="@(selected ? "true" : "false")" disabled="@VM.IsBusy" @onclick="() => VM.SelectServerSource(group.Key)">
-                    <span class="workspace-row-icon">@Assets.SVG(group.First().Kind == BackupSnapshotKind.System ? "gear.svg" : "archive.svg", new SvgOptions(Width: 16, Height: 16))</span>
+                    <span class="workspace-row-icon @BackupUi.PoolIconClass">@Assets.SVG(ServerIcon(group.First().Kind), new SvgOptions(Width: 16, Height: 16))</span>
                     <span class="workspace-row-text">
                         <strong>@group.Key</strong>
                         <small>@string.Format(R("Web_Backup_Restore_PointCount"), group.Count(), DateFmt.FormatDateTime(group.Max(p => p.TimeUtc)))</small>
@@ -78,12 +78,11 @@
     <aside class="workspace-detail" aria-label="@R("Web_Backup_Restore_Browser")">
         @if (VM.RestoreShare is { } share)
         {
-            <div class="workspace-heading">
-                <div>
-                    <h3>@share.Name</h3>
-                    <span class="workspace-heading-sub">@R("Web_Backup_Restore_Browser")</span>
-                </div>
-            </div>
+            <DetailHeader Title="@share.Name" Subtitle="@R("Web_Backup_Restore_Browser")">
+                <Leading>
+                    <span class="detail-head-icon @BackupUi.ShareIconClass" aria-hidden="true">@Assets.SVG("folder.svg", new SvgOptions(Width: 18, Height: 18))</span>
+                </Leading>
+            </DetailHeader>
 
             <div class="workspace-form">
                 <label>
@@ -181,12 +180,13 @@
         }
         else if (VM.ServerSource is { } source)
         {
-            <div class="workspace-heading">
-                <div>
-                    <h3>@source</h3>
-                    <span class="workspace-heading-sub">@R("Web_Backup_Restore_ServerSources")</span>
-                </div>
-            </div>
+            <DetailHeader Title="@source" Subtitle="@R("Web_Backup_Restore_ServerSources")">
+                <Leading>
+                    <span class="detail-head-icon @BackupUi.PoolIconClass" aria-hidden="true">
+                        @Assets.SVG(ServerIcon(VM.ServerPoints.First(p => p.Source == source).Kind), new SvgOptions(Width: 18, Height: 18))
+                    </span>
+                </Leading>
+            </DetailHeader>
             <p class="form-hint backup-server-help">@string.Format(R("Web_Backup_Restore_ServerHelp"), VM.ServerRestoreRoot)</p>
             <div class="backup-browse" role="table" aria-label="@source">
                 <div class="backup-browse-row backup-server-row backup-browse-head" role="row">
@@ -372,6 +372,8 @@
         => $"{DateFmt.FormatDateTime(point.TimeUtc)} · {point.RepositoryName}"
            + (point.JobName is null ? "" : " · " + point.JobName)
            + (point.FileCount > 0 ? $" · {string.Format(R("Web_Backup_Restore_PointFiles"), point.FileCount, NotificationEvents.FormatSize(point.TotalBytes))}" : "");
+
+    private static string ServerIcon(BackupSnapshotKind kind) => kind == BackupSnapshotKind.System ? "gear.svg" : "pool.svg";
 
     private string FolderLabel(string shareName)
         => VM.BrowseFolder.Length == 0 ? shareName : shareName + "/" + VM.BrowseFolder;

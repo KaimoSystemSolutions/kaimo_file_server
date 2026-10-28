@@ -297,6 +297,9 @@
   <data name="Web_Picker_Shares" xml:space="preserve">
     <value>Shares</value>
   </data>
+  <data name="Web_Picker_Pools" xml:space="preserve">
+    <value>Pools</value>
+  </data>
   <data name="Web_Selection_None" xml:space="preserve">
     <value>No selection</value>
   </data>
@@ -5872,18 +5875,6 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Backup_Tab_Activity" xml:space="preserve">
     <value>Activity</value>
   </data>
-  <data name="Web_Backup_Overview_KitPending" xml:space="preserve">
-    <value>The repository "{0}" waits for its recovery kit to be downloaded and confirmed. No backups run into it until then.</value>
-  </data>
-  <data name="Web_Backup_Overview_OpenRepository" xml:space="preserve">
-    <value>Open repository</value>
-  </data>
-  <data name="Web_Backup_Overview_JobCount" xml:space="preserve">
-    <value>{0} jobs</value>
-  </data>
-  <data name="Web_Backup_Overview_RepositoryCount" xml:space="preserve">
-    <value>{0} repositories</value>
-  </data>
   <data name="Web_Backup_LastSuccess" xml:space="preserve">
     <value>Last success</value>
   </data>
@@ -7851,5 +7842,53 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   </data>
   <data name="Web_Error_SystemRoleUndeletable" xml:space="preserve">
     <value>System roles cannot be deleted.</value>
+  </data>
+  <data name="Web_Backup_Overview_Attention" xml:space="preserve">
+    <value>Needs attention</value>
+  </data>
+  <data name="Web_Backup_Overview_AllGood" xml:space="preserve">
+    <value>Everything is fine: all backups and repositories are running as planned.</value>
+  </data>
+  <data name="Web_Backup_Overview_AttentionCount" xml:space="preserve">
+    <value>Needs attention: {0}</value>
+  </data>
+  <data name="Web_Backup_Overview_Running" xml:space="preserve">
+    <value>Running now</value>
+  </data>
+  <data name="Web_Backup_Overview_LastSuccess" xml:space="preserve">
+    <value>Last successful backup</value>
+  </data>
+  <data name="Web_Backup_Overview_NextRun" xml:space="preserve">
+    <value>Next backup</value>
+  </data>
+  <data name="Web_Backup_Overview_NoRepositories" xml:space="preserve">
+    <value>No repository yet</value>
+  </data>
+  <data name="Web_Backup_Overview_NoRepositoriesHelp" xml:space="preserve">
+    <value>Backups need a storage target. Create a repository first.</value>
+  </data>
+  <data name="Web_Backup_Overview_NoJobs" xml:space="preserve">
+    <value>No backup job yet</value>
+  </data>
+  <data name="Web_Backup_Overview_NoJobsHelp" xml:space="preserve">
+    <value>Nothing is backed up yet. Create a job for your shares.</value>
+  </data>
+  <data name="Web_Backup_Overview_JobFailed" xml:space="preserve">
+    <value>The last run on {0} failed.</value>
+  </data>
+  <data name="Web_Backup_Overview_JobOverdue" xml:space="preserve">
+    <value>No successful backup for {0} days (last on {1}).</value>
+  </data>
+  <data name="Web_Backup_Overview_JobOverdueNever" xml:space="preserve">
+    <value>No successful backup yet, although the job is scheduled.</value>
+  </data>
+  <data name="Web_Backup_Overview_JobWarnings" xml:space="preserve">
+    <value>The last run on {0} finished with warnings; some files may be missing from the backup.</value>
+  </data>
+  <data name="Web_Backup_Overview_RepositoryKitPending" xml:space="preserve">
+    <value>Download and confirm the recovery kit; no backups run into this repository until then.</value>
+  </data>
+  <data name="Web_Backup_Overview_RepositoryCheckFailed" xml:space="preserve">
+    <value>The integrity check on {0} found errors.</value>
   </data>
 </root>

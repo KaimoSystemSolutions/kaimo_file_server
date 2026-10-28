@@ -295,7 +295,10 @@
     <value>Abteilungen</value>
   </data>
   <data name="Web_Picker_Shares" xml:space="preserve">
-    <value>Freigaben</value>
+    <value>Shares</value>
+  </data>
+  <data name="Web_Picker_Pools" xml:space="preserve">
+    <value>Pools</value>
   </data>
   <data name="Web_Selection_None" xml:space="preserve">
     <value>Keine Auswahl</value>
@@ -5816,13 +5819,13 @@ Zugangsdaten des Speicherziels (Zugriffsschlüssel, REST-Benutzer, SSH-Schlüsse
 
 AUFBAU
 ------
-Jeder Sicherungslauf erzeugt pro Freigabe einen Snapshot mit den Tags:
-  kaimo, job:&lt;Auftrags-ID&gt;, run:&lt;Lauf-ID&gt;, level:files|db|full, share:&lt;Freigabe-ID&gt;
-Ein Snapshot enthält den Freigabe-Ordner und kaimo-acl-manifest.json (Besitzer und Berechtigungen der Freigabe).
+Jeder Sicherungslauf erzeugt pro Share einen Snapshot mit den Tags:
+  kaimo, job:&lt;Auftrags-ID&gt;, run:&lt;Lauf-ID&gt;, level:files|db|full, share:&lt;Share-ID&gt;
+Ein Snapshot enthält den Share-Ordner und kaimo-acl-manifest.json (Besitzer und Berechtigungen des Shares).
 Aufträge globaler Administratoren können zusätzlich erzeugen:
-  - pro Pool einen Snapshot (Tag pool:&lt;Pool-Name&gt;): den ganzen Pool-Ordner plus ein ACL-Manifest pro Freigabe;
+  - pro Pool einen Snapshot (Tag pool:&lt;Pool-Name&gt;): den ganzen Pool-Ordner plus ein ACL-Manifest pro Share;
   - einen System-Snapshot (Tag kind:system, Stufen db und full) mit kaimo-database.dump (pg_dump),
-    kaimo-backup-info.json (Freigaben, Pools, Pfade) und bei Stufe full dem Anwendungsdaten-Ordner
+    kaimo-backup-info.json (Shares, Pools, Pfade) und bei Stufe full dem Anwendungsdaten-Ordner
     (/data/kaimo-system: DataProtection-Schlüssel, Zertifikate).
 
 WIEDERHERSTELLEN MIT DER RESTIC-KOMMANDOZEILE (funktioniert ohne Kaimo-Server)
@@ -5832,11 +5835,11 @@ WIEDERHERSTELLEN MIT DER RESTIC-KOMMANDOZEILE (funktioniert ohne Kaimo-Server)
    export RESTIC_PASSWORD='&lt;Wert oben&gt;'
    dazu die Zugangsdaten des Speicherziels (siehe "Weitere Parameter" oben, z. B. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).
 3. Sicherungen auflisten:      restic snapshots --tag kaimo
-   Nur eine Freigabe:          restic snapshots --tag share:&lt;Freigabe-ID&gt;
+   Nur ein Share:              restic snapshots --tag share:&lt;Share-ID&gt;
 4. Sicherung durchsuchen:      restic ls &lt;Snapshot-ID&gt;
 5. Alles wiederherstellen:     restic restore &lt;Snapshot-ID&gt; --target /restore
-   Einen Ordner:               restic restore &lt;Snapshot-ID&gt;:&lt;Freigabe-Pfad&gt;/&lt;Ordner&gt; --target /restore
-6. Die wiederhergestellten Dateien zurück in den Freigabe-Ordner kopieren. Besitzer und Berechtigungen stehen in kaimo-acl-manifest.json.
+   Einen Ordner:               restic restore &lt;Snapshot-ID&gt;:&lt;Share-Pfad&gt;/&lt;Ordner&gt; --target /restore
+6. Die wiederhergestellten Dateien zurück in den Share-Ordner kopieren. Besitzer und Berechtigungen stehen in kaimo-acl-manifest.json.
 
 NOTFALL-WIEDERHERSTELLUNG (Server komplett verloren)
 ----------------------------------------------------
@@ -5847,10 +5850,10 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
 3. Wiederherstellen:           restic restore &lt;Snapshot-ID&gt; --target /restore
 4. /restore/data/kaimo-system/ (bzw. deinen Anwendungsdaten-Pfad) in den neuen Anwendungsdaten-Ordner kopieren
    und /restore/data/kaimo-backups/restic-meta/system/kaimo-database.dump in den neuen Sicherungsordner.
-5. Stack mit KAIMO_DB_RESTORE_FROM=kaimo-database.dump starten - die Datenbank (Benutzer, Freigaben,
+5. Stack mit KAIMO_DB_RESTORE_FROM=kaimo-database.dump starten - die Datenbank (Benutzer, Shares,
    Berechtigungen, dieses Repository samt Passwort) ist wieder da.
-6. Dateien wiederherstellen, jeweils neuester Snapshot pro Pool oder Freigabe, an ihre ursprünglichen Pfade:
-   restic restore &lt;Snapshot-ID&gt;:&lt;Pool- oder Freigabe-Pfad&gt; --target &lt;derselbe Pfad&gt;
+6. Dateien wiederherstellen, jeweils neuester Snapshot pro Pool oder Share, an ihre ursprünglichen Pfade:
+   restic restore &lt;Snapshot-ID&gt;:&lt;Pool- oder Share-Pfad&gt; --target &lt;derselbe Pfad&gt;
    Danach den Stack neu starten. Wiederherstellungen über die Weboberfläche funktionieren wieder.
 </value>
   </data>
@@ -5858,7 +5861,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Sicherung</value>
   </data>
   <data name="Web_Backup_Subtitle" xml:space="preserve">
-    <value>Verschlüsselte, inkrementelle Dateisicherung deiner Freigaben mit restic.</value>
+    <value>Verschlüsselte, inkrementelle Dateisicherung deiner Shares mit restic.</value>
   </data>
   <data name="Web_Backup_Tab_Overview" xml:space="preserve">
     <value>Übersicht</value>
@@ -5871,18 +5874,6 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   </data>
   <data name="Web_Backup_Tab_Activity" xml:space="preserve">
     <value>Verlauf</value>
-  </data>
-  <data name="Web_Backup_Overview_KitPending" xml:space="preserve">
-    <value>Das Repository „{0}“ wartet auf Download und Bestätigung seines Wiederherstellungs-Kits. Bis dahin laufen keine Sicherungen hinein.</value>
-  </data>
-  <data name="Web_Backup_Overview_OpenRepository" xml:space="preserve">
-    <value>Repository öffnen</value>
-  </data>
-  <data name="Web_Backup_Overview_JobCount" xml:space="preserve">
-    <value>{0} Aufträge</value>
-  </data>
-  <data name="Web_Backup_Overview_RepositoryCount" xml:space="preserve">
-    <value>{0} Repositories</value>
   </data>
   <data name="Web_Backup_LastSuccess" xml:space="preserve">
     <value>Letzter Erfolg</value>
@@ -5960,7 +5951,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Dateien</value>
   </data>
   <data name="Web_Backup_Jobs_Help" xml:space="preserve">
-    <value>Ein Auftrag sichert Freigaben zu festen Zeiten in ein Repository. Jede Freigabe erhält einen eigenen Sicherungsstand inklusive ihrer Berechtigungen. Globale Administratoren können zusätzlich ganze Pools und die Datenbank sichern.</value>
+    <value>Ein Auftrag sichert Shares zu festen Zeiten in ein Repository. Jeder Share erhält einen eigenen Sicherungsstand inklusive seiner Berechtigungen. Globale Administratoren können zusätzlich ganze Pools und die Datenbank sichern.</value>
   </data>
   <data name="Web_Backup_Jobs_Create" xml:space="preserve">
     <value>Neuer Sicherungsauftrag</value>
@@ -5978,19 +5969,19 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Wähle einen Auftrag aus, um Details zu sehen, oder lege einen neuen an.</value>
   </data>
   <data name="Web_Backup_Jobs_Sources" xml:space="preserve">
-    <value>Freigaben</value>
+    <value>Shares</value>
   </data>
   <data name="Web_Backup_Jobs_SourcesPlaceholder" xml:space="preserve">
-    <value>Freigaben auswählen</value>
+    <value>Shares auswählen</value>
   </data>
   <data name="Web_Backup_Jobs_SourcesHelp" xml:space="preserve">
-    <value>Es werden nur Freigaben angezeigt, deren Sicherung du verwalten darfst.</value>
+    <value>Es werden nur Shares angezeigt, deren Sicherung du verwalten darfst.</value>
   </data>
   <data name="Web_Backup_Jobs_NoShares" xml:space="preserve">
-    <value>Keine Freigaben verfügbar.</value>
+    <value>Keine Shares verfügbar.</value>
   </data>
   <data name="Web_Backup_Jobs_NoRepository" xml:space="preserve">
-    <value>Für alle ausgewählten Freigaben ist kein aktives Repository freigegeben. Bitte einen Administrator, eines für deine Abteilung freizugeben.</value>
+    <value>Für alle ausgewählten Shares ist kein aktives Repository freigegeben. Bitte einen Administrator, eines für deine Abteilung freizugeben.</value>
   </data>
   <data name="Web_Backup_Jobs_IncludeRecycleBin" xml:space="preserve">
     <value>Papierkorb mitsichern</value>
@@ -6119,7 +6110,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Freigegeben für Abteilungen</value>
   </data>
   <data name="Web_Backup_Repos_DepartmentsHelp" xml:space="preserve">
-    <value>Abteilungsadministratoren mit Sicherungsrechten dürfen für ihre Freigaben Aufträge in dieses Repository anlegen. Eine Freigabe gilt auch für alle Unterabteilungen. Das Passwort sehen sie nie.</value>
+    <value>Abteilungsadministratoren mit Sicherungsrechten dürfen für ihre Shares Aufträge in dieses Repository anlegen. Die Zuordnung gilt auch für alle Unterabteilungen. Das Passwort sehen sie nie.</value>
   </data>
   <data name="Web_Backup_Repos_DepartmentsNone" xml:space="preserve">
     <value>Nur globale Administratoren</value>
@@ -6425,19 +6416,19 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Das Repository ist nicht aktiv (Kit nicht bestätigt oder deaktiviert).</value>
   </data>
   <data name="Web_Backup_Error_share_missing" xml:space="preserve">
-    <value>Eine Freigabe existiert nicht mehr.</value>
+    <value>Ein Share existiert nicht mehr.</value>
   </data>
   <data name="Web_Backup_Error_source_unavailable" xml:space="preserve">
-    <value>Der Freigabe-Ordner existiert nicht (Speicherpool nicht eingehängt?).</value>
+    <value>Der Share-Ordner existiert nicht (Speicherpool nicht eingehängt?).</value>
   </data>
   <data name="Web_Backup_Error_source_empty" xml:space="preserve">
-    <value>Der Freigabe-Ordner ist plötzlich leer, obwohl frühere Sicherungen Inhalt hatten (Speicherpool nicht eingehängt?). Die Sicherung wurde übersprungen.</value>
+    <value>Der Share-Ordner ist plötzlich leer, obwohl frühere Sicherungen Inhalt hatten (Speicherpool nicht eingehängt?). Die Sicherung wurde übersprungen.</value>
   </data>
   <data name="Web_Backup_Error_insufficient_space" xml:space="preserve">
     <value>Das Repository-Ziel hat weniger freien Speicher als eingestellt.</value>
   </data>
   <data name="Web_Backup_Error_sources_failed" xml:space="preserve">
-    <value>Mehrere Freigaben konnten nicht gesichert werden.</value>
+    <value>Mehrere Shares konnten nicht gesichert werden.</value>
   </data>
   <data name="Web_Backup_Error_unexpected_error" xml:space="preserve">
     <value>Ein unerwarteter Fehler ist aufgetreten. Siehe Server-Protokoll.</value>
@@ -6467,7 +6458,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Der Kit-Code stimmt nicht. Prüfe den Code in der heruntergeladenen Datei.</value>
   </data>
   <data name="Web_Backup_Error_sources_required" xml:space="preserve">
-    <value>Wähle mindestens eine Freigabe oder einen Pool oder einen Inhalt mit Datenbank.</value>
+    <value>Wähle mindestens einen Share oder einen Pool oder einen Inhalt mit Datenbank.</value>
   </data>
   <data name="Web_Backup_Error_schedule_invalid" xml:space="preserve">
     <value>Wähle Startzeiten und Wochentage – oder keines von beiden.</value>
@@ -6476,7 +6467,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Aufträge über mehrere Abteilungen hinweg benötigen einen globalen Administrator.</value>
   </data>
   <data name="Web_Backup_Error_repository_not_usable" xml:space="preserve">
-    <value>Das Repository ist für diese Freigaben nicht verfügbar.</value>
+    <value>Das Repository ist für diese Shares nicht verfügbar.</value>
   </data>
   <data name="Web_Backup_Error_timeout" xml:space="preserve">
     <value>Der Speicherort hat nicht rechtzeitig geantwortet. Prüfe Adresse und Zugangsdaten.</value>
@@ -6485,13 +6476,13 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Wiederherstellen</value>
   </data>
   <data name="Web_Backup_Restore_Help" xml:space="preserve">
-    <value>Durchsuche die Sicherungsstände einer Freigabe und stelle einzelne Dateien, Ordner oder die ganze Freigabe wieder her: in einen neuen Ordner, an den ursprünglichen Ort oder in eine andere Freigabe. Downloads kommen direkt aus dem Repository.</value>
+    <value>Durchsuche die Sicherungsstände eines Shares und stelle einzelne Dateien, Ordner oder den ganzen Share wieder her: in einen neuen Ordner, an den ursprünglichen Ort oder in einen anderen Share. Downloads kommen direkt aus dem Repository.</value>
   </data>
   <data name="Web_Backup_Restore_Shares" xml:space="preserve">
-    <value>Freigaben</value>
+    <value>Shares</value>
   </data>
   <data name="Web_Backup_Restore_NoShares" xml:space="preserve">
-    <value>Es gibt keine Sicherungen von Freigaben, die du wiederherstellen darfst.</value>
+    <value>Es gibt keine Sicherungen von Shares, die du wiederherstellen darfst.</value>
   </data>
   <data name="Web_Backup_Restore_PointCount" xml:space="preserve">
     <value>{0} Sicherungsstände · zuletzt {1}</value>
@@ -6545,13 +6536,13 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Sicherung wird gelesen…</value>
   </data>
   <data name="Web_Backup_Restore_NoPoints" xml:space="preserve">
-    <value>Für diese Freigabe gibt es keine Sicherungsstände.</value>
+    <value>Für diesen Share gibt es keine Sicherungsstände.</value>
   </data>
   <data name="Web_Backup_Restore_EmptyFolder" xml:space="preserve">
     <value>Dieser Ordner ist in der Sicherung leer.</value>
   </data>
   <data name="Web_Backup_Restore_SelectHint" xml:space="preserve">
-    <value>Wähle eine Freigabe aus, um ihre Sicherungen zu durchsuchen.</value>
+    <value>Wähle einen Share aus, um seine Sicherungen zu durchsuchen.</value>
   </data>
   <data name="Web_Backup_Restore_DialogTitle" xml:space="preserve">
     <value>Aus Sicherung wiederherstellen</value>
@@ -6584,16 +6575,16 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Legt die Einträge an ihren ursprünglichen Ort zurück. Fehlende Dateien werden neu angelegt, vorhandene wie unten gewählt behandelt. Es wird nichts gelöscht.</value>
   </data>
   <data name="Web_Backup_Restore_Mode_OtherShare" xml:space="preserve">
-    <value>Andere Freigabe</value>
+    <value>Anderer Share</value>
   </data>
   <data name="Web_Backup_Restore_Mode_OtherShare_Help" xml:space="preserve">
-    <value>Legt in einem Ordner einer anderen Freigabe einen Ordner „Wiederhergestellt &lt;Datum&gt;“ an.</value>
+    <value>Legt in einem Ordner eines anderen Shares einen Ordner „Wiederhergestellt &lt;Datum&gt;“ an.</value>
   </data>
   <data name="Web_Backup_Restore_Mode_Download" xml:space="preserve">
     <value>Download</value>
   </data>
   <data name="Web_Backup_Restore_ModeNotAllowed" xml:space="preserve">
-    <value>Dafür fehlt dir die Berechtigung auf dieser Freigabe.</value>
+    <value>Dafür fehlt dir die Berechtigung auf diesem Share.</value>
   </data>
   <data name="Web_Backup_Restore_Conflict" xml:space="preserve">
     <value>Vorhandene Dateien</value>
@@ -6611,13 +6602,13 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Dateien, die es zum Zeitpunkt der Sicherung noch nicht gab, bleiben erhalten.</value>
   </data>
   <data name="Web_Backup_Restore_TargetShare" xml:space="preserve">
-    <value>Zielfreigabe</value>
+    <value>Ziel-Share</value>
   </data>
   <data name="Web_Backup_Restore_TargetFolder" xml:space="preserve">
     <value>Zielordner</value>
   </data>
   <data name="Web_Backup_Restore_TargetFolderPlaceholder" xml:space="preserve">
-    <value>z. B. projekte/2026 (leer = Freigabe-Stamm)</value>
+    <value>z. B. projekte/2026 (leer = Share-Stamm)</value>
   </data>
   <data name="Web_Backup_Restore_TargetFolderHelp" xml:space="preserve">
     <value>Der Ordner muss existieren; die Wiederherstellung legt darin einen neuen Unterordner an.</value>
@@ -6680,7 +6671,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Der Eintrag existiert in diesem Sicherungsstand nicht.</value>
   </data>
   <data name="Web_Backup_Error_target_unavailable" xml:space="preserve">
-    <value>Der Ordner der Zielfreigabe existiert nicht (Pool nicht eingehängt?).</value>
+    <value>Der Ordner des Ziel-Shares existiert nicht (Pool nicht eingehängt?).</value>
   </data>
   <data name="Web_Backup_Error_target_folder_missing" xml:space="preserve">
     <value>Der Zielordner existiert nicht.</value>
@@ -6743,7 +6734,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Test-Wiederherstellung: Anzahl Dateien</value>
   </data>
   <data name="Web_Backup_Maintenance_SampleSizeHelp" xml:space="preserve">
-    <value>Nach einer erfolgreichen Prüfung werden so viele zufällig gewählte Dateien aus dem neuesten Sicherungsstand jeder Freigabe in einen versteckten temporären Ordner wiederhergestellt und per SHA-256 mit der aktuellen Datei auf dem Server verglichen; die Kopien werden danach gelöscht. Die Anzahl wird auf alle Freigaben verteilt; Dateien über 256 MB bleiben außen vor. Seit der Sicherung geänderte oder gelöschte Dateien lassen sich nicht vergleichen und werden nur gezählt. Jede Abweichung lässt die Wartung fehlschlagen und löst eine Benachrichtigung aus. Enthält das Repository eine Systemsicherung, wird zusätzlich deren Datenbank-Dump wiederhergestellt und auf Lesbarkeit geprüft. 0 schaltet die Test-Wiederherstellung ab.</value>
+    <value>Nach einer erfolgreichen Prüfung werden so viele zufällig gewählte Dateien aus dem neuesten Sicherungsstand jedes Shares in einen versteckten temporären Ordner wiederhergestellt und per SHA-256 mit der aktuellen Datei auf dem Server verglichen; die Kopien werden danach gelöscht. Die Anzahl wird auf alle Shares verteilt; Dateien über 256 MB bleiben außen vor. Seit der Sicherung geänderte oder gelöschte Dateien lassen sich nicht vergleichen und werden nur gezählt. Jede Abweichung lässt die Wartung fehlschlagen und löst eine Benachrichtigung aus. Enthält das Repository eine Systemsicherung, wird zusätzlich deren Datenbank-Dump wiederhergestellt und auf Lesbarkeit geprüft. 0 schaltet die Test-Wiederherstellung ab.</value>
   </data>
   <data name="Web_Backup_Maintenance_Mirror" xml:space="preserve">
     <value>Spiegel</value>
@@ -6782,7 +6773,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Aufbewahrung</value>
   </data>
   <data name="Web_Backup_Retention_Help" xml:space="preserve">
-    <value>Wie viele Sicherungsstände jeder Freigabe erhalten bleiben. Ältere werden nach jeder erfolgreichen Sicherung entfernt; der Speicherplatz wird bei der Wartung des Repositorys freigegeben. 0 schaltet eine Regel ab.</value>
+    <value>Wie viele Sicherungsstände jedes Shares erhalten bleiben. Ältere werden nach jeder erfolgreichen Sicherung entfernt; der Speicherplatz wird bei der Wartung des Repositorys freigegeben. 0 schaltet eine Regel ab.</value>
   </data>
   <data name="Web_Backup_Retention_Last" xml:space="preserve">
     <value>Letzte</value>
@@ -6887,7 +6878,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Vollständig (Dateien, Datenbank, Systemdaten)</value>
   </data>
   <data name="Web_Backup_Level_Files_Help" xml:space="preserve">
-    <value>Nur die ausgewählten Freigaben und Pools.</value>
+    <value>Nur die ausgewählten Shares und Pools.</value>
   </data>
   <data name="Web_Backup_Level_FilesAndDatabase_Help" xml:space="preserve">
     <value>Zusätzlich bei jedem Lauf zuerst ein frischer Datenbank-Dump (Benutzer, Berechtigungen, Einstellungen, Dateiversionen).</value>
@@ -6905,7 +6896,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Pools auswählen</value>
   </data>
   <data name="Web_Backup_Jobs_PoolsHelp" xml:space="preserve">
-    <value>Ein Pool wird als Ganzes gesichert, auch Ordner, die keine Freigabe sind, als ein Sicherungsstand pro Pool. Wiederherstellung nur in den Server-Ordner.</value>
+    <value>Ein Pool wird als Ganzes gesichert, auch Ordner, die kein Share sind, als ein Sicherungsstand pro Pool. Wiederherstellung nur in den Server-Ordner.</value>
   </data>
   <data name="Web_Backup_Jobs_NoPools" xml:space="preserve">
     <value>Keine Pools gefunden.</value>
@@ -6953,19 +6944,19 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Sichern</value>
   </data>
   <data name="Web_Backup_Jobs_SourceKind_Share" xml:space="preserve">
-    <value>Einzelne Freigaben</value>
+    <value>Einzelne Shares</value>
   </data>
   <data name="Web_Backup_Jobs_SourceKind_Pool" xml:space="preserve">
-    <value>Ganze Pools (mit allen enthaltenen Freigaben)</value>
+    <value>Ganze Pools (mit allen enthaltenen Shares)</value>
   </data>
   <data name="Web_Backup_Jobs_PoolShares" xml:space="preserve">
-    <value>Enthaltene Freigaben</value>
+    <value>Enthaltene Shares</value>
   </data>
   <data name="Web_Backup_Jobs_PoolNoShares" xml:space="preserve">
-    <value>keine Freigaben</value>
+    <value>keine Shares</value>
   </data>
   <data name="Web_Backup_Error_sources_mixed" xml:space="preserve">
-    <value>Wähle entweder Freigaben oder Pools, nicht beides: Ein Pool enthält seine Freigaben bereits.</value>
+    <value>Wähle entweder Shares oder Pools, nicht beides: Ein Pool enthält seine Shares bereits.</value>
   </data>
   <data name="Web_Backup_Restore_NoServerPoints" xml:space="preserve">
     <value>Noch keine System- oder Pool-Sicherungsstände.</value>
@@ -7088,16 +7079,16 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Eine vorhandene SMB-Verbindung aus „Externer Speicher“; Server und Zugangsdaten werden übernommen. Es wird nichts eingebunden: das mitgelieferte rclone spricht SMB direkt.</value>
   </data>
   <data name="Web_Backup_Repos_SmbEncryptionHint" xml:space="preserve">
-    <value>Der Server muss für diese Freigabe Verschlüsselung erzwingen (Samba: smb encrypt = required; Windows: Set-SmbShare -EncryptData $true). rclone kann Verschlüsselung nicht selbst verlangen, daher prüft Kaimo die Freigabe vor jeder Sicherung und verweigert sie, solange der Server unverschlüsselte Verbindungen annimmt.</value>
+    <value>Der Server muss für diesen Share Verschlüsselung erzwingen (Samba: smb encrypt = required; Windows: Set-SmbShare -EncryptData $true). rclone kann Verschlüsselung nicht selbst verlangen, daher prüft Kaimo den Share vor jeder Sicherung und verweigert sie, solange der Server unverschlüsselte Verbindungen annimmt.</value>
   </data>
   <data name="Web_Backup_Error_smb_encryption_not_enforced" xml:space="preserve">
-    <value>Der SMB-Server erzwingt für diese Freigabe keine Verschlüsselung. Bitte serverseitig erzwingen (Samba: smb encrypt = required; Windows: Set-SmbShare -EncryptData $true).</value>
+    <value>Der SMB-Server erzwingt für diesen Share keine Verschlüsselung. Bitte serverseitig erzwingen (Samba: smb encrypt = required; Windows: Set-SmbShare -EncryptData $true).</value>
   </data>
   <data name="Web_Backup_Repos_SmbPath" xml:space="preserve">
-    <value>Freigabe und Ordner</value>
+    <value>Share und Ordner</value>
   </data>
   <data name="Web_Backup_Repos_SmbPathHelp" xml:space="preserve">
-    <value>Zuerst der Freigabename, dann der Ordner des Repositorys, z. B. backup/kaimo-repo. Nur Buchstaben, Ziffern, '.', '_', '-' und '/'.</value>
+    <value>Zuerst der Share-Name, dann der Ordner des Repositorys, z. B. backup/kaimo-repo. Nur Buchstaben, Ziffern, '.', '_', '-' und '/'.</value>
   </data>
   <data name="Web_Backup_Repos_NoSmbConnection" xml:space="preserve">
     <value>Es gibt noch keine SMB-Verbindung.</value>
@@ -7106,10 +7097,10 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Unter „Externer Speicher“ anlegen</value>
   </data>
   <data name="Web_Backup_Error_smb_share_required" xml:space="preserve">
-    <value>Der Pfad muss mit dem Freigabenamen beginnen (freigabe/ordner).</value>
+    <value>Der Pfad muss mit dem Share-Namen beginnen (share/ordner).</value>
   </data>
   <data name="Web_Backup_Error_smb_share_not_found" xml:space="preserve">
-    <value>Die SMB-Freigabe existiert auf dem Server nicht.</value>
+    <value>Der SMB-Share existiert auf dem Server nicht.</value>
   </data>
   <data name="Web_Backup_Error_connection_disabled" xml:space="preserve">
     <value>Die Verbindung ist unter „Externer Speicher“ deaktiviert.</value>
@@ -7851,5 +7842,53 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   </data>
   <data name="Web_Error_SystemRoleUndeletable" xml:space="preserve">
     <value>Systemrollen können nicht gelöscht werden.</value>
+  </data>
+  <data name="Web_Backup_Overview_Attention" xml:space="preserve">
+    <value>Braucht Aufmerksamkeit</value>
+  </data>
+  <data name="Web_Backup_Overview_AllGood" xml:space="preserve">
+    <value>Alles in Ordnung: Alle Sicherungen und Repositorys laufen planmäßig.</value>
+  </data>
+  <data name="Web_Backup_Overview_AttentionCount" xml:space="preserve">
+    <value>Braucht Aufmerksamkeit: {0}</value>
+  </data>
+  <data name="Web_Backup_Overview_Running" xml:space="preserve">
+    <value>Läuft gerade</value>
+  </data>
+  <data name="Web_Backup_Overview_LastSuccess" xml:space="preserve">
+    <value>Letzte erfolgreiche Sicherung</value>
+  </data>
+  <data name="Web_Backup_Overview_NextRun" xml:space="preserve">
+    <value>Nächste Sicherung</value>
+  </data>
+  <data name="Web_Backup_Overview_NoRepositories" xml:space="preserve">
+    <value>Noch kein Repository</value>
+  </data>
+  <data name="Web_Backup_Overview_NoRepositoriesHelp" xml:space="preserve">
+    <value>Sicherungen brauchen ein Speicherziel. Lege zuerst ein Repository an.</value>
+  </data>
+  <data name="Web_Backup_Overview_NoJobs" xml:space="preserve">
+    <value>Noch kein Sicherungsauftrag</value>
+  </data>
+  <data name="Web_Backup_Overview_NoJobsHelp" xml:space="preserve">
+    <value>Noch wird nichts gesichert. Lege einen Auftrag für deine Shares an.</value>
+  </data>
+  <data name="Web_Backup_Overview_JobFailed" xml:space="preserve">
+    <value>Der letzte Lauf am {0} ist fehlgeschlagen.</value>
+  </data>
+  <data name="Web_Backup_Overview_JobOverdue" xml:space="preserve">
+    <value>Seit {0} Tagen keine erfolgreiche Sicherung (zuletzt am {1}).</value>
+  </data>
+  <data name="Web_Backup_Overview_JobOverdueNever" xml:space="preserve">
+    <value>Noch keine erfolgreiche Sicherung, obwohl der Auftrag geplant ist.</value>
+  </data>
+  <data name="Web_Backup_Overview_JobWarnings" xml:space="preserve">
+    <value>Der letzte Lauf am {0} endete mit Warnungen; einzelne Dateien fehlen eventuell in der Sicherung.</value>
+  </data>
+  <data name="Web_Backup_Overview_RepositoryKitPending" xml:space="preserve">
+    <value>Lade das Wiederherstellungs-Kit herunter und bestätige es; bis dahin laufen keine Sicherungen in dieses Repository.</value>
+  </data>
+  <data name="Web_Backup_Overview_RepositoryCheckFailed" xml:space="preserve">
+    <value>Die Integritätsprüfung am {0} hat Fehler gefunden.</value>
   </data>
 </root>

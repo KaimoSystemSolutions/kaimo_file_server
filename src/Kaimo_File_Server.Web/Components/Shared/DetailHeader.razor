@@ -23,7 +23,7 @@
         }
         else if (!string.IsNullOrEmpty(Icon))
         {
-            <span class="detail-head-icon" aria-hidden="true">@Assets.SVG(Icon, new SvgOptions(Width: 18, Height: 18))</span>
+            <span class="detail-head-icon @IconClass" aria-hidden="true">@Assets.SVG(Icon, new SvgOptions(Width: 18, Height: 18))</span>
         }
         <div class="detail-head-text">
             <h3 class="detail-head-title" title="@Title">@Title</h3>
@@ -63,6 +63,9 @@
 @code {
     /// <summary>Icon file in wwwroot/svg for the leading tile; omitted when empty.</summary>
     [Parameter] public string? Icon { get; set; }
+
+    /// <summary>Extra class for the icon tile, e.g. a category colour via <c>TileColor.IconClass()</c>.</summary>
+    [Parameter] public string? IconClass { get; set; }
 
     /// <summary>
     /// Replaces the icon tile, e.g. with an avatar or a tinted icon. Use a

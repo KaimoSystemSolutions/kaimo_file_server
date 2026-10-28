@@ -17,6 +17,8 @@ public enum PrincipalKind
     Role,
     Department,
     Share,
+    /// <summary>Storage pool (backup sources); not a security principal, but picked the same way.</summary>
+    Pool,
 }
 
 /// <summary>

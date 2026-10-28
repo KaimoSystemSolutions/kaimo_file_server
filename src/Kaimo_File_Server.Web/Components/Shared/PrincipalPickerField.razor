@@ -3,7 +3,7 @@
 @inherits AppComponentBase
 
 @*
-    Reusable principal picker (users / groups / roles / departments / shares).
+    Reusable principal picker (users / groups / roles / departments / shares / pools).
 
     A compact trigger shows the current selection (chips for multi-select, a single
     row for single-select). Clicking it opens a modal with optional type tabs, a
@@ -33,7 +33,8 @@
         triggerStyle = $"border-color:{frameColor};background:{frameSoft};";
     }
 <div class="principal-picker @Class" @attributes="AdditionalAttributes">
-    <div class="principal-picker-trigger" style="@triggerStyle" @onclick="OpenDialog" role="button" tabindex="0"
+    <div class="principal-picker-trigger @(Disabled ? "is-disabled" : "")" style="@triggerStyle" @onclick="OpenDialog" role="button"
+         tabindex="@(Disabled ? -1 : 0)" aria-disabled="@(Disabled ? "true" : "false")"
          @onkeydown="TriggerKeyDown" aria-haspopup="dialog">
         @if (_selected.Count == 0)
         {
@@ -68,7 +69,7 @@
                 }
             </span>
         }
-        @if (AllowClear && Mode == SelectionMode.Single && _selected.Count > 0)
+        @if (AllowClear && !Disabled && Mode == SelectionMode.Single && _selected.Count > 0)
         {
             <span class="principal-picker-chip-x principal-picker-clear" role="button" tabindex="0"
                   @onclick="ClearSingle" @onclick:stopPropagation="true"
@@ -206,6 +207,9 @@
     /// mandatory value (e.g. a department that must always be set) where clearing makes no sense.</summary>
     [Parameter] public bool AllowClear { get; set; } = true;
 
+    /// <summary>Read-only trigger (e.g. while a save or move runs); the dialog does not open.</summary>
+    [Parameter] public bool Disabled { get; set; }
+
     /// <summary>Fired when the selection is committed (row pick in single mode, Save in multiple mode, or the trigger clear).</summary>
     [Parameter] public EventCallback<IReadOnlyList<Guid>> SelectedIdsChanged { get; set; }
 
@@ -277,6 +281,8 @@
 
     private void OpenDialog()
     {
+        if (Disabled)
+            return;
         ResetWorkingCopy();
         // Open on the tab of the current selection so a previously chosen group/role isn't hidden.
         var kinds = Kinds;
@@ -377,6 +383,7 @@
         PrincipalKind.Role => "shield.svg",
         PrincipalKind.Department => "building.svg",
         PrincipalKind.Share => "folder.svg",
+        PrincipalKind.Pool => "pool.svg",
         _ => "user.svg",
     };
 
@@ -386,6 +393,7 @@
         PrincipalKind.Role => ("var(--entity-role)", "var(--entity-role-soft)"),
         PrincipalKind.Department => ("var(--entity-department)", "var(--entity-department-soft)"),
         PrincipalKind.Share => ("var(--folder-stroke)", "var(--folder-fill)"),
+        PrincipalKind.Pool => ("var(--entity-pool)", "var(--entity-pool-soft)"),
         _ => ("var(--entity-user)", "var(--entity-user-soft)"),
     };
 
@@ -406,6 +414,7 @@
         PrincipalKind.Role => Text("Web_Picker_Roles", "Roles"),
         PrincipalKind.Department => Text("Web_Picker_Departments", "Departments"),
         PrincipalKind.Share => Text("Web_Picker_Shares", "Shares"),
+        PrincipalKind.Pool => Text("Web_Picker_Pools", "Pools"),
         _ => Text("Web_Picker_Users", "Users"),
     };
 

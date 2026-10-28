@@ -26,6 +26,7 @@
         {
             <button type="button" class="workspace-row @(_selectedId == run.Id ? "workspace-row--selected" : "")"
                     aria-pressed="@(_selectedId == run.Id ? "true" : "false")" @onclick="() => _selectedId = run.Id">
+                <span class="workspace-row-icon @BackupUi.RunIconClass(run.Type)">@Assets.SVG(BackupUi.RunIcon(run.Type), new SvgOptions(Width: 16, Height: 16))</span>
                 <span class="workspace-row-text">
                     <strong>@BackupUi.RunTypeLabel(run.Type) · @RunSubject(run)</strong>
                     <small>@DateFmt.FormatDateTime(run.StartedAtUtc ?? run.QueuedAtUtc) · @BackupUi.TriggerLabel(run.Trigger)</small>
@@ -39,7 +40,7 @@
         @if (Selected is { } current)
         {
             var failed = !string.IsNullOrEmpty(current.ErrorCode);
-            <DetailHeader Icon="@RunIcon(current.Type)" Title="@BackupUi.RunTypeLabel(current.Type)" Subtitle="@RunSubject(current)">
+            <DetailHeader Icon="@BackupUi.RunIcon(current.Type)" IconClass="@BackupUi.RunIconClass(current.Type)" Title="@BackupUi.RunTypeLabel(current.Type)" Subtitle="@RunSubject(current)">
                 <Status>
                     <StatusBadge Tone="@BackupUi.RunTone(current.Status)" Label="@BackupUi.RunStatusLabel(current.Status)" />
                 </Status>
@@ -281,16 +282,6 @@
     // The share name is only recorded once the run started; a queued restore shows its folder.
     private static string SharePath(string? share, string? path)
         => string.Join("/", new[] { share, path }.Where(p => !string.IsNullOrEmpty(p))) is { Length: > 0 } text ? text : "–";
-
-    private static string RunIcon(BackupRunType type) => type switch
-    {
-        BackupRunType.Backup => "upload.svg",
-        BackupRunType.Restore => "cloud-download.svg",
-        BackupRunType.Check or BackupRunType.TestRestore => "shield.svg",
-        BackupRunType.Copy => "copy.svg",
-        BackupRunType.Forget or BackupRunType.Prune => "trash.svg",
-        _ => "archive.svg",
-    };
 
     // Queued or still running runs have no duration yet.
     private static string? Duration(BackupRun run)

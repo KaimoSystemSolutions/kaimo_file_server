@@ -20,7 +20,8 @@
     align-items: center;
 }
 
-    .homes-pool-row .edit-input {
+    .homes-pool-row .edit-input,
+    .homes-pool-row ::deep .principal-picker {
         flex: 1;
         min-width: 0;
     }

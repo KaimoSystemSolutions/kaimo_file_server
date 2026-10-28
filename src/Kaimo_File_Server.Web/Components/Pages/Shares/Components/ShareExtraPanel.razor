@@ -24,20 +24,20 @@
             <InfoButton Text="@(Resources.ResourceManager.GetString("Web_ShareList_MovePoolHint") ?? "The share is unavailable on all access paths while the move runs.")" />
         </span>
         <div class="detail-value-row">
-            <select class="edit-input"
-                    @bind="VM.EditSharePoolPath"
-                    disabled="@(isReadOnly || VM.IsMovingPool)">
-                @if (VM.GetPoolNameForShare(VM.SelectedShare) is null)
-                {
-                    <option value="@VM.EditSharePoolPath">
-                        @Resources.Web_ShareList_StoragePoolUnconfigured
-                    </option>
-                }
-                @foreach (var pool in VM.StoragePools)
-                {
-                    <option value="@pool.Path">@pool.Name — @pool.Path</option>
-                }
-            </select>
+            @{
+                // A share outside every configured pool keeps its current folder as a choice.
+                var pools = VM.StoragePools.Select(p => (p.Path, p.Name)).ToList();
+                if (VM.GetPoolNameForShare(VM.SelectedShare) is null && !string.IsNullOrEmpty(VM.EditSharePoolPath))
+                    pools.Insert(0, (VM.EditSharePoolPath, Resources.Web_ShareList_StoragePoolUnconfigured));
+            }
+            <PrincipalPickerField Mode="SelectionMode.Single"
+                                  Items="pools.ToPoolItems(p => p.Path, p => p.Name)"
+                                  SelectedIds="VM.EditSharePoolPath.AsPoolSelection()"
+                                  SelectedIdsChanged="ids => VM.EditSharePoolPath =
+                                      pools.Select(p => p.Path).PoolPathFor(ids) ?? VM.EditSharePoolPath"
+                                  AllowClear="false"
+                                  Disabled="@(isReadOnly || VM.IsMovingPool)"
+                                  Title="@Resources.Web_ShareList_Label_StoragePool" />
             <button class="btn-primary"
                     @onclick="ChangeStoragePool"
                     disabled="@(isReadOnly || VM.IsMovingPool)">

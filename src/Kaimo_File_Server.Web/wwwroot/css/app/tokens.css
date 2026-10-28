@@ -99,6 +99,8 @@
     --entity-role-soft: rgba(185, 126, 32, 0.18);
     --entity-department: #e28a84;
     --entity-department-soft: rgba(190, 80, 73, 0.17);
+    --entity-pool: #6cc7bd;
+    --entity-pool-soft: rgba(44, 150, 138, 0.18);
     --folder-fill: rgba(214, 158, 46, 0.16);
     --folder-stroke: #ddb765;
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
@@ -165,6 +167,8 @@
     --entity-role-soft: #f8ecd4;
     --entity-department: #a3453f;
     --entity-department-soft: #f8e4e2;
+    --entity-pool: #1f7a72;
+    --entity-pool-soft: #dcf2ef;
     --folder-fill: rgba(183, 121, 31, 0.12);
     --folder-stroke: #9a6700;
     --shadow: 0 2px 8px rgba(27, 32, 28, 0.08);

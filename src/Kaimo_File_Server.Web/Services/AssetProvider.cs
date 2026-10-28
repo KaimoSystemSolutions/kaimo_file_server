@@ -19,6 +19,7 @@ public class AssetProvider
         "path",
         "line",
         "circle",
+        "ellipse",
         "polyline",
         "polygon",
         "rect",

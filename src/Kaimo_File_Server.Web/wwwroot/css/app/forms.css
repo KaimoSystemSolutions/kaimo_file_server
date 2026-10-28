@@ -135,6 +135,15 @@
         box-shadow: 0 0 0 3px var(--accent-subtle);
     }
 
+    .principal-picker-trigger.is-disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+        .principal-picker-trigger.is-disabled:hover {
+            border-color: var(--border-strong, var(--border));
+        }
+
 .principal-picker-placeholder {
     flex: 1;
     font-size: 13px;

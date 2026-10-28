@@ -11,7 +11,8 @@
 
 /* Field + action rows (move pool): the field grows, the button keeps a fixed size and
    stays vertically centred with the field. */
-.detail-value-row .edit-input { flex: 1; min-width: 0; }
+.detail-value-row .edit-input,
+.detail-value-row ::deep .principal-picker { flex: 1; min-width: 0; }
 
 .detail-value-row .btn-primary {
     flex-shrink: 0;

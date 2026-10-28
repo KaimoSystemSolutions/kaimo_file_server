@@ -17,17 +17,17 @@
                 <span class="detail-value--mono">@VM.HomesSharePath</span>
             </div>
             <div class="homes-field">
-                <label class="settings-field-label label-with-info" for="homes-pool">
+                <span class="settings-field-label label-with-info">
                     @Resources.Web_ShareList_Label_StoragePool
                     <InfoButton Text="@T("Web_Settings_Homes_MoveHint", "Moves every home folder with all its files. Home folders are unavailable on all access paths while the move runs.")" />
-                </label>
+                </span>
                 <div class="homes-pool-row">
-                    <select id="homes-pool" class="edit-input" @bind="VM.HomesTargetPool" disabled="@Busy">
-                        @foreach (var pool in VM.StorageUsages)
-                        {
-                            <option value="@pool.StoragePath">@VM.ResolvePoolName(pool.StoragePath)</option>
-                        }
-                    </select>
+                    <PrincipalPickerField Mode="SelectionMode.Single"
+                                          Items="PoolItems"
+                                          SelectedIds="VM.HomesTargetPool.AsPoolSelection()"
+                                          SelectedIdsChanged="ids => VM.HomesTargetPool = PoolPaths.PoolPathFor(ids) ?? VM.HomesTargetPool"
+                                          AllowClear="false" Disabled="@Busy"
+                                          Title="@Resources.Web_ShareList_Label_StoragePool" />
                     <button class="btn-primary" type="button" disabled="@(Busy || IsCurrentPool)" @onclick="() => _confirmMove = true">
                         @(VM.IsMovingHomes ? "…" : Resources.Web_ShareList_Action_MovePool)
                     </button>
@@ -51,17 +51,17 @@
     {
         <div class="homes-fields">
             <div class="homes-field">
-                <label class="settings-field-label label-with-info" for="homes-setup-pool">
+                <span class="settings-field-label label-with-info">
                     @Resources.Web_ShareList_Label_StoragePool
                     <InfoButton Text="@T("Web_Settings_Homes_PoolHint", "You can move the home folders to another pool later.")" />
-                </label>
+                </span>
                 <div class="homes-pool-row">
-                    <select id="homes-setup-pool" class="edit-input" @bind="VM.HomesSelectedPool" disabled="@Busy">
-                        @foreach (var pool in VM.StorageUsages)
-                        {
-                            <option value="@pool.StoragePath">@VM.ResolvePoolName(pool.StoragePath)</option>
-                        }
-                    </select>
+                    <PrincipalPickerField Mode="SelectionMode.Single"
+                                          Items="PoolItems"
+                                          SelectedIds="VM.HomesSelectedPool.AsPoolSelection()"
+                                          SelectedIdsChanged="ids => VM.HomesSelectedPool = PoolPaths.PoolPathFor(ids) ?? VM.HomesSelectedPool"
+                                          AllowClear="false" Disabled="@Busy"
+                                          Title="@Resources.Web_ShareList_Label_StoragePool" />
                     <button class="btn-primary" type="button" disabled="@Busy" @onclick="SetUp">
                         @T("Web_Settings_Homes_SetUp", "Set up home folders")
                     </button>
@@ -117,6 +117,9 @@
     private string? _error;
 
     private bool Busy => _busy || VM.IsMovingHomes;
+
+    private IEnumerable<string> PoolPaths => VM.StorageUsages.Select(u => u.StoragePath);
+    private IReadOnlyList<PrincipalPickerItem> PoolItems => PoolPaths.ToPoolItems(p => p, VM.ResolvePoolName);
 
     private bool IsCurrentPool => string.Equals(VM.HomesTargetPool, VM.HomesPoolPath, StringComparison.Ordinal);
 

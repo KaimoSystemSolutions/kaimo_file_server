@@ -32,7 +32,7 @@
             var repo = view.Repository;
             <button type="button" class="workspace-row @(_selectedId == repo.Id && !_editing ? "workspace-row--selected" : "")"
                     aria-pressed="@(_selectedId == repo.Id ? "true" : "false")" @onclick="() => Select(repo.Id)">
-                <span class="workspace-row-icon">@Assets.SVG("archive.svg", new SvgOptions(Width: 16, Height: 16))</span>
+                <span class="workspace-row-icon @BackupUi.RepositoryIconClass">@Assets.SVG("archive.svg", new SvgOptions(Width: 16, Height: 16))</span>
                 <span class="workspace-row-text">
                     <strong>@repo.Name</strong>
                     <small>@BackupUi.BackendLabel(repo.Backend)</small>
@@ -435,7 +435,7 @@
         {
             var repo = view.Repository;
             var maintenance = VM.ActiveMaintenance(repo.Id);
-            <DetailHeader Icon="archive.svg" Title="@repo.Name" Subtitle="@BackupUi.BackendLabel(repo.Backend)">
+            <DetailHeader Icon="archive.svg" IconClass="@BackupUi.RepositoryIconClass" Title="@repo.Name" Subtitle="@BackupUi.BackendLabel(repo.Backend)">
                 <Status>
                     <StatusBadge Tone="@BackupUi.RepositoryTone(repo)" Label="@BackupUi.RepositoryStateLabel(repo)" />
                 </Status>

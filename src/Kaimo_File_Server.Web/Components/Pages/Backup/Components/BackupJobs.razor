@@ -30,7 +30,7 @@
             var job = view.Job;
             <button type="button" class="workspace-row @(_selectedId == job.Id && !_editing ? "workspace-row--selected" : "")"
                     aria-pressed="@(_selectedId == job.Id ? "true" : "false")" @onclick="() => Select(job.Id)">
-                <span class="workspace-row-icon">@Assets.SVG("history.svg", new SvgOptions(Width: 16, Height: 16))</span>
+                <span class="workspace-row-icon @BackupUi.JobIconClass">@Assets.SVG("history.svg", new SvgOptions(Width: 16, Height: 16))</span>
                 <span class="workspace-row-text">
                     <strong>@job.Name</strong>
                     <small>@BackupUi.SourcesText(view) → @view.RepositoryName</small>
@@ -66,13 +66,17 @@
                 </label>
                 @if (VM.Access.JobsUnrestricted)
                 {
-                    <label>
-                        <span>@R("Web_Backup_Jobs_SourceKind")</span>
-                        <select class="edit-input" @bind="form.SourceKind">
-                            <option value="@BackupSourceKind.Share">@R("Web_Backup_Jobs_SourceKind_Share")</option>
-                            <option value="@BackupSourceKind.Pool">@R("Web_Backup_Jobs_SourceKind_Pool")</option>
-                        </select>
-                    </label>
+                    <div class="workspace-field">
+                        <span id="backup-job-source-kind">@R("Web_Backup_Jobs_SourceKind")</span>
+                        <div class="toggle-button-group" role="radiogroup" aria-labelledby="backup-job-source-kind">
+                            @foreach (var kind in new[] { BackupSourceKind.Share, BackupSourceKind.Pool })
+                            {
+                                <button type="button" role="radio" aria-checked="@(form.SourceKind == kind ? "true" : "false")"
+                                        class="toggle-btn @(form.SourceKind == kind ? "toggle-btn--active" : null)"
+                                        @onclick="() => form.SourceKind = kind">@R("Web_Backup_Jobs_SourceKind_" + kind)</button>
+                            }
+                        </div>
+                    </div>
                 }
                 @if (form.SourceKind == BackupSourceKind.Share)
                 {
@@ -91,9 +95,12 @@
                 {
                     <div class="workspace-field">
                         <span>@R("Web_Backup_Jobs_Pools")</span>
-                        <MultiSelect T="string" Items="form.Pools" Label="BackupUi.PoolName" OnChanged="StateHasChanged"
-                                     PlaceholderText="@R("Web_Backup_Jobs_PoolsPlaceholder")"
-                                     EmptyText="@R("Web_Backup_Jobs_NoPools")" />
+                        <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                              Items="form.Pools.ToPoolItems(p => p.Item, p => BackupUi.PoolName(p.Item))"
+                                              SelectedIds="form.Pools.CheckedIds(PrincipalPickerBindings.PoolId)"
+                                              SelectedIdsChanged="ids => form.Pools.ApplySelection(ids, PrincipalPickerBindings.PoolId)"
+                                              Title="@R("Web_Backup_Jobs_Pools")"
+                                              Placeholder="@(form.Pools.Count == 0 ? R("Web_Backup_Jobs_NoPools") : R("Web_Backup_Jobs_PoolsPlaceholder"))" />
                         <small>@R("Web_Backup_Jobs_PoolsHelp")</small>
                     </div>
                     @if (form.SelectedPools.Any())
@@ -216,7 +223,7 @@
             var job = view.Job;
             var active = VM.ActiveRuns.FirstOrDefault(r => r.JobId == job.Id);
             var hasPools = job.Sources.Any(s => s.Kind == BackupSourceKind.Pool);
-            <DetailHeader Icon="history.svg" Title="@job.Name" Subtitle="@view.RepositoryName">
+            <DetailHeader Icon="history.svg" IconClass="@BackupUi.JobIconClass" Title="@job.Name" Subtitle="@view.RepositoryName">
                 <Status>
                     <StatusBadge Tone="@BackupUi.JobTone(job)" Label="@BackupUi.JobStatusLabel(job)" />
                 </Status>

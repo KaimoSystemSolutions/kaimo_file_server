@@ -26,6 +26,34 @@ public static class BackupUi
             : path.StartsWith(prefix, StringComparison.Ordinal) ? path[prefix.Length..]
             : null;
 
+    // ── icon colours: jobs as on the start page's backup tile, repositories like other storage
+    //    targets (connections), shares and pools in their entity colours ──
+
+    public static readonly string JobIconClass = TileColor.Group.IconClass();
+    public static readonly string RepositoryIconClass = TileColor.Info.IconClass();
+    public static readonly string ShareIconClass = TileColor.Folder.IconClass();
+    public static readonly string PoolIconClass = TileColor.Pool.IconClass();
+
+    public static string RunIcon(BackupRunType type) => type switch
+    {
+        BackupRunType.Backup => "upload.svg",
+        BackupRunType.Restore => "cloud-download.svg",
+        BackupRunType.Check or BackupRunType.TestRestore => "shield.svg",
+        BackupRunType.Copy => "copy.svg",
+        // Retention keeps a selection of backup points; only pruning really frees data.
+        BackupRunType.Forget => "filter.svg",
+        BackupRunType.Prune => "trash.svg",
+        _ => "archive.svg",
+    };
+
+    /// <summary>Backups belong to a job, restores to a share, everything else is repository maintenance.</summary>
+    public static string RunIconClass(BackupRunType type) => type switch
+    {
+        BackupRunType.Backup => JobIconClass,
+        BackupRunType.Restore => ShareIconClass,
+        _ => RepositoryIconClass,
+    };
+
     public static string RunStatusLabel(BackupRunStatus status) => R("Web_Backup_Status_" + status);
 
     public static string RunTypeLabel(BackupRunType type) => R("Web_Backup_RunType_" + type);
@@ -35,7 +63,6 @@ public static class BackupUi
     public static string LevelLabel(BackupContentLevel level) => R("Web_Backup_Level_" + level);
 
     public static string PoolName(string poolPath) => Path.GetFileName(Path.TrimEndingDirectorySeparator(poolPath));
-
     /// <summary>Name of a source in a run outcome; the system source is stored as a key and shown in the UI language.</summary>
     public static string SourceName(string name)
         => name == Infrastructure.Backup.Restic.BackupJobExecutor.SystemSourceKey ? R("Web_Backup_Source_System") : name;

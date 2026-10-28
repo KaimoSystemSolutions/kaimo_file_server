@@ -53,24 +53,75 @@
     background: var(--bg-secondary);
 }
 
-.backup-page ::deep .backup-overview-row:disabled {
-    cursor: default;
+/* Status banner + one row per message (same reading as the start page's attention list). */
+.backup-page ::deep .backup-overview-status {
+    margin-bottom: var(--space-5);
 }
 
-    .backup-page ::deep .backup-overview-row:disabled:hover {
-        background: var(--bg-secondary);
+    .backup-page ::deep .backup-overview-status > :is(.success-banner, .warning-banner, .error-banner) {
+        margin-bottom: 0;
     }
 
-.backup-page ::deep .backup-overview-meta {
-    display: flex;
-    flex: 0 1 auto;
-    flex-direction: column;
+.backup-page ::deep .backup-overview-list {
+    margin: var(--space-2) 0 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    list-style: none;
+}
+
+    .backup-page ::deep .backup-overview-list--flat {
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+    }
+
+.backup-page ::deep .backup-overview-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 52px;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border);
+}
+
+    .backup-page ::deep .backup-overview-item:last-child {
+        border-bottom: 0;
+    }
+
+    .backup-page ::deep .backup-overview-item--run {
+        grid-template-columns: auto minmax(0, 1fr) minmax(120px, 220px);
+    }
+
+.backup-page ::deep .backup-overview-text {
+    display: grid;
     gap: 2px;
     min-width: 0;
-    color: var(--text-tertiary);
-    font-size: 11.5px;
-    text-align: right;
-    white-space: nowrap;
+}
+
+    .backup-page ::deep .backup-overview-text strong {
+        overflow: hidden;
+        color: var(--text-primary);
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .backup-page ::deep .backup-overview-text small {
+        color: var(--text-secondary);
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
+.backup-page ::deep .backup-overview-progress {
+    margin: 0;
+}
+
+.backup-page ::deep .backup-overview-tiles {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
 /* ── Job editor ── */
@@ -655,9 +706,23 @@
         align-items: stretch;
     }
 
-    .backup-page ::deep .backup-overview-meta {
-        display: none;
+    /* Badge and open button wrap under the message. */
+    .backup-page ::deep .backup-overview-item {
+        grid-template-columns: auto minmax(0, 1fr) auto;
     }
+
+        .backup-page ::deep .backup-overview-item > .status-badge {
+            grid-column: 2;
+            justify-self: start;
+        }
+
+    .backup-page ::deep .backup-overview-item--run {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+        .backup-page ::deep .backup-overview-progress {
+            grid-column: 2;
+        }
 
     .backup-page ::deep .backup-browse-row {
         grid-template-columns: 28px minmax(0, 1fr) 80px;

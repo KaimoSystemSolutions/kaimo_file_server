@@ -233,6 +233,7 @@
 .tile-icon--group { background: var(--entity-group-soft); color: var(--entity-group); }
 .tile-icon--role { background: var(--entity-role-soft); color: var(--entity-role); }
 .tile-icon--department { background: var(--entity-department-soft); color: var(--entity-department); }
+.tile-icon--pool { background: var(--entity-pool-soft); color: var(--entity-pool); }
 .tile-icon--info { background: color-mix(in srgb, var(--info) 16%, transparent); color: var(--info); }
 .tile-icon--accent { background: var(--accent-subtle); color: var(--accent-strong); }
 .tile-icon--success { background: var(--success-subtle); color: var(--success); }
@@ -245,6 +246,7 @@
 .tile-segment--group { background: var(--entity-group); }
 .tile-segment--role { background: var(--entity-role); }
 .tile-segment--department { background: var(--entity-department); }
+.tile-segment--pool { background: var(--entity-pool); }
 .tile-segment--info { background: var(--info); }
 .tile-segment--accent { background: var(--accent); }
 .tile-segment--success { background: var(--success); }
