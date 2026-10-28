@@ -20,6 +20,12 @@ internal sealed class RestoreMerge(
     /// <summary>Destination paths that kept their current content (skipped or restored under a new name).</summary>
     public List<string> Untouched { get; } = [];
 
+    /// <summary>
+    /// Destination paths that existed before the restore and therefore keep their live permissions:
+    /// merged folders, unchanged and overwritten files.
+    /// </summary>
+    public HashSet<string> Existing { get; } = new(StringComparer.Ordinal);
+
     public async Task MoveAsync(string source, string relativeDestination)
     {
         var destination = Absolute(relativeDestination);
@@ -34,6 +40,7 @@ internal sealed class RestoreMerge(
 
         if (sourceIsDirectory && Directory.Exists(destination))
         {
+            Existing.Add(relativeDestination);
             foreach (var child in Directory.EnumerateFileSystemEntries(source).ToList())
             {
                 var name = Path.GetFileName(child);
@@ -48,6 +55,7 @@ internal sealed class RestoreMerge(
         if (!sourceIsDirectory && File.Exists(destination) && await SameContentAsync(source, destination))
         {
             outcome.Unchanged++;
+            Existing.Add(relativeDestination);
             return;
         }
 
@@ -84,6 +92,7 @@ internal sealed class RestoreMerge(
             outcome.VersionsCreated++;
         File.Move(source, destination, overwrite: true);
         outcome.Overwritten++;
+        Existing.Add(relativeDestination);
     }
 
     private void RestoreBeside(string source, string relativeDestination, bool sourceIsDirectory)

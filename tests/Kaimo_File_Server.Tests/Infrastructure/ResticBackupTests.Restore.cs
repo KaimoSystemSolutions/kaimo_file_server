@@ -44,6 +44,40 @@ public partial class ResticBackupTests
     }
 
     [Fact]
+    public void MapPath_SkipsPathsThatExistedBefore_ButMapsTheirNewChildren()
+    {
+        // In place: an item that already existed keeps its live permissions (a grant revoked
+        // since the backup must not come back); what the restore created gets the backed-up ones.
+        var existing = new HashSet<string>(StringComparer.Ordinal) { "docs/a", "docs/a/kept.txt" };
+        var all = new HashSet<string>();
+
+        Assert.Null(BackupRestoreExecutor.MapPath("docs/a", "", all, "", [], existing));
+        Assert.Null(BackupRestoreExecutor.MapPath("docs/a/kept.txt", "", all, "", [], existing));
+        Assert.Equal("docs/a/new.txt", BackupRestoreExecutor.MapPath("docs/a/new.txt", "", all, "", [], existing));
+    }
+
+    [Fact]
+    public async Task Merge_RecordsTheDestinationPathsThatExistedBefore()
+    {
+        var (root, staged, share) = MergeFixture();
+        try
+        {
+            File.WriteAllText(Path.Combine(share, "docs", "sub", "b.txt"), "backup-b");
+            var outcome = new BackupRestoreOutcome();
+            var merge = new RestoreMerge(share, Guid.NewGuid(), BackupRestoreConflict.Overwrite, new CountingVersions().Service, null, " (r)", outcome);
+
+            await merge.MoveAsync(Path.Combine(staged, "docs"), "docs");
+
+            // Merged folders, the overwritten file and the unchanged file existed; docs/new.txt is new.
+            Assert.Equal(["docs", "docs/a.txt", "docs/sub", "docs/sub/b.txt"], merge.Existing.Order(StringComparer.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RestoredFolderName_IsNumberedWhenTaken()
     {
         var root = Directory.CreateTempSubdirectory("kaimo-restore-name-").FullName;

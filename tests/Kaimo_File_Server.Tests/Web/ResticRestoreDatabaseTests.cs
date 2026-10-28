@@ -25,11 +25,15 @@ namespace Kaimo_File_Server.Tests;
 /// Restore against the real EF schema (Sqlite): who may see and restore which backup points,
 /// which mode needs which bit, and how backed-up permissions are written back.
 /// </summary>
-public sealed class ResticRestoreDatabaseTests : DatabaseTestBase
+public sealed partial class ResticRestoreDatabaseTests : DatabaseTestBase
 {
     private readonly User _user = new(Guid.NewGuid(), "Alice", "alice", "hash", "nt");
     private readonly Mock<IManagementAuthService> _auth = new();
     private readonly Mock<IBackupRunner> _runner = new();
+    private readonly Mock<IProcessRunner> _process = new();
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "kaimo-restore-" + Guid.NewGuid().ToString("N"));
+    /// <summary>The JSON lines <c>restic ls</c> prints.</summary>
+    private string[] _lsOutput = [];
     private BackupRestoreRequest? _queued;
 
     private UserContext Actor => new(_user, [], [], []);
@@ -41,6 +45,14 @@ public sealed class ResticRestoreDatabaseTests : DatabaseTestBase
         _runner.Setup(r => r.EnqueueRestoreAsync(It.IsAny<BackupRestoreRequest>(), It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .Callback<BackupRestoreRequest, string, Guid, CancellationToken>((request, _, _, _) => _queued = request)
             .ReturnsAsync(Guid.NewGuid());
+        _process.Setup(p => p.RunStreamingAsync(It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<IReadOnlyDictionary<string, string>?>(), It.IsAny<Action<string>?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, IReadOnlyList<string> _, IReadOnlyDictionary<string, string>? _, Action<string>? onLine, bool _, CancellationToken _) =>
+            {
+                foreach (var line in _lsOutput)
+                    onLine?.Invoke(line);
+                return Task.FromResult(new ProcessResult(0, "", ""));
+            });
     }
 
     /// <summary>Grants each bit on the given shares only (empty = nowhere).</summary>
@@ -59,12 +71,18 @@ public sealed class ResticRestoreDatabaseTests : DatabaseTestBase
 
     private BackupCatalogService Catalog(bool demo = false)
     {
-        var config = new ConfigurationBuilder().Build();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Backup:Restic:LocalRoots"] = _root,
+            ["Backup:Restic:CacheDirectory"] = Path.Combine(_root, "cache"),
+        }).Build();
+        var vault = new Mock<ICredentialVault>();
+        vault.Setup(v => v.Unprotect<string>(It.IsAny<string>(), It.IsAny<CredentialContext>())).Returns("pw");
         return new BackupCatalogService(
             DbFactory,
             _auth.Object,
-            new ResticTargetResolver(DbFactory, Mock.Of<ICredentialVault>(), config),
-            new ResticClient(Mock.Of<IProcessRunner>(), config),
+            new ResticTargetResolver(DbFactory, vault.Object, config),
+            new ResticClient(_process.Object, config),
             _runner.Object,
             new DemoModeOptions { ReadOnly = demo },
             TimeProvider.System,
@@ -77,8 +95,15 @@ public sealed class ResticRestoreDatabaseTests : DatabaseTestBase
     {
         var projects = new ShareDefinition("projects", Path.Combine(Path.GetTempPath(), "kaimo-restore-projects"));
         var sales = new ShareDefinition("sales", Path.Combine(Path.GetTempPath(), "kaimo-restore-sales"));
-        var homes = new ShareDefinition("users", "/data/storage/pool01/users") { IsUserHomes = true };
-        var repo = new BackupRepository { Name = "NAS", Backend = BackupBackend.Local, State = BackupRepositoryState.Active };
+        var homes = new ShareDefinition("users", Path.Combine(_root, "users")) { IsUserHomes = true };
+        var repo = new BackupRepository
+        {
+            Name = "NAS",
+            Backend = BackupBackend.Local,
+            State = BackupRepositoryState.Active,
+            SettingsJson = new ResticRepositorySettings { Path = Path.Combine(_root, "repo") }.Serialize(),
+            EncryptedPassword = "protected",
+        };
         await using var db = NewContext();
         db.Users.Add(_user);
         db.ShareDefinitions.AddRange(projects, sales, homes);
@@ -164,15 +189,14 @@ public sealed class ResticRestoreDatabaseTests : DatabaseTestBase
     }
 
     [Fact]
-    public async Task RestoringPermissions_NeedsTheInPlaceBitOnTheDestination()
+    public async Task NewFolder_ByRestoreFromBackupOnly_IsQueuedWithPermissions()
     {
         var seed = await SeedAsync();
         Restorer([seed.Projects.Id], []);
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            Catalog().EnqueueRestoreAsync(Actor, Request(seed, BackupRestoreMode.NewFolder, permissions: true)));
 
-        Restorer([seed.Projects.Id], [seed.Projects.Id]);
-        await Catalog().EnqueueRestoreAsync(Actor, Request(seed, BackupRestoreMode.InPlace, permissions: true));
+        // F21: backed-up permissions are always restored, whatever the request says.
+        await Catalog().EnqueueRestoreAsync(Actor, Request(seed, BackupRestoreMode.NewFolder, permissions: false));
+
         Assert.True(_queued!.RestorePermissions);
     }
 

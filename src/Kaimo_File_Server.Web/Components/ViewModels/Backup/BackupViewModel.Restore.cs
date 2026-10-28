@@ -50,6 +50,12 @@ public partial class BackupViewModel
     /// <summary>Key of a backup point in the picker (snapshot ids are only unique per repository).</summary>
     public static string PointKey(BackupPointView point) => point.RepositoryId.ToString("N") + ":" + point.SnapshotId;
 
+    /// <summary>
+    /// "New folder" needs RestoreFromBackup and, on the home-folder share, a folder below the root:
+    /// a new folder at the homes root would be no home and is refused by the server.
+    /// </summary>
+    public bool CanRestoreIntoNewFolder => RestoreRights.FromBackup && !(RestoreShare?.IsUserHomes == true && BrowseFolder.Length == 0);
+
     /// <summary>Nothing or everything selected: the restore takes the whole folder.</summary>
     public bool RestoresWholeFolder => SelectedEntries.Count == 0 || SelectedEntries.Count == BrowseEntries.Count;
 
@@ -112,15 +118,10 @@ public partial class BackupViewModel
         RestoreTargets = (await catalog.ListRestoreTargetSharesAsync(actor)).Where(s => s.Id != RestoreShare?.ShareId).ToList();
         RestoreForm = new BackupRestoreForm
         {
-            Mode = RestoreRights.FromBackup ? BackupRestoreMode.NewFolder : BackupRestoreMode.InPlace,
+            Mode = CanRestoreIntoNewFolder || !RestoreRights.InPlace ? BackupRestoreMode.NewFolder : BackupRestoreMode.InPlace,
             TargetShareId = RestoreTargets.FirstOrDefault()?.Id ?? Guid.Empty,
         };
     });
-
-    /// <summary>RestoreBackupInPlace on the destination is needed to write permissions back.</summary>
-    public bool CanRestorePermissions => RestoreForm.Mode == BackupRestoreMode.OtherShare
-        ? RestoreForm.TargetShareId != Guid.Empty
-        : RestoreRights.InPlace;
 
     public Task<bool> StartRestoreAsync() => RunAsync(async actor =>
     {
@@ -135,7 +136,8 @@ public partial class BackupViewModel
             RestoresWholeFolder ? [] : SelectedEntries.ToList(),
             form.Mode,
             form.Conflict,
-            form.RestorePermissions && CanRestorePermissions,
+            // Backed-up permissions are always restored onto created paths (the server enforces it too).
+            true,
             form.Mode == BackupRestoreMode.OtherShare ? form.TargetShareId : null,
             form.Mode == BackupRestoreMode.OtherShare ? form.TargetFolder : null));
         Runs = await catalog.ListRunsAsync(actor);

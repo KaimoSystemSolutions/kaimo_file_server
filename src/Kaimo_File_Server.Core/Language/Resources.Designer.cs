@@ -5893,20 +5893,20 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Owners and permissions as at the time of the backup. Users and groups that no longer exist are skipped and listed. ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Restored items get their owners and permissions as recorded in the backup point; items that already exist keep their current permissions. ähnelt.
         /// </summary>
-        public static string Web_Backup_Restore_PermissionsHelp {
+        public static string Web_Backup_Restore_PermissionsAuto {
             get {
-                return ResourceManager.GetString("Web_Backup_Restore_PermissionsHelp", resourceCulture);
+                return ResourceManager.GetString("Web_Backup_Restore_PermissionsAuto", resourceCulture);
             }
         }
-        
+
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Needs the permission “Restore in place” on the destination share. ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die A new folder cannot be created at the top level of the home folders. Open a home folder first or restore in place. ähnelt.
         /// </summary>
-        public static string Web_Backup_Restore_PermissionsNotAllowed {
+        public static string Web_Backup_Error_homes_root_new_folder {
             get {
-                return ResourceManager.GetString("Web_Backup_Restore_PermissionsNotAllowed", resourceCulture);
+                return ResourceManager.GetString("Web_Backup_Error_homes_root_new_folder", resourceCulture);
             }
         }
         
@@ -15442,7 +15442,7 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Restore in place (overwrite, other share, permissions) ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Restore in place (overwrite, other share; resets owners and permissions of overwritten items to the backup state) ähnelt.
         /// </summary>
         public static string Web_Perm_RestoreBackupInPlace {
             get {
@@ -15451,7 +15451,7 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Restore from backup (new folder / download) ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Restore from backup (new folder / download; includes read access to the share&apos;s backup content) ähnelt.
         /// </summary>
         public static string Web_Perm_RestoreFromBackup {
             get {
@@ -20865,6 +20865,24 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_ShareLinks_SelectHint {
             get {
                 return ResourceManager.GetString("Web_ShareLinks_SelectHint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die You are not permitted to change this link. ähnelt.
+        /// </summary>
+        public static string Web_ShareLinks_NotPermitted {
+            get {
+                return ResourceManager.GetString("Web_ShareLinks_NotPermitted", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Created by a user with more rights — you can only disable or delete this link. ähnelt.
+        /// </summary>
+        public static string Web_ShareLinks_RestrictedHint {
+            get {
+                return ResourceManager.GetString("Web_ShareLinks_RestrictedHint", resourceCulture);
             }
         }
         

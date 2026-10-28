@@ -18,7 +18,8 @@ public sealed record BackupAccess(
 }
 
 /// <summary>A share with restorable backup points.</summary>
-public sealed record BackupRestoreShare(Guid ShareId, string Name, int BackupPointCount, DateTime LatestUtc);
+/// <param name="IsUserHomes">The home-folder share: no new folder can be created at its root.</param>
+public sealed record BackupRestoreShare(Guid ShareId, string Name, int BackupPointCount, DateTime LatestUtc, bool IsUserHomes = false);
 
 /// <summary>One backup point (restic snapshot) of a share, from the local cache.</summary>
 public sealed record BackupPointView(

@@ -203,18 +203,25 @@ else
                             <StatusBadge Tone="StatusToneFor(sel.StatusKey)" Label="@StatusLabel(sel.StatusKey)" />
                         </Status>
                         <Actions>
-                            <button class="btn-tinted" type="button" @onclick="StartEdit">
-                                @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
-                                <span>@T("Web_ShareLinks_Edit", "Edit")</span>
-                            </button>
-                            <button class="btn-tinted btn-tinted--info" type="button" @onclick="() => CopyAsync(sel.Url)">
-                                @Assets.SVG("copy.svg", new SvgOptions(Width: 14, Height: 14))
-                                <span>@T("Web_ShareLink_Copy", "Copy")</span>
-                            </button>
+                            @if (sel.CanEdit)
+                            {
+                                <button class="btn-tinted" type="button" @onclick="StartEdit">
+                                    @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
+                                    <span>@T("Web_ShareLinks_Edit", "Edit")</span>
+                                </button>
+                                <button class="btn-tinted btn-tinted--info" type="button" @onclick="() => CopyAsync(sel.Url)">
+                                    @Assets.SVG("copy.svg", new SvgOptions(Width: 14, Height: 14))
+                                    <span>@T("Web_ShareLink_Copy", "Copy")</span>
+                                </button>
+                            }
                         </Actions>
                         <MoreActions>
                             <MenuItem Icon="folder.svg" Label="@T("Web_ShareLinks_OpenInBrowser", "Open in file browser")"
                                       OnClick="() => Nav.NavigateTo(BrowserHref(sel))" />
+                            @if (link.IsEnabled)
+                            {
+                                <MenuItem Icon="circle_x.svg" Label="@T("Web_ShareLinks_Disable", "Disable")" OnClick="() => DisableAsync(link.Id)" />
+                            }
                             <MenuItem Separator />
                             <MenuItem Icon="trash.svg" Label="@Resources.Web_Action_Delete" Danger OnClick="() => _confirmDelete = true" />
                         </MoreActions>
@@ -227,6 +234,10 @@ else
                                 ? T("Web_ShareLinks_UploadsDisabled", "Upload links are disabled in the settings; this link currently accepts no files.")
                                 : T("Web_ShareLinks_DownloadsDisabled", "Download links are disabled in the settings; this link currently does not open."))</div>
                         </div>
+                    }
+                    @if (!sel.CanEdit)
+                    {
+                        <p class="form-hint">@T("Web_ShareLinks_RestrictedHint", "Created by a user with more rights — you can only disable or delete this link.")</p>
                     }
 
                     <div class="fact-tiles">
@@ -247,7 +258,10 @@ else
                     </DetailSection>
 
                     <DetailSection Title="@T("Web_ShareLink_Url", "Public link")">
-                        <PropertyRow Label="@T("Web_ShareLink_Url", "Public link")" Value="@sel.Url" Mono Copyable />
+                        @if (sel.CanEdit)
+                        {
+                            <PropertyRow Label="@T("Web_ShareLink_Url", "Public link")" Value="@sel.Url" Mono Copyable />
+                        }
                         <PropertyRow Label="@T("Web_ShareLinks_PasswordProtected", "Password-protected")"
                                      Value="@(link.PasswordHash is not null ? Resources.Web_Common_Yes : Resources.Web_Common_No)" />
                     </DetailSection>
@@ -442,15 +456,28 @@ else
         if (await VM.SaveAsync(link))
             _editing = false;
         else
-            _editError = Resources.Web_Error_LoadFilesFailed;
+            _editError = VM.ActionError ?? Resources.Web_Error_LoadFilesFailed;
     }
 
     private async Task DeleteAsync(Guid id)
     {
         _confirmDelete = false;
-        await VM.DeleteAsync(id);
+        if (!await VM.DeleteAsync(id))
+        {
+            ShowActionError();
+            return;
+        }
         if (_selectedId == id) { _selectedId = null; _editing = false; }
     }
+
+    private async Task DisableAsync(Guid id)
+    {
+        if (!await VM.SetEnabledAsync(id, false))
+            ShowActionError();
+    }
+
+    private void ShowActionError()
+        => Toasts.Show(VM.ActionError ?? Resources.Web_Error_LoadFilesFailed, ToastType.Error);
 
     private async Task CopyAsync(string url)
     {

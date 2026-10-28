@@ -233,7 +233,7 @@ public partial class GlobalSearch : IDisposable
 
         var mgmtScope = await ManagementAuth.GetAuthorizedShareIdsAnyAsync(
             _user, ManagementPermission.ShareAdmin);
-        var managedIds = mgmtScope.IsUnrestricted ? null : mgmtScope.ScopeIds.ToHashSet();
+        var managedIds = mgmtScope.ScopeIds.ToHashSet();
 
         var found = new List<(Guid Id, string Name)>();
         foreach (var share in await ShareRepo.GetAllAsync())
@@ -241,12 +241,14 @@ public partial class GlobalSearch : IDisposable
             // Homes are reached through "user" in the web UI, never as the "users" share.
             if (share.IsUserHomes)
                 continue;
-            if (mgmtScope.IsUnrestricted || managedIds!.Contains(share.Id))
+            if (mgmtScope.IsUnrestricted)
             {
                 found.Add((share.Id, share.Name));
                 continue;
             }
-            if (!share.IsEnabled || share.IsShareHidden)
+            // A scoped manager is offered a share only when they could read it themselves
+            // (results are ACL-filtered anyway); hidden shares only when they manage them.
+            if (!share.IsEnabled || (share.IsShareHidden && !managedIds.Contains(share.Id)))
                 continue;
             if (await Acl.HasAccessAsync(_user, share.Id, "", true, FilePermission.ListReadData))
                 found.Add((share.Id, share.Name));

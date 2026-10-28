@@ -132,7 +132,7 @@
                                              Value="@string.Format(R("Web_Backup_Activity_RestoreConflictsValue"), result.Overwritten, result.VersionsCreated, result.Unchanged, result.Skipped, result.Renamed)" />
                             }
                             <PropertyRow Label="@R("Web_Backup_Restore_Permissions")"
-                                         Value="@(request.RestorePermissions ? string.Format(R("Web_Backup_Activity_RestoreAclValue"), result.AclEntriesApplied) : R("Web_Common_No"))" />
+                                         Value="@(request.RestorePermissions || result.AclEntriesApplied > 0 ? string.Format(R("Web_Backup_Activity_RestoreAclValue"), result.AclEntriesApplied) : R("Web_Common_No"))" />
                         }
                     </ChildContent>
                     <Body>

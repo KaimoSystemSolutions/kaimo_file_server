@@ -234,6 +234,46 @@ public partial class ManagementAuthServiceTests
         Assert.True(await _sut.CanAddUserToDepartmentAsync(actor, _targetId, Guid.NewGuid()));
     }
 
+    // ═══════════════════ OutranksUserAsync (rank only, no department scope) ═══════════════════
+
+    [Fact]
+    public async Task OutranksUser_EqualGlobalAdmins_ReturnsTrue()
+    {
+        var actor = Actor(RoleWith(ManagementPermission.FullAdmin));
+        TargetHolds((ScopeType.Global, Guid.Empty, ManagementPermission.FullAdmin));
+
+        Assert.True(await _sut.OutranksUserAsync(actor, _targetId));
+    }
+
+    [Fact]
+    public async Task OutranksUser_SupersetInSameDepartment_ReturnsTrue_WithoutMembership()
+    {
+        var dept = Guid.NewGuid();
+        GrantScoped(ScopeType.Department, dept, ManagementPermission.DepartmentAdmin);
+        var actor = Actor();
+        TargetHolds((ScopeType.Department, dept, ManagementPermission.ResetPasswords));
+
+        Assert.True(await _sut.OutranksUserAsync(actor, _targetId));
+    }
+
+    [Fact]
+    public async Task OutranksUser_TargetHoldsBroaderRole_ReturnsFalse()
+    {
+        var actor = Actor(RoleWith(ManagementPermission.UserAdmin));
+        TargetHolds((ScopeType.Global, Guid.Empty, ManagementPermission.FullAdmin));
+
+        Assert.False(await _sut.OutranksUserAsync(actor, _targetId));
+    }
+
+    [Fact]
+    public async Task OutranksUser_TargetWithoutAssignments_ReturnsTrue()
+    {
+        var actor = Actor();
+        TargetHolds();
+
+        Assert.True(await _sut.OutranksUserAsync(actor, _targetId));
+    }
+
     // ═══════════════════ Presets ═══════════════════
 
     [Fact]

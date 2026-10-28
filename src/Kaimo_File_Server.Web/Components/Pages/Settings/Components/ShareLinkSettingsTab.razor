@@ -24,6 +24,10 @@
     {
         <div class="success-banner">@Resources.Web_ChangesSaved</div>
     }
+    @if (_notPermitted)
+    {
+        <div class="error-banner">@Resources.Web_Settings_NoPermissionChange</div>
+    }
 
     <div class="toggle-row sharelink-toggle-row">
         <span class="label-with-info">
@@ -83,6 +87,7 @@
     private bool _restrictToDefaultDomain = true;
     private long _maxUploadMb = ShareLinkSettings.DefaultMaxUploadFileSizeBytes / Mb;
     private bool _saved;
+    private bool _notPermitted;
 
     private const long Mb = 1024 * 1024;
 
@@ -102,17 +107,26 @@
 
     private async Task SaveAsync()
     {
-        // Keep the legacy address fields as stored: they seed the Domains tab until it is saved.
-        await ShareLinks.SaveSettingsAsync(new ShareLinkSettings
+        _saved = false;
+        _notPermitted = false;
+        try
         {
-            BaseAddresses = _settings.BaseAddresses.ToList(),
-            DefaultIndex = _settings.DefaultIndex,
-            AllowUploadLinks = _allowUploadLinks,
-            AllowDownloadLinks = _allowDownloadLinks,
-            RestrictToDefaultDomain = _restrictToDefaultDomain,
-            MaxUploadFileSizeBytes = _maxUploadMb * Mb,
-        });
+            // Keep the legacy address fields as stored: they seed the Domains tab until it is saved.
+            await ShareLinks.SaveSettingsAsync(new ShareLinkSettings
+            {
+                BaseAddresses = _settings.BaseAddresses.ToList(),
+                DefaultIndex = _settings.DefaultIndex,
+                AllowUploadLinks = _allowUploadLinks,
+                AllowDownloadLinks = _allowDownloadLinks,
+                RestrictToDefaultDomain = _restrictToDefaultDomain,
+                MaxUploadFileSizeBytes = _maxUploadMb * Mb,
+            });
+            _saved = true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _notPermitted = true;
+        }
         Apply(await ShareLinks.GetSettingsAsync());
-        _saved = true;
     }
 }

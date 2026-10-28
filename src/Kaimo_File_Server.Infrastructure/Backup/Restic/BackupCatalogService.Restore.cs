@@ -16,9 +16,14 @@ public partial class BackupCatalogService
     //  Restore (scoped: RestoreFromBackup / RestoreBackupInPlace per share)
     // ══════════════════════════════════════════
 
-    /// <summary>The homes share is Global-only, like its backup jobs.</summary>
-    private static bool CanSeeRestoreShare(BackupAccess access, ShareDefinition share)
-        => access.RestoreUnrestricted || (!share.IsUserHomes && access.RestoreShareIds?.Contains(share.Id) == true);
+    /// <summary>
+    /// The homes share is Global-only, like its backup jobs, and additionally needs
+    /// <see cref="ManagementPermission.AccessHomeContents"/> (<paramref name="homes"/>).
+    /// </summary>
+    private static bool CanSeeRestoreShare(BackupAccess access, ShareDefinition share, bool homes)
+        => share.IsUserHomes
+            ? access.RestoreUnrestricted && homes
+            : access.RestoreUnrestricted || access.RestoreShareIds?.Contains(share.Id) == true;
 
     private async Task<bool> HasShareBitAsync(UserContext actor, ShareDefinition share, ManagementPermission bit)
     {
@@ -41,8 +46,9 @@ public partial class BackupCatalogService
             .ToDictionary(g => g.Key, g => (Count: g.Count(), Latest: g.Max(s => s.TimeUtc)));
         var ids = points.Keys.ToList();
         var shares = await db.ShareDefinitions.AsNoTracking().Where(s => ids.Contains(s.Id)).ToListAsync();
-        return shares.Where(s => CanSeeRestoreShare(access, s))
-            .Select(s => new BackupRestoreShare(s.Id, s.Name, points[s.Id].Count, points[s.Id].Latest))
+        var homes = await CanSeeHomesAsync(actor);
+        return shares.Where(s => CanSeeRestoreShare(access, s, homes))
+            .Select(s => new BackupRestoreShare(s.Id, s.Name, points[s.Id].Count, points[s.Id].Latest, s.IsUserHomes))
             .OrderBy(s => s.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
     }
@@ -54,7 +60,7 @@ public partial class BackupCatalogService
         await using var db = await dbFactory.CreateDbContextAsync();
         var share = await db.ShareDefinitions.AsNoTracking().FirstOrDefaultAsync(s => s.Id == shareId)
                     ?? throw new ResticException("share_missing", "The share no longer exists.");
-        if (!CanSeeRestoreShare(access, share))
+        if (!CanSeeRestoreShare(access, share, share.IsUserHomes && await CanSeeHomesAsync(actor)))
             throw new UnauthorizedAccessException("The share is outside the actor's restore scope.");
         var snapshots = (await db.BackupSnapshots.AsNoTracking()
                 .Where(s => s.ShareId == shareId && s.Kind == BackupSnapshotKind.Share)
@@ -86,7 +92,8 @@ public partial class BackupCatalogService
             return [];
         await using var db = await dbFactory.CreateDbContextAsync();
         var shares = await db.ShareDefinitions.AsNoTracking().OrderBy(s => s.Name).ToListAsync();
-        return shares.Where(s => scope.IsUnrestricted || (!s.IsUserHomes && scope.ScopeIds.Contains(s.Id))).ToList();
+        var homes = scope.IsUnrestricted && await CanSeeHomesAsync(actor);
+        return shares.Where(s => s.IsUserHomes ? homes : scope.IsUnrestricted || scope.ScopeIds.Contains(s.Id)).ToList();
     }
 
     /// <summary>Loads a share backup point the actor may see; optionally requires a restore bit on its share.</summary>
@@ -101,7 +108,7 @@ public partial class BackupCatalogService
         var share = snapshot.Kind == BackupSnapshotKind.Share && snapshot.ShareId is { } shareId
             ? await db.ShareDefinitions.AsNoTracking().FirstOrDefaultAsync(s => s.Id == shareId, ct)
             : null;
-        if (share is null || !CanSeeRestoreShare(access, share)
+        if (share is null || !CanSeeRestoreShare(access, share, share.IsUserHomes && await CanSeeHomesAsync(actor))
                           || required is { } bit && !await HasShareBitAsync(actor, share, bit))
             throw new UnauthorizedAccessException("The backup point is outside the actor's restore scope.");
         var repository = await db.BackupRepositories.AsNoTracking().FirstAsync(r => r.Id == repositoryId, ct);
@@ -117,14 +124,25 @@ public partial class BackupCatalogService
     public async Task<IReadOnlyList<BackupBrowseEntry>> BrowseAsync(
         UserContext actor, Guid repositoryId, string snapshotId, string folder, CancellationToken ct = default)
     {
-        var (snapshot, _, repository) = await AuthorizeBackupPointAsync(actor, repositoryId, snapshotId, null, ct);
+        var (snapshot, share, repository) = await AuthorizeBackupPointAsync(actor, repositoryId, snapshotId, null, ct);
+        var relative = RequireFolder(folder);
+        if (share.IsUserHomes && relative.Length > 0)
+            await RequireHomePathAsync(actor, relative);
+        var entries = await ListSnapshotFolderAsync(snapshot, repository, relative, ct);
+        return share.IsUserHomes && relative.Length == 0 ? await FilterHomesRootAsync(actor, entries) : entries;
+    }
+
+    /// <summary>The entries of a normalized folder of a backup point, unfiltered by home owners.</summary>
+    private async Task<IReadOnlyList<BackupBrowseEntry>> ListSnapshotFolderAsync(
+        BackupSnapshot snapshot, BackupRepository repository, string folder, CancellationToken ct)
+    {
         var root = BackupRestoreExecutor.SourceRoot(snapshot)
                    ?? throw new ResticException("snapshot_missing", "The backup point records no share folder.");
-        var path = BackupRestoreExecutor.SnapshotPath(root, RequireFolder(folder));
+        var path = BackupRestoreExecutor.SnapshotPath(root, folder);
         var nodes = await WithInteractiveTimeoutAsync(async token =>
         {
             using var target = await resolver.ResolveAsync(repository, token);
-            return await restic.ListDirectoryAsync(target, snapshotId, path, token);
+            return await restic.ListDirectoryAsync(target, snapshot.SnapshotId, path, token);
         }, ct);
         return nodes
             .Where(n => !n.Name.StartsWith(ShareEntryPolicy.InternalNamespacePrefix, StringComparison.Ordinal))
@@ -136,8 +154,9 @@ public partial class BackupCatalogService
     /// <summary>
     /// Authorizes and queues a restore. New folder needs RestoreFromBackup on the source share;
     /// in place RestoreBackupInPlace; another share RestoreFromBackup on the source and
-    /// RestoreBackupInPlace on the target; restoring permissions RestoreBackupInPlace on the
-    /// destination.
+    /// RestoreBackupInPlace on the target. Backed-up permissions are always restored onto the
+    /// paths the restore creates. Every home folder read or written must be reachable
+    /// (AccessHomeContents); a new folder at the homes root would be no home and is refused.
     /// </summary>
     public async Task<Guid> EnqueueRestoreAsync(UserContext actor, BackupRestoreRequest request, CancellationToken ct = default)
     {
@@ -147,7 +166,7 @@ public partial class BackupCatalogService
         var sourceBit = request.Mode == BackupRestoreMode.InPlace
             ? ManagementPermission.RestoreBackupInPlace
             : ManagementPermission.RestoreFromBackup;
-        var (_, share, _) = await AuthorizeBackupPointAsync(actor, request.RepositoryId, request.SnapshotId, sourceBit, ct);
+        var (snapshot, share, repository) = await AuthorizeBackupPointAsync(actor, request.RepositoryId, request.SnapshotId, sourceBit, ct);
         if (request.ShareId != share.Id)
             throw new ResticException("snapshot_missing", "The backup point does not belong to the share.");
 
@@ -156,6 +175,10 @@ public partial class BackupCatalogService
         if (items.Any(i => string.IsNullOrEmpty(i) || i.Contains('/') || i.Contains('\\') || i is "." or ".."
                            || i.StartsWith(ShareEntryPolicy.InternalNamespacePrefix, StringComparison.Ordinal)))
             throw new ResticException("path_invalid", "Only entries of the selected folder can be restored.");
+        if (share.IsUserHomes && request.Mode == BackupRestoreMode.NewFolder && folder.Length == 0)
+            throw new ResticException("homes_root_new_folder", "A new folder cannot be created at the homes root.");
+        if (share.IsUserHomes)
+            items = await RequireHomeOwnersAsync(actor, snapshot, repository, folder, items, ct);
 
         var destination = share;
         string? targetFolder = null;
@@ -169,16 +192,18 @@ public partial class BackupCatalogService
             targetFolder = RequireFolder(request.TargetFolder, destination.RecycleRootDepth);
             if (targetFolder.Length > 0 && ShareEntryPolicy.IsReservedForUserWrites(targetFolder, destination.RecycleRootDepth))
                 throw new ResticException("path_invalid", "The restore target lies in a folder reserved by Kaimo.");
+            if (destination.IsUserHomes)
+                await RequireHomePathAsync(actor, targetFolder);
             if (!Directory.Exists(ShareRelativePath.ToContainedAbsolutePath(destination.Path, targetFolder, allowInternalNamespace: false)))
                 throw new ResticException("target_folder_missing", "The target folder does not exist.");
         }
-        if (request.RestorePermissions && !await HasShareBitAsync(actor, destination, ManagementPermission.RestoreBackupInPlace))
-            throw new UnauthorizedAccessException("Restoring permissions needs RestoreBackupInPlace on the destination.");
-
         var normalized = request with
         {
             FolderPath = folder,
             Items = items,
+            // Backed-up permissions are always restored onto the created paths (a copy must not
+            // inherit wider access than the original had).
+            RestorePermissions = true,
             Conflict = request.Mode == BackupRestoreMode.InPlace ? request.Conflict : BackupRestoreConflict.Skip,
             TargetShareId = request.Mode == BackupRestoreMode.OtherShare ? destination.Id : null,
             TargetFolder = targetFolder,
@@ -206,6 +231,8 @@ public partial class BackupCatalogService
         var relative = RequireFolder(path);
         if (relative.Length == 0)
             throw new ResticException("path_invalid", "Select a file or folder.");
+        if (share.IsUserHomes)
+            await RequireHomePathAsync(actor, relative);
         var root = BackupRestoreExecutor.SourceRoot(snapshot)
                    ?? throw new ResticException("snapshot_missing", "The backup point records no share folder.");
         var parent = ShareRelativePath.GetParent(relative);

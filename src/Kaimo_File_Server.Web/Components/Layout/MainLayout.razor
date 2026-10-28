@@ -406,9 +406,13 @@
                                             _currentUser, ManagementPermission.UseConnections)
                                         || await ManagementAuthService.HasAnyPermissionAsync(
                                             _currentUser, ManagementPermission.ManageCloudAccess));
-            _canManageSettings = _currentUser != null
-                                 && await ManagementAuthService.HasAnyPermissionAsync(
-                                        _currentUser, ManagementPermission.ManageSystemSettings);
+            // Settings and notifications are global-only pages (SettingsViewModel, NotificationsViewModel):
+            // gate them on the global mask, so e.g. the JobMenu reindex/cancel is not rendered for
+            // scoped holders (callbacks of unrendered buttons cannot fire).
+            var globalMask = _currentUser != null
+                ? await ManagementAuthService.GetEffectivePermissionsAtAsync(_currentUser, ScopeType.Global, Guid.Empty)
+                : ManagementPermission.None;
+            _canManageSettings = globalMask.HasFlag(ManagementPermission.ManageSystemSettings);
             // Mirror HomesAdminViewModel.CanAccessPage (Global ManageHomes); the home-folder
             // settings live on the Settings page.
             _canManageHomeFolders = _currentUser != null
@@ -438,14 +442,13 @@
             _canViewSecurity = _currentUser != null
                                && await ManagementAuthService.HasGlobalPermissionAsync(
                                       _currentUser, ManagementPermission.ViewSecurityMonitor);
-            _canManageNotifications = _currentUser != null
-                                      && await ManagementAuthService.HasAnyPermissionAsync(
-                                             _currentUser, ManagementPermission.ManageNotifications);
-            // Mirror BackupAccess.CanAccessPage (repositories or jobs).
+            _canManageNotifications = globalMask.HasFlag(ManagementPermission.ManageNotifications);
+            // Mirror BackupAccess.CanAccessPage (repositories, jobs or restore).
             _canManageFileBackup = _currentUser != null
                                    && await ManagementAuthService.HasAnyPermissionAsync(
                                           _currentUser,
-                                          ManagementPermission.ManageBackupRepositories | ManagementPermission.ManageBackupJobs);
+                                          ManagementPermission.ManageBackupRepositories | ManagementPermission.ManageBackupJobs
+                                          | ManagementPermission.RestoreFromBackup | ManagementPermission.RestoreBackupInPlace);
             // The running-jobs menu lists every backup run, so only Global job admins see it;
             // scoped admins follow their runs on the backup page.
             _canSeeAllBackupRuns = _currentUser != null

@@ -1,6 +1,6 @@
 # Plan: Scoped management permission checks — audit and fixes
 
-Status: 2026-10-28 · Phases 1–4 implemented (not committed) · second pass done, Phase 5 open (§6) · Method: bottom-up, layer by layer
+Status: 2026-10-28 · Phases 1–5 implemented (not committed) · second pass done, Phase 5 implemented (§6.4) · Method: bottom-up, layer by layer
 (permission model → authorization engine → assignment service → view models → peripheral features).
 
 ## 1. Summary
@@ -333,6 +333,44 @@ Method: code reading of every remaining `IManagementAuthService` consumer outsid
 - **F20** (P5-2, P5-3): editing, revealing the URL of, re-enabling or deleting a link created by someone else requires that the actor outranks the creator (reuse the F1 rule; expose it as `IManagementAuthService.CanActForUserAsync` or check `CanManageUserAsync(actor, creatorId, <link bit>)`) — or, simpler alternative to decide: only the creator and global link managers may edit; scoped managers may only **disable/delete** foreign links. Add a server-side re-check (`CanManageShareAsync` with the kind's bit + the creator rule) to `SaveAsync`/`DeleteAsync`; gate `SaveSettingsAsync` by global `ManageSystemSettings`.
 - **F21** (P5-4, P5-5): document "restore bits imply read access to the share's backup content" in the permission descriptions (both `.resx`), require `ManageShareAcls` on the destination for `RestorePermissions`, and for restores without permissions either copy the restored folder's ACL from the manifest as **protected** entries or restrict the restored folder to the actor (owner-only) so restored data never becomes broader than before. Decision needed.
 - **F22** (P5-6, P5-7): share picker → ACL read or `GetAuthorizedShareIdsAnyAsync` restricted to enabled/visible shares; nav gates aligned with the page gates (Notifications/Settings via global mask, Backup nav incl. restore bits); `CancelReindex` behind global `ManageSystemSettings`.
+
+### 6.4 Phase 5 — implemented 2026-10-28 (not committed)
+
+Decisions (maintainer, 2026-10-28): **F20** rank rule — full access to a foreign link only when the actor
+outranks its creator, otherwise only disable/delete. **F21** backed-up permissions are **always** restored; a
+backup point without a permission manifest restores with inherited ACLs only (no `ManageShareAcls` requirement).
+
+- **F19** (P5-1): new partial `BackupCatalogService.HomeRestore.cs`. The homes share is listed / its backup
+  points opened only with `HasAnyPermissionAsync(AccessHomeContents)` on top of the global restore bits; every
+  path below the root needs `CanManageUserAsync(actor, owner, AccessHomeContents)` for the owner in the first
+  segment (non-GUID → denied). Browsing the root shows only reachable homes; download, enqueue (folder, items, or
+  the whole root = every home in it) and an `OtherShare` target inside the homes share (root refused) are
+  checked the same way; restore targets offer homes only with `AccessHomeContents`.
+  Tests: `ResticRestoreDatabaseTests.Homes.cs`.
+- **F20** (P5-2, P5-3): `IManagementAuthService.OutranksUserAsync` (rank only, wraps the F1 rule).
+  `ShareLinkRow.CanEdit`; restricted rows carry no URL, hide Edit/Copy/URL and show
+  `Web_ShareLinks_RestrictedHint`; a "Disable" menu item uses the new `SetEnabledAsync`. `SaveAsync`,
+  `SetEnabledAsync` and `DeleteAsync` resolve the actor fresh, re-read the stored link, re-check the kind's share
+  bit (+ the creator rule for save/enable) and copy only editable fields; refusals set `ActionError`
+  (`Web_ShareLinks_NotPermitted`). `ShareLinkService.SaveSettingsAsync` requires global `ManageSystemSettings`
+  (the settings tab shows `Web_Settings_NoPermissionChange`).
+  Tests: `ShareLinkListViewModelAuthorizationTests.cs`, `ManagementAuthServiceTests.TargetRank.cs` (OutranksUser).
+- **F21** (P5-4, P5-5): `BackupRestoreExecutor.ApplyBackedUpPermissionsAsync` runs for every restore;
+  without a manifest it sets `BackupRestoreOutcome.PermissionsUnavailable` (counted as a warning, shown in the
+  activity as `Web_Backup_Activity_PermissionsUnavailable`). The catalog always queues `RestorePermissions = true`
+  (field kept for old run details); the restore dialog toggle became the hint `Web_Backup_Restore_PermissionsAuto`;
+  `Web_Backup_Restore_PermissionsHelp`/`…NotAllowed` removed; the restore permission labels state the implied
+  read access and the ACL reset. Tests: `ResticRestoreDatabaseTests.Permissions.cs`,
+  `NewFolder_ByRestoreFromBackupOnly_IsQueuedWithPermissions`.
+- **F22** (P5-6, P5-7): `GlobalSearch` share picker uses the management shortcut only for global actors; scoped
+  actors need an enabled share and read ACL (hidden shares only when managed). `MainLayout` derives
+  `_canManageSettings`/`_canManageNotifications` from the global mask (JobMenu reindex/cancel only for global
+  holders); Backup nav and the `/backup` search destination include the restore bits.
+  Tests: `SearchScopeGateTests.cs`.
+
+  Follow-up: `SearchDestination.GlobalOnly` (`/settings*`, `/notifications`) — these destinations are matched
+  against the global mask (read once per query) like their pages; the others keep `HasAnyPermissionAsync`.
+  Test: `SearchScopeGateTests.GlobalOnlyPages_AreFoundOnlyWithTheBitAtGlobalScope`.
 
 ## 7. Review follow-up (2026-10-28)
 

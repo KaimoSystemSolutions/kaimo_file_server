@@ -262,7 +262,7 @@
                                @onchange="() => SetMode(mode)" />
                         <span>
                             <strong>@R("Web_Backup_Restore_Mode_" + mode)</strong>
-                            <small>@(allowed ? R("Web_Backup_Restore_Mode_" + mode + "_Help") : R("Web_Backup_Restore_ModeNotAllowed"))</small>
+                            <small>@(allowed ? R("Web_Backup_Restore_Mode_" + mode + "_Help") : ModeNotAllowedReason(mode))</small>
                         </span>
                     </label>
                 }
@@ -299,16 +299,7 @@
                         <small>@R("Web_Backup_Restore_TargetFolderHelp")</small>
                     </label>
                 }
-                <div class="toggle-row">
-                    <span>
-                        @R("Web_Backup_Restore_Permissions")
-                        <small class="form-hint">@(VM.CanRestorePermissions ? R("Web_Backup_Restore_PermissionsHelp") : R("Web_Backup_Restore_PermissionsNotAllowed"))</small>
-                    </span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" @bind="form.RestorePermissions" disabled="@(!VM.CanRestorePermissions)" aria-label="@R("Web_Backup_Restore_Permissions")" />
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
+                <p class="form-hint">@R("Web_Backup_Restore_PermissionsAuto")</p>
             </div>
 
             <div class="modal-actions">
@@ -341,20 +332,21 @@
 
     private bool IsModeAllowed(BackupRestoreMode mode) => mode switch
     {
-        BackupRestoreMode.NewFolder => VM.RestoreRights.FromBackup,
+        BackupRestoreMode.NewFolder => VM.CanRestoreIntoNewFolder,
         BackupRestoreMode.InPlace => VM.RestoreRights.InPlace,
         _ => VM.RestoreRights.FromBackup && VM.RestoreTargets.Count > 0,
     };
 
+    /// <summary>The homes root is the one place where the right alone does not suffice.</summary>
+    private string ModeNotAllowedReason(BackupRestoreMode mode)
+        => mode == BackupRestoreMode.NewFolder && VM.RestoreRights.FromBackup
+            ? R("Web_Backup_Error_homes_root_new_folder")
+            : R("Web_Backup_Restore_ModeNotAllowed");
+
     private bool CanStart => IsModeAllowed(VM.RestoreForm.Mode)
                              && (VM.RestoreForm.Mode != BackupRestoreMode.OtherShare || VM.RestoreForm.TargetShareId != Guid.Empty);
 
-    private void SetMode(BackupRestoreMode mode)
-    {
-        VM.RestoreForm.Mode = mode;
-        if (!VM.CanRestorePermissions)
-            VM.RestoreForm.RestorePermissions = false;
-    }
+    private void SetMode(BackupRestoreMode mode) => VM.RestoreForm.Mode = mode;
 
     private async Task OpenDialogAsync()
     {

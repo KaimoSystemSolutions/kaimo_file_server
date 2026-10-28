@@ -40,6 +40,14 @@ public interface IManagementAuthService
     Task<bool> CanCreateUserInDepartmentAsync(UserContext actor, Guid departmentId);
 
     /// <summary>
+    /// Management rank only: whether the actor covers every role assignment the target holds
+    /// (the rank part of <see cref="CanManageUserAsync"/>, without its department scope). A target
+    /// without assignments is always outranked. Used where the actor acts on something that runs
+    /// with the target's authority, e.g. a public link of another creator.
+    /// </summary>
+    Task<bool> OutranksUserAsync(UserContext actor, Guid targetUserId);
+
+    /// <summary>
     /// Whether the actor may add the user to the department: requires
     /// <see cref="ManagementPermission.AssignDepartments"/> on the department and authority over
     /// the user (same rule as <see cref="CanManageUserAsync"/>), so a foreign user can never be

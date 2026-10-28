@@ -20,7 +20,8 @@ namespace Kaimo_File_Server.Infrastructure.Backup.Restic;
 /// destination share (<c>.kaimo-restore</c>, same file system ⇒ atomic moves, invisible to
 /// users and excluded from backups); the staged entries are then moved into place under the
 /// share lock. In-place restores never delete anything and keep a file version of every file
-/// they overwrite. Optionally the backed-up owners and ACLs are written back.
+/// they overwrite. The backed-up owners and ACLs are written onto every path the restore created;
+/// paths that already existed keep their live permissions.
 /// </summary>
 public sealed class BackupRestoreExecutor(
     IDbContextFactory<ApplicationDbContext> dbFactory,
@@ -113,6 +114,11 @@ public sealed class BackupRestoreExecutor(
             staging = Path.Combine(destinationRoot, StagingFolderName, runId.ToString("N"));
             var data = Path.Combine(staging, "data");
             CreatePrivateDirectory(data);
+            // Read before anything is restored or moved: a backup point whose permissions cannot be
+            // read is refused instead of leaving a copy that only inherits its new parent's ACL.
+            var manifest = await ReadManifestAsync(snapshot,
+                (manifestPath, file, token) => restic.DumpAsync(target, request.SnapshotId, manifestPath, asZipArchive: false, file, token),
+                staging, ct);
 
             var restored = await restic.RestoreAsync(target, request.SnapshotId, snapshotFolder, request.Items, data,
                 p => report(null, 5 + (int)(Math.Clamp(p, 0, 1) * 80)), ct);
@@ -148,28 +154,17 @@ public sealed class BackupRestoreExecutor(
             // One coarse entry: search re-indexes and sync clients reconcile the subtree.
             await AppendChangeAsync(destination.Id, destinationBase);
 
-            if (request.RestorePermissions)
-            {
-                report(null, 95);
-                var manifestPath = ManifestPath(snapshot)
-                                   ?? throw new ResticException("manifest_missing", "The backup point holds no permission manifest.");
-                var manifestFile = Path.Combine(staging, BackupAclManifest.FileName);
-                await using (var file = new FileStream(manifestFile, FileMode.Create, FileAccess.Write))
-                    await restic.DumpAsync(target, request.SnapshotId, manifestPath, asZipArchive: false, file, ct);
-                await using var manifest = File.OpenRead(manifestFile);
-                // Own context: ApplyAclAsync clears its change tracker in batches, which would
-                // otherwise detach this run's row and lose its final status.
-                await using var aclDb = await dbFactory.CreateDbContextAsync(ct);
-                var (applied, skipped) = await ApplyAclAsync(aclDb, manifest, destination.Id, destinationRoot,
-                    p => MapPath(p, folder, items, destinationBase, merge.Untouched), run.ActorUserId ?? Guid.Empty, now, ct);
-                outcome.AclEntriesApplied = applied;
-                outcome.SkippedPrincipals = skipped;
-            }
+            // Always (also for requests queued with RestorePermissions = false), but only onto the
+            // paths this restore created: an existing item keeps its live ACL, so a grant revoked
+            // since the backup does not come back with an in-place restore.
+            report(null, 95);
+            await ApplyBackedUpPermissionsAsync(dbFactory, manifest, destination.Id, destinationRoot,
+                p => MapPath(p, folder, items, destinationBase, merge.Untouched, merge.Existing),
+                run.ActorUserId ?? Guid.Empty, now, outcome, ct);
 
-            run.Status = outcome.SkippedItems.Count > 0 || outcome.SkippedPrincipals.Count > 0
-                ? BackupRunStatus.SucceededWithWarnings
-                : BackupRunStatus.Succeeded;
-            run.WarningCount = outcome.SkippedItems.Count + outcome.SkippedPrincipals.Count;
+            var warnings = outcome.SkippedItems.Count + outcome.SkippedPrincipals.Count;
+            run.Status = warnings > 0 ? BackupRunStatus.SucceededWithWarnings : BackupRunStatus.Succeeded;
+            run.WarningCount = warnings;
             run.FilesNew = outcome.FilesRestored;
             run.BytesProcessed = outcome.BytesRestored;
             repository.LastReachableAtUtc = time.GetUtcNow().UtcDateTime;
@@ -281,6 +276,41 @@ public sealed class BackupRestoreExecutor(
     private const string PartialSuffix = ".partial";
 
     /// <summary>
+    /// Dumps the permission manifest of a share backup point into <paramref name="staging"/> and
+    /// reads it. Throws <see cref="ResticException"/> (<c>manifest_missing</c> / <c>manifest_invalid</c>)
+    /// when the backup point records none or it cannot be read.
+    /// </summary>
+    internal static async Task<ManifestDocument> ReadManifestAsync(BackupSnapshot snapshot,
+        Func<string, Stream, CancellationToken, Task> dumpManifest, string staging, CancellationToken ct)
+    {
+        var manifestPath = ManifestPath(snapshot)
+                           ?? throw new ResticException("manifest_missing", "The backup point holds no permission manifest.");
+        Directory.CreateDirectory(staging);
+        var manifestFile = Path.Combine(staging, BackupAclManifest.FileName);
+        await using (var file = new FileStream(manifestFile, FileMode.Create, FileAccess.Write))
+            await dumpManifest(manifestPath, file, ct);
+        await using var manifest = File.OpenRead(manifestFile);
+        return await ParseManifestAsync(manifest, ct);
+    }
+
+    /// <summary>
+    /// Writes the backed-up owners and ACLs of the restored paths (<paramref name="map"/> keeps only
+    /// the paths the restore created, mapped onto their destination; unknown principals are skipped).
+    /// </summary>
+    internal static async Task ApplyBackedUpPermissionsAsync(
+        IDbContextFactory<ApplicationDbContext> dbFactory, ManifestDocument manifest,
+        Guid shareId, string shareRoot, Func<string, string?> map, Guid actorUserId, DateTime nowUtc,
+        BackupRestoreOutcome outcome, CancellationToken ct)
+    {
+        // Own context: ApplyAclAsync clears its change tracker in batches, which would
+        // otherwise detach the run's row and lose its final status.
+        await using var aclDb = await dbFactory.CreateDbContextAsync(ct);
+        var (applied, skipped) = await ApplyAclAsync(aclDb, manifest, shareId, shareRoot, map, actorUserId, nowUtc, ct);
+        outcome.AclEntriesApplied = applied;
+        outcome.SkippedPrincipals = skipped;
+    }
+
+    /// <summary>
     /// Display name of a non-share backup point in <paramref name="culture"/> (default: the
     /// thread's UI culture): "Pool pool01", the system label or the recorded paths.
     /// </summary>
@@ -354,15 +384,19 @@ public sealed class BackupRestoreExecutor(
 
     /// <summary>
     /// Maps a share-relative path of the backed-up share to its restore destination, or null
-    /// when it is not part of the selection or was left untouched (skipped / kept by a rename).
+    /// when it is not part of the selection, was left untouched (skipped / kept by a rename) or
+    /// existed before the restore (<paramref name="existing"/>: it keeps its live permissions).
     /// </summary>
     internal static string? MapPath(
-        string manifestPath, string folder, IReadOnlySet<string> items, string destinationBase, IReadOnlyCollection<string> untouched)
+        string manifestPath, string folder, IReadOnlySet<string> items, string destinationBase, IReadOnlyCollection<string> untouched,
+        IReadOnlySet<string>? existing = null)
     {
         var rest = folder.Length == 0 ? manifestPath : RelativeTo(manifestPath, folder);
         if (!IsSelected(rest, items))
             return null;
         var destination = ShareRelativePath.Combine(destinationBase, rest);
+        if (existing?.Contains(destination) == true)
+            return null;
         return untouched.Any(u => destination == u || destination.StartsWith(u + "/", StringComparison.Ordinal))
             ? null
             : destination;
@@ -405,9 +439,9 @@ public sealed class BackupRestoreExecutor(
     //  Permissions
     // ══════════════════════════════════════════
 
-    private sealed record ManifestAce(Guid PrincipalId, string? PrincipalName, int EntryType, long Permissions, int Inheritance);
-    private sealed record ManifestEntry(string Path, bool IsDirectory, Guid OwnerId, string? OwnerName, List<ManifestAce>? Acl);
-    private sealed record ManifestDocument(int FormatVersion, List<ManifestEntry>? Entries);
+    internal sealed record ManifestAce(Guid PrincipalId, string? PrincipalName, int EntryType, long Permissions, int Inheritance);
+    internal sealed record ManifestEntry(string Path, bool IsDirectory, Guid OwnerId, string? OwnerName, List<ManifestAce>? Acl);
+    internal sealed record ManifestDocument(int FormatVersion, List<ManifestEntry>? Entries);
 
     /// <summary>
     /// Writes owners and ACL entries of the manifest back onto the restored paths of
@@ -418,13 +452,31 @@ public sealed class BackupRestoreExecutor(
     internal static async Task<(int Applied, List<BackupSkippedPrincipal> Skipped)> ApplyAclAsync(
         ApplicationDbContext db, Stream manifest, Guid shareId, string shareRoot, Func<string, string?> map,
         Guid actorUserId, DateTime nowUtc, CancellationToken ct)
+        => await ApplyAclAsync(db, await ParseManifestAsync(manifest, ct), shareId, shareRoot, map, actorUserId, nowUtc, ct);
+
+    private static async Task<ManifestDocument> ParseManifestAsync(Stream manifest, CancellationToken ct)
     {
         // ponytail: whole manifest in memory; switch to a streaming reader for shares with millions of ACL rows.
-        var document = await JsonSerializer.DeserializeAsync<ManifestDocument>(manifest, BackupRestoreDetails.Json, ct)
-                       ?? throw new ResticException("manifest_invalid", "The permission manifest could not be read.");
+        ManifestDocument? document;
+        try
+        {
+            document = await JsonSerializer.DeserializeAsync<ManifestDocument>(manifest, BackupRestoreDetails.Json, ct);
+        }
+        catch (JsonException)
+        {
+            document = null;
+        }
+        if (document is null)
+            throw new ResticException("manifest_invalid", "The permission manifest could not be read.");
         if (document.FormatVersion > BackupAclManifest.FormatVersion)
             throw new ResticException("manifest_invalid", "The permission manifest was written by a newer version.");
+        return document;
+    }
 
+    private static async Task<(int Applied, List<BackupSkippedPrincipal> Skipped)> ApplyAclAsync(
+        ApplicationDbContext db, ManifestDocument document, Guid shareId, string shareRoot, Func<string, string?> map,
+        Guid actorUserId, DateTime nowUtc, CancellationToken ct)
+    {
         var users = (await db.Users.AsNoTracking().Select(u => u.Id).ToListAsync(ct)).ToHashSet();
         var principals = new HashSet<Guid>(users);
         principals.UnionWith(await db.Groups.AsNoTracking().Select(g => g.Id).ToListAsync(ct));

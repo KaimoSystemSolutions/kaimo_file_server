@@ -4644,6 +4644,12 @@
   <data name="Web_ShareLinks_SelectHint" xml:space="preserve">
     <value>Select a link to see its details.</value>
   </data>
+  <data name="Web_ShareLinks_NotPermitted" xml:space="preserve">
+    <value>You are not permitted to change this link.</value>
+  </data>
+  <data name="Web_ShareLinks_RestrictedHint" xml:space="preserve">
+    <value>Created by a user with more rights — you can only disable or delete this link.</value>
+  </data>
   <data name="Web_ShareLinks_Enabled" xml:space="preserve">
     <value>Enabled</value>
   </data>
@@ -5749,10 +5755,10 @@
     <value>Manage backup jobs</value>
   </data>
   <data name="Web_Perm_RestoreFromBackup" xml:space="preserve">
-    <value>Restore from backup (new folder / download)</value>
+    <value>Restore from backup (new folder / download; includes read access to the share's backup content)</value>
   </data>
   <data name="Web_Perm_RestoreBackupInPlace" xml:space="preserve">
-    <value>Restore in place (overwrite, other share, permissions)</value>
+    <value>Restore in place (overwrite, other share; resets owners and permissions of overwritten items to the backup state)</value>
   </data>
   <data name="Notification_Category_filebackup" xml:space="preserve">
     <value>File backup</value>
@@ -6619,11 +6625,11 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Backup_Restore_Permissions" xml:space="preserve">
     <value>Restore permissions</value>
   </data>
-  <data name="Web_Backup_Restore_PermissionsHelp" xml:space="preserve">
-    <value>Owners and permissions as at the time of the backup. Users and groups that no longer exist are skipped and listed.</value>
+  <data name="Web_Backup_Restore_PermissionsAuto" xml:space="preserve">
+    <value>Restored items get their owners and permissions as recorded in the backup point; items that already exist keep their current permissions.</value>
   </data>
-  <data name="Web_Backup_Restore_PermissionsNotAllowed" xml:space="preserve">
-    <value>Needs the permission “Restore in place” on the destination share.</value>
+  <data name="Web_Backup_Error_homes_root_new_folder" xml:space="preserve">
+    <value>A new folder cannot be created at the top level of the home folders. Open a home folder first or restore in place.</value>
   </data>
   <data name="Web_Backup_Restore_Start" xml:space="preserve">
     <value>Start restore</value>

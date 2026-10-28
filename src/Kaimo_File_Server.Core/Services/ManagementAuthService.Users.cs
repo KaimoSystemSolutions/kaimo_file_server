@@ -28,6 +28,12 @@ public partial class ManagementAuthService
         return inScope && await OutranksAsync(actor, targetUserId);
     }
 
+    public async Task<bool> OutranksUserAsync(UserContext actor, Guid targetUserId)
+    {
+        using var scope = BeginEvaluationScope();
+        return await OutranksAsync(actor, targetUserId);
+    }
+
     public async Task<bool> CanAddUserToDepartmentAsync(
         UserContext actor, Guid userId, Guid departmentId)
     {

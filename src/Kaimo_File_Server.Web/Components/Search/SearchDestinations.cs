@@ -17,15 +17,17 @@ namespace Kaimo_File_Server.Web.Components.Search;
 /// <para><see cref="RequiredAny"/> is the access gate: <c>null</c> means always
 /// visible; otherwise the user must hold ANY of the flagged management permissions
 /// (checked via <see cref="IManagementAuthService.HasAnyPermissionAsync"/>, which
-/// honors scoped assignments too). It mirrors the per-page/per-tab gates so search
-/// never reveals a destination the user cannot open.</para>
+/// honors scoped assignments too; for <see cref="GlobalOnly"/> destinations against the
+/// global mask, because their page checks the bits at global scope only). It mirrors the per-page/per-tab gates so search never reveals a
+/// destination the user cannot open.</para>
 /// </summary>
 public sealed record SearchDestination(
     string TitleKey,
     string[] Keywords,
     string Url,
     string Icon,
-    ManagementPermission? RequiredAny)
+    ManagementPermission? RequiredAny,
+    bool GlobalOnly = false)
 {
     public string Title => Resources.ResourceManager.GetString(TitleKey) ?? TitleKey;
 
@@ -74,6 +76,13 @@ public static class SearchDestinations
 
     private const ManagementPermission Settings = ManagementPermission.ManageSystemSettings;
 
+    /// <summary>
+    /// A destination whose page checks its bits at global scope only (the settings tabs via
+    /// <c>SettingsViewModel</c>, the notifications page via <c>NotificationsViewModel</c>).
+    /// </summary>
+    private static SearchDestination Global(string titleKey, string[] keywords, string url, string icon, ManagementPermission requiredAny)
+        => new(titleKey, keywords, url, icon, requiredAny, GlobalOnly: true);
+
     public static readonly IReadOnlyList<SearchDestination> All = new List<SearchDestination>
     {
         // ── Top-level tabs ──
@@ -105,24 +114,24 @@ public static class SearchDestinations
             "/shares?view=virtual", "cloud-download.svg", ConnectionsGate),
 
         // ── Settings sections (deep-linked via ?tab=) ──
-        new("Web_Settings_Tab_Region",
+        Global("Web_Settings_Tab_Region",
             ["language", "sprache", "localization", "lokalisierung", "i18n",
              "region", "date format", "datumsformat", "datum", "date", "iso"],
             "/settings?tab=language", "globe.svg", Settings),
-        new("Web_Settings_Tab_ContextMenu",
+        Global("Web_Settings_Tab_ContextMenu",
             ["context menu", "kontextmenü", "kontextmenu", "rechtsklick"],
             "/settings?tab=contextmenu", "edit.svg", Settings),
-        new("Web_Settings_Tab_Password",
+        Global("Web_Settings_Tab_Password",
             ["password", "passwort", "kennwort", "passwortrichtlinie", "password policy"],
             "/settings?tab=passwordpolicy", "shield.svg", Settings),
-        new("Web_Settings_Tab_SystemStatus",
+        Global("Web_Settings_Tab_SystemStatus",
             ["system status", "systemstatus", "status", "network", "netzwerk", "ip", "ip-adresse", "ip address",
              "ram", "memory", "arbeitsspeicher", "hostname"],
             "/settings?tab=systemstatus", "compass.svg", Settings),
-        new("Web_Settings_Tab_Storage",
+        Global("Web_Settings_Tab_Storage",
             ["storage", "speicher", "speicherpool", "pool", "festplatte", "disk"],
             "/settings?tab=storage", "folder.svg", Settings),
-        new("Web_Settings_Tab_Versioning",
+        Global("Web_Settings_Tab_Versioning",
             ["versioning", "versionierung", "versions", "versionen", "version history", "versionsverlauf",
              "snapshot", "snapshots", "retention", "aufbewahrung"],
             "/settings?tab=versioning", "history.svg", Settings),
@@ -131,50 +140,51 @@ public static class SearchDestinations
         new("Web_Nav_HomeFolders",
             ["home", "homes", "users", "user", "home folder", "home-ordner", "heimverzeichnis", "benutzerordner"],
             "/home-folders", "user.svg", ManagementPermission.ManageHomes),
-        new("Web_Nav_HomeFolders",
+        Global("Web_Nav_HomeFolders",
             ["home", "homes", "home folder", "home-ordner", "heimverzeichnis", "benutzerordner",
              "home folder settings", "home-ordner einstellungen"],
             "/settings?tab=homefolders", "user.svg", Settings),
-        new("Web_Recycle_SectionLabel",
+        Global("Web_Recycle_SectionLabel",
             ["recycle bin", "papierkorb", "trash", "retention", "aufbewahrung"],
             "/settings?tab=storage", "folder.svg", Settings),
-        new("Web_Settings_Tab_Search",
+        Global("Web_Settings_Tab_Search",
             ["search", "suche", "elasticsearch", "index", "indexierung", "suchmaschine"],
             "/settings?tab=search", "search.svg", Settings),
-        new("Web_Settings_Tab_CloudAccess",
+        Global("Web_Settings_Tab_CloudAccess",
             ["cache", "directory cache", "verzeichnis-cache", "cloud access cache", "cache ttl", "cloudaccess cache"],
             "/settings?tab=cloudaccess", "cloud-download.svg", Settings),
-        new("Web_Settings_Tab_Domains",
+        Global("Web_Settings_Tab_Domains",
             ["domain", "domains", "domäne", "domänen", "address", "adresse", "public url", "öffentliche adresse", "base url"],
             "/settings?tab=domains", "globe.svg", Settings),
-        new("Web_Settings_Tab_AccessRestrictions",
+        Global("Web_Settings_Tab_AccessRestrictions",
             ["access restriction", "zugriffsbeschränkung", "ip range", "ip-bereich", "allowlist", "whitelist", "cidr"],
             "/settings?tab=accessrestrictions", "shield.svg", Settings),
-        new("Web_Settings_Tab_Logging",
+        Global("Web_Settings_Tab_Logging",
             ["logging", "logs", "protokoll", "protokollierung", "log level"],
             "/settings?tab=logging", "gear.svg", LoggingGate),
-        new("Web_Settings_Tab_Fileservices",
+        Global("Web_Settings_Tab_Fileservices",
             ["file services", "dateidienste", "datendienste", "smb", "samba", "nfs", "ftp"],
             "/settings?tab=dataservices", "archive.svg", ManagementPermission.ManageDataServices),
-        new("Web_Settings_Tab_Certificate",
+        Global("Web_Settings_Tab_Certificate",
             ["certificate", "zertifikat", "https", "ssl", "tls"],
             "/settings?tab=certificate", "shield.svg", ManagementPermission.ManageCertificates),
-        new("Web_Settings_Tab_Backup",
+        Global("Web_Settings_Tab_Backup",
             ["backup", "sicherung", "datensicherung", "database backup", "datenbank-sicherung", "datenbank"],
             "/settings?tab=backup", "archive.svg", ManagementPermission.ManageBackups),
         new("Web_Nav_Backup",
             ["file backup", "dateisicherung", "restic", "restore", "wiederherstellung", "backup repository", "recovery kit"],
-            "/backup", "archive.svg", ManagementPermission.ManageBackupRepositories | ManagementPermission.ManageBackupJobs),
-        new("Web_Nav_DeviceAdmin",
+            "/backup", "archive.svg", ManagementPermission.ManageBackupRepositories | ManagementPermission.ManageBackupJobs
+                                      | ManagementPermission.RestoreFromBackup | ManagementPermission.RestoreBackupInPlace),
+        Global("Web_Nav_DeviceAdmin",
             ["client devices", "geräte", "clients", "device", "mobile app"],
             "/settings?tab=clientdevices", "refresh.svg", ManagementPermission.ManageClientDevices),
         new("Web_Nav_Security",
             ["security", "sicherheit", "login attempts", "anmeldeversuche", "lockout", "sperre", "api requests"],
             "/security", "shield.svg", ManagementPermission.ViewSecurityMonitor),
-        new("Web_Nav_Notifications",
+        Global("Web_Nav_Notifications",
             ["notifications", "benachrichtigungen", "mail", "e-mail", "email templates", "mailvorlagen", "rules", "regeln"],
             "/notifications", "mail.svg", ManagementPermission.ManageNotifications),
-        new("Web_Settings_Tab_MailServer",
+        Global("Web_Settings_Tab_MailServer",
             ["mail server", "mailserver", "smtp", "e-mail", "email", "test mail", "testmail"],
             "/settings?tab=mailserver", "mail.svg", ManagementPermission.ManageMailServer),
     };
@@ -196,11 +206,19 @@ public static class SearchDestinations
         var matched = All.Where(d => Matches(d, q)).ToList();
 
         var allowed = new List<SearchDestination>(matched.Count);
+        ManagementPermission? globalMask = null;
         foreach (var d in matched)
         {
             ct.ThrowIfCancellationRequested();
-            if (d.RequiredAny is null
-                || await mgmt.HasAnyPermissionAsync(user, d.RequiredAny.Value))
+            if (d.RequiredAny is not { } gate)
+                allowed.Add(d);
+            else if (d.GlobalOnly)
+            {
+                globalMask ??= await mgmt.GetEffectivePermissionsAtAsync(user, ScopeType.Global, Guid.Empty);
+                if ((globalMask.Value & gate) != 0)
+                    allowed.Add(d);
+            }
+            else if (await mgmt.HasAnyPermissionAsync(user, gate))
                 allowed.Add(d);
         }
         return allowed;

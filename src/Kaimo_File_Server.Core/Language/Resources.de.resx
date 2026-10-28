@@ -4644,6 +4644,12 @@
   <data name="Web_ShareLinks_SelectHint" xml:space="preserve">
     <value>Wählen Sie einen Link, um die Details zu sehen.</value>
   </data>
+  <data name="Web_ShareLinks_NotPermitted" xml:space="preserve">
+    <value>Sie dürfen diesen Link nicht ändern.</value>
+  </data>
+  <data name="Web_ShareLinks_RestrictedHint" xml:space="preserve">
+    <value>Von einem Benutzer mit mehr Rechten erstellt – Sie können diesen Link nur deaktivieren oder löschen.</value>
+  </data>
   <data name="Web_ShareLinks_Enabled" xml:space="preserve">
     <value>Aktiviert</value>
   </data>
@@ -5749,10 +5755,10 @@
     <value>Sicherungsaufträge verwalten</value>
   </data>
   <data name="Web_Perm_RestoreFromBackup" xml:space="preserve">
-    <value>Aus Sicherung wiederherstellen (neuer Ordner / Download)</value>
+    <value>Aus Sicherung wiederherstellen (neuer Ordner / Download; schließt Lesezugriff auf die gesicherten Inhalte der Freigabe ein)</value>
   </data>
   <data name="Web_Perm_RestoreBackupInPlace" xml:space="preserve">
-    <value>Am Originalort wiederherstellen (überschreiben, andere Freigabe, Berechtigungen)</value>
+    <value>Am Originalort wiederherstellen (überschreiben, andere Freigabe; setzt Besitzer und Berechtigungen überschriebener Elemente auf den Sicherungsstand zurück)</value>
   </data>
   <data name="Notification_Category_filebackup" xml:space="preserve">
     <value>Dateisicherung</value>
@@ -6619,11 +6625,11 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Backup_Restore_Permissions" xml:space="preserve">
     <value>Berechtigungen wiederherstellen</value>
   </data>
-  <data name="Web_Backup_Restore_PermissionsHelp" xml:space="preserve">
-    <value>Besitzer und Berechtigungen wie zum Zeitpunkt der Sicherung. Nicht mehr vorhandene Benutzer und Gruppen werden übersprungen und aufgelistet.</value>
+  <data name="Web_Backup_Restore_PermissionsAuto" xml:space="preserve">
+    <value>Wiederhergestellte Elemente erhalten Besitzer und Berechtigungen wie im Sicherungspunkt aufgezeichnet; bereits vorhandene Elemente behalten ihre aktuellen Berechtigungen.</value>
   </data>
-  <data name="Web_Backup_Restore_PermissionsNotAllowed" xml:space="preserve">
-    <value>Erfordert die Berechtigung „Am Originalort wiederherstellen“ auf der Zielfreigabe.</value>
+  <data name="Web_Backup_Error_homes_root_new_folder" xml:space="preserve">
+    <value>Auf der obersten Ebene der Home-Ordner kann kein neuer Ordner angelegt werden. Öffne zuerst einen Home-Ordner oder stelle am ursprünglichen Ort wieder her.</value>
   </data>
   <data name="Web_Backup_Restore_Start" xml:space="preserve">
     <value>Wiederherstellung starten</value>

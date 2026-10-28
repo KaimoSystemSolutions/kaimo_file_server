@@ -58,8 +58,16 @@ public sealed class ShareLinkService(
         return settings;
     }
 
+    /// <summary>
+    /// Stores the link settings; requires <see cref="ManagementPermission.ManageSystemSettings"/>
+    /// at global scope (same mask as the settings page), otherwise <see cref="UnauthorizedAccessException"/>.
+    /// </summary>
     public async Task SaveSettingsAsync(ShareLinkSettings settings)
     {
+        var actor = await ResolveActorAsync();
+        if (actor is null || !(await mgmtAuth.GetEffectivePermissionsAtAsync(actor, ScopeType.Global, Guid.Empty))
+                .HasFlag(ManagementPermission.ManageSystemSettings))
+            throw new UnauthorizedAccessException("ManageSystemSettings at global scope is required.");
         settings.Normalize();
         await config.SetAsync(ShareLinkSettings.ConfigKey, settings);
     }

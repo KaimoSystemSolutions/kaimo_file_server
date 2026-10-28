@@ -144,7 +144,6 @@ public sealed class BackupRestoreForm
 {
     public BackupRestoreMode Mode { get; set; } = BackupRestoreMode.NewFolder;
     public BackupRestoreConflict Conflict { get; set; } = BackupRestoreConflict.Rename;
-    public bool RestorePermissions { get; set; }
     public Guid TargetShareId { get; set; }
     public string TargetFolder { get; set; } = string.Empty;
 }
