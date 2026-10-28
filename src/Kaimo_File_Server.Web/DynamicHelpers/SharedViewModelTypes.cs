@@ -20,6 +20,7 @@ public record ScopedAssignmentDisplayItem(
     string ScopeName,
     string? InheritedFrom = null);
 
-public record PermissionGroup(string Label, List<PermissionFlag> Flags);
+/// <param name="Icon">SVG asset shown in the area's header in the role editor.</param>
+public record PermissionGroup(string Label, List<PermissionFlag> Flags, string Icon = "shield.svg");
 public record PermissionFlag(ManagementPermission Flag, string Label);
 public record PermissionPreset(string Label, ManagementPermission Permissions);

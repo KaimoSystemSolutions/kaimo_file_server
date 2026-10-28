@@ -111,5 +111,10 @@
         FileBackupAdmin = ManageBackupRepositories | ManageBackupJobs | RestoreFromBackup | RestoreBackupInPlace,
 
         BackupOperator = ManageBackupJobs | RestoreFromBackup | RestoreBackupInPlace,
+
+        // Everything the built-in Administrator role holds: FullAdmin plus the bits deliberately
+        // kept outside it (see the File backup note above). The role editor's "FullAdmin" preset.
+        Administrator = FullAdmin | ManageHomes | AccessHomeContents
+                      | ManageMailServer | ManageNotifications | FileBackupAdmin,
     }
 }

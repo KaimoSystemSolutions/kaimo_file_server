@@ -10,10 +10,17 @@
                         @* Role detail remains unchanged — same as original *@
                         @if (VM.IsEditing)
                         {
-                            <div class="detail-header">
-<h3>@Resources.Web_Admin_EditRole</h3>
-                                <span class="detail-subtitle">@VM.SelectedRole.Name</span>
-                            </div>
+                            @* The role being edited stays named in the header (live with the name field). *@
+                            <DetailHeader Icon="shield.svg"
+                                          Title="@(string.IsNullOrWhiteSpace(VM.EditRoleName) ? VM.SelectedRole.Name : VM.EditRoleName)"
+                                          Subtitle="@Resources.Web_Admin_EditRole">
+                                <Status>
+                                    @if (!VM.SelectedRole.IsSystemRole)
+                                    {
+                                        <span class="role-edit-count">@string.Format(R("Web_Role_PermissionCount", "{0} of {1} permissions"), GrantedTotal(), PermissionTotal)</span>
+                                    }
+                                </Status>
+                            </DetailHeader>
                             @if (!VM.SelectedRole.IsSystemRole)
                             {
                                 <div class="form-group" style="margin-top: 16px;">
@@ -22,37 +29,7 @@
                                 </div>
                                 <div class="detail-section" style="margin-top: 16px;">
 <span class="detail-label">@Resources.Web_Admin_Label_Permissions</span>
-                                    <div class="permission-presets">
-                                        @foreach (var preset in UserListViewModel.PermissionPresets)
-                                        {
-
-                                            var isActive = VM.EditRolePermissions == preset.Permissions;
-                                            <button class="preset-chip @(isActive ? "preset-chip--active" : "")"
-                                                    @onclick="() => VM.ApplyPermissionPreset(preset.Permissions)">
-                                                @preset.Label
-                                            </button>
-                                        }
-<button class="preset-chip" @onclick="() => VM.ApplyPermissionPreset(ManagementPermission.None)">@Resources.Web_Common_None</button>
-                                    </div>
-                                    <div class="permission-groups">
-                                        @foreach (var permGroup in UserListViewModel.PermissionGroups)
-                                        {
-                                            <div class="permission-group">
-                                                <span class="permission-group-label">@permGroup.Label</span>
-                                                <div class="permission-flags">
-                                                    @foreach (var flag in permGroup.Flags)
-                                                    {
-                                                        var isChecked = VM.HasEditPermission(flag.Flag);
-                                                        <label class="permission-flag">
-                                                            <input type="checkbox" checked="@isChecked"
-                                                                   @onchange="e => VM.ToggleEditPermission(flag.Flag, (bool)(e.Value ?? false))" />
-                                                            <span>@flag.Label</span>
-                                                        </label>
-                                                    }
-                                                </div>
-                                            </div>
-                                        }
-                                    </div>
+                                    <RolePermissionEditor VM="VM" Disabled="@VM.IsSaving" />
                                 </div>
                             }
                             else
@@ -215,6 +192,10 @@
     private async Task CreateAssignment() { await VM.CreateAssignmentAsync(); StateHasChanged(); }
     private async Task DeleteAssignment(Guid id) { await VM.DeleteAssignmentAsync(id); StateHasChanged(); }
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+    private static string R(string key, string fallback) => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    private static int PermissionTotal => UserListViewModel.PermissionGroups.Sum(g => g.Flags.Count);
+    private int GrantedTotal() => UserListViewModel.PermissionGroups.Sum(VM.GrantedCount);
 
     // Global is shown as what it is to the user: the topmost department.
     private static string FormatScopeType(ScopeType type) => type switch { ScopeType.Global => R("Web_Admin_ScopeChoice_System"), ScopeType.Department => Resources.Web_Admin_ScopeType_Department, ScopeType.Share => Resources.Web_Admin_ScopeType_Share, _ => type.ToString() };

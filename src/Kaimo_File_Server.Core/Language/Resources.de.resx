@@ -5097,6 +5097,33 @@
   <data name="Web_Perm_ManageNotifications" xml:space="preserve">
     <value>E-Mail-Benachrichtigungen verwalten</value>
   </data>
+  <data name="Web_Perm_GlobalOnly" xml:space="preserve">
+    <value>Nur global</value>
+  </data>
+  <data name="Web_Perm_GlobalOnly_Hint" xml:space="preserve">
+    <value>Wirkt nur, wenn die Rolle systemweit zugewiesen wird.</value>
+  </data>
+  <data name="Web_Perm_SelectAllInGroup" xml:space="preserve">
+    <value>Alle Rechte: {0}</value>
+  </data>
+  <data name="Web_Role_PermissionCount" xml:space="preserve">
+    <value>{0} von {1} Rechten</value>
+  </data>
+  <data name="Web_Perm_ManageClientDevices" xml:space="preserve">
+    <value>Client-Geräte verwalten</value>
+  </data>
+  <data name="Web_Perm_CreateSyncs" xml:space="preserve">
+    <value>Synchronisationen anlegen</value>
+  </data>
+  <data name="Web_Perm_ConfigureSyncs" xml:space="preserve">
+    <value>Synchronisationen konfigurieren</value>
+  </data>
+  <data name="Web_Perm_SyncManually" xml:space="preserve">
+    <value>Synchronisationen manuell starten</value>
+  </data>
+  <data name="Web_Perm_DeleteSyncs" xml:space="preserve">
+    <value>Synchronisationen löschen</value>
+  </data>
   <data name="Web_Settings_Tab_MailServer" xml:space="preserve">
     <value>Mailserver</value>
   </data>

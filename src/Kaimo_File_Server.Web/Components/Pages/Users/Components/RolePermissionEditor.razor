@@ -1,0 +1,66 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Security
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Icons
+
+@*
+    Management permissions of the role being edited: preset chips, then one bordered block per
+    permission area (header with select-all checkbox, icon, name and granted counter; the area's
+    permissions indented below). Permissions that only take effect system-wide carry a badge.
+*@
+<div class="role-perm-editor">
+    <div class="permission-presets">
+        @foreach (var preset in UserListViewModel.PermissionPresets)
+        {
+            var isActive = VM.EditRolePermissions == preset.Permissions;
+            <button type="button" class="preset-chip @(isActive ? "preset-chip--active" : "")" aria-pressed="@(isActive ? "true" : "false")"
+                    disabled="@Disabled" @onclick="() => VM.ApplyPermissionPreset(preset.Permissions)">
+                @preset.Label
+            </button>
+        }
+        <button type="button" class="preset-chip @(VM.EditRolePermissions == ManagementPermission.None ? "preset-chip--active" : "")"
+                disabled="@Disabled" @onclick="() => VM.ApplyPermissionPreset(ManagementPermission.None)">@Resources.Web_Common_None</button>
+    </div>
+
+    @foreach (var group in UserListViewModel.PermissionGroups)
+    {
+        var granted = VM.GrantedCount(group);
+        var all = granted == group.Flags.Count;
+        <section class="role-perm-group @(granted > 0 ? "role-perm-group--granted" : "")">
+            <label class="role-perm-group__head">
+                <input type="checkbox" checked="@all" disabled="@Disabled"
+                       aria-label="@string.Format(SelectAllLabel, group.Label)"
+                       @onchange="e => VM.ToggleEditGroup(group, (bool)(e.Value ?? false))" />
+                <span class="role-perm-group__icon" aria-hidden="true">@Icons.SVG(group.Icon, new SvgOptions(Width: 16, Height: 16))</span>
+                <span class="role-perm-group__title">@group.Label</span>
+                <span class="role-perm-group__count">@granted / @group.Flags.Count</span>
+            </label>
+            <div class="role-perm-group__items">
+                @foreach (var flag in group.Flags)
+                {
+                    <label class="role-perm-item">
+                        <input type="checkbox" checked="@VM.HasEditPermission(flag.Flag)" disabled="@Disabled"
+                               @onchange="e => VM.ToggleEditPermission(flag.Flag, (bool)(e.Value ?? false))" />
+                        <span class="role-perm-item__label">@flag.Label</span>
+                        @if (UserListViewModel.IsGlobalOnly(flag.Flag))
+                        {
+                            <StatusBadge Tone="StatusTone.Warning" ShowDot="false" Label="@GlobalOnlyLabel"
+                                         Class="role-perm-badge" title="@GlobalOnlyHint" />
+                        }
+                    </label>
+                }
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
+    [Parameter] public bool Disabled { get; set; }
+
+    private static string R(string key, string fallback) => Resources.ResourceManager.GetString(key) ?? fallback;
+    private static string GlobalOnlyLabel => R("Web_Perm_GlobalOnly", "Global only");
+    private static string GlobalOnlyHint => R("Web_Perm_GlobalOnly_Hint", "Only takes effect when the role is assigned system-wide.");
+    private static string SelectAllLabel => R("Web_Perm_SelectAllInGroup", "All permissions: {0}");
+}

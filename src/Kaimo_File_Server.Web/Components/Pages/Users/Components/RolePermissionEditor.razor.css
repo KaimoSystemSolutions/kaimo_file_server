@@ -1,0 +1,132 @@
+.role-perm-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.permission-presets {
+    display: flex;
+    gap: var(--space-1);
+    flex-wrap: wrap;
+}
+
+    .permission-presets .preset-chip:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+
+    .permission-presets .preset-chip:disabled {
+        opacity: 0.5;
+        cursor: default;
+    }
+
+/* One block per permission area: own frame, gap to the next area. */
+.role-perm-group {
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+
+/* Area header: raised surface, separated from its items by a strong rule. */
+.role-perm-group__head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-strong);
+    cursor: pointer;
+}
+
+    .role-perm-group__head:hover {
+        background: var(--bg-hover);
+    }
+
+.role-perm-group__icon {
+    display: inline-flex;
+    color: var(--text-tertiary);
+}
+
+.role-perm-group--granted .role-perm-group__icon {
+    color: var(--accent);
+}
+
+.role-perm-group__title {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-heading);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.role-perm-group__count {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Items are indented under the header checkbox so they visibly belong to their area. */
+.role-perm-group__items {
+    display: flex;
+    flex-direction: column;
+}
+
+.role-perm-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3) var(--space-1) calc(var(--space-3) + var(--space-6));
+    border-bottom: 1px solid var(--border-light);
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+    .role-perm-item:last-child {
+        border-bottom: 0;
+    }
+
+    .role-perm-item:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+/* The label takes the free width, so the "Global only" badge sits right-aligned. */
+.role-perm-item__label {
+    flex: 1;
+    min-width: 0;
+}
+
+.role-perm-group__head input[type="checkbox"],
+.role-perm-item input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+    .role-perm-group__head input[type="checkbox"]:focus-visible,
+    .role-perm-item input[type="checkbox"]:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+
+    .role-perm-group__head input[type="checkbox"]:disabled,
+    .role-perm-item input[type="checkbox"]:disabled {
+        opacity: 0.5;
+        cursor: default;
+    }
+
+/* The shared badge reserves a column width for status lists; inline after a label it hugs its text. */
+.role-perm-item ::deep .role-perm-badge {
+    min-width: 0;
+}

@@ -110,7 +110,7 @@ public partial class DatabaseSeeder
     [
         // ManageHomes/AccessHomeContents stay outside FullAdmin: FullAdmin doubles as the "is global admin" test, so a
         // new bit there would demote custom roles that were built from the FullAdmin preset.
-        ("Administrator",     ManagementPermission.FullAdmin | ManagementPermission.ManageHomes | ManagementPermission.AccessHomeContents | ManagementPermission.ManageMailServer | ManagementPermission.ManageNotifications | ManagementPermission.FileBackupAdmin, true, WellKnownGUIDs.ROLE_ADMIN),
+        ("Administrator",     ManagementPermission.Administrator,                                  true, WellKnownGUIDs.ROLE_ADMIN),
         ("UserManager",       ManagementPermission.UserAdmin | ManagementPermission.AssignGroups,   true, WellKnownGUIDs.ROLE_USER_MANAGER), 
         ("ShareManager",      ManagementPermission.ShareAdmin,                                     true, WellKnownGUIDs.ROLE_SHARE_MANAGER),
         ("DepartmentAdmin",   ManagementPermission.DepartmentAdmin,                                true, WellKnownGUIDs.ROLE_DEPARTMENT_ADMIN),

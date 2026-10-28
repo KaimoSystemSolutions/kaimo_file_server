@@ -30,6 +30,30 @@ public partial class UserListViewModel
         else EditRolePermissions &= ~flag;
     }
 
+    /// <summary>Number of the area's permissions the edited role currently holds.</summary>
+    public int GrantedCount(PermissionGroup group)
+        => group.Flags.Count(f => HasEditPermission(f.Flag));
+
+    /// <summary>Grants or revokes every permission of one area; other areas stay untouched.</summary>
+    public void ToggleEditGroup(PermissionGroup group, bool value)
+        => ToggleEditPermission(group.Flags.Aggregate(ManagementPermission.None, (all, f) => all | f.Flag), value);
+
+    /// <summary>
+    /// Permissions that are only ever evaluated against the system-wide (Global) permission set;
+    /// assigned at a department or share they have no effect. Marked "Global only" in the editor.
+    /// </summary>
+    // ponytail: hand-maintained from the HasGlobalPermissionAsync / global-mask checks; a new
+    // global-only check must be added here (RolePermissionEditorTests pins the current set).
+    public const ManagementPermission GlobalOnlyPermissions =
+        ManagementPermission.SystemAdmin | ManagementPermission.ViewSecurityMonitor
+        | ManagementPermission.ManageMailServer | ManagementPermission.ManageNotifications
+        | ManagementPermission.ManageClientDevices | ManagementPermission.ManageHomes
+        | ManagementPermission.ManageConnections | ManagementPermission.UseConnections
+        | ManagementPermission.ManageBackupRepositories;
+
+    public static bool IsGlobalOnly(ManagementPermission flag)
+        => (flag & GlobalOnlyPermissions) == flag;
+
     // Built on each access so the labels resolve against the current UI culture
     // (CurrentUICulture is set per request, so a static-readonly list would freeze
     // the language captured at type-load time).
@@ -48,13 +72,13 @@ public partial class UserListViewModel
             // Enabling/disabling accounts and their file services is its own right,
             // separate from EditUserProfiles.
             new(ManagementPermission.EnableDisableUsers, Resources.Web_Perm_EnableDisable),
-        ]),
+        ], "user.svg"),
         new(Resources.Web_PermGroup_GroupMgmt,
         [
             new(ManagementPermission.CreateGroups, Resources.Web_Perm_CreateGroups),
             new(ManagementPermission.DeleteGroups, Resources.Web_Perm_DeleteGroups),
             new(ManagementPermission.ManageGroupMembers, Resources.Web_Perm_ManageMembers),
-        ]),
+        ], "users.svg"),
         new(Resources.Web_PermGroup_AssignDelegation,
         [
             new(ManagementPermission.AssignGroups, Resources.Web_Perm_AssignGroups),
@@ -62,7 +86,7 @@ public partial class UserListViewModel
             // Department membership (adding/removing users) is its own right, separate from
             // EditDepartment, which covers the department's settings, groups and shares.
             new(ManagementPermission.AssignDepartments, Resources.Web_Perm_AssignDepartments),
-        ]),
+        ], "shield.svg"),
         new(Resources.Web_PermGroup_ShareMgmt,
         [
             new(ManagementPermission.CreateShares, Resources.Web_Perm_CreateShares),
@@ -74,12 +98,12 @@ public partial class UserListViewModel
                 Resources.ResourceManager.GetString("Web_Perm_ManageShareLinks") ?? "Manage share links"),
             new(ManagementPermission.ManageUploadLinks,
                 Resources.ResourceManager.GetString("Web_Perm_ManageUploadLinks") ?? "Manage upload links"),
-        ]),
+        ], "share.svg"),
         new(Resources.Web_PermGroup_DeptMgmt,
         [
             new(ManagementPermission.EditDepartment, Resources.Web_Perm_EditDepartment),
             new(ManagementPermission.ViewDepartment, Resources.Web_Perm_ViewDepartment),
-        ]),
+        ], "building.svg"),
         new(Resources.Web_PermGroup_SystemMgmt,
         [
             new(ManagementPermission.ManageSystemSettings, Resources.Web_Perm_ManageSystemSettings),
@@ -93,13 +117,23 @@ public partial class UserListViewModel
                 Resources.ResourceManager.GetString("Web_Perm_ManageMailServer") ?? "Configure mail server"),
             new(ManagementPermission.ManageNotifications,
                 Resources.ResourceManager.GetString("Web_Perm_ManageNotifications") ?? "Manage mail notifications"),
-        ]),
+            new(ManagementPermission.ManageClientDevices,
+                Resources.ResourceManager.GetString("Web_Perm_ManageClientDevices") ?? "Manage client devices"),
+        ], "gear.svg"),
         new(Resources.Web_PermGroup_ExternalStorage,
         [
             new(ManagementPermission.ManageCloudAccess, Resources.Web_Perm_ManageCloudAccess),
             new(ManagementPermission.ManageConnections, Resources.Web_Perm_ManageConnections),
             new(ManagementPermission.UseConnections, Resources.Web_Perm_UseConnections),
-        ]),
+            new(ManagementPermission.CreateSyncs,
+                Resources.ResourceManager.GetString("Web_Perm_CreateSyncs") ?? "Create syncs"),
+            new(ManagementPermission.ConfigureSyncs,
+                Resources.ResourceManager.GetString("Web_Perm_ConfigureSyncs") ?? "Configure syncs"),
+            new(ManagementPermission.SyncManually,
+                Resources.ResourceManager.GetString("Web_Perm_SyncManually") ?? "Start syncs manually"),
+            new(ManagementPermission.DeleteSyncs,
+                Resources.ResourceManager.GetString("Web_Perm_DeleteSyncs") ?? "Delete syncs"),
+        ], "cloud-download.svg"),
         new(Resources.ResourceManager.GetString("Web_PermGroup_FileBackup") ?? "File backup",
         [
             new(ManagementPermission.ManageBackupRepositories,
@@ -110,7 +144,7 @@ public partial class UserListViewModel
                 Resources.ResourceManager.GetString("Web_Perm_RestoreFromBackup") ?? "Restore from backup"),
             new(ManagementPermission.RestoreBackupInPlace,
                 Resources.ResourceManager.GetString("Web_Perm_RestoreBackupInPlace") ?? "Restore in place"),
-        ]),
+        ], "archive.svg"),
     ];
 
     public static readonly List<PermissionPreset> PermissionPresets =
@@ -122,7 +156,8 @@ public partial class UserListViewModel
         new("SystemAdmin", ManagementPermission.SystemAdmin),
         new("ExternalStorageAdmin", ManagementPermission.CloudAccessAdmin),
         new("BackupAdmin", ManagementPermission.FileBackupAdmin),
-        new("FullAdmin", ManagementPermission.FullAdmin),
+        // Same bits as the built-in Administrator role, not just the FullAdmin mask.
+        new("FullAdmin", ManagementPermission.Administrator),
     ];
 
     public void ApplyPermissionPreset(ManagementPermission preset)
