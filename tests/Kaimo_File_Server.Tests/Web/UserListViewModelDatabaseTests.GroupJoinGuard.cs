@@ -64,8 +64,10 @@ public partial class UserListViewModelDatabaseTests
     }
 
     [Fact]
-    public async Task SaveGroupAsync_RemovingMemberFromGroupWithUnassignableRole_IsAllowed()
+    public async Task SaveGroupAsync_RemovingMemberFromGroupWithUnassignableRole_IsRefused()
     {
+        // Leaving revokes the group's roles, so it is bounded like revoking an assignment
+        // (plans/scoped-management-permissions-audit.md, F5).
         var actor = SeedUser("groupadmin");
         var group = SeedGroupWithRole("auditors", ManagementPermission.AccessHomeContents);
         var target = SeedUser("bob");
@@ -75,8 +77,8 @@ public partial class UserListViewModelDatabaseTests
         foreach (var m in sut.EditGroupMembers) m.IsChecked = false;
         await sut.SaveGroupAsync();
 
-        Assert.Null(sut.ErrorMessage);
-        Assert.False(await IsMemberAsync(group.Id, target.Id));
+        Assert.Equal(Resources.ResourceManager.GetString("Web_Error_GroupGrantsUnrevokableRoles"), sut.ErrorMessage);
+        Assert.True(await IsMemberAsync(group.Id, target.Id));
     }
 
     [Fact]

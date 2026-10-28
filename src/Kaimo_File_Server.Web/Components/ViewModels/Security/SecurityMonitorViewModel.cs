@@ -12,7 +12,7 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 /// <summary>
 /// Security overview: login attempts per account and API / WebDAV traffic per client address
 /// for a selectable period, read from the persisted security events. Gated by
-/// <see cref="ManagementPermission.ViewSecurityMonitor"/>.
+/// <see cref="ManagementPermission.ViewSecurityMonitor"/>, held system-wide (the data covers every account).
 /// </summary>
 public sealed class SecurityMonitorViewModel(
     SecurityMonitor monitor,
@@ -61,7 +61,7 @@ public sealed class SecurityMonitorViewModel(
             var username = state.User.Identity?.Name;
             var actor = string.IsNullOrEmpty(username) ? null : await userContexts.CreateByUsernameAsync(username);
             CanAccessPage = actor is not null
-                            && await mgmtAuth.HasAnyPermissionAsync(actor, ManagementPermission.ViewSecurityMonitor);
+                            && await mgmtAuth.HasGlobalPermissionAsync(actor, ManagementPermission.ViewSecurityMonitor);
             if (!CanAccessPage) return;
 
             KnownAccounts = (await users.GetAllAsync())

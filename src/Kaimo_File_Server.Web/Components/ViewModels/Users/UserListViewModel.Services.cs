@@ -5,8 +5,9 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 
 /// <summary>
 /// User edit → "Services" tab: which file services (client app, web login, SMB, WebDAV) the
-/// selected user may use. Like the sign-in toggles, they are locked on one's own account, and
-/// a member of the Admins group always keeps the web login (see <c>ServiceAccessGate</c>).
+/// selected user may use. Like the sign-in toggles, they are locked on one's own account and
+/// need <c>EnableDisableUsers</c> (see <c>SaveUserAsync</c>), and a member of the Admins group
+/// always keeps the web login (see <c>ServiceAccessGate</c>).
 /// </summary>
 public partial class UserListViewModel
 {

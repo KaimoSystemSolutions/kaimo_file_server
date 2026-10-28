@@ -52,7 +52,7 @@
         <div class="detail-section">
             <span class="detail-label">@Resources.Web_ShareList_Label_Department</span>
             <PrincipalPickerField Mode="SelectionMode.Single"
-                                  Items="VM.Departments.ToDepartmentItems()"
+                                  Items="VM.ShareTargetDepartments.ToDepartmentItems()"
                                   SelectedIds="VM.EditShareDepartmentId.AsSelection()"
                                   SelectedIdsChanged="ids => VM.EditShareDepartmentId =
                                       ids.FirstOrNull() ?? WellKnownGUIDs.DEPARTMENT_GLOBAL"
@@ -63,7 +63,8 @@
             {
                 <button class="btn-primary department-change-button"
                         @onclick="() => VM.ShowDepartmentConfirm = true"
-                        disabled="@(isReadOnly || VM.EditShareDepartmentId == VM.SelectedShare.DepartmentId)">
+                        disabled="@(isReadOnly || !VM.CanChangeSelectedShareDepartment
+                                    || VM.EditShareDepartmentId == VM.SelectedShare.DepartmentId)">
                     @Resources.Web_ShareList_Action_ChangeDepartment
                 </button>
             }

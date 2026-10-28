@@ -15,7 +15,7 @@ namespace Kaimo_File_Server.Core.Services;
 /// <see cref="ScopeType.Global"/> — the representation the authorization engine, role ACL
 /// entries, the Admins-group mirror and the last-admin guard already understand.
 /// </summary>
-public sealed class RoleAssignmentService(
+public sealed partial class RoleAssignmentService(
     IScopedRoleAssignmentRepository assignmentRepo,
     IRoleRepository roleRepo,
     IUserRepository userRepo,
@@ -34,14 +34,19 @@ public sealed class RoleAssignmentService(
             : (scopeType, scopeId);
 
     /// <summary>
-    /// Creates the assignment after the no-privilege-elevation gate. Granting the admin role
-    /// system-wide to a user also adds them to the Admins group (full mirror).
+    /// Creates the assignment after the no-privilege-elevation gate. The recipient must be within
+    /// the actor's own <see cref="ManagementPermission.AssignRoles"/> reach (it may lie outside the
+    /// target scope). Granting the admin role system-wide to a user also adds them to the Admins
+    /// group (full mirror).
     /// </summary>
     /// <returns>A localized error message, or <c>null</c> on success.</returns>
     public async Task<string?> CreateAsync(
         UserContext actor, Guid principalId, Role role, ScopeType scopeType, Guid scopeId)
     {
         (scopeType, scopeId) = Normalize(scopeType, scopeId);
+
+        if (!await mgmtAuth.IsPrincipalInScopeAsync(actor, principalId, ManagementPermission.AssignRoles))
+            return Resources.Web_Error_NoPermission;
 
         if (!await mgmtAuth.CanAssignRoleAsync(actor, role.ManagementPermissions, scopeType, scopeId))
             return Resources.Web_Error_NoPermission;
@@ -53,6 +58,32 @@ public sealed class RoleAssignmentService(
             await ReconcileAdminCouplingAsync(principalId, true);
 
         return null;
+    }
+
+    /// <summary>
+    /// The users and groups the actor may grant roles to: everyone for a global
+    /// <see cref="ManagementPermission.AssignRoles"/> holder, otherwise the principals within the
+    /// actor's department reach (see <see cref="IManagementAuthService.IsPrincipalInScopeAsync"/>).
+    /// </summary>
+    public async Task<(List<User> Users, List<Group> Groups)> GetAssignableRecipientsAsync(UserContext actor)
+    {
+        var users = (await userRepo.GetAllAsync()).ToList();
+        var groups = (await groupRepo.GetAllAsync()).ToList();
+        if (await mgmtAuth.HasGlobalPermissionAsync(actor, ManagementPermission.AssignRoles))
+            return (users, groups);
+
+        // Resolved once per covered department instead of one check per principal: a user is
+        // reachable as a member of a covered department, a group by its department.
+        using var evaluation = mgmtAuth.BeginEvaluationScope(); // read-only batch of checks
+        var departments = await mgmtAuth.GetAuthorizedDepartmentIdsAsync(actor, ManagementPermission.AssignRoles)
+                          ?? AuthorizedScopeResult.None();
+        var userIds = await mgmtAuth.GetUserIdsInScopeAsync(actor, ManagementPermission.AssignRoles);
+        if (departments.IsUnrestricted || userIds is null)
+            return (users, groups);
+
+        var departmentIds = departments.ScopeIds.ToHashSet();
+        return (users.Where(u => userIds.Contains(u.Id)).ToList(),
+                groups.Where(g => departmentIds.Contains(g.DepartmentId)).ToList());
     }
 
     /// <summary>
@@ -83,9 +114,55 @@ public sealed class RoleAssignmentService(
     /// <summary>
     /// Whether the actor may add members to the group. Joining a group confers every role the
     /// group holds (and joining Admins the system-wide admin role, via the mirror), so the actor
-    /// must be allowed to assign each of them directly. Removing members needs no such check.
+    /// must be allowed to assign each of them directly.
     /// </summary>
-    public async Task<bool> CanAddGroupMembersAsync(UserContext actor, Guid groupId)
+    public Task<bool> CanAddGroupMembersAsync(UserContext actor, Guid groupId)
+        => CanDelegateGroupGrantsAsync(actor, groupId);
+
+    /// <summary>
+    /// Whether the actor may remove members from the group. Leaving a group revokes every role
+    /// the group holds, so — like <see cref="DeleteAsync"/> — it is bounded by the authority to
+    /// assign each of them: a department admin cannot strip a role a global admin granted.
+    /// </summary>
+    public Task<bool> CanRemoveGroupMembersAsync(UserContext actor, Guid groupId)
+        => CanDelegateGroupGrantsAsync(actor, groupId);
+
+    /// <summary>
+    /// Whether the actor may take the user out of every group of the department, which is what
+    /// leaving the department does. Bounded per group like <see cref="CanRemoveGroupMembersAsync"/>.
+    /// </summary>
+    public async Task<bool> CanLeaveDepartmentGroupsAsync(UserContext actor, Guid userId, Guid departmentId)
+    {
+        foreach (var group in await userRepo.GetGroupsForUserAsync(userId))
+        {
+            if (group.DepartmentId == departmentId && !await CanRemoveGroupMembersAsync(actor, group.Id))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Whether every assignment at the scope stays within the actor's own effective permissions
+    /// there, so deleting the scope (and its assignments with it) revokes nothing the actor could
+    /// not hold itself — e.g. a right a global admin granted at a subdepartment.
+    /// </summary>
+    public async Task<bool> CoversAssignmentsAtAsync(UserContext actor, ScopeType scopeType, Guid scopeId)
+    {
+        var assignments = await assignmentRepo.GetByScopeAsync(scopeType, scopeId);
+        if (assignments.Count == 0)
+            return true;
+
+        var effective = await mgmtAuth.GetEffectivePermissionsAtAsync(actor, scopeType, scopeId);
+        foreach (var assignment in assignments)
+        {
+            if (await roleRepo.GetByIdAsync(assignment.RoleId) is { } role
+                && (role.ManagementPermissions & ~effective) != ManagementPermission.None)
+                return false;
+        }
+        return true;
+    }
+
+    private async Task<bool> CanDelegateGroupGrantsAsync(UserContext actor, Guid groupId)
     {
         var grants = new List<(Guid RoleId, ScopeType ScopeType, Guid ScopeId)>();
         grants.AddRange((await assignmentRepo.GetByPrincipalAsync(groupId))

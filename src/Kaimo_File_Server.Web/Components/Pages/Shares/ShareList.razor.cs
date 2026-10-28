@@ -90,7 +90,8 @@ public partial class ShareList
     {
         VM.DeselectShare();
         _activeTab = ShareDetailTab.Settings;
-        VM.IsCreating = !VM.IsCreating;
+        if (VM.IsCreating) VM.IsCreating = false;
+        else VM.StartCreate();
         StateHasChanged();
     }
 

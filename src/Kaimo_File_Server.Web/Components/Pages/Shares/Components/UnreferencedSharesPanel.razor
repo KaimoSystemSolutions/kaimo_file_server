@@ -66,7 +66,7 @@
                     <span class="unref-cell-num">@FormatHelper.FormatFileSize(folder.SizeBytes)</span>
                     <span class="unref-cell-muted">@DateFmt.FormatDateTime(folder.LastWriteUtc)</span>
                     <span class="unref-actions">
-                        @if (VM.CanCreateShare)
+                        @if (VM.CanAdoptUnreferencedShares)
                         {
                             <button class="btn-secondary" type="button" disabled="@busy"
                                     @onclick="() => Adopt(folder)">
@@ -74,11 +74,14 @@
                                 <span>@T("Web_Unreferenced_Adopt", "Create share")</span>
                             </button>
                         }
-                        <button class="btn-danger-outline" type="button" disabled="@busy"
-                                @onclick="() => _confirmPurge = folder">
-                            @Assets.SVG("trash.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                            <span>@T("Web_Unreferenced_Purge", "Delete data")</span>
-                        </button>
+                        @if (VM.CanPurgeUnreferencedShares)
+                        {
+                            <button class="btn-danger-outline" type="button" disabled="@busy"
+                                    @onclick="() => _confirmPurge = folder">
+                                @Assets.SVG("trash.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                                <span>@T("Web_Unreferenced_Purge", "Delete data")</span>
+                            </button>
+                        }
                     </span>
                 </div>
             }

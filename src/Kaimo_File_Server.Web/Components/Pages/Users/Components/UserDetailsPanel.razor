@@ -180,10 +180,11 @@
                             @* Own account: the sign-in toggles are locked (enforced in SaveUserAsync too). *@
                             <p class="form-hint">@R("Web_Admin_OwnSecurityLocked")</p>
                         }
-                        @if (VM.CanEditSecuritySettingsForSelected || (VM.CanEditSelectedUser && VM.CanManageHomes))
+                        @if (VM.CanEditAccountEnabledForSelected || VM.CanEditCanChangePasswordForSelected
+                             || (VM.CanEditSelectedUser && VM.CanManageHomes))
                         {
                             <div class="create-form-toggles user-edit-toggles">
-                                @if (VM.CanEditSecuritySettingsForSelected)
+                                @if (VM.CanEditAccountEnabledForSelected)
                                 {
                                     <div class="toggle-row">
                                         <span class="toggle-label-text">@Resources.Web_Admin_Toggle_AccountEnabled</span>
@@ -192,6 +193,9 @@
                                             <span class="toggle-slider"></span>
                                         </label>
                                     </div>
+                                }
+                                @if (VM.CanEditCanChangePasswordForSelected)
+                                {
                                     <div class="toggle-row">
                                         <span class="toggle-label-text">@Resources.Web_Admin_Toggle_CanChangePassword</span>
                                         <label class="toggle-switch">
@@ -223,10 +227,14 @@
                         {
                             <p class="form-hint">@R("Web_User_FileServices_SelfLocked")</p>
                         }
+                        else if (!VM.CanEditServiceAccessForSelected)
+                        {
+                            <p class="form-hint">@R("Web_User_FileServices_NoPermission")</p>
+                        }
                         <div class="create-form-toggles user-edit-toggles">
                             @foreach (var service in FileServiceAccessViewModel.Services)
                             {
-                                var locked = !VM.CanEditSecuritySettingsForSelected
+                                var locked = !VM.CanEditServiceAccessForSelected
                                     || (service == UserServiceAccess.Web && VM.SelectedUserKeepsWebLogin);
                                 var name = R($"Web_FileServices_Service_{service}");
                                 <div class="toggle-row">

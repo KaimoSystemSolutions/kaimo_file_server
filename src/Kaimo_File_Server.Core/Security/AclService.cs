@@ -208,6 +208,8 @@ public partial class AclService : IAclService
         var share = await sp.GetRequiredService<IShareRepository>().GetByIdAsync(shareId);
         var deptDefault = await ResolveDepartmentDefaultAsync(userContext, share, sp);
         var homeGrant = share is { IsUserHomes: true } ? new HomeAccessGrant(userContext, sp) : null;
+        // One read-only batch: the per-owner checks share the actor's assignments and the tree.
+        using var evaluation = homeGrant?.BeginEvaluation();
 
         // -- 4. Index ACLs for O(1) lookup --
         var aclByPath = IndexAclsByPath(allAcls);

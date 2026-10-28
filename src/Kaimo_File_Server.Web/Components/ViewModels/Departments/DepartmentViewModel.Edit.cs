@@ -56,34 +56,22 @@ public partial class DepartmentViewModel
         EditUseCustomColor = Selected.Color != null;
         EditColor = Selected.Color ?? DepartmentPalette.AutoHex(Selected.Id);
 
-        // Available parents (exclude self + descendants to prevent cycles). Global is not a
-        // parent option: "no parent" already means "directly below Global".
-        var allDepts = await _departmentRepo.GetAllAsync();
-        var descendantIds = await _departmentRepo.GetDescendantIdsAsync(Selected.Id);
-        descendantIds.Add(Selected.Id);
-        descendantIds.Add(WellKnownGUIDs.DEPARTMENT_GLOBAL);
-        AvailableParents = allDepts
-            .Where(d => !descendantIds.Contains(d.Id))
-            .OrderByGlobalFirst().ToList();
+        // Available parents: authorized ones only, never self or a descendant (cycles). Global is
+        // not a parent option: "no parent" already means "directly below Global".
+        AvailableParents = await LoadAvailableParentsAsync(Selected);
 
-        // Members (M:N — DepartmentUser)
+        // Members (M:N — DepartmentUser), groups (Group.DepartmentId) and shares
+        // (ShareDefinition.DepartmentId): each picker offers what already belongs here plus what
+        // the actor controls and may move in (see DepartmentViewModel.EditScope.cs). System groups
+        // (Everyone, Admins) and the home-folder share stay permanently Global.
         var allUsers = (await _userRepo.GetAllAsync()).OrderBy(u => u.Name).ToList();
-        var memberIds = Members.Select(u => u.Id).ToHashSet();
-        EditMembers = allUsers
-            .Select(u => new CheckboxItem<User>(u, memberIds.Contains(u.Id))).ToList();
+        EditMembers = await BuildMemberPickerAsync(Selected.Id, allUsers);
 
-        // Groups (direct FK: Group.DepartmentId). The Everyone group is a live mirror of every
-        // registered user and stays permanently Global — it must never be pulled into a
-        // department, so it is excluded from the assignable list.
         var allGroups = (await _groupRepo.GetAllAsync()).OrderBy(g => g.Name).ToList();
-        EditGroups = allGroups
-            .Where(g => g.Id != WellKnownGUIDs.GROUP_EVERYONE)
-            .Select(g => new CheckboxItem<Group>(g, g.DepartmentId == Selected.Id)).ToList();
+        EditGroups = await BuildGroupPickerAsync(Selected.Id, allGroups);
 
-        // Shares (direct FK: ShareDefinition.DepartmentId)
         var allShares = (await _shareRepo.GetAllAsync()).OrderBy(s => s.Name).ToList();
-        EditShares = allShares
-            .Select(s => new CheckboxItem<ShareDefinition>(s, s.DepartmentId == Selected.Id)).ToList();
+        EditShares = await BuildSharePickerAsync(Selected.Id, allShares);
     }
 
     public async Task SaveAsync()
@@ -110,15 +98,44 @@ public partial class DepartmentViewModel
                 return;
             }
 
+            // -- Parent change: validated (no cycles) and authorized on the old and new parent --
+            var isGlobal = IsGlobalDepartment(Selected);
+            var newParentId = isGlobal || EditParentId == WellKnownGUIDs.DEPARTMENT_GLOBAL ? null : EditParentId;
+            var oldParentId = (await _departmentRepo.GetByIdAsync(Selected.Id))?.ParentDepartmentId;
+            if (newParentId != oldParentId
+                && await ValidateParentChangeAsync(Selected.Id, oldParentId, newParentId) is { } parentError)
+            {
+                ErrorMessage = parentError;
+                return;
+            }
+
+            // -- Pending assignment diff, authorized as a whole before anything is written --
+            var desiredUserIds = EditMembers
+                .Where(m => m.IsChecked).Select(m => m.Item.Id).ToHashSet();
+            var currentUserIds = Members.Select(u => u.Id).ToHashSet();
+            var addedUsers = EditMembers
+                .Where(m => m.IsChecked && !currentUserIds.Contains(m.Item.Id))
+                .Select(m => m.Item).DistinctBy(u => u.Id).ToList();
+            var removedUserIds = currentUserIds.Except(desiredUserIds).ToList();
+
+            var movedGroups = await ResolveMovedGroupsAsync(Selected.Id);
+            var movedShares = await ResolveMovedSharesAsync(Selected.Id);
+
+            var refused = await FindRefusedChangesAsync(Selected.Id, addedUsers, removedUserIds,
+                movedGroups.Select(m => m.Group), movedShares.Select(m => m.Share));
+            if (refused.Count > 0)
+            {
+                ErrorMessage = string.Format(ChangesNotPermittedFormat, string.Join(", ", refused));
+                return;
+            }
+
             // -- Update department entity --
             if (!string.IsNullOrWhiteSpace(EditName))
                 Selected.Name = EditName.Trim();
             Selected.Description = string.IsNullOrWhiteSpace(EditDescription) ? null : EditDescription.Trim();
             // The Global department is a pure placeholder for "the whole system": it has no
             // parent and never carries default file permissions.
-            var isGlobal = IsGlobalDepartment(Selected);
-            Selected.ParentDepartmentId = isGlobal || EditParentId == WellKnownGUIDs.DEPARTMENT_GLOBAL
-                ? null : EditParentId;
+            Selected.ParentDepartmentId = newParentId;
             Selected.DefaultFilePermission = EditHasOwnPermission && !isGlobal
                 ? (long)EditDefaultPermission
                 : null;
@@ -128,14 +145,10 @@ public partial class DepartmentViewModel
             await _departmentRepo.UpdateAsync(Selected);
 
             // -- Members diff (M:N via DepartmentUser) --
-            var desiredUserIds = EditMembers
-                .Where(m => m.IsChecked).Select(m => m.Item.Id).ToHashSet();
-            var currentUserIds = Members.Select(u => u.Id).ToHashSet();
-
-            foreach (var userId in desiredUserIds.Except(currentUserIds))
-                await _departmentRepo.AddUserAsync(Selected.Id, userId);
+            foreach (var user in addedUsers)
+                await _departmentRepo.AddUserAsync(Selected.Id, user.Id);
             var removedGroupMemberships = 0;
-            foreach (var userId in currentUserIds.Except(desiredUserIds))
+            foreach (var userId in removedUserIds)
             {
                 await _departmentRepo.RemoveUserAsync(Selected.Id, userId);
 
@@ -152,42 +165,18 @@ public partial class DepartmentViewModel
                 }
             }
 
-            // -- Groups diff (direct FK: Group.DepartmentId) --
-            foreach (var item in EditGroups)
+            // -- Groups diff (direct FK: Group.DepartmentId); released ones go back to Global --
+            foreach (var (group, shouldBelong) in movedGroups)
             {
-                var group = item.Item;
-                var shouldBelong = item.IsChecked;
-                var currentlyBelongs = group.DepartmentId == Selected.Id;
-
-                if (shouldBelong && !currentlyBelongs)
-                {
-                    group.DepartmentId = Selected.Id;
-                    await _groupRepo.UpdateAsync(group);
-                }
-                else if (!shouldBelong && currentlyBelongs)
-                {
-                    group.DepartmentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
-                    await _groupRepo.UpdateAsync(group);
-                }
+                group.DepartmentId = shouldBelong ? Selected.Id : WellKnownGUIDs.DEPARTMENT_GLOBAL;
+                await _groupRepo.UpdateAsync(group);
             }
 
             // -- Shares diff (direct FK: ShareDefinition.DepartmentId) --
-            foreach (var item in EditShares)
+            foreach (var (share, shouldBelong) in movedShares)
             {
-                var share = item.Item;
-                var shouldBelong = item.IsChecked;
-                var currentlyBelongs = share.DepartmentId == Selected.Id;
-
-                if (shouldBelong && !currentlyBelongs)
-                {
-                    share.DepartmentId = Selected.Id;
-                    await _shareRepo.UpdateAsync(share);
-                }
-                else if (!shouldBelong && currentlyBelongs)
-                {
-                    share.DepartmentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
-                    await _shareRepo.UpdateAsync(share);
-                }
+                share.DepartmentId = shouldBelong ? Selected.Id : WellKnownGUIDs.DEPARTMENT_GLOBAL;
+                await _shareRepo.UpdateAsync(share);
             }
 
             // -- Refresh --

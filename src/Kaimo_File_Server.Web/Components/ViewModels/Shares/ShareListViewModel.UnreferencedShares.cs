@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Infrastructure.Services;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
@@ -10,8 +11,9 @@ public sealed record UnreferencedFolder(
 /// <summary>
 /// "Deleted / unreferenced shares": deleting a share keeps its folder, and admins may
 /// copy folders into a pool by hand. Both show up here via a plain folder scan, and
-/// can be adopted as a share or purged. Global admins only — such a folder has no
-/// department, so no scoped admin owns it.
+/// can be adopted as a share or purged. Global authority only — such a folder has no
+/// department, so no scoped admin owns it: purging needs global DeleteShares, adopting global
+/// CreateShares.
 /// </summary>
 public partial class ShareListViewModel
 {
@@ -21,7 +23,12 @@ public partial class ShareListViewModel
     public string? BusyPath { get; private set; }
     public string? UnreferencedErrorMessage { get; private set; }
 
-    public bool CanManageUnreferencedShares => _manageAllShares;
+    private bool _canPurgeUnreferenced;
+    private bool _canAdoptUnreferenced;
+
+    public bool CanManageUnreferencedShares => _canPurgeUnreferenced || _canAdoptUnreferenced;
+    public bool CanPurgeUnreferencedShares => _canPurgeUnreferenced;
+    public bool CanAdoptUnreferencedShares => _canAdoptUnreferenced;
 
     public Task LoadUnreferencedSharesAsync()
     {
@@ -32,7 +39,7 @@ public partial class ShareListViewModel
     // Rescan without clearing the message, so an action's error survives its refresh.
     private async Task RescanUnreferencedAsync()
     {
-        if (!_manageAllShares) return;
+        if (!CanManageUnreferencedShares) return;
 
         IsScanning = true;
         try
@@ -67,7 +74,7 @@ public partial class ShareListViewModel
     public async Task<bool> PurgeUnreferencedFolderAsync(string path)
     {
         UnreferencedErrorMessage = null;
-        if (!_manageAllShares)
+        if (!_canPurgeUnreferenced)
         {
             UnreferencedErrorMessage = Resources.Web_Error_NoPermission;
             return false;
@@ -133,7 +140,7 @@ public partial class ShareListViewModel
     public async Task<bool> AdoptUnreferencedFolderAsync(string path)
     {
         UnreferencedErrorMessage = null;
-        if (!_manageAllShares || !CanCreateShare)
+        if (!_canAdoptUnreferenced)
         {
             UnreferencedErrorMessage = Resources.Web_Error_NoPermission;
             return false;
@@ -160,7 +167,8 @@ public partial class ShareListViewModel
 
                 CreateErrorMessage = null;
                 if (!await CreateShareCoreAsync(
-                        name, Path.GetDirectoryName(path)!, adoptExistingFolder: true))
+                        name, Path.GetDirectoryName(path)!, WellKnownGUIDs.DEPARTMENT_GLOBAL,
+                        adoptExistingFolder: true))
                 {
                     UnreferencedErrorMessage = CreateErrorMessage;
                     CreateErrorMessage = null;

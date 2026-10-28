@@ -10,7 +10,7 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 
 /// <summary>
 /// Backs the "Client devices" settings tab. It lets an operator holding
-/// <see cref="ManagementPermission.ManageClientDevices"/> review every user's
+/// <see cref="ManagementPermission.ManageClientDevices"/> system-wide review every user's
 /// registered devices (their connected apps and instances, plus each device's
 /// synced-folder selections) and revoke stale or unused ones.
 ///
@@ -96,7 +96,7 @@ public sealed class ClientDeviceAdminViewModel
         {
             _actor = await GetCurrentUserAsync();
             CanManage = _actor is not null
-                && await _mgmtAuth.HasAnyPermissionAsync(_actor, ManagementPermission.ManageClientDevices);
+                && await _mgmtAuth.HasGlobalPermissionAsync(_actor, ManagementPermission.ManageClientDevices);
             if (!CanManage)
             {
                 Reset();
@@ -163,7 +163,7 @@ public sealed class ClientDeviceAdminViewModel
     public async Task<bool> RevokeDeviceAsync(Guid deviceId)
     {
         if (_actor is null
-            || !await _mgmtAuth.HasAnyPermissionAsync(_actor, ManagementPermission.ManageClientDevices))
+            || !await _mgmtAuth.HasGlobalPermissionAsync(_actor, ManagementPermission.ManageClientDevices))
             return false;
 
         var device = await _devices.GetByIdAsync(deviceId);
@@ -206,7 +206,7 @@ public sealed class ClientDeviceAdminViewModel
     public async Task<bool> DeleteDeviceAsync(Guid deviceId)
     {
         if (_actor is null
-            || !await _mgmtAuth.HasAnyPermissionAsync(_actor, ManagementPermission.ManageClientDevices))
+            || !await _mgmtAuth.HasGlobalPermissionAsync(_actor, ManagementPermission.ManageClientDevices))
             return false;
 
         var device = await _devices.GetByIdAsync(deviceId);
@@ -244,7 +244,7 @@ public sealed class ClientDeviceAdminViewModel
             return false;
 
         if (_actor is null
-            || !await _mgmtAuth.HasAnyPermissionAsync(_actor, ManagementPermission.ManageClientDevices))
+            || !await _mgmtAuth.HasGlobalPermissionAsync(_actor, ManagementPermission.ManageClientDevices))
             return false;
 
         var device = await _devices.GetByIdAsync(deviceId);

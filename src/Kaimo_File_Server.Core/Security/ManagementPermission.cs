@@ -28,7 +28,7 @@
         // -- Role & Permission Assignment --
         AssignGroups = 1L << 16,  // assign users to groups (within scope)
         AssignRoles = 1L << 17,  // assign roles (only ≤ own permissions)
-        AssignDepartments = 1L << 18,  // move users between departments
+        AssignDepartments = 1L << 18,  // add/remove users to/from departments (within scope)
 
         // -- Share Management --
         CreateShares = 1L << 24,
@@ -92,7 +92,7 @@
                    | ManageShareAccess | ManageShareAcls | ManageShareLinks
                    | ManageUploadLinks,
 
-        DepartmentAdmin = UserAdmin | GroupAdmin | AssignGroups
+        DepartmentAdmin = UserAdmin | GroupAdmin | AssignGroups | AssignDepartments
                         | ManageShareAccess | ManageShareAcls
                         | EditDepartment | ViewDepartment,
 

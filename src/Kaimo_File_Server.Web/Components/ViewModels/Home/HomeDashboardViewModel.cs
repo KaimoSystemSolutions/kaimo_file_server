@@ -186,7 +186,7 @@ public sealed class HomeDashboardViewModel(
                     DisabledUserCount = all.Count(u => !u.IsEnabled);
                 });
 
-            CanSeeSecurity = await mgmtAuth.HasAnyPermissionAsync(actor, ManagementPermission.ViewSecurityMonitor);
+            CanSeeSecurity = await mgmtAuth.HasGlobalPermissionAsync(actor, ManagementPermission.ViewSecurityMonitor);
             if (CanSeeSecurity)
                 await SectionAsync("security", async () =>
                 {

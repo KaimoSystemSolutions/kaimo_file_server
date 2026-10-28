@@ -7825,4 +7825,25 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Version_NoBackup_Other" xml:space="preserve">
     <value>Der aktuelle Inhalt kann nicht als Version gesichert werden.</value>
   </data>
+  <data name="Web_Dept_ChangesNotPermitted" xml:space="preserve">
+    <value>Folgende Änderungen dürfen Sie nicht vornehmen: {0}</value>
+  </data>
+  <data name="Web_Group_MembersNotPermitted" xml:space="preserve">
+    <value>Folgende Benutzer dürfen Sie nicht in die Abteilung dieser Gruppe aufnehmen: {0}</value>
+  </data>
+  <data name="Web_Dept_InvalidParent" xml:space="preserve">
+    <value>Die gewählte übergeordnete Abteilung ist ungültig.</value>
+  </data>
+  <data name="Web_Dept_AssignmentsBeyondOwnRights" xml:space="preserve">
+    <value>Diese Abteilung hat Rollenzuweisungen mit Rechten, die Sie selbst nicht besitzen. Nur ein Administrator mit diesen Rechten kann sie löschen.</value>
+  </data>
+  <data name="Web_Error_GroupGrantsUnrevokableRoles" xml:space="preserve">
+    <value>Diese Gruppe vergibt Rollen, die Sie nicht entziehen dürfen. Sie können daher keine Mitglieder aus ihr entfernen.</value>
+  </data>
+  <data name="Web_User_FileServices_NoPermission" xml:space="preserve">
+    <value>Zum Ändern der Dateidienste ist für diesen Benutzer die Berechtigung „Aktivieren/Deaktivieren“ erforderlich.</value>
+  </data>
+  <data name="Web_Error_SystemRoleUndeletable" xml:space="preserve">
+    <value>Systemrollen können nicht gelöscht werden.</value>
+  </data>
 </root>

@@ -342,7 +342,10 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             // anonymous public-link browser) never loads it, so no sync marker can be rendered.
             if (Capabilities.HasCloudSync)
             {
-                CanManageSyncs = await _mgmtAuth.HasAnyPermissionAsync(userContext, ManagementPermission.SyncAdmin);
+                // Same share set as the sync overview: any sync right on THIS share.
+                var syncScope = await _mgmtAuth.GetAuthorizedShareIdsAnyAsync(userContext, ManagementPermission.SyncAdmin);
+                CanManageSyncs = syncScope is not null
+                    && (syncScope.IsUnrestricted || syncScope.ScopeIds.Contains(CurrentShare.Id));
                 await LoadShareSyncsAsync(CurrentShare.Id);
             }
 

@@ -25,6 +25,8 @@ public partial class RoleAssignmentServiceTests : DatabaseTestBase
         _mgmtAuth.Setup(m => m.CanAssignRoleAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>(),
                 It.IsAny<ScopeType>(), It.IsAny<Guid>()))
             .ReturnsAsync(true);
+        _mgmtAuth.Setup(m => m.IsPrincipalInScopeAsync(It.IsAny<UserContext>(), It.IsAny<Guid>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(true);
     }
 
     private RoleAssignmentService BuildSut()

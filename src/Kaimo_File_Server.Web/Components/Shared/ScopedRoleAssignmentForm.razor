@@ -147,7 +147,7 @@
     // the authorization engine stays the source of truth.
     private const ManagementPermission SystemLevelPermissions =
         ManagementPermission.SystemAdmin | ManagementPermission.ViewSecurityMonitor
-        | ManagementPermission.ManageMailServer | ManagementPermission.ManageNotifications
+        | ManagementPermission.ManageClientDevices | ManagementPermission.ManageMailServer | ManagementPermission.ManageNotifications
         | ManagementPermission.ManageBackupRepositories;
 
     private bool IsGlobalScope => ScopeType == ScopeType.Global

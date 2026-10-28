@@ -136,9 +136,12 @@ public partial class UserListViewModel
     public bool CanDeleteRoles { get; private set; }
 
     public List<Department> AuthorizedDepartmentsForCreate { get; private set; } = [];
+
+    /// <summary>Departments in which the actor may create groups (Global only with global authority).</summary>
+    public List<Department> AuthorizedDepartmentsForGroupCreate { get; private set; } = [];
     public List<Department> AuthorizedDepartmentsForView { get; private set; } = [];
 
-    /// <summary>Departments the actor may add/remove users from (EditDepartment); offered in the
+    /// <summary>Departments the actor may add/remove users from (AssignDepartments); offered in the
     /// user-edit department picker. Unrestricted actors get every department.</summary>
     public List<Department> AuthorizedDepartmentsForAssign { get; private set; } = [];
 
@@ -171,6 +174,20 @@ public partial class UserListViewModel
     /// one's own account, so no admin can disable their own account or revoke their own password
     /// change. Leaving the Admins group stays possible while another admin exists (last-admin guard).</summary>
     public bool CanEditSecuritySettingsForSelected => CanEditSelectedUser && !IsViewingSelf;
+
+    /// <summary>Whether the "account enabled" toggle is editable: additionally needs
+    /// <see cref="ManagementPermission.EnableDisableUsers"/> on the user.</summary>
+    public bool CanEditAccountEnabledForSelected => CanEditSecuritySettingsForSelected && _canEnableDisableSelected;
+
+    /// <summary>File services (app, web, SMB, WebDAV) are sign-in switches too: same rule as
+    /// <see cref="CanEditAccountEnabledForSelected"/>.</summary>
+    public bool CanEditServiceAccessForSelected => CanEditAccountEnabledForSelected;
+
+    /// <summary>Whether the "may change password" toggle is editable: it belongs to password
+    /// management and needs <see cref="ManagementPermission.ResetPasswords"/> on the user.</summary>
+    public bool CanEditCanChangePasswordForSelected => CanEditSecuritySettingsForSelected && CanResetPasswordForSelected;
+
+    private bool _canEnableDisableSelected;
 
     /// <summary>Whether the actor may change the selected user's password from the edit form:
     /// an admin with reset authority, or the user changing their OWN password when the account
@@ -317,6 +334,8 @@ public partial class UserListViewModel
         var createResult = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
             _actorContext, ManagementPermission.CreateUsers);
         AuthorizedDepartmentsForCreate = await LoadDepartmentsFromScopeResultAsync(createResult);
+        AuthorizedDepartmentsForGroupCreate = await LoadDepartmentsFromScopeResultAsync(
+            await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(_actorContext, ManagementPermission.CreateGroups));
 
         var editResult = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
             _actorContext, ManagementPermission.EditUserProfiles);
@@ -334,7 +353,7 @@ public partial class UserListViewModel
         CreateUserDepartmentId = AuthorizedDepartmentsForCreate.FirstOrDefault()?.Id;
 
         var assignResult = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
-            _actorContext, ManagementPermission.EditDepartment);
+            _actorContext, ManagementPermission.AssignDepartments);
         // Every user implicitly belongs to the Global department, so it is not offered here.
         AuthorizedDepartmentsForAssign = (await LoadDepartmentsFromScopeResultAsync(assignResult))
             .Where(d => d.Id != WellKnownGUIDs.DEPARTMENT_GLOBAL).ToList();
@@ -348,6 +367,7 @@ public partial class UserListViewModel
             CanEditSelectedUser = false;
             CanDeleteSelectedUser = false;
             CanResetPasswordForSelected = false;
+            _canEnableDisableSelected = false;
             return;
         }
 
@@ -357,6 +377,8 @@ public partial class UserListViewModel
             _actorContext, user.Id, ManagementPermission.DeleteUsers);
         CanResetPasswordForSelected = await _mgmtAuth.CanManageUserAsync(
             _actorContext, user.Id, ManagementPermission.ResetPasswords);
+        _canEnableDisableSelected = await _mgmtAuth.CanManageUserAsync(
+            _actorContext, user.Id, ManagementPermission.EnableDisableUsers);
     }
 
     private async Task<List<Department>> LoadDepartmentsFromScopeResultAsync(AuthorizedScopeResult result)
@@ -414,6 +436,7 @@ public partial class UserListViewModel
             SelectedUser = null;
             UserRoles = []; UserGroups = []; UserDepartments = []; UserScopedAssignments = [];
             CanEditSelectedUser = false; CanDeleteSelectedUser = false; CanResetPasswordForSelected = false;
+            _canEnableDisableSelected = false;
             return;
         }
 

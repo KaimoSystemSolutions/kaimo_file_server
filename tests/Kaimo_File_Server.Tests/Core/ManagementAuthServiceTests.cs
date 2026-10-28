@@ -22,6 +22,7 @@ public partial class ManagementAuthServiceTests
     private readonly Mock<IRoleRepository> _roleRepo = new();
     private readonly Mock<IGroupRepository> _groupRepo = new();
     private readonly Mock<IShareRepository> _shareRepo = new();
+    private readonly Mock<IUserRepository> _userRepo = new();
 
     private readonly Guid _actorId = Guid.NewGuid();
     private readonly ManagementAuthService _sut;
@@ -35,10 +36,16 @@ public partial class ManagementAuthServiceTests
         _departmentRepo
             .Setup(d => d.GetDescendantIdsAsync(It.IsAny<Guid>()))
             .ReturnsAsync(new HashSet<Guid>());
+        _departmentRepo
+            .Setup(d => d.GetDepartmentsForUserAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(new List<Kaimo_File_Server.Core.Domain.Department.Department>());
+        _userRepo
+            .Setup(u => u.GetGroupsForUserAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(new List<Group>());
 
         _sut = new ManagementAuthService(
             _assignmentRepo.Object, _departmentRepo.Object, _roleRepo.Object,
-            _groupRepo.Object, _shareRepo.Object);
+            _groupRepo.Object, _shareRepo.Object, _userRepo.Object);
     }
 
     // -- Helpers --

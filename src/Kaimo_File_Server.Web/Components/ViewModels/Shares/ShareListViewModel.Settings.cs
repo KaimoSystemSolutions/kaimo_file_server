@@ -188,6 +188,22 @@ public partial class ShareListViewModel
             return true;
         }
 
+        // The move takes the share away from its current department's admins, so — like the
+        // department editor — it needs authority over that department, not just over the share.
+        // Re-read: the loaded share may be stale.
+        var currentDepartmentId = (await _shareRepo.GetByIdAsync(SelectedShare.Id))?.DepartmentId
+                                  ?? SelectedShare.DepartmentId;
+        if (!await _mgmtAuth.CanManageDepartmentAsync(
+                _actorContext!, currentDepartmentId, ManagementPermission.EditShareSettings))
+        { EditSuccessMessage = null; EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
+
+        // The target decides which department admins manage the share from now on, so it must
+        // exist and lie in the actor's EditShareSettings scope (Global needs global authority).
+        if (_departmentRepo is null || await _departmentRepo.GetByIdAsync(EditShareDepartmentId) is null
+            || !await _mgmtAuth.CanManageDepartmentAsync(
+                _actorContext!, EditShareDepartmentId, ManagementPermission.EditShareSettings))
+        { EditSuccessMessage = null; EditErrorMessage = Resources.Web_Dept_NoPermissionInDept; return false; }
+
         try
         {
             SelectedShare.DepartmentId = EditShareDepartmentId;

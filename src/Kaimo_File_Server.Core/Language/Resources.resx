@@ -7825,4 +7825,25 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Version_NoBackup_Other" xml:space="preserve">
     <value>The current content cannot be kept as a version.</value>
   </data>
+  <data name="Web_Dept_ChangesNotPermitted" xml:space="preserve">
+    <value>You are not allowed to make the following changes: {0}</value>
+  </data>
+  <data name="Web_Group_MembersNotPermitted" xml:space="preserve">
+    <value>You are not allowed to add the following users to the department of this group: {0}</value>
+  </data>
+  <data name="Web_Dept_InvalidParent" xml:space="preserve">
+    <value>The selected parent department is not valid.</value>
+  </data>
+  <data name="Web_Dept_AssignmentsBeyondOwnRights" xml:space="preserve">
+    <value>This department has role assignments with rights you do not hold yourself. Only an administrator holding those rights can delete it.</value>
+  </data>
+  <data name="Web_Error_GroupGrantsUnrevokableRoles" xml:space="preserve">
+    <value>This group grants roles you are not allowed to revoke, so you cannot remove members from it.</value>
+  </data>
+  <data name="Web_User_FileServices_NoPermission" xml:space="preserve">
+    <value>Changing the file services requires the "Enable/Disable" permission for this user.</value>
+  </data>
+  <data name="Web_Error_SystemRoleUndeletable" xml:space="preserve">
+    <value>System roles cannot be deleted.</value>
+  </data>
 </root>

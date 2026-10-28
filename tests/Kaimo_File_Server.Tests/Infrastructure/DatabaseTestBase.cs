@@ -112,7 +112,7 @@ public abstract class DatabaseTestBase : IDisposable
     /// changes after a role permission or scoped assignment is added or removed.
     /// </summary>
     protected ManagementAuthService BuildManagementAuthService()
-        => new(ScopedRoleRepo(), DepartmentRepo(), RoleRepo(), GroupRepo(), ShareRepo());
+        => new(ScopedRoleRepo(), DepartmentRepo(), RoleRepo(), GroupRepo(), ShareRepo(), UserRepo());
 
     private IServiceProvider BuildRepoServiceProvider()
     {

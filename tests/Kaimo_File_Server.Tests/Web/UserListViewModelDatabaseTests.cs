@@ -60,12 +60,18 @@ public partial class UserListViewModelDatabaseTests : DatabaseTestBase
             .ReturnsAsync(true);
         _mgmtAuth.Setup(m => m.CanCreateUserInDepartmentAsync(It.IsAny<UserContext>(), It.IsAny<Guid>()))
             .ReturnsAsync(true);
+        _mgmtAuth.Setup(m => m.CanAddUserToDepartmentAsync(It.IsAny<UserContext>(), It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .ReturnsAsync(true);
+        _mgmtAuth.Setup(m => m.CanManageDepartmentAsync(It.IsAny<UserContext>(), It.IsAny<Guid>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(true);
         _mgmtAuth.Setup(m => m.GetAuthorizedDepartmentIdsAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
             .ReturnsAsync(AuthorizedScopeResult.Unrestricted());
         // A global admin holds every bit everywhere and can delegate any role.
         _mgmtAuth.Setup(m => m.GetEffectivePermissionsAtAsync(It.IsAny<UserContext>(), It.IsAny<ScopeType>(), It.IsAny<Guid>()))
             .ReturnsAsync(ManagementPermission.FullAdmin);
         _mgmtAuth.Setup(m => m.CanAssignRoleAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>(), It.IsAny<ScopeType>(), It.IsAny<Guid>()))
+            .ReturnsAsync(true);
+        _mgmtAuth.Setup(m => m.IsPrincipalInScopeAsync(It.IsAny<UserContext>(), It.IsAny<Guid>(), It.IsAny<ManagementPermission>()))
             .ReturnsAsync(true);
 
         return new UserListViewModel(

@@ -133,6 +133,28 @@ public partial class ShareListViewModel
     // All departments (global first) for the settings picker; empty when no
     // department repository is wired (keeps the section hidden).
     public List<Department> Departments { get; private set; } = [];
+
+    // Departments a share may be moved to: where the actor holds EditShareSettings.
+    private AuthorizedScopeResult _shareTargetScope = AuthorizedScopeResult.None();
+
+    /// <summary>
+    /// Departments offered as the target of <see cref="ChangeDepartmentAsync"/>: those where the
+    /// actor holds <see cref="ManagementPermission.EditShareSettings"/> (Global only with global
+    /// authority), plus the selected share's current department so the picker can show it.
+    /// </summary>
+    public List<Department> ShareTargetDepartments => Departments
+        .Where(d => _shareTargetScope.IsUnrestricted
+                    || _shareTargetScope.ScopeIds.Contains(d.Id)
+                    || d.Id == SelectedShare?.DepartmentId)
+        .ToList();
+
+    /// <summary>
+    /// Whether the selected share may leave its department: the actor needs
+    /// <see cref="ManagementPermission.EditShareSettings"/> on that department (like on the target),
+    /// so share-scoped authority alone never moves a share. Re-checked by <see cref="ChangeDepartmentAsync"/>.
+    /// </summary>
+    public bool CanChangeSelectedShareDepartment => SelectedShare is not null
+        && (_shareTargetScope.IsUnrestricted || _shareTargetScope.ScopeIds.Contains(SelectedShare.DepartmentId));
     // DepartmentId → department, for the list-view chip lookup.
     private IReadOnlyDictionary<Guid, Department> _departmentsById =
         new Dictionary<Guid, Department>();
@@ -219,6 +241,9 @@ public partial class ShareListViewModel
                 _actorContext = null;
                 IsAdmin = false;
                 CanCreateShare = false;
+                _createShareScope = AuthorizedScopeResult.None();
+                _canPurgeUnreferenced = false;
+                _canAdoptUnreferenced = false;
                 _manageAllShares = false;
                 _manageableShareIds = new();
                 Shares = [];
@@ -240,8 +265,16 @@ public partial class ShareListViewModel
                 : mgmtScope.ScopeIds.ToHashSet();
 
             IsAdmin = _manageAllShares || _manageableShareIds.Count > 0;
-            CanCreateShare = await _mgmtAuth.HasAnyPermissionAsync(
-                actor, ManagementPermission.CreateShares);
+            _shareTargetScope = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
+                actor, ManagementPermission.EditShareSettings) ?? AuthorizedScopeResult.None();
+            // Creating needs a department to create in (CreateShares at share scope covers none).
+            _createShareScope = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
+                actor, ManagementPermission.CreateShares) ?? AuthorizedScopeResult.None();
+            CanCreateShare = _createShareScope.IsUnrestricted || _createShareScope.ScopeIds.Count > 0;
+            // Unreferenced folders belong to no department: purging needs global DeleteShares,
+            // adopting (the share lands in Global) global CreateShares.
+            _canPurgeUnreferenced = await _mgmtAuth.HasGlobalPermissionAsync(actor, ManagementPermission.DeleteShares);
+            _canAdoptUnreferenced = await _mgmtAuth.HasGlobalPermissionAsync(actor, ManagementPermission.CreateShares);
 
             // Load every share, then filter per actor.
             var allShares = await _shareRepo.GetAllAsync();

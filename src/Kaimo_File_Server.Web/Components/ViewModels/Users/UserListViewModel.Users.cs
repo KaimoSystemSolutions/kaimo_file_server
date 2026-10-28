@@ -154,7 +154,7 @@ public partial class UserListViewModel
             .ToList();
         var userGroups = await _userRepo.GetGroupsForUserAsync(SelectedUser.Id);
         var userGroupIds = userGroups.Select(g => g.Id).ToHashSet();
-        EditUserGroups = allGroups.Select(g => new CheckboxItem<Group>(g, userGroupIds.Contains(g.Id))).ToList();
+        EditUserGroups = await BuildUserGroupPickerAsync(allGroups, userGroupIds);
 
         // Departments the actor may manage; pre-checked where the user is already a member.
         // Memberships in departments outside this authorized set stay untouched on save.
@@ -182,111 +182,32 @@ public partial class UserListViewModel
         var leavesAdminsGroup = wasInAdminsGroup
             && EditUserGroups.Any(g => g.Item.Id == WellKnownGUIDs.GROUP_ADMINS && !g.IsChecked);
 
-        // Joining a group grants its roles: refuse additions the actor could not assign directly.
-        foreach (var joined in EditUserGroups.Where(g => g.IsChecked && UserGroups.All(ug => ug.Id != g.Item.Id)))
-        {
-            if (!await _roleAssignments.CanAddGroupMembersAsync(_actorContext, joined.Item.Id))
-            {
-                ErrorMessage = GroupGrantsUnassignableRolesMessage;
-                return;
-            }
-        }
+        // Group and department memberships, authorized as a whole before anything is written.
+        var (canAssignGroups, joinedGroups, leftGroups, membershipError) =
+            await AuthorizeMembershipChangesAsync(SelectedUser.Id);
+        if (membershipError is not null) { ErrorMessage = membershipError; return; }
 
-        // The sign-in toggles are locked on one's own account: keep the values stored now, not
-        // the ones loaded with the form (another admin may have changed them meanwhile).
-        var current = IsViewingSelf ? await _userRepo.GetByIdAsync(SelectedUser.Id) ?? SelectedUser : null;
-        var isEnabled = current?.IsEnabled ?? EditUserIsEnabled;
-        var canChangePassword = current?.CanChangePassword ?? EditUserCanChangePassword;
-
-        // Last-admin protection: if this user is currently the SOLE enabled global admin,
-        // the save must not strip that — neither by disabling the account nor by leaving
-        // the Admins group (admin inherited through another group survives that).
-        var adminUserIds = await GetEnabledGlobalAdminUserIdsAsync();
-        if (adminUserIds.Contains(SelectedUser.Id) && !adminUserIds.Any(id => id != SelectedUser.Id))
-        {
-            var willBeAdmin = isEnabled
-                && (!leavesAdminsGroup
-                    || await UserInheritsGlobalAdminFromGroupAsync(SelectedUser.Id, WellKnownGUIDs.GROUP_ADMINS));
-            if (!willBeAdmin) { ErrorMessage = Resources.Web_Error_LastAdmin; return; }
-        }
+        var (mayEnableDisable, isEnabled, canChangePassword) = await ResolveSignInTogglesAsync(SelectedUser);
+        if (await WouldRemoveLastAdminAsync(SelectedUser.Id, isEnabled, leavesAdminsGroup))
+        { ErrorMessage = Resources.Web_Error_LastAdmin; return; }
 
         try
         {
             IsSaving = true;
             ErrorMessage = null;
 
-            if (EditUserName != SelectedUser.Name && !string.IsNullOrWhiteSpace(EditUserName))
-                await _userRepo.UpdateNameAsync(SelectedUser.Id, EditUserName.Trim());
+            await SaveProfileFieldsAsync(SelectedUser, mayEnableDisable, isEnabled, canChangePassword);
 
-            await _userRepo.UpdateProfileAsync(
-                SelectedUser.Id, EditUserDescription.Trim(), EditUserEmail.Trim(),
-                isEnabled, canChangePassword);
-
-            await _userRepo.UpdatePersonalNamesAsync(
-                SelectedUser.Id, NullIfBlank(EditUserFirstName), NullIfBlank(EditUserLastName));
-            await SaveEditServicesAsync(SelectedUser);
-            if (CanManageHomes && EditUserHomeDirectoryEnabled != SelectedUser.HomeDirectoryEnabled)
-                await _homes!.SetEnabledAsync(SelectedUser.Id, EditUserHomeDirectoryEnabled);
-            if (_photoChanged)
-                await _userRepo.UpdatePhotoAsync(SelectedUser.Id, EditUserPhoto, EditUserPhotoContentType);
-
-            if (!string.IsNullOrWhiteSpace(NewPassword))
-            {
-                if (!await _mgmtAuth.CanManageUserAsync(
-                        _actorContext, SelectedUser.Id, ManagementPermission.ResetPasswords))
-                { ErrorMessage = Resources.Web_User_NoPermissionPasswordReset; return; }
-                var pwError = (await GetPasswordPolicyAsync()).Validate(NewPassword);
-                if (pwError is not null) { ErrorMessage = pwError; return; }
-                if (NewPassword != ConfirmPassword) { ErrorMessage = Resources.Web_User_PasswordsDoNotMatch; return; }
-                await _userRepo.UpdatePasswordAsync(SelectedUser.Id,
-                    _passwordService.HashPassword(NewPassword),
-                    _ntHashProtector.Protect(_passwordService.ComputeNtHash(NewPassword)));
-                await PublishAsync(NotificationEvents.PasswordReset(
-                    SelectedUser.Id, SelectedUser.Name, SelectedUser.Username, _actorContext.User.Id));
-                // An admin resetting their own password keeps this session (others end).
-                if (SelectedUser.Id == _actorContext.User.Id)
-                    await RenewOwnSessionAsync(SelectedUser.Id);
-            }
+            if (!string.IsNullOrWhiteSpace(NewPassword) && !await ResetPasswordAsync(SelectedUser))
+                return;
 
             // The edit may have disabled the account or reset its password: drop cached
             // WebDAV logins so neither the old password nor a disabled account stays usable.
             InvalidateCachedWebDavLogins(SelectedUser.Id);
 
-            // Department membership — diff against the picker's authorized subset only, so
-            // memberships in departments the actor cannot manage are never touched. Each change
-            // is still gated per-department by EditDepartment.
-            var finalDeptIds = UserDepartments.Select(d => d.Id).ToHashSet();
-            if (CanAssignDepartments)
-            {
-                var shownDeptIds = EditUserDepartments.Select(d => d.Item.Id).ToHashSet();
-                var desiredDeptIds = EditUserDepartments.Where(d => d.IsChecked).Select(d => d.Item.Id).ToHashSet();
-
-                foreach (var deptId in desiredDeptIds.Except(finalDeptIds))
-                    if (await _mgmtAuth.CanManageDepartmentAsync(_actorContext, deptId, ManagementPermission.EditDepartment))
-                        await _departmentRepo.AddUserAsync(deptId, SelectedUser.Id);
-
-                foreach (var deptId in finalDeptIds.Intersect(shownDeptIds).Except(desiredDeptIds))
-                    if (await _mgmtAuth.CanManageDepartmentAsync(_actorContext, deptId, ManagementPermission.EditDepartment))
-                    {
-                        await _departmentRepo.RemoveUserAsync(deptId, SelectedUser.Id);
-                        // Mirror DepartmentViewModel: leaving a department drops group memberships tied to it.
-                        var groups = await _userRepo.GetGroupsForUserAsync(SelectedUser.Id);
-                        var remaining = groups.Where(g => g.DepartmentId != deptId).Select(g => g.Id).ToList();
-                        if (remaining.Count != groups.Count)
-                            await _userRepo.SetGroupsForUserAsync(SelectedUser.Id, remaining);
-                    }
-
-                finalDeptIds = (await _departmentRepo.GetDepartmentsForUserAsync(SelectedUser.Id)).Select(d => d.Id).ToHashSet();
-            }
-
-            // A user's groups must stay within the user's departments (or Global), so drop any
-            // whose department the user no longer belongs to after the diff above.
-            var selectedGroupIds = EditUserGroups.Where(g => g.IsChecked)
-                .Where(g => g.Item.DepartmentId == WellKnownGUIDs.DEPARTMENT_GLOBAL
-                            || finalDeptIds.Contains(g.Item.DepartmentId))
-                .Select(g => g.Item.Id).ToList();
-            if (await _mgmtAuth.CanManageUserAsync(_actorContext, SelectedUser.Id, ManagementPermission.AssignGroups))
-                await _userRepo.SetGroupsForUserAsync(SelectedUser.Id, selectedGroupIds);
+            var finalDeptIds = await ApplyDepartmentChangesAsync(SelectedUser.Id);
+            if (canAssignGroups)
+                await ApplyGroupChangesAsync(SelectedUser.Id, joinedGroups, leftGroups, finalDeptIds);
 
             // Admin role <-> Admins group are mirrored. Joining or leaving the group (as it was
             // actually persisted under its permission gate above) grants or revokes the role.
@@ -295,16 +216,7 @@ public partial class UserListViewModel
             if (inAdminsGroup != wasInAdminsGroup)
                 await ReconcileAdminCouplingAsync(SelectedUser.Id, inAdminsGroup);
 
-            await LoadTabDataAsync();
-            SelectedUser = Users.FirstOrDefault(u => u.Id == SelectedUser.Id);
-            if (SelectedUser is not null)
-            {
-                await ResolveSelectedUserPermissionsAsync(SelectedUser);
-                UserRoles = (await _userRepo.GetRolesForUserAsync(SelectedUser.Id)).OrderBy(r => r.Name).ToList();
-                UserGroups = (await _userRepo.GetGroupsForUserAsync(SelectedUser.Id)).OrderBy(g => g.Name).ToList();
-                UserDepartments = (await _departmentRepo.GetDepartmentsForUserAsync(SelectedUser.Id)).OrderBy(d => d.Name).ToList();
-                await LoadUserScopedAssignmentsAsync(SelectedUser.Id);
-            }
+            await ReloadSelectedUserAsync(SelectedUser.Id);
 
             IsEditing = false;
             NewPassword = ""; ConfirmPassword = "";
@@ -316,6 +228,98 @@ public partial class UserListViewModel
             ErrorMessage = Resources.Web_Error_SaveFailed;
         }
         finally { IsSaving = false; }
+    }
+
+    /// <summary>
+    /// Last-admin protection: if this user is currently the SOLE enabled global admin, the save
+    /// must not strip that — neither by disabling the account nor by leaving the Admins group
+    /// (admin inherited through another group survives that).
+    /// </summary>
+    private async Task<bool> WouldRemoveLastAdminAsync(Guid userId, bool isEnabled, bool leavesAdminsGroup)
+    {
+        var adminUserIds = await GetEnabledGlobalAdminUserIdsAsync();
+        if (!adminUserIds.Contains(userId) || adminUserIds.Any(id => id != userId))
+            return false;
+
+        var willBeAdmin = isEnabled
+            && (!leavesAdminsGroup
+                || await UserInheritsGlobalAdminFromGroupAsync(userId, WellKnownGUIDs.GROUP_ADMINS));
+        return !willBeAdmin;
+    }
+
+    /// <summary>Writes the profile fields of the form; locked sign-in toggles carry their stored value.</summary>
+    private async Task SaveProfileFieldsAsync(User user, bool mayEnableDisable, bool isEnabled, bool canChangePassword)
+    {
+        if (EditUserName != user.Name && !string.IsNullOrWhiteSpace(EditUserName))
+            await _userRepo.UpdateNameAsync(user.Id, EditUserName.Trim());
+
+        await _userRepo.UpdateProfileAsync(
+            user.Id, EditUserDescription.Trim(), EditUserEmail.Trim(),
+            isEnabled, canChangePassword);
+
+        await _userRepo.UpdatePersonalNamesAsync(
+            user.Id, NullIfBlank(EditUserFirstName), NullIfBlank(EditUserLastName));
+        if (mayEnableDisable)
+            await SaveEditServicesAsync(user);
+        if (CanManageHomes && EditUserHomeDirectoryEnabled != user.HomeDirectoryEnabled)
+            await _homes!.SetEnabledAsync(user.Id, EditUserHomeDirectoryEnabled);
+        if (_photoChanged)
+            await _userRepo.UpdatePhotoAsync(user.Id, EditUserPhoto, EditUserPhotoContentType);
+    }
+
+    /// <summary>
+    /// The sign-in toggles are locked on one's own account and need their own rights: enabled +
+    /// file services → EnableDisableUsers, "may change password" → ResetPasswords. A locked toggle
+    /// keeps the value stored now, not the one loaded with the form (another admin may have
+    /// changed it meanwhile).
+    /// </summary>
+    private async Task<(bool MayEnableDisable, bool IsEnabled, bool CanChangePassword)> ResolveSignInTogglesAsync(User user)
+    {
+        var mayEnableDisable = !IsViewingSelf && await _mgmtAuth.CanManageUserAsync(
+            _actorContext!, user.Id, ManagementPermission.EnableDisableUsers);
+        var mayChangePasswordFlag = !IsViewingSelf && await _mgmtAuth.CanManageUserAsync(
+            _actorContext!, user.Id, ManagementPermission.ResetPasswords);
+        var current = mayEnableDisable && mayChangePasswordFlag
+            ? null
+            : await _userRepo.GetByIdAsync(user.Id) ?? user;
+        return (mayEnableDisable,
+            mayEnableDisable ? EditUserIsEnabled : current!.IsEnabled,
+            mayChangePasswordFlag ? EditUserCanChangePassword : current!.CanChangePassword);
+    }
+
+    /// <summary>Sets <see cref="NewPassword"/> as the user's password. Returns <c>false</c> (with
+    /// <see cref="ErrorMessage"/> set) when the reset is not permitted or the password is invalid.</summary>
+    private async Task<bool> ResetPasswordAsync(User user)
+    {
+        if (!await _mgmtAuth.CanManageUserAsync(_actorContext!, user.Id, ManagementPermission.ResetPasswords))
+        { ErrorMessage = Resources.Web_User_NoPermissionPasswordReset; return false; }
+        var pwError = (await GetPasswordPolicyAsync()).Validate(NewPassword);
+        if (pwError is not null) { ErrorMessage = pwError; return false; }
+        if (NewPassword != ConfirmPassword) { ErrorMessage = Resources.Web_User_PasswordsDoNotMatch; return false; }
+
+        await _userRepo.UpdatePasswordAsync(user.Id,
+            _passwordService.HashPassword(NewPassword),
+            _ntHashProtector.Protect(_passwordService.ComputeNtHash(NewPassword)));
+        await PublishAsync(NotificationEvents.PasswordReset(user.Id, user.Name, user.Username, _actorContext!.User.Id));
+        // An admin resetting their own password keeps this session (others end).
+        if (user.Id == _actorContext.User.Id)
+            await RenewOwnSessionAsync(user.Id);
+        return true;
+    }
+
+    /// <summary>Reloads the lists and the selected user's details after a save.</summary>
+    private async Task ReloadSelectedUserAsync(Guid userId)
+    {
+        await LoadTabDataAsync();
+        SelectedUser = Users.FirstOrDefault(u => u.Id == userId);
+        if (SelectedUser is null)
+            return;
+
+        await ResolveSelectedUserPermissionsAsync(SelectedUser);
+        UserRoles = (await _userRepo.GetRolesForUserAsync(userId)).OrderBy(r => r.Name).ToList();
+        UserGroups = (await _userRepo.GetGroupsForUserAsync(userId)).OrderBy(g => g.Name).ToList();
+        UserDepartments = (await _departmentRepo.GetDepartmentsForUserAsync(userId)).OrderBy(d => d.Name).ToList();
+        await LoadUserScopedAssignmentsAsync(userId);
     }
 
     // ══════════════════════════════════════════

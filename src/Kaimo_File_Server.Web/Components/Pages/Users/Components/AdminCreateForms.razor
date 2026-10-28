@@ -94,7 +94,7 @@
                 <div class="form-group">
                     <label>@Resources.Web_Admin_Label_Department</label>
                     <PrincipalPickerField Mode="SelectionMode.Single"
-                                          Items="VM.AllDepartments.ToDepartmentItems()"
+                                          Items="VM.AuthorizedDepartmentsForGroupCreate.ToDepartmentItems()"
                                           SelectedIds="new[] { VM.CreateGroupDepartmentId }"
                                           SelectedIdsChanged="ids => VM.CreateGroupDepartmentId = ids.FirstOrNull() ?? WellKnownGUIDs.DEPARTMENT_GLOBAL"
                                           Title="@Resources.Web_Admin_Label_Department" />

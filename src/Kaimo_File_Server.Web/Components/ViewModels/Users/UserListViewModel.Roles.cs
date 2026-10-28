@@ -45,9 +45,9 @@ public partial class UserListViewModel
                 Resources.ResourceManager.GetString("Web_Perm_ManageHomes") ?? "Manage home folders"),
             new(ManagementPermission.AccessHomeContents,
                 Resources.ResourceManager.GetString("Web_Perm_AccessHomeContents") ?? "Access home folder contents"),
-            // EnableDisableUsers is intentionally NOT offered here: the IsEnabled
-            // toggle lives in the profile-edit form and is enforced via
-            // EditUserProfiles. A standalone bit would be dead (never checked).
+            // Enabling/disabling accounts and their file services is its own right,
+            // separate from EditUserProfiles.
+            new(ManagementPermission.EnableDisableUsers, Resources.Web_Perm_EnableDisable),
         ]),
         new(Resources.Web_PermGroup_GroupMgmt,
         [
@@ -59,9 +59,9 @@ public partial class UserListViewModel
         [
             new(ManagementPermission.AssignGroups, Resources.Web_Perm_AssignGroups),
             new(ManagementPermission.AssignRoles, Resources.Web_Perm_AssignRoles),
-            // AssignDepartments is intentionally NOT offered here: department
-            // membership is edited through DepartmentViewModel and enforced via
-            // EditDepartment. A standalone bit would be dead (never checked).
+            // Department membership (adding/removing users) is its own right, separate from
+            // EditDepartment, which covers the department's settings, groups and shares.
+            new(ManagementPermission.AssignDepartments, Resources.Web_Perm_AssignDepartments),
         ]),
         new(Resources.Web_PermGroup_ShareMgmt,
         [
@@ -155,22 +155,23 @@ public partial class UserListViewModel
         if (SelectedRole is null || _actorContext is null) return;
 
         // Role definitions are GLOBAL objects: editing a role's bitmask changes it in every
-        // scope the role is assigned. Mutation therefore requires Global AssignRoles, and the
-        // resulting permission set may never exceed the actor's own global effective
-        // permissions — otherwise a role could be crafted to elevate beyond the actor.
-        var globalPerms = await _mgmtAuth.GetEffectivePermissionsAtAsync(
-            _actorContext, ScopeType.Global, Guid.Empty);
-
-        if ((globalPerms & ManagementPermission.AssignRoles) == 0)
+        // scope the role is assigned. Mutation therefore requires Global AssignRoles, and neither
+        // the resulting set nor a removed bit may exceed the actor's own global permissions;
+        // demoting the last admin role is refused (see RoleAssignmentService).
+        if (!await _mgmtAuth.HasGlobalPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
         {
             ErrorMessage = Resources.Web_Error_NoPermission;
             return;
         }
 
-        if (!SelectedRole.IsSystemRole && (EditRolePermissions & ~globalPerms) != 0)
+        if (!SelectedRole.IsSystemRole)
         {
-            ErrorMessage = Resources.Web_Error_NoPermission;
-            return;
+            var stored = await _roleRepo.GetByIdAsync(SelectedRole.Id) ?? SelectedRole;
+            if (await _roleAssignments.AuthorizeRoleChangeAsync(_actorContext, stored, EditRolePermissions) is { } error)
+            {
+                ErrorMessage = error;
+                return;
+            }
         }
 
         if (!SelectedRole.IsSystemRole && string.IsNullOrWhiteSpace(EditRoleName))

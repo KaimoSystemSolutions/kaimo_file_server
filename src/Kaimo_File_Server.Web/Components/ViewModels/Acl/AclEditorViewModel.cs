@@ -405,7 +405,8 @@ public class AclEditorViewModel
 
         try
         {
-            var entry = Entries.FirstOrDefault(e => e.Id == EditingEntryId.Value);
+            // Re-read: only an entry that still belongs to the loaded file may be changed.
+            var entry = await FindEntryOfLoadedFileAsync(EditingEntryId.Value);
             if (entry is null)
             { ErrorMessage = Resources.Web_Error_EntryNotFound; return false; }
 
@@ -438,6 +439,10 @@ public class AclEditorViewModel
 
         try
         {
+            // Deleting is by id: refuse ids that are not entries of the loaded file.
+            if (await FindEntryOfLoadedFileAsync(entryId) is null)
+            { ErrorMessage = Resources.Web_Error_EntryNotFound; return false; }
+
             await _aclRepo.DeleteAsync(entryId);
             Entries = await _aclRepo.GetByFileMetadataIdAsync(FileMetadataId);
             SuccessMessage = Resources.Web_Acl_Removed;
@@ -450,6 +455,9 @@ public class AclEditorViewModel
             return false;
         }
     }
+
+    private async Task<AccessEntry?> FindEntryOfLoadedFileAsync(Guid entryId)
+        => (await _aclRepo.GetByFileMetadataIdAsync(FileMetadataId)).FirstOrDefault(e => e.Id == entryId);
 
     // ------------------ Display Helpers ------------------
 

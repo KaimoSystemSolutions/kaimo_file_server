@@ -67,6 +67,8 @@ public partial class DepartmentViewModel
     public bool CanAccessPage { get; private set; }
     public bool IsGlobalAdmin { get; private set; }
     public bool CanEdit { get; private set; }
+
+    /// <summary>Whether the selected department may be deleted (EditDepartment on its parent).</summary>
     public bool CanDelete { get; private set; }
 
     /// <summary>Whether the actor may assign roles somewhere; gates the add/remove controls of
@@ -177,7 +179,6 @@ public partial class DepartmentViewModel
         CanEdit = await _mgmtAuth.HasAnyPermissionAsync(
             _actorContext, ManagementPermission.EditDepartment);
 
-        CanDelete = IsGlobalAdmin;
 
         CanAssignRoles = await _mgmtAuth.HasAnyPermissionAsync(
             _actorContext, ManagementPermission.AssignRoles);
@@ -207,6 +208,8 @@ public partial class DepartmentViewModel
                     .OrderByGlobalFirst().ToList();
             }
         }
+
+        await LoadCreateParentOptionsAsync();
     }
 
     // ══════════════════════════════════════════
@@ -223,11 +226,13 @@ public partial class DepartmentViewModel
             Selected = null;
             Members = []; Groups = []; Shares = []; RoleAssignments = [];
             PermInfo = null;
+            CanDelete = false;
             return;
         }
 
         Selected = dept;
         await LoadDetailAsync(dept);
+        CanDelete = await CanDeleteDepartmentAsync(dept);
     }
 
     private async Task LoadDetailAsync(Department dept)
@@ -259,7 +264,8 @@ public partial class DepartmentViewModel
         IsCreating = true;
         CreateName = "";
         CreateDescription = "";
-        CreateParentId = null;
+        // Top level needs global authority; scoped admins start below their own department.
+        CreateParentId = CanCreateTopLevel ? null : CreateParentOptions.FirstOrDefault()?.Id;
         ErrorMessage = null; SuccessMessage = null;
     }
 
@@ -277,14 +283,18 @@ public partial class DepartmentViewModel
         if (await IsNameTakenAsync(CreateName.Trim(), exceptId: null))
         { ErrorMessage = Resources.Web_Dept_NameTaken; return; }
 
+        // "No parent" already means "directly below Global".
+        var parentId = CreateParentId == WellKnownGUIDs.DEPARTMENT_GLOBAL ? null : CreateParentId;
+        if (await ValidateNewParentAsync(parentId) is { } parentError)
+        { ErrorMessage = parentError; return; }
+
         try
         {
             IsSaving = true;
             var dept = new Department(
                 CreateName.Trim(),
                 string.IsNullOrWhiteSpace(CreateDescription) ? null : CreateDescription.Trim(),
-                // "No parent" already means "directly below Global".
-                CreateParentId == WellKnownGUIDs.DEPARTMENT_GLOBAL ? null : CreateParentId);
+                parentId);
             await _departmentRepo.CreateAsync(dept);
 
             IsCreating = false;
@@ -309,6 +319,10 @@ public partial class DepartmentViewModel
     //  Delete
     // ══════════════════════════════════════════
 
+    private static string AssignmentsBeyondOwnRightsMessage
+        => Resources.ResourceManager.GetString("Web_Dept_AssignmentsBeyondOwnRights")
+           ?? "This department has role assignments with rights you do not hold yourself. Only an administrator holding those rights can delete it.";
+
     public void RequestDelete()
     {
         IsConfirmingDelete = true;
@@ -325,26 +339,40 @@ public partial class DepartmentViewModel
             return;
         }
 
-        if (!await _mgmtAuth.CanManageDepartmentAsync(
-                _actorContext, Selected.Id, ManagementPermission.EditDepartment))
+        // Re-read: the parent decides who may delete, and the loaded object may be stale.
+        var stored = await _departmentRepo.GetByIdAsync(Selected.Id);
+        if (stored is null || !await CanDeleteDepartmentAsync(stored))
         { ErrorMessage = Resources.Web_Error_NoPermission; return; }
+
+        // The department's role assignments go with it: never revoke one the actor could not hold.
+        if (!await _roleAssignments.CoversAssignmentsAtAsync(_actorContext, ScopeType.Department, stored.Id))
+        { ErrorMessage = AssignmentsBeyondOwnRightsMessage; return; }
 
         try
         {
             IsSaving = true;
 
-            // Reassign orphaned groups/shares to Global before deleting
+            // Children, groups and shares move up to the deleted department's parent (Global for a
+            // top-level department), so they stay under the authority that allowed the delete.
+            // The children's own assignments stay.
+            foreach (var child in await _departmentRepo.GetChildrenAsync(stored.Id))
+            {
+                child.ParentDepartmentId = stored.ParentDepartmentId;
+                await _departmentRepo.UpdateAsync(child);
+            }
+
+            var newHomeId = stored.ParentDepartmentId ?? WellKnownGUIDs.DEPARTMENT_GLOBAL;
             var deptGroups = await _departmentRepo.GetGroupsAsync(Selected.Id);
             foreach (var group in deptGroups)
             {
-                group.DepartmentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
+                group.DepartmentId = newHomeId;
                 await _groupRepo.UpdateAsync(group);
             }
 
             var deptShares = await _departmentRepo.GetSharesAsync(Selected.Id);
             foreach (var share in deptShares)
             {
-                share.DepartmentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
+                share.DepartmentId = newHomeId;
                 await _shareRepo.UpdateAsync(share);
             }
 
@@ -355,6 +383,7 @@ public partial class DepartmentViewModel
             Selected = null;
             Members = []; Groups = []; Shares = [];
             PermInfo = null;
+            CanDelete = false;
             IsConfirmingDelete = false;
             await LoadDepartmentsAsync();
             SuccessMessage = Resources.Web_Dept_Deleted;

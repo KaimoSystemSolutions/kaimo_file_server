@@ -35,11 +35,25 @@ public class DepartmentViewModelDatabaseTests : DatabaseTestBase
         _mgmtAuth.Setup(m => m.CanManageDepartmentAsync(
                 It.IsAny<UserContext>(), It.IsAny<Guid>(), ManagementPermission.EditDepartment))
             .ReturnsAsync(true);
+        _mgmtAuth.Setup(m => m.CanManageDepartmentAsync(
+                It.IsAny<UserContext>(), It.IsAny<Guid>(), ManagementPermission.AssignDepartments))
+            .ReturnsAsync(true);
+        _mgmtAuth.Setup(m => m.CanAddUserToDepartmentAsync(
+                It.IsAny<UserContext>(), It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .ReturnsAsync(true);
+        _mgmtAuth.Setup(m => m.CanManageUserAsync(
+                It.IsAny<UserContext>(), It.IsAny<Guid>(), ManagementPermission.AssignDepartments))
+            .ReturnsAsync(true);
+        _mgmtAuth.Setup(m => m.GetAuthorizedDepartmentIdsAsync(
+                It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(AuthorizedScopeResult.Unrestricted());
 
         _mgmtAuth.Setup(m => m.HasAnyPermissionAsync(It.IsAny<UserContext>(), ManagementPermission.AssignRoles))
             .ReturnsAsync(true);
         _mgmtAuth.Setup(m => m.CanAssignRoleAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>(),
                 It.IsAny<ScopeType>(), It.IsAny<Guid>()))
+            .ReturnsAsync(true);
+        _mgmtAuth.Setup(m => m.IsPrincipalInScopeAsync(It.IsAny<UserContext>(), It.IsAny<Guid>(), It.IsAny<ManagementPermission>()))
             .ReturnsAsync(true);
 
         return new DepartmentViewModel(

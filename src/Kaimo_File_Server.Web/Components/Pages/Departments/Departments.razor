@@ -65,9 +65,10 @@ else
                 <div class="form-group">
                     <label>@Resources.Web_Dept_Label_Parent</label>
                     <PrincipalPickerField Mode="SelectionMode.Single"
-                                          Items="VM.Departments.Where(d => !VM.IsGlobalDepartment(d)).ToDepartmentItems()"
+                                          Items="VM.CreateParentOptions.ToDepartmentItems()"
                                           SelectedIds="VM.CreateParentId.AsSelection()"
                                           SelectedIdsChanged="ids => VM.CreateParentId = ids.FirstOrNull()"
+                                          AllowClear="VM.CanCreateTopLevel"
                                           Title="@Resources.Web_Dept_Label_Parent"
                                           Placeholder="@Resources.Web_Dept_NoParent" />
                 </div>
@@ -154,6 +155,7 @@ else
                                                   Items="VM.AvailableParents.ToDepartmentItems()"
                                                   SelectedIds="VM.EditParentId.AsSelection()"
                                                   SelectedIdsChanged="ids => VM.EditParentId = ids.FirstOrNull()"
+                                                  AllowClear="VM.CanMoveToTopLevel"
                                                   Title="@Resources.Web_Dept_Label_InheritsFrom"
                                                   Placeholder="@Resources.Web_Dept_NoParent" />
                             <span class="form-hint">@Resources.Web_Dept_InheritHint</span>

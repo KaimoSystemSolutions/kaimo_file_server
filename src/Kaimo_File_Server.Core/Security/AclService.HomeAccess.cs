@@ -24,6 +24,9 @@ public partial class AclService
         private readonly Dictionary<Guid, bool> _owners = new();
         private bool? _any;
 
+        /// <summary>Opens an evaluation scope for a batch of decisions; <c>null</c> without a management service.</summary>
+        public IDisposable? BeginEvaluation() => _mgmt?.BeginEvaluationScope();
+
         public async Task<FilePermission> ForAsync(string normalizedPath)
         {
             if (_mgmt is null)

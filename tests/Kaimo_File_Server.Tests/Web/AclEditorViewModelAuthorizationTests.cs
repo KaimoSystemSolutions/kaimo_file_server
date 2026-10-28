@@ -20,7 +20,7 @@ namespace Kaimo_File_Server.Tests;
 /// current user holds <see cref="ManagementPermission.ManageShareAcls"/> on the target share,
 /// and that a refusal never touches the ACL repository.
 /// </summary>
-public class AclEditorViewModelAuthorizationTests
+public partial class AclEditorViewModelAuthorizationTests
 {
     private readonly Mock<IAclRepository> _aclRepo = new();
     private readonly Mock<IFileMetadataRepository> _metaRepo = new();
@@ -199,13 +199,18 @@ public class AclEditorViewModelAuthorizationTests
     [Fact]
     public async Task DeleteEntryAsync_WhenAuthorized_Deletes()
     {
+        var existing = new AccessEntry(
+            Guid.NewGuid(), AclEntryType.Allow, FilePermission.ReadAll, AclInheritance.Everything);
+        _aclRepo
+            .Setup(a => a.GetByFileMetadataIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(new List<AccessEntry> { existing });
         Authorize(true);
         await _sut.LoadAsync("docs", _shareId);
 
-        var ok = await _sut.DeleteEntryAsync(Guid.NewGuid());
+        var ok = await _sut.DeleteEntryAsync(existing.Id);
 
         Assert.True(ok);
-        _aclRepo.Verify(a => a.DeleteAsync(It.IsAny<Guid>()), Times.Once);
+        _aclRepo.Verify(a => a.DeleteAsync(existing.Id), Times.Once);
     }
 
     // ═══════════════════ Unauthenticated ═══════════════════

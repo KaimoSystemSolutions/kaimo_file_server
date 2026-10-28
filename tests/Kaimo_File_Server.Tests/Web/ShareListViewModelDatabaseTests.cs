@@ -86,6 +86,16 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         _mgmtAuth
             .Setup(m => m.HasAnyPermissionAsync(It.IsAny<UserContext>(), ManagementPermission.CreateShares))
             .ReturnsAsync(true);
+        // Global authority: create shares in any department (incl. Global), purge/adopt folders.
+        _mgmtAuth
+            .Setup(m => m.GetAuthorizedDepartmentIdsAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(AuthorizedScopeResult.Unrestricted());
+        _mgmtAuth
+            .Setup(m => m.CanManageDepartmentAsync(It.IsAny<UserContext>(), It.IsAny<Guid>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(true);
+        _mgmtAuth
+            .Setup(m => m.HasGlobalPermissionAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(true);
         // Global admin → may perform every per-share management action.
         _mgmtAuth
             .Setup(m => m.CanManageShareAsync(It.IsAny<UserContext>(), It.IsAny<Guid>(), It.IsAny<ManagementPermission>()))

@@ -395,6 +395,8 @@
             _avatarUri = DynamicHelpers.UserAvatar.DataUri(_currentUser?.User);
             if (_currentUser?.User is { } actor)
                 _initials = DynamicHelpers.UserAvatar.Initials(actor);
+            // Read-only batch of nav checks: load the actor's assignments once, not per check.
+            using var evaluation = ManagementAuthService.BeginEvaluationScope();
             _canManageSyncs = _currentUser != null
                               && await ManagementAuthService.HasAnyPermissionAsync(_currentUser, ManagementPermission.SyncAdmin);
             _canManageCloudAccess = _currentUser != null
@@ -432,8 +434,9 @@
                                    && await ManagementAuthService.HasAnyPermissionAsync(
                                           _currentUser,
                                           ManagementPermission.ManageShareLinks | ManagementPermission.ManageUploadLinks);
+            // System-wide data: mirrors SecurityMonitorViewModel.CanAccessPage (global only).
             _canViewSecurity = _currentUser != null
-                               && await ManagementAuthService.HasAnyPermissionAsync(
+                               && await ManagementAuthService.HasGlobalPermissionAsync(
                                       _currentUser, ManagementPermission.ViewSecurityMonitor);
             _canManageNotifications = _currentUser != null
                                       && await ManagementAuthService.HasAnyPermissionAsync(

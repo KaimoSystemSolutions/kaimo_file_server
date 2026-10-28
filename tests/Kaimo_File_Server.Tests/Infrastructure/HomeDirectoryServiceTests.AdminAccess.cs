@@ -100,6 +100,24 @@ public sealed partial class HomeDirectoryServiceTests
     }
 
     [Fact]
+    public async Task Home_access_batch_evaluates_all_owners_in_one_evaluation_scope()
+    {
+        var alice = AddUser("alice");
+        var bob = AddUser("bob");
+        var admin = AddUser("admin");
+        admin.HomeDirectoryEnabled = false;
+        await _sut.ConfigureAsync(_root, admin.Id);
+        GrantHomeAccess(admin, alice, bob);
+        var aliceHome = HomeDirectoryService.HomePathOf(alice.Id);
+        var bobHome = HomeDirectoryService.HomePathOf(bob.Id);
+
+        await _aclService.HasAccessBatchAsync(Ctx(admin), _shares.Single().Id,
+            [(aliceHome, true), (bobHome, true)], FilePermission.ListReadData);
+
+        _mgmt.Verify(m => m.BeginEvaluationScope(), Times.Once);
+    }
+
+    [Fact]
     public async Task Home_access_permission_does_not_open_regular_shares()
     {
         var admin = AddUser("admin");

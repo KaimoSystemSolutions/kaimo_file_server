@@ -13,12 +13,58 @@ namespace Kaimo_File_Server.Core.Services;
 /// TWO sources of authority:
 ///   1. Direct role assignments → treated as Global scope
 ///   2. ScopedRoleAssignment entries → explicitly scoped (Global/Department/Share)
+///
+/// How roles combine:
+///   • Permission checks (<c>CanManage*</c>, <see cref="HasGlobalPermissionAsync"/>, the
+///     ALL-bits scope lists) are evaluated PER ROLE ASSIGNMENT: when the required mask has several
+///     bits, a single role must carry all of them. Rights split across two roles do not add up
+///     there; in particular "global admin" means one global role carrying the full
+///     <see cref="ManagementPermission.FullAdmin"/> mask (the last-admin guards count the same way).
+///   • <see cref="GetEffectivePermissionsAtAsync"/> and the delegation gate
+///     (<see cref="CanAssignRoleAsync"/>, the target-rank check) take the UNION of every assignment
+///     covering the scope, because they ask "which bits could the actor already use here?".
+///   • Group memberships are read from the store on every check, not from the
+///     <see cref="UserContext"/> snapshot (see <see cref="BeginEvaluationScope"/> for caching).
 /// </summary>
 public interface IManagementAuthService
 {
     // -- User Management --
+
+    /// <summary>
+    /// Whether the actor may perform <paramref name="required"/> on the target user: the target
+    /// is a member of a department in the actor's scope (for <see cref="ManagementPermission.DeleteUsers"/>:
+    /// every department of the target is) AND the actor outranks the target, i.e. covers every
+    /// role assignment the target holds.
+    /// </summary>
     Task<bool> CanManageUserAsync(UserContext actor, Guid targetUserId, ManagementPermission required);
     Task<bool> CanCreateUserInDepartmentAsync(UserContext actor, Guid departmentId);
+
+    /// <summary>
+    /// Whether the actor may add the user to the department: requires
+    /// <see cref="ManagementPermission.AssignDepartments"/> on the department and authority over
+    /// the user (same rule as <see cref="CanManageUserAsync"/>), so a foreign user can never be
+    /// pulled under the actor's user management.
+    /// </summary>
+    Task<bool> CanAddUserToDepartmentAsync(UserContext actor, Guid userId, Guid departmentId);
+
+    /// <summary>
+    /// Whether the principal (user or group) of a role assignment lies within the actor's reach
+    /// for <paramref name="required"/>: a user who is a member of a department (or descendant)
+    /// covered by such an assignment, or a group whose department is covered. Global authority
+    /// reaches every principal; share-scoped authority reaches none. Unlike
+    /// <see cref="CanManageUserAsync"/> there is no rank check: granting rights to a higher-ranked
+    /// user elevates nobody.
+    /// </summary>
+    Task<bool> IsPrincipalInScopeAsync(UserContext actor, Guid principalId, ManagementPermission required);
+
+    /// <summary>
+    /// The users within the actor's reach for <paramref name="required"/>: members of a department
+    /// (or descendant) covered by an assignment holding it. This is the scope part of
+    /// <see cref="CanManageUserAsync"/> and <see cref="IsPrincipalInScopeAsync"/>, resolved once per
+    /// covered department instead of once per user, so pickers can filter in memory. <c>null</c>
+    /// means every user (global authority). No rank check.
+    /// </summary>
+    Task<HashSet<Guid>?> GetUserIdsInScopeAsync(UserContext actor, ManagementPermission required);
 
     // -- Group Management --
     Task<bool> CanManageGroupAsync(UserContext actor, Guid groupId, ManagementPermission required);
@@ -28,6 +74,16 @@ public interface IManagementAuthService
 
     // -- Department Management --
     Task<bool> CanManageDepartmentAsync(UserContext actor, Guid departmentId, ManagementPermission required);
+
+    // -- Evaluation scope --
+
+    /// <summary>
+    /// Opens a scope in which lookups (the actor's assignments and group memberships, roles, the
+    /// department tree, shares) are cached until it is disposed; without one, every check reads
+    /// the store. Use it only around a read-only batch of checks (e.g. filtering a picker), never
+    /// across a mutation. Nested scopes reuse the outer cache.
+    /// </summary>
+    IDisposable BeginEvaluationScope();
 
     // -- Generic Checks --
 
@@ -40,7 +96,8 @@ public interface IManagementAuthService
     /// <summary>
     /// Returns true if the actor has the required permission at GLOBAL scope.
     /// Use for "is this user an unrestricted admin?" type checks.
-    /// A department-scoped admin will return false here.
+    /// A department-scoped admin will return false here. ALL-bits per role: one global role must
+    /// hold every bit in <paramref name="required"/> (see the class remarks).
     /// </summary>
     Task<bool> HasGlobalPermissionAsync(UserContext actor, ManagementPermission required);
 

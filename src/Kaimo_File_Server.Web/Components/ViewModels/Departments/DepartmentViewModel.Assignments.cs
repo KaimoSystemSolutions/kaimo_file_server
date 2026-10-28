@@ -77,8 +77,12 @@ public partial class DepartmentViewModel
         NewAssignmentPrincipalId = null;
         ErrorMessage = null;
         AllRoles = (await _roleRepo.GetAllAsync()).OrderBy(r => r.Name).ToList();
-        AllUsers = (await _userRepo.GetAllAsync()).OrderBy(u => u.Name).ToList();
-        AllGroups = (await _groupRepo.GetAllAsync()).OrderBy(g => g.Name).ToList();
+        // Only recipients within the actor's reach are offered (enforced again on create).
+        var (users, groups) = _actorContext is null
+            ? (new List<User>(), new List<Group>())
+            : await _roleAssignments.GetAssignableRecipientsAsync(_actorContext);
+        AllUsers = users.OrderBy(u => u.Name).ToList();
+        AllGroups = groups.OrderBy(g => g.Name).ToList();
     }
 
     public void CancelAddAssignment()

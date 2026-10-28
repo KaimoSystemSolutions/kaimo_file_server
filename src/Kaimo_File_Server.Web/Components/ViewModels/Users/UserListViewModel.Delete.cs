@@ -73,14 +73,15 @@ public partial class UserListViewModel
     public async Task ConfirmDeleteRoleAsync()
     {
         if (SelectedRole is null || _actorContext is null) return;
-        // Deleting a (global) role definition requires Global AssignRoles.
-        if (!await _mgmtAuth.HasGlobalPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
-        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
         {
             IsSaving = true;
-            await _roleRepo.DeleteAsync(SelectedRole.Id);
+            // System-role guard, global authority over every bit, last-admin guard and the
+            // removal of the role's assignments live in the shared service.
+            var role = await _roleRepo.GetByIdAsync(SelectedRole.Id) ?? SelectedRole;
+            var error = await _roleAssignments.DeleteRoleAsync(_actorContext, role);
+            if (error is not null) { ErrorMessage = error; return; }
             SelectedRole = null; RoleScopedAssignments = [];
             IsConfirmingDelete = false;
             await LoadTabDataAsync();
