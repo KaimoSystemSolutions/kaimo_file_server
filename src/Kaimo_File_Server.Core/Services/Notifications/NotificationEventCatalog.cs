@@ -54,6 +54,7 @@ public static class NotificationEventCatalog
     public const string UserPasswordReset = "user.password_reset";
     public const string UserPasswordChanged = "user.password_changed";
     public const string AccountLocked = "security.account_locked";
+    public const string AddressLocked = "security.address_locked";
     public const string UploadReceived = "sharelink.upload_received";
     public const string LinkAccessed = "sharelink.accessed";
     public const string SyncFailed = "sync.failed";
@@ -100,6 +101,10 @@ public static class NotificationEventCatalog
         new(AccountLocked, "security", [NotificationContextRoles.Affected],
             [P("user.username", "erika"), P("remoteAddress", "203.0.113.7"), P("lockedMinutes", "15")],
             [Role(NotificationContextRoles.Affected), Holders("ViewSecurityMonitor")],
+            DefaultThrottleMinutes: 60),
+        new(AddressLocked, "security", [],
+            [P("remoteAddress", "203.0.113.7"), P("lockedMinutes", "30"), P("channel", "WebDAV")],
+            [Holders("ViewSecurityMonitor")],
             DefaultThrottleMinutes: 60),
         new(UploadReceived, "sharelinks", [NotificationContextRoles.LinkCreator],
             [P("link.name", "Bewerbungen"), P("file.name", "lebenslauf.pdf"), P("file.size", "1.2 MB")],

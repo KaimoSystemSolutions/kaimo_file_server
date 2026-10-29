@@ -65,7 +65,7 @@ namespace Kaimo_File_Server.Core.Domain.Identity
         /// </summary>
         public string PasswordHash { get; init; } = string.Empty;
 
-        /// <summary>
+        /// <summary>b
         /// NT hash (MD4 of the UTF-16LE password) required for
         /// SMB NTLM authentication from Windows clients.
         /// </summary>

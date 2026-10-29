@@ -6,6 +6,7 @@ using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Web.Services.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Net.Http.Headers;
 
 namespace Kaimo_File_Server.Web.Controllers.Api;
@@ -47,12 +48,21 @@ public sealed record RefreshRequest(string RefreshToken);
 /// <summary>
 /// Authentication and device registration for the client API. Login delegates to
 /// the shared <see cref="ILoginService"/>, so brute-force lockout and
-/// username-enumeration resistance are identical to the web UI.
+/// username-enumeration resistance are identical to the web UI. On top of that,
+/// every endpoint here shares a fixed request limit per client address
+/// (<see cref="RateLimitPolicy"/>), which turns a request flood away before it
+/// reaches the login service or the token store.
 /// </summary>
 [AllowAnonymous]
 [Route("api/v1/auth")]
+[EnableRateLimiting(RateLimitPolicy)]
 public sealed class AuthApiController : ApiControllerBase
 {
+    public const string RateLimitPolicy = "api-auth";
+
+    /// <summary>Login, refresh and logout requests per client address and minute, together.</summary>
+    public const int RequestsPerMinute = 20;
+
     private readonly ILoginService _loginService;
     private readonly IUserContextFactory _userContextFactory;
     private readonly ISyncDeviceRepository _devices;

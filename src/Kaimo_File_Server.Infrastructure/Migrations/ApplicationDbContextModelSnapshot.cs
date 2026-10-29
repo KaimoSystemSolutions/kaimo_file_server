@@ -911,6 +911,11 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<int>("RepeatCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(256)

@@ -65,6 +65,8 @@ public partial class ApplicationDbContext
             // Stored as text so the table stays readable for ad-hoc SQL analysis.
             entity.Property(e => e.Channel).IsRequired().HasConversion<string>().HasMaxLength(16);
             entity.Property(e => e.Outcome).IsRequired().HasConversion<string>().HasMaxLength(32);
+            // Rows written before repeats were folded stand for one attempt each.
+            entity.Property(e => e.RepeatCount).HasDefaultValue(1);
             // Period filter and retention pruning; per-account history.
             entity.HasIndex(e => e.AtUtc);
             entity.HasIndex(e => new { e.Username, e.AtUtc });

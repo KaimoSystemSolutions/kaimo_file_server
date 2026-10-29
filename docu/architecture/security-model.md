@@ -49,8 +49,29 @@ Common rules:
   Empty passwords are rejected; failed and successful checks take comparable time so usernames
   cannot be enumerated.
 - **Lockout.** `LoginThrottle` (`src/Kaimo_File_Server.Core/Security/LoginThrottle.cs`) locks a key
-  after consecutive failures (defaults: 5 attempts, 15 minutes, configurable in `config_settings`).
-  The state is held in process memory.
+  after consecutive failures. `CredentialLoginService` charges every attempt against three keys
+  (values in `LoginProtectionSettings`, configurable in `config_settings`):
+  - the client address across all user names (`security.login.ipMaxAttempts` 15,
+    `security.login.ipLockoutMinutes` 30). Checked first, so once the address is locked further
+    attempts cost neither a database lookup nor a password hash;
+  - user name + client address (`app.user.maxLoginAttempts` 5, `app.user.lockoutMinutes` 15);
+  - the account across all addresses (`security.login.accountWideFactor` × the per-user limit, default 10×).
+
+  A successful login resets all three. The state is held in process memory. Known residual risk:
+  an attacker with a valid account of their own can reset their address budget by signing in;
+  the per-user and account-wide limits and the request limit below are not affected.
+- **Request limit.** `/api/v1/auth/*` (login, refresh, logout) is limited to 20 requests per minute
+  and client address (`AuthApiController.RateLimitPolicy`), independent of the lockout.
+- **Lock scope.** `LoginResult.LockScope` tells an account lock (user name + address, or
+  account-wide) from an address lock. An account lock raises `security.account_locked`; an
+  address lock raises `security.address_locked` for the security administrators instead (a
+  locked address refuses every user name, so notifying the names tried from it would report
+  accounts as locked that are not). Both are sent once per lock; all address locks share one
+  dedup key, so a distributed attack yields one mail per throttle window.
+- **Login log.** LockedOut attempts that hit the same lock (channel, account, address) are folded
+  into one `login_attempts` row with a `RepeatCount`; the security overview sums the count.
+  Attempts refused by a locked address are logged as `AddressLockedOut` without a user name, fold
+  per (channel, address) and count as failures, but never as locked accounts.
 - **JWT.** Tokens are HMAC-SHA256 with the algorithm pinned during validation. `JwtTokenService.ValidateSecret`
   refuses to start with a short secret, a known public default, or a development secret outside the
   Development environment. Every token carries the account's `SecurityStamp`; changing the password

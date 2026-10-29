@@ -3,6 +3,7 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Security
 @using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.Pages.Security.Components
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Kaimo_File_Server.Web.Services
@@ -187,7 +188,7 @@ else
                                         <td><strong>@(string.IsNullOrEmpty(a.Username) ? "—" : a.Username)</strong></td>
                                         <td class="security-mono">@(a.Address ?? "—")</td>
                                         <td>@ChannelLabel(a.Channel)</td>
-                                        <td><StatusBadge Tone="OutcomeTone(a.Outcome)" Label="@OutcomeLabel(a.Outcome)" /></td>
+                                        <td><LoginAttemptResult Attempt="a" /></td>
                                     </tr>
                                 }
                             </tbody>
@@ -283,25 +284,5 @@ else
         SecurityChannel.Api => "API",
         SecurityChannel.WebDav => "WebDAV",
         _ => "Web",
-    };
-
-    private static StatusTone OutcomeTone(LoginOutcome outcome) => outcome switch
-    {
-        LoginOutcome.Success => StatusTone.Positive,
-        LoginOutcome.LockedOut => StatusTone.Warning,
-        LoginOutcome.AccountDisabled => StatusTone.Neutral,
-        LoginOutcome.AddressNotAllowed => StatusTone.Warning,
-        LoginOutcome.ServiceDisabled => StatusTone.Neutral,
-        _ => StatusTone.Negative,
-    };
-
-    private static string OutcomeLabel(LoginOutcome outcome) => outcome switch
-    {
-        LoginOutcome.Success => T("Web_Security_Outcome_Success", "Success"),
-        LoginOutcome.LockedOut => T("Web_Security_Outcome_Locked", "Locked out"),
-        LoginOutcome.AccountDisabled => T("Web_Security_Outcome_Disabled", "Account disabled"),
-        LoginOutcome.AddressNotAllowed => T("Web_Security_Outcome_AddressNotAllowed", "Address not allowed"),
-        LoginOutcome.ServiceDisabled => T("Web_Security_Outcome_ServiceDisabled", "Service switched off"),
-        _ => T("Web_Security_Outcome_Invalid", "Invalid credentials"),
     };
 }

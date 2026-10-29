@@ -1,0 +1,12 @@
+/* Outcome badge plus the optional "×N" repeat badge, side by side in one table cell. */
+
+.login-attempt-result {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.login-attempt-result ::deep .login-attempt-repeat {
+    font-variant-numeric: tabular-nums;
+}

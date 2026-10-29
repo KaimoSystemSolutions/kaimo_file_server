@@ -48,7 +48,10 @@ All timestamps are UTC ISO-8601. All enums serialize as their names (e.g. `"TwoW
 ## 2. Authentication & devices
 
 Login uses the same credential service as the web UI, so brute-force lockout and
-username-enumeration resistance are identical.
+username-enumeration resistance are identical. In addition, `login`, `refresh` and
+`logout` share a fixed budget of 20 requests per minute and client address; beyond it
+the server answers `429 rate_limited` with a `Retry-After` header before the request
+reaches the credential check.
 
 ### `POST /api/v1/auth/login`
 ```jsonc
@@ -76,6 +79,7 @@ username-enumeration resistance are identical.
 - `401 unauthorized` — invalid credentials.
 - `403 forbidden` — account disabled.
 - `429 locked_out` — too many attempts; honor the `Retry-After` header.
+- `429 rate_limited` — too many requests to `/api/v1/auth/*` from this address; honor `Retry-After`.
 
 ### `POST /api/v1/auth/refresh`
 ```jsonc

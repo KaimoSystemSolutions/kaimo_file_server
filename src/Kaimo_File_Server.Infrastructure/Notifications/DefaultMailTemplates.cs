@@ -65,6 +65,11 @@ public static class DefaultMailTemplates
         [(C.AccountLocked, "en")] = new("Account {{ user.username }} temporarily locked",
             "<p>After too many failed sign-in attempts the account <strong>{{ user.username }}</strong> was locked for {{ lockedMinutes }} minutes.</p><p>Last source: {{ remoteAddress }}<br>Time: {{ event.time }}</p>"),
 
+        [(C.AddressLocked, "de")] = new("Client-Adresse {{ remoteAddress }} vorübergehend gesperrt",
+            "<p>Von der Adresse <strong>{{ remoteAddress }}</strong> gab es zu viele fehlgeschlagene Anmeldeversuche (zuletzt über {{ channel }}). Die Adresse ist für {{ lockedMinutes }} Minuten für alle Anmeldungen gesperrt. Kein Konto wurde dadurch gesperrt.</p><p>Zeitpunkt: {{ event.time }}</p><p>Weitere Adresssperren innerhalb der Drosselung werden nicht einzeln gemeldet; alle Versuche stehen in der Sicherheitsübersicht.</p>"),
+        [(C.AddressLocked, "en")] = new("Client address {{ remoteAddress }} temporarily locked",
+            "<p>The address <strong>{{ remoteAddress }}</strong> made too many failed sign-in attempts (last through {{ channel }}). It is locked for all sign-ins for {{ lockedMinutes }} minutes. No account was locked by this.</p><p>Time: {{ event.time }}</p><p>Further address locks within the throttle window are not reported one by one; every attempt is listed in the security overview.</p>"),
+
         [(C.UploadReceived, "de")] = new("Neue Datei über „{{ link.name }}“",
             "<p>Hallo {{ recipient.name }},</p><p>über deinen Upload-Link <strong>{{ link.name }}</strong> wurde die Datei <strong>{{ file.name }}</strong> ({{ file.size }}) hochgeladen.</p>" + LoginLink),
         [(C.UploadReceived, "en")] = new("New file via \"{{ link.name }}\"",

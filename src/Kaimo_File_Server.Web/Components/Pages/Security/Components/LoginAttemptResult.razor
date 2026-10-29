@@ -1,0 +1,48 @@
+@using Kaimo_File_Server.Core.Domain.Identity
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Security
+@using Kaimo_File_Server.Web.Components.Shared
+
+@*
+    Result cell of the security overview's attempt list: the outcome badge and, when repeated
+    LockedOut attempts of one lockout (account or address) were folded into the row, a "×N" badge with the count.
+*@
+
+<span class="login-attempt-result">
+    <StatusBadge Tone="OutcomeTone(Attempt.Outcome)" Label="@OutcomeLabel(Attempt.Outcome)" />
+    @if (Attempt.RepeatCount > 1)
+    {
+        var hint = string.Format(T("Web_Security_RepeatCount_Hint", "{0} attempts during this lockout"), Attempt.RepeatCount);
+        <StatusBadge Tone="StatusTone.Neutral" ShowDot="false" Class="login-attempt-repeat"
+                     Label="@($"×{Attempt.RepeatCount}")" title="@hint" aria-label="@hint" />
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public LoginAttemptRecord Attempt { get; set; } = default!;
+
+    private static string T(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    private static StatusTone OutcomeTone(LoginOutcome outcome) => outcome switch
+    {
+        LoginOutcome.Success => StatusTone.Positive,
+        LoginOutcome.LockedOut => StatusTone.Warning,
+        LoginOutcome.AddressLockedOut => StatusTone.Warning,
+        LoginOutcome.AccountDisabled => StatusTone.Neutral,
+        LoginOutcome.AddressNotAllowed => StatusTone.Warning,
+        LoginOutcome.ServiceDisabled => StatusTone.Neutral,
+        _ => StatusTone.Negative,
+    };
+
+    private static string OutcomeLabel(LoginOutcome outcome) => outcome switch
+    {
+        LoginOutcome.Success => T("Web_Security_Outcome_Success", "Success"),
+        LoginOutcome.LockedOut => T("Web_Security_Outcome_Locked", "Locked out"),
+        LoginOutcome.AddressLockedOut => T("Web_Security_Outcome_AddressLocked", "Address locked"),
+        LoginOutcome.AccountDisabled => T("Web_Security_Outcome_Disabled", "Account disabled"),
+        LoginOutcome.AddressNotAllowed => T("Web_Security_Outcome_AddressNotAllowed", "Address not allowed"),
+        LoginOutcome.ServiceDisabled => T("Web_Security_Outcome_ServiceDisabled", "Service switched off"),
+        _ => T("Web_Security_Outcome_Invalid", "Invalid credentials"),
+    };
+}

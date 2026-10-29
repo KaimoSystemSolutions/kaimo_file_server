@@ -565,6 +565,24 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Client address locked ähnelt.
+        /// </summary>
+        public static string Notification_Event_security_address_locked {
+            get {
+                return ResourceManager.GetString("Notification_Event_security_address_locked", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die A client address was locked for all sign-ins after too many failed attempts, across all user names. No account is locked by it. ähnelt.
+        /// </summary>
+        public static string Notification_Event_security_address_locked_Desc {
+            get {
+                return ResourceManager.GetString("Notification_Event_security_address_locked_Desc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Share link downloaded ähnelt.
         /// </summary>
         public static string Notification_Event_sharelink_accessed {
@@ -16828,6 +16846,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Address locked ähnelt.
+        /// </summary>
+        public static string Web_Security_Outcome_AddressLocked {
+            get {
+                return ResourceManager.GetString("Web_Security_Outcome_AddressLocked", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Locked out ähnelt.
         /// </summary>
         public static string Web_Security_Outcome_Locked {
@@ -16905,6 +16932,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Security_Refresh {
             get {
                 return ResourceManager.GetString("Web_Security_Refresh", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} attempts during this lockout ähnelt.
+        /// </summary>
+        public static string Web_Security_RepeatCount_Hint {
+            get {
+                return ResourceManager.GetString("Web_Security_RepeatCount_Hint", resourceCulture);
             }
         }
         

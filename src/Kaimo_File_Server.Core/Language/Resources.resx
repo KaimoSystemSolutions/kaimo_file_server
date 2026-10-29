@@ -4773,6 +4773,12 @@
   <data name="Web_Security_Outcome_Locked" xml:space="preserve">
     <value>Locked out</value>
   </data>
+  <data name="Web_Security_Outcome_AddressLocked" xml:space="preserve">
+    <value>Address locked</value>
+  </data>
+  <data name="Web_Security_RepeatCount_Hint" xml:space="preserve">
+    <value>{0} attempts during this lockout</value>
+  </data>
   <data name="Web_Security_LockedUntil" xml:space="preserve">
     <value>Locked until {0}</value>
   </data>
@@ -5171,6 +5177,12 @@
   </data>
   <data name="Notification_Event_security_account_locked_Desc" xml:space="preserve">
     <value>An account was locked after too many failed sign-in attempts.</value>
+  </data>
+  <data name="Notification_Event_security_address_locked" xml:space="preserve">
+    <value>Client address locked</value>
+  </data>
+  <data name="Notification_Event_security_address_locked_Desc" xml:space="preserve">
+    <value>A client address was locked for all sign-ins after too many failed attempts, across all user names. No account is locked by it.</value>
   </data>
   <data name="Notification_Event_sharelink_upload_received" xml:space="preserve">
     <value>File received via upload link</value>

@@ -1,3 +1,4 @@
+using System.Net;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Infrastructure.Configuration;
@@ -11,8 +12,13 @@ namespace Kaimo_File_Server.Infrastructure.Services;
 /// users — and returning an indistinguishable result for "no such user" and
 /// "wrong password".
 ///
-/// Lockout thresholds come from config (<c>app.user.maxLoginAttempts</c>,
-/// <c>app.user.lockoutMinutes</c>) so an administrator can tune them at runtime.
+/// Every attempt is charged against three budgets — the client address, the
+/// (user name, address) pair and the account — whose thresholds come from
+/// <see cref="LoginProtectionSettings"/> so an administrator can tune them at runtime.
+/// The address budget is checked first: guessing with ever-new user names from one
+/// address never reaches a per-user limit, so it is refused there, before any database
+/// lookup or password hash. Such a lock is reported with <see cref="LockoutScope.Address"/>,
+/// because it refuses every user name without locking any account.
 /// </summary>
 public sealed class CredentialLoginService : ILoginService
 {
@@ -21,9 +27,6 @@ public sealed class CredentialLoginService : ILoginService
     // leak whether the username exists. Computed once per process.
     private static readonly string DummyPasswordHash =
         BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N"));
-
-    private const string MaxAttemptsKey = "app.user.maxLoginAttempts";
-    private const string LockoutMinutesKey = "app.user.lockoutMinutes";
 
     private readonly IUserRepository _users;
     private readonly IPasswordService _passwords;
@@ -52,27 +55,23 @@ public sealed class CredentialLoginService : ILoginService
         string username, string password, string? remoteAddress = null, string? host = null)
     {
         var trimmed = (username ?? string.Empty).Trim();
-        var key = ThrottleKey(trimmed, remoteAddress);
-        var accountKey = AccountThrottleKey(trimmed);
         password ??= string.Empty;
 
-        var policy = await ResolvePolicyAsync();
-        var accountPolicy = policy with { MaxAttempts = policy.MaxAttempts * AccountWideAttemptFactor };
+        var settings = await _config.LoadLoginProtectionAsync();
+        var budget = new LoginBudget(_throttle,
+            (AddressThrottleKey(remoteAddress), settings.IpPolicy, LockoutScope.Address),
+            (ThrottleKey(trimmed, remoteAddress), settings.UserPolicy, LockoutScope.Account),
+            (AccountThrottleKey(trimmed), settings.AccountPolicy, LockoutScope.Account));
 
         // 1. Reject early if already locked — without a DB lookup, so a locked
         //    response is identical for existing and non-existing usernames. The
         //    attempt is reserved atomically, so parallel requests cannot all pass
         //    this gate while earlier ones are still inside the slow hash verify.
-        //    Both the (user, address) budget and the account-wide ceiling apply.
-        var status = _throttle.BeginAttempt(key, policy);
+        //    The address budget, the (user, address) budget and the account-wide
+        //    ceiling all apply.
+        var (status, scope) = budget.Begin();
         if (status.IsLockedOut)
-            return LoginResult.LockedOut(status.RetryAfter);
-        var accountStatus = _throttle.BeginAttempt(accountKey, accountPolicy);
-        if (accountStatus.IsLockedOut)
-        {
-            _throttle.EndAttempt(key);
-            return LoginResult.LockedOut(accountStatus.RetryAfter);
-        }
+            return LoginResult.LockedOut(status.RetryAfter, scope);
 
         bool settled = false;
         try
@@ -83,7 +82,7 @@ public sealed class CredentialLoginService : ILoginService
             if (password.Length == 0)
             {
                 settled = true;
-                return RegisterFailure(key, policy, accountKey, accountPolicy);
+                return RegisterFailure(budget);
             }
 
             var user = await _users.GetByUsernameAsync(trimmed);
@@ -97,7 +96,7 @@ public sealed class CredentialLoginService : ILoginService
             if (user is null || !passwordOk)
             {
                 settled = true;
-                return RegisterFailure(key, policy, accountKey, accountPolicy);
+                return RegisterFailure(budget);
             }
 
             // 3. Valid credentials but the account is locked/disabled. Not a
@@ -116,14 +115,13 @@ public sealed class CredentialLoginService : ILoginService
             if (_access is not null && !await _access.IsAllowedAsync(context, remoteAddress, host))
             {
                 settled = true;
-                var failure = RegisterFailure(key, policy, accountKey, accountPolicy);
+                var failure = RegisterFailure(budget);
                 return failure.Outcome == LoginOutcome.LockedOut ? failure : LoginResult.AddressNotAllowed;
             }
 
             // 5. Success — clear any accumulated failures for these keys.
             settled = true;
-            _throttle.Reset(key);
-            _throttle.Reset(accountKey);
+            budget.Reset();
             return LoginResult.ForSuccess(context);
         }
         finally
@@ -131,35 +129,44 @@ public sealed class CredentialLoginService : ILoginService
             // Disabled accounts and infrastructure errors neither count nor leak
             // a reservation that would otherwise shrink the budget forever.
             if (!settled)
-            {
-                _throttle.EndAttempt(key);
-                _throttle.EndAttempt(accountKey);
-            }
+                budget.Release();
         }
     }
 
-    private LoginResult RegisterFailure(
-        string key, LoginThrottlePolicy policy, string accountKey, LoginThrottlePolicy accountPolicy)
+    private static LoginResult RegisterFailure(LoginBudget budget)
     {
-        var failure = _throttle.RegisterFailure(key, policy);
-        var accountFailure = _throttle.RegisterFailure(accountKey, accountPolicy);
-        if (!failure.IsLockedOut && !accountFailure.IsLockedOut)
-            return LoginResult.InvalidCredentials;
-
-        var retryAfter = failure.RetryAfter > accountFailure.RetryAfter ? failure.RetryAfter : accountFailure.RetryAfter;
-        return LoginResult.LockedOut(retryAfter);
+        var (failure, scope) = budget.RegisterFailure();
+        return failure.IsLockedOut ? LoginResult.LockedOut(failure.RetryAfter, scope) : LoginResult.InvalidCredentials;
     }
 
     /// <summary>
-    /// The account-wide budget is this many times the per-address budget. It caps
-    /// guessing spread over many (possibly spoofed) client addresses, while a stranger
-    /// still needs far more failures to lock the real user out than per address.
+    /// Default of <see cref="LoginProtectionSettings.AccountWideFactor"/>: the account-wide
+    /// budget is this many times the per-address budget. It caps guessing spread over many
+    /// (possibly spoofed) client addresses, while a stranger still needs far more failures to
+    /// lock the real user out than per address.
     /// </summary>
-    internal const int AccountWideAttemptFactor = 10;
+    internal const int AccountWideAttemptFactor = LoginProtectionSettings.DefaultAccountWideFactor;
 
     /// <summary>Key of the account-wide ceiling, independent of the client address.</summary>
     // Leading "|" cannot start a username, so this never collides with a (user, address) key.
     internal static string AccountThrottleKey(string username) => $"|account|{username.ToLowerInvariant()}";
+
+    /// <summary>
+    /// Key of the per-address budget, across all user names. The address is canonicalized
+    /// (an IPv4-mapped IPv6 address counts as its IPv4 address), so one client cannot get a
+    /// second budget by switching notation. Empty without a known address: the throttle skips
+    /// empty keys, so no address budget applies then.
+    /// </summary>
+    // Leading "|" cannot start a username, so this never collides with a (user, address) key.
+    internal static string AddressThrottleKey(string? remoteAddress)
+    {
+        var trimmed = remoteAddress?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+            return string.Empty;
+        if (IPAddress.TryParse(trimmed, out var parsed))
+            trimmed = (parsed.IsIPv4MappedToIPv6 ? parsed.MapToIPv4() : parsed).ToString();
+        return $"|ip|{trimmed.ToLowerInvariant()}";
+    }
 
     /// <summary>
     /// Lockout is tracked per (username, client address): a stranger failing
@@ -178,16 +185,5 @@ public sealed class CredentialLoginService : ILoginService
         // Discard the result; only the timing cost matters.
         _ = _passwords.VerifyPassword(password, DummyPasswordHash);
         return false;
-    }
-
-    private async Task<LoginThrottlePolicy> ResolvePolicyAsync()
-    {
-        var maxAttempts = await _config.GetIntAsync(MaxAttemptsKey, 5);
-        var lockoutMinutes = await _config.GetIntAsync(LockoutMinutesKey, 15);
-
-        if (maxAttempts <= 0) maxAttempts = 5;
-        if (lockoutMinutes <= 0) lockoutMinutes = 15;
-
-        return new LoginThrottlePolicy(maxAttempts, TimeSpan.FromMinutes(lockoutMinutes));
     }
 }

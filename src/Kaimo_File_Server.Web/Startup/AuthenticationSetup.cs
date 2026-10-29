@@ -9,10 +9,11 @@ using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Web.Services.Api;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Kaimo_File_Server.Web.Startup;
 
-/// <summary>Authentication schemes (web session cookie, device bearer, WebDAV Basic), proxy trust, HTTPS redirection, security monitor, client-API tokens, rate limiting and OpenAPI.</summary>
+/// <summary>Authentication schemes (web session cookie, device bearer, WebDAV Basic), proxy trust, HTTPS redirection, security monitor, client-API tokens, rate limiting (search, auth) and OpenAPI.</summary>
 internal static class AuthenticationSetup
 {
     public static void AddKaimoAuthentication(this WebApplicationBuilder builder)
@@ -131,36 +132,54 @@ internal static class AuthenticationSetup
         // Issues/rotates client-API access + refresh tokens.
         builder.Services.AddScoped<ApiTokenService>();
 
-        // Per-user throttling for expensive client-API endpoints (currently search, which may
-        // walk whole directory trees when Elasticsearch is down). Partitioned by the JWT subject,
-        // falling back to the client address (already resolved through trusted proxies only).
-        builder.Services.AddRateLimiter(options =>
-        {
-            options.AddPolicy(SearchApiController.RateLimitPolicy, context =>
-                RateLimitPartition.GetTokenBucketLimiter(
-                    context.User.FindFirstValue(ClaimTypes.NameIdentifier)
-                        ?? context.Connection.RemoteIpAddress?.ToString()
-                        ?? "unknown",
-                    _ => new TokenBucketRateLimiterOptions
-                    {
-                        TokenLimit = 10,                              // burst
-                        TokensPerPeriod = 1,
-                        ReplenishmentPeriod = TimeSpan.FromSeconds(2), // sustained: 30/min
-                        QueueLimit = 0
-                    }));
-
-            options.OnRejected = async (context, ct) =>
-            {
-                var response = context.HttpContext.Response;
-                response.StatusCode = StatusCodes.Status429TooManyRequests;
-                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-                    response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
-                await response.WriteAsJsonAsync(
-                    new ApiError("rate_limited", "Too many requests. Retry later."), ct);
-            };
-        });
+        builder.Services.AddRateLimiter(ConfigureRateLimiter);
 
         // OpenAPI document for per-platform client code generation (served at /openapi/v1.json).
         builder.Services.AddOpenApi("v1");
+    }
+
+    /// <summary>
+    /// Rate-limiter policies of the client API. Where a partition uses the client address, it is
+    /// already resolved through trusted proxies only (see ForwardedHeadersSetup).
+    /// </summary>
+    internal static void ConfigureRateLimiter(RateLimiterOptions options)
+    {
+        // Per-user throttling for expensive client-API endpoints (currently search, which may
+        // walk whole directory trees when Elasticsearch is down). Partitioned by the JWT subject,
+        // falling back to the client address.
+        options.AddPolicy(SearchApiController.RateLimitPolicy, context =>
+            RateLimitPartition.GetTokenBucketLimiter(
+                context.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? context.Connection.RemoteIpAddress?.ToString()
+                    ?? "unknown",
+                _ => new TokenBucketRateLimiterOptions
+                {
+                    TokenLimit = 10,                              // burst
+                    TokensPerPeriod = 1,
+                    ReplenishmentPeriod = TimeSpan.FromSeconds(2), // sustained: 30/min
+                    QueueLimit = 0
+                }));
+
+        // Fixed request budget of /api/v1/auth/* per client address, independent of the
+        // credential lockout: caps password guessing and refresh-token probing by sheer volume.
+        options.AddPolicy(AuthApiController.RateLimitPolicy, context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = AuthApiController.RequestsPerMinute,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
+                }));
+
+        options.OnRejected = async (context, ct) =>
+        {
+            var response = context.HttpContext.Response;
+            response.StatusCode = StatusCodes.Status429TooManyRequests;
+            if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+            await response.WriteAsJsonAsync(
+                new ApiError("rate_limited", "Too many requests. Retry later."), ct);
+        };
     }
 }

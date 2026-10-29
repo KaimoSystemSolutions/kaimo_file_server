@@ -210,6 +210,14 @@ of ten times the per-address attempt limit. Guessing spread over many (real or
 forged) addresses therefore locks the account temporarily instead of going on
 indefinitely.
 
+Each client address additionally has its own budget across all user names
+(default 15 failed attempts, then 30 minutes locked), and the client-API
+endpoints `/api/v1/auth/*` accept at most 20 requests per minute per address.
+Both are keyed by the client address, so **behind an untrusted proxy or the
+Docker userland proxy they apply to all clients together**: 15 failed logins from
+anyone lock out every login (web, client API, WebDAV) for 30 minutes. Make the
+proxy trusted (see above) before exposing the server.
+
 ## 🔓 Plain HTTP port 8080
 
 `web` serves HTTPS on `8443` and plain HTTP on container port `8080`. The

@@ -53,6 +53,20 @@ public sealed class SecurityEventRepository(IDbContextFactory<ApplicationDbConte
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task AddLockoutRepeatsAsync(IReadOnlyDictionary<long, int> increments, CancellationToken ct = default)
+    {
+        if (increments.Count == 0)
+            return;
+
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        foreach (var (id, count) in increments)
+            await db.LoginAttempts
+                .Where(a => a.Id == id)
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.RepeatCount, a => a.RepeatCount + count), ct);
+        await transaction.CommitAsync(ct);
+    }
+
     public async Task<SecurityTotals> GetTotalsAsync(DateTime sinceUtc, DateTime nowUtc)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -60,9 +74,10 @@ public sealed class SecurityEventRepository(IDbContextFactory<ApplicationDbConte
         var buckets = db.ClientActivityBuckets.Where(b => b.LastSeenUtc >= sinceUtc);
 
         int successes = await attempts.CountAsync(a => a.Outcome == LoginOutcome.Success);
-        int failures = await attempts.CountAsync(a => a.Outcome != LoginOutcome.Success);
+        int failures = await attempts.Where(a => a.Outcome != LoginOutcome.Success).SumAsync(a => a.RepeatCount);
+        // Accounts only: a locked address locks no account (see LoginOutcome.AddressLockedOut).
         int activeLockouts = await db.LoginAttempts
-            .Where(a => a.LockedUntilUtc > nowUtc)
+            .Where(a => a.Outcome == LoginOutcome.LockedOut && a.LockedUntilUtc > nowUtc)
             .Select(a => a.Username)
             .Distinct()
             .CountAsync();
@@ -76,7 +91,8 @@ public sealed class SecurityEventRepository(IDbContextFactory<ApplicationDbConte
         DateTime sinceUtc, DateTime nowUtc, int limit)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        var inPeriod = db.LoginAttempts.Where(a => a.AtUtc >= sinceUtc);
+        // Address lockouts are logged without an account and belong to no account summary.
+        var inPeriod = db.LoginAttempts.Where(a => a.AtUtc >= sinceUtc && a.Outcome != LoginOutcome.AddressLockedOut);
 
         var rows = await inPeriod
             .GroupBy(a => a.Username)
@@ -88,7 +104,7 @@ public sealed class SecurityEventRepository(IDbContextFactory<ApplicationDbConte
                                         || a.Outcome == LoginOutcome.AccountDisabled
                                         || a.Outcome == LoginOutcome.AddressNotAllowed
                                         || a.Outcome == LoginOutcome.ServiceDisabled),
-                Lockouts = g.Count(a => a.Outcome == LoginOutcome.LockedOut),
+                Lockouts = g.Sum(a => a.Outcome == LoginOutcome.LockedOut ? a.RepeatCount : 0),
                 Addresses = g.Select(a => a.Address).Distinct().Count(),
                 LastAttemptUtc = g.Max(a => a.AtUtc),
                 LockedUntilUtc = g.Max(a => a.LockedUntilUtc),

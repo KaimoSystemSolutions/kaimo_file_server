@@ -71,6 +71,7 @@ builders in `NotificationEvents` keep every call site to one line.
 | `user.password_reset` | User administration | affected, actor | Affected user |
 | `user.password_changed` | Self-service profile | affected | Affected user |
 | `security.account_locked` | `MonitoredLoginService` (once per lock) | affected | Affected user + `ViewSecurityMonitor` holders, 60 min throttle |
+| `security.address_locked` | `MonitoredLoginService` (once per lock of a client address) | – | `ViewSecurityMonitor` holders, 60 min throttle (one dedup key for all addresses) |
 | `sharelink.upload_received` | `PublicUploadService` | linkCreator | Link creator |
 | `sharelink.accessed` | `PublicDownloadController` | linkCreator | Link creator, 60 min throttle |
 | `sync.failed` | `CloudSyncExecutionService` | syncCreator | Sync creator + sync administrators, 6 h throttle |

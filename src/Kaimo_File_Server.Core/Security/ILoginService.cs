@@ -24,6 +24,24 @@ public enum LoginOutcome
     /// <see cref="InvalidCredentials"/>; only the admin-side security log tells them apart.
     /// </summary>
     ServiceDisabled,
+
+    /// <summary>
+    /// Only in the security log, never returned by the login service: an attempt refused
+    /// because its client address was locked (<see cref="LoginResult"/> reports
+    /// <see cref="LockedOut"/> with <see cref="LockoutScope.Address"/>). Such a lock refuses
+    /// every user name, so it is logged without one and never counts as a locked account.
+    /// </summary>
+    AddressLockedOut,
+}
+
+/// <summary>Which budget a <see cref="LoginOutcome.LockedOut"/> result comes from.</summary>
+public enum LockoutScope
+{
+    /// <summary>The account is locked: per (user name, client address) or account-wide.</summary>
+    Account,
+
+    /// <summary>The client address is locked, across all user names; no account is locked by it.</summary>
+    Address,
 }
 
 /// <summary>
@@ -32,11 +50,13 @@ public enum LoginOutcome
 /// <see cref="LoginOutcome.InvalidCredentials"/> is returned for BOTH an unknown
 /// username and a wrong password — deliberately indistinguishable, so the
 /// response cannot be used to enumerate valid usernames.
+/// <see cref="LockScope"/> is only meaningful for <see cref="LoginOutcome.LockedOut"/>.
 /// </summary>
 public sealed record LoginResult(
     LoginOutcome Outcome,
     UserContext? UserContext = null,
-    TimeSpan RetryAfter = default)
+    TimeSpan RetryAfter = default,
+    LockoutScope LockScope = LockoutScope.Account)
 {
     public static LoginResult ForSuccess(UserContext context) =>
         new(LoginOutcome.Success, context);
@@ -53,8 +73,8 @@ public sealed record LoginResult(
     public static readonly LoginResult ServiceDisabled =
         new(LoginOutcome.ServiceDisabled);
 
-    public static LoginResult LockedOut(TimeSpan retryAfter) =>
-        new(LoginOutcome.LockedOut, RetryAfter: retryAfter);
+    public static LoginResult LockedOut(TimeSpan retryAfter, LockoutScope scope = LockoutScope.Account) =>
+        new(LoginOutcome.LockedOut, RetryAfter: retryAfter, LockScope: scope);
 }
 
 /// <summary>

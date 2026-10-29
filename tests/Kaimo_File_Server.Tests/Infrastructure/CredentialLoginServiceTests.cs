@@ -13,13 +13,15 @@ namespace Kaimo_File_Server.Tests;
 /// username-enumeration resistance. Uses a real <see cref="LoginThrottle"/>
 /// (driven by a controllable clock) plus mocked repositories.
 /// </summary>
-public class CredentialLoginServiceTests
+public partial class CredentialLoginServiceTests
 {
     private const string Username = "alice";
     private const string CorrectPassword = "correct-horse";
     private const string UserHash = "hash-for-alice";
     private const int MaxAttempts = 3;
     private const int LockoutMinutes = 10;
+    private const int IpMaxAttempts = 4;
+    private const int IpLockoutMinutes = 20;
 
     private readonly Mock<IUserRepository> _users = new();
     private readonly Mock<IPasswordService> _passwords = new();
@@ -34,6 +36,10 @@ public class CredentialLoginServiceTests
             .ReturnsAsync(MaxAttempts);
         _config.Setup(c => c.GetIntAsync("app.user.lockoutMinutes", It.IsAny<int>()))
             .ReturnsAsync(LockoutMinutes);
+        _config.Setup(c => c.GetIntAsync("security.login.ipMaxAttempts", It.IsAny<int>()))
+            .ReturnsAsync(IpMaxAttempts);
+        _config.Setup(c => c.GetIntAsync("security.login.ipLockoutMinutes", It.IsAny<int>()))
+            .ReturnsAsync(IpLockoutMinutes);
 
         var throttle = new LoginThrottle(_time);
         _sut = new CredentialLoginService(

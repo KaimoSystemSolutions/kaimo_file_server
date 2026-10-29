@@ -4773,6 +4773,12 @@
   <data name="Web_Security_Outcome_Locked" xml:space="preserve">
     <value>Gesperrt</value>
   </data>
+  <data name="Web_Security_Outcome_AddressLocked" xml:space="preserve">
+    <value>Adresse gesperrt</value>
+  </data>
+  <data name="Web_Security_RepeatCount_Hint" xml:space="preserve">
+    <value>{0} Versuche während dieser Sperre</value>
+  </data>
   <data name="Web_Security_LockedUntil" xml:space="preserve">
     <value>Gesperrt bis {0}</value>
   </data>
@@ -5171,6 +5177,12 @@
   </data>
   <data name="Notification_Event_security_account_locked_Desc" xml:space="preserve">
     <value>Ein Konto wurde nach zu vielen fehlgeschlagenen Anmeldeversuchen gesperrt.</value>
+  </data>
+  <data name="Notification_Event_security_address_locked" xml:space="preserve">
+    <value>Client-Adresse gesperrt</value>
+  </data>
+  <data name="Notification_Event_security_address_locked_Desc" xml:space="preserve">
+    <value>Eine Client-Adresse wurde nach zu vielen Fehlversuchen über alle Benutzernamen hinweg für alle Anmeldungen gesperrt. Ein Konto wird dadurch nicht gesperrt.</value>
   </data>
   <data name="Notification_Event_sharelink_upload_received" xml:space="preserve">
     <value>Datei über Upload-Link empfangen</value>

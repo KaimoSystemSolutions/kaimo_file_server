@@ -38,9 +38,22 @@ public interface ISecurityEventRepository
         IReadOnlyCollection<ClientActivityBucket> buckets,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Adds repeated lockout hits to already saved attempts: <see cref="LoginAttemptRecord.RepeatCount"/>
+    /// of each row id grows by the given amount, in one transaction. Unknown ids are ignored.
+    /// </summary>
+    Task AddLockoutRepeatsAsync(IReadOnlyDictionary<long, int> increments, CancellationToken ct = default);
+
+    /// <summary>
+    /// Totals of the period. Failures include attempts refused by a locked address;
+    /// active lockouts count locked accounts only.
+    /// </summary>
     Task<SecurityTotals> GetTotalsAsync(DateTime sinceUtc, DateTime nowUtc);
 
-    /// <summary>Accounts with the most failed attempts first.</summary>
+    /// <summary>
+    /// Accounts with the most failed attempts first; lockouts count every folded repeat.
+    /// Address lockouts are logged without an account and are not part of any summary.
+    /// </summary>
     Task<IReadOnlyList<AccountLoginSummary>> SummarizeAccountsAsync(DateTime sinceUtc, DateTime nowUtc, int limit);
 
     /// <summary>Busiest clients first.</summary>

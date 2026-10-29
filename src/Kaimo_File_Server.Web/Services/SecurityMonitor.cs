@@ -11,7 +11,8 @@ namespace Kaimo_File_Server.Web.Services;
 /// Collects login attempts (web, REST API, WebDAV) and API / WebDAV request counts per client
 /// address, and writes them in batches through <see cref="ISecurityEventRepository"/>. Recording
 /// never touches the database, so the login and request paths stay fast; requests are summed
-/// into hourly buckets per address before they are stored.
+/// into hourly buckets per address before they are stored, and repeated LockedOut attempts of one
+/// lock are folded into one row (<see cref="LockoutRepeatFolder"/>).
 /// </summary>
 public sealed class SecurityMonitor(DemoModeOptions? demo = null, TimeProvider? timeProvider = null)
 {
@@ -27,18 +28,24 @@ public sealed class SecurityMonitor(DemoModeOptions? demo = null, TimeProvider? 
     private readonly object _bucketLock = new();
     private Dictionary<(string Address, DateTime Hour), ClientActivityBucket> _buckets = new();
     private readonly SemaphoreSlim _flushGate = new(1, 1);
+    // Only touched inside the flush gate.
+    private readonly LockoutRepeatFolder _repeats = new();
 
     public void RecordLogin(SecurityChannel channel, string username, string? address, LoginResult result)
     {
         var now = _time.GetUtcNow().UtcDateTime;
+        bool locked = result.Outcome == LoginOutcome.LockedOut;
+        // A locked address refuses every user name; it is logged without one, so the
+        // overview neither shows the names tried as locked accounts nor splits its repeats.
+        bool addressLocked = locked && result.LockScope == LockoutScope.Address;
         Enqueue(new LoginAttemptRecord
         {
             AtUtc = now,
             Channel = channel,
-            Username = Truncate((username ?? "").Trim().ToLowerInvariant(), MaxUsernameLength),
+            Username = addressLocked ? "" : Truncate((username ?? "").Trim().ToLowerInvariant(), MaxUsernameLength),
             Address = address is null ? null : Truncate(address.Trim(), MaxAddressLength),
-            Outcome = result.Outcome,
-            LockedUntilUtc = result.Outcome == LoginOutcome.LockedOut ? now + result.RetryAfter : null,
+            Outcome = addressLocked ? LoginOutcome.AddressLockedOut : result.Outcome,
+            LockedUntilUtc = locked ? now + result.RetryAfter : null,
         });
     }
 
@@ -64,7 +71,8 @@ public sealed class SecurityMonitor(DemoModeOptions? demo = null, TimeProvider? 
 
     /// <summary>
     /// Writes everything recorded so far. Flushes are serialized; a failed batch is kept for the
-    /// next flush (still bounded by <see cref="MaxPending"/>).
+    /// next flush (still bounded by <see cref="MaxPending"/>), and so are repeat counts that could
+    /// not be added to their saved rows.
     /// </summary>
     public async Task FlushAsync(ISecurityEventRepository repository, CancellationToken ct = default)
     {
@@ -83,36 +91,56 @@ public sealed class SecurityMonitor(DemoModeOptions? demo = null, TimeProvider? 
             }
 
             // The read-only demo persists nothing; the batch is discarded.
-            if ((attempts.Count == 0 && buckets.Count == 0) || demo?.ReadOnly == true)
+            if (demo?.ReadOnly == true)
                 return;
 
-            try
+            var rows = _repeats.Fold(attempts);
+            if (rows.Count > 0 || buckets.Count > 0)
             {
-                await repository.SaveAsync(attempts, buckets, ct);
+                await SaveBatchAsync(repository, rows, buckets, ct);
+                _repeats.BatchSaved(_time.GetUtcNow().UtcDateTime);
             }
-            catch
+
+            if (_repeats.PendingRepeats.Count > 0)
             {
-                // Re-queue copies: the failed context may have touched the originals' keys.
-                foreach (var a in attempts)
-                    Enqueue(new LoginAttemptRecord
-                    {
-                        AtUtc = a.AtUtc, Channel = a.Channel, Username = a.Username, Address = a.Address,
-                        Outcome = a.Outcome, LockedUntilUtc = a.LockedUntilUtc,
-                    });
-                lock (_bucketLock)
-                    foreach (var b in buckets)
-                        Merge(new ClientActivityBucket
-                        {
-                            Address = b.Address, HourUtc = b.HourUtc, ApiRequests = b.ApiRequests,
-                            WebDavRequests = b.WebDavRequests, RejectedRequests = b.RejectedRequests,
-                            LastSeenUtc = b.LastSeenUtc, LastPath = b.LastPath,
-                        });
-                throw;
+                // A failure keeps the increments for the next flush; nothing is counted twice.
+                await repository.AddLockoutRepeatsAsync(new Dictionary<long, int>(_repeats.PendingRepeats), ct);
+                _repeats.RepeatsSaved();
             }
         }
         finally
         {
             _flushGate.Release();
+        }
+    }
+
+    private async Task SaveBatchAsync(
+        ISecurityEventRepository repository, List<LoginAttemptRecord> rows, List<ClientActivityBucket> buckets,
+        CancellationToken ct)
+    {
+        try
+        {
+            await repository.SaveAsync(rows, buckets, ct);
+        }
+        catch
+        {
+            _repeats.BatchFailed();
+            // Re-queue copies: the failed context may have touched the originals' keys.
+            foreach (var a in rows)
+                Enqueue(new LoginAttemptRecord
+                {
+                    AtUtc = a.AtUtc, Channel = a.Channel, Username = a.Username, Address = a.Address,
+                    Outcome = a.Outcome, LockedUntilUtc = a.LockedUntilUtc, RepeatCount = a.RepeatCount,
+                });
+            lock (_bucketLock)
+                foreach (var b in buckets)
+                    Merge(new ClientActivityBucket
+                    {
+                        Address = b.Address, HourUtc = b.HourUtc, ApiRequests = b.ApiRequests,
+                        WebDavRequests = b.WebDavRequests, RejectedRequests = b.RejectedRequests,
+                        LastSeenUtc = b.LastSeenUtc, LastPath = b.LastPath,
+                    });
+            throw;
         }
     }
 
@@ -234,7 +262,8 @@ public sealed class SecurityMonitorFlushService(
 /// login service, so the web login, the REST API, WebDAV and the own-password check are all
 /// covered without touching their call sites. The transport is read from the current
 /// request path; Blazor circuits have no API/WebDAV path and count as web.
-/// A lockout also raises the <c>security.account_locked</c> notification, once per lock.
+/// A lockout raises a notification, once per lock: <c>security.account_locked</c> for an
+/// account, <c>security.address_locked</c> for a client address.
 /// </summary>
 public sealed class MonitoredLoginService(
     ILoginService inner,
@@ -251,11 +280,20 @@ public sealed class MonitoredLoginService(
     public async Task<LoginResult> AuthenticateAsync(string username, string password, string? remoteAddress = null, string? host = null)
     {
         var result = await inner.AuthenticateAsync(username, password, remoteAddress, host);
-        monitor.RecordLogin(SecurityMonitorMiddleware.ChannelOf(http.HttpContext?.Request.Path), username, remoteAddress, result);
+        var channel = SecurityMonitorMiddleware.ChannelOf(http.HttpContext?.Request.Path);
+        monitor.RecordLogin(channel, username, remoteAddress, result);
         if (result.Outcome == LoginOutcome.LockedOut && notifications is not null)
         {
             // A notification must never affect the login result (the publisher itself never throws).
-            try { await NotifyLockedAsync(username, remoteAddress, result.RetryAfter); }
+            try
+            {
+                // A locked address locks no account: notifying (and looking up) every user name
+                // tried from it would tell real users their account is locked when it is not.
+                if (result.LockScope == LockoutScope.Address)
+                    await NotifyAddressLockedAsync(remoteAddress, channel, result.RetryAfter);
+                else
+                    await NotifyLockedAsync(username, remoteAddress, result.RetryAfter);
+            }
             catch (Exception) { /* user lookup failed; the lock itself is already in effect */ }
         }
         return result;
@@ -264,14 +302,32 @@ public sealed class MonitoredLoginService(
     private async Task NotifyLockedAsync(string username, string? remoteAddress, TimeSpan retryAfter)
     {
         var key = username.Trim();
-        var now = DateTime.UtcNow;
-        if (LockNotifiedUntil.TryGetValue(key, out var until) && until > now) return;
-        if (LockNotifiedUntil.Count > 10_000) LockNotifiedUntil.Clear();
-        LockNotifiedUntil[key] = now + retryAfter;
+        if (!IsFirstOfLock(key, retryAfter)) return;
 
         // Unknown user names still notify the security administrators, just without an affected user.
         var user = users is null ? null : await users.GetByUsernameAsync(key);
         await notifications!.PublishAsync(NotificationEvents.AccountLocked(user?.Id, key, remoteAddress, retryAfter));
+    }
+
+    private async Task NotifyAddressLockedAsync(string? remoteAddress, SecurityChannel channel, TimeSpan retryAfter)
+    {
+        // An address lock needs a known address; without one there is nothing to report.
+        var address = remoteAddress?.Trim();
+        if (string.IsNullOrEmpty(address)) return;
+        // Leading "|" cannot start a user name, so this never collides with an account key.
+        if (!IsFirstOfLock("|ip|" + address, retryAfter)) return;
+
+        await notifications!.PublishAsync(NotificationEvents.AddressLocked(address, channel, retryAfter));
+    }
+
+    /// <summary>True for the first LockedOut of a lock of <paramref name="key"/>; remembers the lock until it ends.</summary>
+    private static bool IsFirstOfLock(string key, TimeSpan retryAfter)
+    {
+        var now = DateTime.UtcNow;
+        if (LockNotifiedUntil.TryGetValue(key, out var until) && until > now) return false;
+        if (LockNotifiedUntil.Count > 10_000) LockNotifiedUntil.Clear();
+        LockNotifiedUntil[key] = now + retryAfter;
+        return true;
     }
 }
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Kaimo_File_Server.Core.Domain.Notifications;
+using Kaimo_File_Server.Core.Security;
 using C = Kaimo_File_Server.Core.Services.Notifications.NotificationEventCatalog;
 using R = Kaimo_File_Server.Core.Services.Notifications.NotificationContextRoles;
 
@@ -41,6 +42,16 @@ public static class NotificationEvents
         => Build(C.AccountLocked, null, Roles((R.Affected, userId)),
             [("user.username", username), ("remoteAddress", remoteAddress ?? "-"), ("lockedMinutes", Math.Max(1, (int)Math.Ceiling(lockedFor.TotalMinutes)).ToString())],
             userId is null ? "lock:unknown-user" : "lock:" + username.Trim().ToLowerInvariant());
+
+    /// <remarks>
+    /// All address locks share one dedup key: a distributed attack locks many addresses, and
+    /// the throttle must turn that into one mail per window, not one per address.
+    /// </remarks>
+    public static NotificationEvent AddressLocked(string remoteAddress, SecurityChannel channel, TimeSpan lockedFor)
+        => Build(C.AddressLocked, null, Roles(),
+            [("remoteAddress", remoteAddress), ("lockedMinutes", Math.Max(1, (int)Math.Ceiling(lockedFor.TotalMinutes)).ToString()),
+             ("channel", channel switch { SecurityChannel.Api => "API", SecurityChannel.WebDav => "WebDAV", _ => "Web" })],
+            "lock:address");
 
     public static NotificationEvent UploadReceived(Guid linkId, string linkName, Guid creatorId, string fileName, long size)
         => Build(C.UploadReceived, null, Roles((R.LinkCreator, creatorId)),
