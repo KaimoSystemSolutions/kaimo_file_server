@@ -29,6 +29,8 @@ public sealed class LogViewerViewModel(
     public static int MaxPages => MaxFetch / PageSize;
 
     private readonly SemaphoreSlim _queryGate = new(1, 1);
+    // The authorized viewer; every download token is bound to this user.
+    private Guid _actorId;
     private readonly List<string> _excludedMessagePrefixes = [];
 
     public IReadOnlyList<string> Sources { get; private set; } = [];
@@ -204,7 +206,7 @@ public sealed class LogViewerViewModel(
     {
         if (!IsAuthorized)
             return "";
-        var token = Uri.EscapeDataString(downloadTokens.Protect(CreateQuery()));
+        var token = Uri.EscapeDataString(downloadTokens.Protect(CreateQuery(), _actorId));
         return $"{baseUri.TrimEnd('/')}/api/system-logs/download?token={token}&format={Uri.EscapeDataString(format)}";
     }
 
@@ -226,7 +228,10 @@ public sealed class LogViewerViewModel(
         if (string.IsNullOrEmpty(username))
             return false;
         var actor = await userContextFactory.CreateByUsernameAsync(username);
-        return actor is not null
-            && await managementAuth.HasGlobalPermissionAsync(actor, ManagementPermission.ViewSystemLogs);
+        if (actor is null
+            || !await managementAuth.HasGlobalPermissionAsync(actor, ManagementPermission.ViewSystemLogs))
+            return false;
+        _actorId = actor.User.Id;
+        return true;
     }
 }

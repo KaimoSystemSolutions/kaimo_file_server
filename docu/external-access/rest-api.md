@@ -2,7 +2,7 @@
 
 > **Audience:** Native client apps — Android, iOS, and desktop (Linux/Windows/macOS)
 > **Base path:** `/api/v1`
-> **Transport:** REST/JSON over HTTPS, JWT bearer auth
+> **Transport:** REST/JSON over HTTPS only (plain HTTP → `426 https_required`), JWT bearer auth
 > **OpenAPI document:** `GET /openapi/v1.json` (use it to generate a typed client per platform)
 > **Controllers:** `src/Kaimo_File_Server.Web/Controllers/Api/` (`AuthApiController`, `BrowseApiController`, `SearchApiController`, `SyncApiController`)
 
@@ -267,10 +267,15 @@ Common codes: `unauthorized` (401), `forbidden` (403), `not_found` (404),
 `invalid_query` / `invalid_modified_at` / `invalid_created_at` / `invalid_target` (400),
 `precondition_failed` (412), `idempotency_key_conflict` (422), `conflict` / `target_exists` /
 `type_mismatch` / `sync_root_renamed` (409), `sync_root_missing` (404), `locked_out` /
-`rate_limited` (429), `search_timeout` (503). Clients should branch on `code`, not on `message` (the message
+`rate_limited` (429), `https_required` (426), `search_timeout` (503). Clients should branch on `code`, not on `message` (the message
 is an English developer hint; user-facing text is localized in the app). A body or
 parameter that cannot be bound at all (malformed JSON, wrong types, invalid GUIDs)
 yields `invalid_request` (400) in the same envelope.
+
+`https_required` (426, with `Upgrade: TLS/1.2, HTTP/1.1`) is returned for **every** `/api/v1`
+request that arrives over plain HTTP — before credentials or the bearer token are checked. It is
+not configurable. Behind a TLS-terminating reverse proxy the proxy must be trusted
+(`ForwardedHeaders:KnownProxies`/`KnownNetworks`) and send `X-Forwarded-Proto: https`.
 
 > **OpenAPI note.** The generated `/openapi/v1.json` describes the routes, bodies, and
 > success shapes. The opt-in `If-Match` / `If-None-Match` / `Idempotency-Key` headers

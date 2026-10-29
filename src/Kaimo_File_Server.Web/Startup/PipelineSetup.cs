@@ -14,19 +14,7 @@ internal static class PipelineSetup
         // carries the security headers (CSP, nosniff, referrer and framing policy).
         app.UseMiddleware<SecurityHeadersMiddleware>();
 
-        // Resolve the real client scheme/IP from the reverse proxy before anything reads
-        // Request.IsHttps (HSTS, the HTTPS redirect, the session cookie endpoints and the
-        // WebDAV Basic handler's HTTPS requirement all depend on it).
-        app.UseForwardedHeaders();
-
-        // Browsers on plain HTTP are sent to HTTPS: the session cookie is Secure-only and the
-        // password must not cross the network in clear text. The client API and WebDAV are
-        // excluded — native clients do not follow redirects for uploads, and WebDAV has its
-        // own HTTPS requirement (services.webdav.requireHttps).
-        app.UseWhen(
-            context => !context.Request.Path.StartsWithSegments("/api/v1")
-                       && !context.Request.Path.StartsWithSegments(WebDavPathResolver.Prefix),
-            branch => branch.UseHttpsRedirection());
+        app.UseTransportSecurity();
 
         if (app.Environment.IsDevelopment())
         {
@@ -110,5 +98,33 @@ internal static class PipelineSetup
             .AddInteractiveServerRenderMode();
 
         app.UseMiddleware<ConfigLocalizationMiddleware>();
+    }
+
+    /// <summary>
+    /// Scheme handling for every request: trusted forwarded headers, the browser HTTPS redirect
+    /// and the client-API HTTPS requirement. Runs before authentication, so a plain-HTTP API
+    /// request is rejected before any password hash or token is checked.
+    /// </summary>
+    internal static void UseTransportSecurity(this IApplicationBuilder app)
+    {
+        // Resolve the real client scheme/IP from the reverse proxy before anything reads
+        // Request.IsHttps (HSTS, the HTTPS redirect, the session cookie endpoints and the
+        // WebDAV Basic handler's HTTPS requirement all depend on it).
+        app.UseForwardedHeaders();
+
+        // Browsers on plain HTTP are sent to HTTPS: the session cookie is Secure-only and the
+        // password must not cross the network in clear text. The client API and WebDAV are
+        // excluded — native clients do not follow redirects for uploads; the API is rejected
+        // below instead, and WebDAV has its own HTTPS requirement (services.webdav.requireHttps).
+        app.UseWhen(
+            context => !context.Request.Path.StartsWithSegments(ApiHttpsRequirementMiddleware.PathPrefix)
+                       && !context.Request.Path.StartsWithSegments(WebDavPathResolver.Prefix),
+            branch => branch.UseHttpsRedirection());
+
+        // The client API always requires HTTPS (426 otherwise); there is no setting to turn it
+        // off. Behind a TLS-terminating proxy the proxy must be trusted and send X-Forwarded-Proto.
+        app.UseWhen(
+            context => context.Request.Path.StartsWithSegments(ApiHttpsRequirementMiddleware.PathPrefix),
+            branch => branch.UseMiddleware<ApiHttpsRequirementMiddleware>());
     }
 }

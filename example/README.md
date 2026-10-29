@@ -8,7 +8,7 @@ else like secrets, data layout, backups, reverse proxy, troubleshooting you find
 
 | Service | Description | Exposed on host |
 | --- | --- | --- |
-| `web` | Web UI and REST/sync API | `8081` (HTTP), `8443` (HTTPS) |
+| `web` | Web UI and REST/sync API | `8443` (HTTPS) |
 | `samba` | Native SMB file access | `445` |
 | `host` | Background worker; owns the database schema | — |
 | `smb-bridge` | Authorization and configuration control plane for Samba | — |
@@ -72,5 +72,5 @@ See [`DETAILS.md`](DETAILS.md) for:
 - [Data & persistence](DETAILS.md#-data--persistence) and [storage pools](DETAILS.md#storage-pools)
 - [Database backup & restore](DETAILS.md#️-database-backup--restore)
 - [Search](DETAILS.md#-search-elasticsearch) and [mail notifications](DETAILS.md#️-mail-notifications)
-- [Reverse proxy](DETAILS.md#-behind-a-reverse-proxy) and [plain HTTP port 8081](DETAILS.md#-plain-http-port-8081)
+- [Reverse proxy](DETAILS.md#-behind-a-reverse-proxy) and [plain HTTP port 8080](DETAILS.md#-plain-http-port-8080)
 - [Troubleshooting](DETAILS.md#-troubleshooting)

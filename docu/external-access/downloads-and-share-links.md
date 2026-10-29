@@ -37,7 +37,13 @@ sequenceDiagram
 | `GET /api/public/download` | `PublicDownloadTicketStore` | Files of a public share link, streamed under the link creator's identity |
 | `GET /api/cloud-access/download` | `CloudAccessDownloadTicketStore` | One file of a Cloud Access virtual share |
 | `GET /api/database-backups/download` | `BackupDownloadTokenService` | A database backup archive (Data Protection-signed token, 2 min, single use) |
-| `GET /api/system-logs/download` | – | Log archive export for authorized administrators |
+| `GET /api/system-logs/download` | `LogDownloadTokenService` | Log archive export of one UTC day (Data Protection-signed token, 2 min, single use) |
+
+The backup and log tokens are bound to the user who requested them. On download the controller
+re-checks that this user still exists, is enabled and still holds `ManageBackups` or
+`ViewSystemLogs` globally; a replayed, expired or tampered token gets `401`, a revoked permission
+`403`. A disabled account gets `403` from the log download and `401` from the backup download.
+Both endpoints answer `403` on a read-only demo.
 
 The file, ZIP, public and Cloud Access tickets live in process-local `ConcurrentDictionary` stores
 and expire after five minutes (`src/Kaimo_File_Server.Web/Services/*TicketStore.cs`).

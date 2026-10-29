@@ -137,7 +137,10 @@ services:
     restart: unless-stopped
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Web.dll"]
     ports:
-      - "8081:8080"
+      # Plain HTTP is not published: the client API (/api/v1) refuses it with 426 and browsers
+      # are redirected to HTTPS anyway. Only re-enable it for a TLS-terminating reverse proxy
+      # on this host, bound to loopback (see DETAILS.md "Plain HTTP port 8080"):
+      # - "127.0.0.1:8081:8080"
       - "8443:8443"
     environment:
       <<: *dotnet-environment

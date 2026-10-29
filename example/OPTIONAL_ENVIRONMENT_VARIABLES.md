@@ -44,8 +44,9 @@ Add these variables to `web`.
 | `Jwt__ExpirationHours` | `24` | Login-token lifetime in hours. |
 | `GoogleOAuth__ClientId` | Image default | Overrides the Google OAuth client ID. |
 | `GoogleOAuth__ClientSecret` | Image default | Overrides the Google OAuth client secret. |
-| `ForwardedHeaders__KnownProxies__0` | Empty | Address of a reverse proxy allowed to set `X-Forwarded-For`/`-Proto`. Add `__1`, `__2`, … for more. Needed for every proxy that is not on loopback — also one in the same Docker network or LAN; see [Behind a reverse proxy](DETAILS.md#-behind-a-reverse-proxy). |
+| `ForwardedHeaders__KnownProxies__0` | Empty | Address of a reverse proxy allowed to set `X-Forwarded-For`/`-Proto`. Add `__1`, `__2`, … for more. Needed for every proxy that is not on loopback — also one in the same Docker network or LAN; see [Behind a reverse proxy](DETAILS.md#-behind-a-reverse-proxy). A proxy that forwards to plain HTTP (`8080`) must be listed, otherwise the client API answers every request with `426` (see [Plain HTTP port 8080](DETAILS.md#-plain-http-port-8080)). |
 | `ForwardedHeaders__KnownNetworks__0` | Empty (= loopback only) | Trusted proxy range in CIDR notation, e.g. `172.18.0.0/16`. Setting this or `KnownProxies` replaces the loopback default. |
+| `HttpsRedirection__HttpsPort` | `8443` | Public HTTPS port browsers on plain HTTP are redirected to. Set it when HTTPS is published under another port or a reverse proxy serves it on `443`. The client API is never redirected; it rejects plain HTTP with `426`. |
 | `KAIMO_ACCESS_RESTRICTIONS_DISABLED` | `false` | Set to `true` to ignore every access restriction rule (Settings → Access restrictions), e.g. after locking yourself out. Remove it again afterwards. |
 | `Security__EventRetentionDays` | `365` | Days that login attempts and per-client API/WebDAV activity (tables `login_attempts`, `client_activity`) are kept for the security overview. |
 

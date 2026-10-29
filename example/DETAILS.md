@@ -7,7 +7,7 @@ search, mail, reverse proxy and troubleshooting.
 
 | Service | Description | Exposed on host |
 | --- | --- | --- |
-| `web` | Web UI and REST/sync API | `8081` (HTTP), `8443` (HTTPS) |
+| `web` | Web UI and REST/sync API | `8443` (HTTPS) |
 | `samba` | Native SMB file access | `445` |
 | `host` | Background worker; owns the database schema | — |
 | `smb-bridge` | Authorization and configuration control plane for Samba | — |
@@ -193,8 +193,8 @@ in which **every** host is a trusted proxy. Recreate the service afterwards:
 
 Signs that your proxy is not trusted:
 
-- WebDAV clients get `426 Upgrade Required` although you connect via `https://`
-  (the server sees plain HTTP from the proxy).
+- Desktop/sync clients (client API) and WebDAV clients get `426 Upgrade Required`
+  although you connect via `https://` (the server sees plain HTTP from the proxy).
 - A few failed logins lock out *every* user of an account at once, because all
   requests appear to come from the proxy's address. Login lockout is tracked per
   user **and** client address, so with a trusted proxy a stranger guessing a
@@ -210,25 +210,58 @@ of ten times the per-address attempt limit. Guessing spread over many (real or
 forged) addresses therefore locks the account temporarily instead of going on
 indefinitely.
 
-## 🔓 Plain HTTP port 8081
+## 🔓 Plain HTTP port 8080
 
-Port `8081` is unencrypted. Browsers opening the web UI there are redirected
-to HTTPS (`https://<host>:8443`), because the login session cookie is only
-ever sent over HTTPS. If you publish HTTPS under a different port, set
-`HttpsRedirection__HttpsPort` on the `web` service to that port.
+`web` serves HTTPS on `8443` and plain HTTP on container port `8080`. The
+example stack publishes **only `8443`**; `8080` is reachable from other
+containers in the Compose network, but not from the host or the LAN.
 
-The client API (`/api/v1`) and WebDAV (`/dav`) are **not** redirected on
-`8081`: their credentials cross the network in clear text there. Use it only
-in a network you fully trust, or remove the `8081` mapping from
-`docker-compose.yml` if you do not need it.
+What happens on plain HTTP:
 
-**Behind a reverse proxy** that forwards to `8081`, the proxy must be trusted
-(see above) and send `X-Forwarded-Proto: https` — otherwise every page request
-is redirected again (redirect loop). Access restriction rules that allow a
-domain (Settings → Access restrictions) need the original `Host` header, so let
-the proxy pass it through (nginx: `proxy_set_header Host $host;`). If the proxy rewrites the `Host` header,
-also list the public URL so the browser connection is accepted:
+- **Browsers** opening the web UI are redirected to HTTPS
+  (`https://<host>:8443`), because the login session cookie is only ever sent
+  over HTTPS. If you publish HTTPS under a different port, set
+  `HttpsRedirection__HttpsPort` on the `web` service to that port.
+- **The client API (`/api/v1`)** always requires HTTPS. A request over plain
+  HTTP — including login, token refresh and every bearer-authenticated call —
+  is answered with `426 Upgrade Required` and the error code
+  `https_required`, before any password or token is checked. There is no
+  setting to turn this off. Native clients must use the `https://` address.
+- **WebDAV (`/dav`)** keeps its own setting: Basic authentication over plain
+  HTTP is refused with `426` while `services.webdav.requireHttps` is on (the
+  default).
+
+**Behind a reverse proxy** that terminates TLS and forwards to `8080`, the
+proxy must be trusted (see [Behind a reverse proxy](#-behind-a-reverse-proxy))
+and send `X-Forwarded-Proto: https`. Otherwise every page request is
+redirected again (redirect loop) and every client-API request gets `426`.
+Access restriction rules that allow a domain (Settings → Access restrictions)
+need the original `Host` header, so let the proxy pass it through (nginx:
+`proxy_set_header Host $host;`). If the proxy rewrites the `Host` header, also
+list the public URL so the browser connection is accepted:
 `Web__AllowedOrigins: https://files.example.com`.
+
+- **Proxy container in the same Compose network:** forward to `web:8080`
+  directly; no port needs to be published.
+- **Proxy on the Docker host itself:** re-enable the commented mapping in
+  `docker-compose.yml`, bound to loopback only, and recreate the service with
+  `docker compose up -d web`:
+
+  ```yaml
+  services:
+    web:
+      ports:
+        - "127.0.0.1:8081:8080"
+        - "8443:8443"
+  ```
+
+  Docker forwards such connections through its userland proxy, so `web` sees
+  the bridge gateway (e.g. `172.18.0.1`) as the peer, not `127.0.0.1`. List
+  that address in `ForwardedHeaders__KnownProxies__0`; give the Compose network
+  a fixed subnet so the gateway address does not change.
+
+Never publish `8080` on a public or untrusted interface: browsers would be
+redirected, but anything else sent there crosses the network in clear text.
 
 ## 🩺 Troubleshooting
 

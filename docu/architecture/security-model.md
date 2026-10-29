@@ -92,7 +92,10 @@ attribute and non-HTTPS writes). Its expiry equals the token's `exp` (`Jwt:Expir
   the open circuit while the page is open, so the nonce-based Content-Security-Policy remains the
   primary XSS defence.
 - **Plain HTTP.** Browser requests on HTTP are redirected to HTTPS (`HttpsRedirection:HttpsPort`,
-  default `Kestrel:HttpsPort`); `/api/v1` and `/dav` are not redirected.
+  default `Kestrel:HttpsPort`); `/api/v1` and `/dav` are not redirected. The client API (`/api/v1`)
+  always rejects plain HTTP with `426 Upgrade Required` (`ApiError("https_required")`,
+  `ApiHttpsRequirementMiddleware`), after the forwarded headers and before authentication, so no
+  password or token is checked. WebDAV enforces HTTPS itself (`services.webdav.requireHttps`).
 
 The client API and WebDAV are unaffected: their credentials (Authorization header) are never sent by
 a browser on its own, the API has no CORS policy and accepts JSON bodies only, and `/dav` rejects
