@@ -203,6 +203,44 @@ public partial class LoginProtectionSettingsTabTests
     }
 
     [Fact]
+    public void EveryCard_HasAHeaderIcon()
+    {
+        using var ctx = new BunitContext();
+        var cut = Render(ctx, canManage: true);
+
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("input")), Timeout);
+        Assert.All(cut.FindAll(".detail-section"), section =>
+            Assert.NotNull(section.QuerySelector(".login-protection-card-head .tile-icon svg")));
+    }
+
+    // Each number field is one row (icon | label + hint | input), so a label or hint that wraps
+    // only grows its own row instead of shifting the inputs of neighbouring fields.
+    [Fact]
+    public void EveryNumberField_IsARowWithIconTextAndControl()
+    {
+        using var ctx = new BunitContext();
+        var cut = Render(ctx, canManage: true);
+
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("input")), Timeout);
+        var fields = cut.FindAll(".login-protection-field");
+        Assert.Equal(10, fields.Count);
+        Assert.All(fields, field =>
+        {
+            Assert.NotNull(field.QuerySelector(".login-protection-field-icon svg"));
+            Assert.NotNull(field.QuerySelector(".login-protection-field-text label"));
+            Assert.NotNull(field.QuerySelector(".login-protection-field-control input[type='number']"));
+        });
+    }
+
+    [Fact]
+    public void NumberField_RequiresIcon()
+    {
+        var icon = typeof(LoginProtectionNumberField).GetProperty("Icon");
+
+        Assert.NotNull(icon?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Components.EditorRequiredAttribute), false).SingleOrDefault());
+    }
+
+    [Fact]
     public void SearchDestination_DoesNotPromiseTheApiRateLimit()
     {
         var destination = Assert.Single(SearchDestinations.All, d => d.Url == "/settings?tab=loginprotection");

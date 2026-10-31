@@ -4,11 +4,25 @@
     gap: var(--space-2);
 }
 
-.login-protection-fields {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: var(--space-4);
+/* One card per protected area (same surface as the file-service cards). */
+.login-protection-card {
     max-width: 820px;
+    margin-bottom: var(--space-4);
+    padding: var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-tertiary);
+}
+
+.login-protection-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+.login-protection-card-titles {
+    min-width: 0;
 }
 
 .login-protection-heading {
@@ -18,22 +32,39 @@
     gap: var(--space-2);
 }
 
-.login-protection-pending {
-    max-width: 640px;
-    margin: 0 0 var(--space-4);
+.login-protection-card-title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 15px;
+    font-weight: 650;
+    color: var(--text-primary);
 }
 
-.login-protection-note {
-    max-width: 640px;
-    margin-top: var(--space-4);
+.login-protection-card-desc {
+    margin: 2px 0 0;
+    font-size: 12.5px;
+    color: var(--text-secondary);
 }
 
-.login-protection-toggle {
-    max-width: 640px;
+/* Rows separate themselves with a top border; the last row needs no extra space below. */
+.login-protection-fields ::deep .login-protection-field:last-child {
+    padding-bottom: 0;
+}
+
+.login-protection-pending,
+.login-protection-toggle,
+.login-protection-warning {
     margin: 0 0 var(--space-3);
 }
 
-.login-protection-warning {
-    max-width: 640px;
-    margin-bottom: var(--space-4);
+@media (max-width: 600px) {
+    .login-protection-card {
+        padding: var(--space-3);
+    }
+}
+
+.login-protection-note {
+    margin: var(--space-3) 0 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
 }

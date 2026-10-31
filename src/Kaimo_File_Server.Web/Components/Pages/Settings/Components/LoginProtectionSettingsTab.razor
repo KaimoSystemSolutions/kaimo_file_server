@@ -1,13 +1,16 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Security
 @using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
 @inject LoginProtectionSettingsViewModel VM
 
 @*
     Settings tab for brute-force protection: thresholds of the credential login (web UI, client
     API, WebDAV), of share-link passwords and of the SMB account lockout. One save writes all
     values; out-of-range fields are marked individually. The share-link and SMB values are stored
-    but not enforced yet, which both cards state with a badge and a note.
+    but not enforced yet, which both cards state with a badge and a note. Each area is a card with
+    an icon header; field icons name what is counted (user, address, link) or limited (duration).
 *@
 
 @if (VM.IsLoading)
@@ -27,56 +30,55 @@ else
         <InfoButton Text="@R("Web_LoginProtection_LockoutRiskHint")" />
     </p>
 
-    <div class="detail-section">
-        <span class="detail-label">@R("Web_LoginProtection_Login_Title")</span>
-        <p class="settings-description">@R("Web_LoginProtection_Login_Desc")</p>
+    <section class="detail-section login-protection-card">
+        @CardHead("devices.svg", "Web_LoginProtection_Login_Title", "Web_LoginProtection_Login_Desc", notYetEffective: false)
         <div class="admin-compact login-protection-fields">
-            <LoginProtectionNumberField Id="login-protection-max-attempts" Label="@R("Web_LoginProtection_MaxAttempts")"
+            <LoginProtectionNumberField Id="login-protection-max-attempts" Icon="user.svg"
+                                        Label="@R("Web_LoginProtection_MaxAttempts")"
                                         Hint="@R("Web_LoginProtection_MaxAttempts_Hint")" Max="LoginProtectionSettings.MaxAttemptsLimit"
                                         Error="@VM.ErrorFor(nameof(VM.MaxAttempts))" @bind-Value="VM.MaxAttempts" />
-            <LoginProtectionNumberField Id="login-protection-lockout-minutes" Label="@R("Web_LoginProtection_LockoutMinutes")"
+            <LoginProtectionNumberField Id="login-protection-lockout-minutes" Icon="history.svg"
+                                        Label="@R("Web_LoginProtection_LockoutMinutes")"
                                         Hint="@R("Web_LoginProtection_LockoutMinutes_Hint")" Max="LoginProtectionSettings.MaxLockoutMinutes"
                                         Error="@VM.ErrorFor(nameof(VM.LockoutMinutes))" @bind-Value="VM.LockoutMinutes" />
-            <LoginProtectionNumberField Id="login-protection-account-factor" Label="@R("Web_LoginProtection_AccountWideFactor")"
+            <LoginProtectionNumberField Id="login-protection-account-factor" Icon="hash.svg"
+                                        Label="@R("Web_LoginProtection_AccountWideFactor")"
                                         Hint="@AccountWideFactorHint"
                                         Max="LoginProtectionSettings.MaxAccountWideFactor"
                                         Error="@VM.ErrorFor(nameof(VM.AccountWideFactor))" @bind-Value="VM.AccountWideFactor" />
-            <LoginProtectionNumberField Id="login-protection-ip-max-attempts" Label="@R("Web_LoginProtection_IpMaxAttempts")"
+            <LoginProtectionNumberField Id="login-protection-ip-max-attempts" Icon="globe.svg"
+                                        Label="@R("Web_LoginProtection_IpMaxAttempts")"
                                         Hint="@R("Web_LoginProtection_IpMaxAttempts_Hint")" Max="LoginProtectionSettings.MaxAttemptsLimit"
                                         Error="@VM.ErrorFor(nameof(VM.IpMaxAttempts))" @bind-Value="VM.IpMaxAttempts" />
-            <LoginProtectionNumberField Id="login-protection-ip-lockout-minutes" Label="@R("Web_LoginProtection_IpLockoutMinutes")"
+            <LoginProtectionNumberField Id="login-protection-ip-lockout-minutes" Icon="history.svg"
+                                        Label="@R("Web_LoginProtection_IpLockoutMinutes")"
                                         Hint="@R("Web_LoginProtection_IpLockoutMinutes_Hint")" Max="LoginProtectionSettings.MaxLockoutMinutes"
                                         Error="@VM.ErrorFor(nameof(VM.IpLockoutMinutes))" @bind-Value="VM.IpLockoutMinutes" />
         </div>
         <p class="form-hint login-protection-note">@R("Web_LoginProtection_ProxyHint")</p>
-    </div>
+    </section>
 
-    <div class="detail-section">
-        <div class="login-protection-heading">
-            <span class="detail-label">@R("Web_LoginProtection_ShareLink_Title")</span>
-            <StatusBadge Tone="StatusTone.Warning" Label="@R("Web_LoginProtection_NotYetEffective")" />
-        </div>
-        <p class="settings-description">@R("Web_LoginProtection_ShareLink_Desc")</p>
+    <section class="detail-section login-protection-card">
+        @CardHead("share.svg", "Web_LoginProtection_ShareLink_Title", "Web_LoginProtection_ShareLink_Desc", notYetEffective: true)
         <p class="form-hint login-protection-pending">@ShareLinkPendingNote</p>
         <div class="admin-compact login-protection-fields">
-            <LoginProtectionNumberField Id="login-protection-link-per-address" Label="@R("Web_LoginProtection_ShareLinkPerAddress")"
+            <LoginProtectionNumberField Id="login-protection-link-per-address" Icon="globe.svg"
+                                        Label="@R("Web_LoginProtection_ShareLinkPerAddress")"
                                         Hint="@R("Web_LoginProtection_ShareLinkPerAddress_Hint")" Max="LoginProtectionSettings.MaxAttemptsLimit"
                                         Error="@VM.ErrorFor(nameof(VM.ShareLinkMaxAttemptsPerAddress))" @bind-Value="VM.ShareLinkMaxAttemptsPerAddress" />
-            <LoginProtectionNumberField Id="login-protection-link-per-link" Label="@R("Web_LoginProtection_ShareLinkPerLink")"
+            <LoginProtectionNumberField Id="login-protection-link-per-link" Icon="share.svg"
+                                        Label="@R("Web_LoginProtection_ShareLinkPerLink")"
                                         Hint="@R("Web_LoginProtection_ShareLinkPerLink_Hint")" Max="LoginProtectionSettings.MaxAttemptsLimit"
                                         Error="@VM.ErrorFor(nameof(VM.ShareLinkMaxAttemptsPerLink))" @bind-Value="VM.ShareLinkMaxAttemptsPerLink" />
-            <LoginProtectionNumberField Id="login-protection-link-lockout-minutes" Label="@R("Web_LoginProtection_LockoutMinutes")"
+            <LoginProtectionNumberField Id="login-protection-link-lockout-minutes" Icon="history.svg"
+                                        Label="@R("Web_LoginProtection_LockoutMinutes")"
                                         Hint="@R("Web_LoginProtection_ShareLinkLockoutMinutes_Hint")" Max="LoginProtectionSettings.MaxLockoutMinutes"
                                         Error="@VM.ErrorFor(nameof(VM.ShareLinkLockoutMinutes))" @bind-Value="VM.ShareLinkLockoutMinutes" />
         </div>
-    </div>
+    </section>
 
-    <div class="detail-section">
-        <div class="login-protection-heading">
-            <span class="detail-label">@R("Web_LoginProtection_Smb_Title")</span>
-            <StatusBadge Tone="StatusTone.Warning" Label="@R("Web_LoginProtection_NotYetEffective")" />
-        </div>
-        <p class="settings-description">@R("Web_LoginProtection_Smb_Desc")</p>
+    <section class="detail-section login-protection-card">
+        @CardHead("connection_smb.svg", "Web_LoginProtection_Smb_Title", "Web_LoginProtection_Smb_Desc", notYetEffective: true)
         <p class="form-hint login-protection-pending">@R("Web_LoginProtection_Smb_Pending")</p>
         <div class="toggle-row login-protection-toggle">
             <span class="toggle-label-text">@R("Web_LoginProtection_Smb_Enabled")</span>
@@ -87,16 +89,18 @@ else
         </div>
         <div class="warning-banner login-protection-warning">@R("Web_LoginProtection_Smb_GlobalWarning")</div>
         <div class="admin-compact login-protection-fields">
-            <LoginProtectionNumberField Id="login-protection-smb-attempts" Label="@R("Web_LoginProtection_SmbAttempts")"
+            <LoginProtectionNumberField Id="login-protection-smb-attempts" Icon="user.svg"
+                                        Label="@R("Web_LoginProtection_SmbAttempts")"
                                         Hint="@R("Web_LoginProtection_SmbAttempts_Hint")" Max="LoginProtectionSettings.MaxAttemptsLimit"
                                         Disabled="!VM.SmbLockoutEnabled"
                                         Error="@VM.ErrorFor(nameof(VM.SmbLockoutAttempts))" @bind-Value="VM.SmbLockoutAttempts" />
-            <LoginProtectionNumberField Id="login-protection-smb-lockout-minutes" Label="@R("Web_LoginProtection_LockoutMinutes")"
+            <LoginProtectionNumberField Id="login-protection-smb-lockout-minutes" Icon="history.svg"
+                                        Label="@R("Web_LoginProtection_LockoutMinutes")"
                                         Hint="@R("Web_LoginProtection_SmbLockoutMinutes_Hint")" Max="LoginProtectionSettings.MaxLockoutMinutes"
                                         Disabled="!VM.SmbLockoutEnabled"
                                         Error="@VM.ErrorFor(nameof(VM.SmbLockoutMinutes))" @bind-Value="VM.SmbLockoutMinutes" />
         </div>
-    </div>
+    </section>
 
     <div class="settings-actions">
         <button type="button" class="btn-primary" disabled="@VM.IsSaving" @onclick="VM.SaveAsync">@Resources.Web_Settings_Button_Save</button>
@@ -117,6 +121,21 @@ else
 
     private static string ShareLinkPendingNote => string.Format(R("Web_LoginProtection_ShareLink_Pending"),
         ShareLinkService.PasswordPolicy.MaxAttempts, (int)ShareLinkService.PasswordPolicy.LockoutDuration.TotalMinutes);
+
+    private RenderFragment CardHead(string icon, string titleKey, string descKey, bool notYetEffective) =>
+        @<div class="login-protection-card-head">
+            <span class="tile-icon tile-icon--neutral" aria-hidden="true">@Assets.SVG(icon, new SvgOptions(Width: 18, Height: 18))</span>
+            <div class="login-protection-card-titles">
+                <div class="login-protection-heading">
+                    <h2 class="login-protection-card-title">@R(titleKey)</h2>
+                    @if (notYetEffective)
+                    {
+                        <StatusBadge Tone="StatusTone.Warning" Label="@R("Web_LoginProtection_NotYetEffective")" />
+                    }
+                </div>
+                <p class="login-protection-card-desc">@R(descKey)</p>
+            </div>
+        </div>;
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 }

@@ -1,26 +1,39 @@
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+
 @*
-    One numeric field of the "Login protection" tab: label, number input bounded 1..Max, hint,
-    and the validation message of the last save (marked with aria-invalid and linked through
-    aria-describedby, so screen readers announce it with the field; the tab's banner is the
-    single live alert, so several field errors are not read out at once).
+    One numeric field of the "Login protection" tab, laid out as a row: icon (what is counted or
+    limited), label and hint, then the number input bounded 1..Max in a fixed-width column, so a
+    wrapping label never shifts the inputs of other fields. The validation message of the last
+    save sits below the input (marked with aria-invalid and linked through aria-describedby, so
+    screen readers announce it with the field; the tab's banner is the single live alert, so
+    several field errors are not read out at once).
 *@
 
 <div class="form-group login-protection-field">
-    <label for="@Id">@Label</label>
-    <input id="@Id" type="number" min="1" max="@Max" class="edit-input login-protection-number"
-           value="@Value" @onchange="OnChangeAsync" disabled="@Disabled"
-           aria-invalid="@(Error is null ? null : "true")"
-           aria-describedby="@DescribedBy" />
-    @if (Error is not null)
-    {
-        <span id="@($"{Id}-error")" class="login-protection-field-error">@Error</span>
-    }
-    <span id="@($"{Id}-hint")" class="form-hint">@Hint</span>
+    <span class="login-protection-field-icon" aria-hidden="true">@Assets.SVG(Icon, new SvgOptions(Width: 16, Height: 16))</span>
+    <div class="login-protection-field-text">
+        <label for="@Id">@Label</label>
+        <span id="@($"{Id}-hint")" class="form-hint">@Hint</span>
+    </div>
+    <div class="login-protection-field-control">
+        <input id="@Id" type="number" min="1" max="@Max" class="edit-input login-protection-number"
+               value="@Value" @onchange="OnChangeAsync" disabled="@Disabled"
+               aria-invalid="@(Error is null ? null : "true")"
+               aria-describedby="@DescribedBy" />
+        @if (Error is not null)
+        {
+            <span id="@($"{Id}-error")" class="login-protection-field-error">@Error</span>
+        }
+    </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+
+    /// <summary>File name in <c>wwwroot/svg/</c>, e.g. <c>user.svg</c> for a per-user limit.</summary>
+    [Parameter, EditorRequired] public string Icon { get; set; } = string.Empty;
     [Parameter] public string? Hint { get; set; }
     [Parameter] public string? Error { get; set; }
     [Parameter, EditorRequired] public int Max { get; set; }
