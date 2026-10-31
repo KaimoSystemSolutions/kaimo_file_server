@@ -7930,4 +7930,112 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Backup_Overview_RepositoryCheckFailed" xml:space="preserve">
     <value>The integrity check on {0} found errors.</value>
   </data>
+  <data name="Web_Settings_Tab_LoginProtection" xml:space="preserve">
+    <value>Login protection</value>
+  </data>
+  <data name="Web_LoginProtection_Intro" xml:space="preserve">
+    <value>Limits how often a wrong password may be tried before further attempts are refused for a while.</value>
+  </data>
+  <data name="Web_LoginProtection_LockoutRiskHint" xml:space="preserve">
+    <value>Low values also lock out legitimate users: a mistyped password, an old password saved in a sync client or many users behind one shared address (office NAT, untrusted reverse proxy) quickly use up the budget. A lock ends by itself after the set duration; a successful login resets the counters of that user and address.</value>
+  </data>
+  <data name="Web_LoginProtection_Login_Title" xml:space="preserve">
+    <value>Web, client API and WebDAV</value>
+  </data>
+  <data name="Web_LoginProtection_Login_Desc" xml:space="preserve">
+    <value>Applies to the web sign-in, the client apps and WebDAV alike.</value>
+  </data>
+  <data name="Web_LoginProtection_MaxAttempts" xml:space="preserve">
+    <value>Failed attempts per user and address</value>
+  </data>
+  <data name="Web_LoginProtection_MaxAttempts_Hint" xml:space="preserve">
+    <value>After that, this user is locked from this address.</value>
+  </data>
+  <data name="Web_LoginProtection_LockoutMinutes" xml:space="preserve">
+    <value>Lockout duration (minutes)</value>
+  </data>
+  <data name="Web_LoginProtection_LockoutMinutes_Hint" xml:space="preserve">
+    <value>Applies to the lock per user and address and to the account-wide limit.</value>
+  </data>
+  <data name="Web_LoginProtection_AccountWideFactor" xml:space="preserve">
+    <value>Account-wide factor</value>
+  </data>
+  <data name="Web_LoginProtection_AccountWideFactor_Hint" xml:space="preserve">
+    <value>The account is locked for all addresses after {0} failed attempts (attempts per user and address × factor).</value>
+  </data>
+  <data name="Web_LoginProtection_IpMaxAttempts" xml:space="preserve">
+    <value>Failed attempts per address</value>
+  </data>
+  <data name="Web_LoginProtection_IpMaxAttempts_Hint" xml:space="preserve">
+    <value>Counts every user name tried from one address; after that, the address is locked.</value>
+  </data>
+  <data name="Web_LoginProtection_IpLockoutMinutes" xml:space="preserve">
+    <value>Address lockout duration (minutes)</value>
+  </data>
+  <data name="Web_LoginProtection_IpLockoutMinutes_Hint" xml:space="preserve">
+    <value>While locked, no account can sign in from this address.</value>
+  </data>
+  <data name="Web_LoginProtection_ProxyHint" xml:space="preserve">
+    <value>Behind a reverse proxy, every client appears with the proxy's address unless the proxy is trusted (ForwardedHeaders:KnownProxies) – a single attacker could then lock out everyone. See the reverse proxy section in example/DETAILS.md.</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLink_Title" xml:space="preserve">
+    <value>Share link passwords</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLink_Desc" xml:space="preserve">
+    <value>Limits password guessing on password-protected download and upload links.</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLinkPerAddress" xml:space="preserve">
+    <value>Wrong passwords per link and address</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLinkPerAddress_Hint" xml:space="preserve">
+    <value>After that, this address cannot try the link any more.</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLinkPerLink" xml:space="preserve">
+    <value>Wrong passwords per link</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLinkPerLink_Hint" xml:space="preserve">
+    <value>Counted across all addresses; after that, the link is locked for everyone.</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLinkLockoutMinutes_Hint" xml:space="preserve">
+    <value>How long a locked link or address stays locked.</value>
+  </data>
+  <data name="Web_LoginProtection_Smb_Title" xml:space="preserve">
+    <value>SMB (Windows file sharing)</value>
+  </data>
+  <data name="Web_LoginProtection_Smb_Desc" xml:space="preserve">
+    <value>Samba counts failed SMB logins per account, regardless of the client address.</value>
+  </data>
+  <data name="Web_LoginProtection_Smb_Enabled" xml:space="preserve">
+    <value>Lock accounts after failed SMB logins</value>
+  </data>
+  <data name="Web_LoginProtection_Smb_GlobalWarning" xml:space="preserve">
+    <value>An SMB lock applies to the account globally, from every address. Anyone who knows a user name can deliberately lock that user out of SMB.</value>
+  </data>
+  <data name="Web_LoginProtection_SmbAttempts" xml:space="preserve">
+    <value>Failed SMB logins</value>
+  </data>
+  <data name="Web_LoginProtection_SmbAttempts_Hint" xml:space="preserve">
+    <value>After that, the account is locked for SMB.</value>
+  </data>
+  <data name="Web_LoginProtection_SmbLockoutMinutes_Hint" xml:space="preserve">
+    <value>After that, the account is unlocked automatically.</value>
+  </data>
+  <data name="Web_LoginProtection_Error_Range" xml:space="preserve">
+    <value>Allowed: {0}–{1}</value>
+  </data>
+  <data name="Web_LoginProtection_Error_Invalid" xml:space="preserve">
+    <value>Please correct the marked fields.</value>
+  </data>
+  <data name="Web_LoginProtection_AccountWideFactor_HintUnknown" xml:space="preserve">
+    <value>The account is locked for all addresses after (attempts per user and address × factor) failed attempts.</value>
+  </data>
+  <data name="Web_LoginProtection_NotYetEffective" xml:space="preserve">
+    <value>Not effective yet</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLink_Pending" xml:space="preserve">
+    <value>These values are saved but only take effect in a later version. Until then a fixed limit applies: {0} wrong passwords per link (from all addresses) lock the link for {1} minutes.</value>
+  </data>
+  <data name="Web_LoginProtection_Smb_Pending" xml:space="preserve">
+    <value>These values are saved but only take effect in a later version. Until then Samba does not lock any account after failed SMB logins.</value>
+  </data>
 </root>

@@ -49,7 +49,9 @@ public sealed class ShareLinkService(
     IShareRepository? shares = null,
     IFileServiceFactory? fileServices = null)
 {
-    private static readonly LoginThrottlePolicy PasswordPolicy = new(10, TimeSpan.FromMinutes(15));
+    // Per link, across all addresses. Shown on the "Login protection" tab as the limit in force
+    // until the configurable share-link budgets of LoginProtectionSettings are wired in.
+    internal static readonly LoginThrottlePolicy PasswordPolicy = new(10, TimeSpan.FromMinutes(15));
 
     public async Task<ShareLinkSettings> GetSettingsAsync()
     {

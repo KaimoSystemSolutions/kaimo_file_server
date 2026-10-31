@@ -7930,4 +7930,112 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Backup_Overview_RepositoryCheckFailed" xml:space="preserve">
     <value>Die Integritätsprüfung am {0} hat Fehler gefunden.</value>
   </data>
+  <data name="Web_Settings_Tab_LoginProtection" xml:space="preserve">
+    <value>Anmeldeschutz</value>
+  </data>
+  <data name="Web_LoginProtection_Intro" xml:space="preserve">
+    <value>Begrenzt, wie oft ein falsches Passwort probiert werden darf, bevor weitere Versuche eine Zeit lang abgewiesen werden.</value>
+  </data>
+  <data name="Web_LoginProtection_LockoutRiskHint" xml:space="preserve">
+    <value>Niedrige Werte sperren auch berechtigte Nutzer aus: Ein Tippfehler, ein altes Passwort in einem Sync-Client oder viele Nutzer hinter einer gemeinsamen Adresse (Büro-NAT, nicht vertrauter Reverse Proxy) verbrauchen das Budget schnell. Eine Sperre endet nach der eingestellten Dauer von selbst; eine erfolgreiche Anmeldung setzt die Zähler dieses Nutzers und dieser Adresse zurück.</value>
+  </data>
+  <data name="Web_LoginProtection_Login_Title" xml:space="preserve">
+    <value>Web, Client-API und WebDAV</value>
+  </data>
+  <data name="Web_LoginProtection_Login_Desc" xml:space="preserve">
+    <value>Gilt gleichermaßen für die Web-Anmeldung, die Client-Apps und WebDAV.</value>
+  </data>
+  <data name="Web_LoginProtection_MaxAttempts" xml:space="preserve">
+    <value>Fehlversuche pro Nutzer und Adresse</value>
+  </data>
+  <data name="Web_LoginProtection_MaxAttempts_Hint" xml:space="preserve">
+    <value>Danach ist dieser Nutzer von dieser Adresse aus gesperrt.</value>
+  </data>
+  <data name="Web_LoginProtection_LockoutMinutes" xml:space="preserve">
+    <value>Sperrdauer (Minuten)</value>
+  </data>
+  <data name="Web_LoginProtection_LockoutMinutes_Hint" xml:space="preserve">
+    <value>Gilt für die Sperre pro Nutzer und Adresse und für die kontoweite Obergrenze.</value>
+  </data>
+  <data name="Web_LoginProtection_AccountWideFactor" xml:space="preserve">
+    <value>Faktor kontoweit</value>
+  </data>
+  <data name="Web_LoginProtection_AccountWideFactor_Hint" xml:space="preserve">
+    <value>Das Konto wird nach {0} Fehlversuchen für alle Adressen gesperrt (Fehlversuche pro Nutzer und Adresse × Faktor).</value>
+  </data>
+  <data name="Web_LoginProtection_IpMaxAttempts" xml:space="preserve">
+    <value>Fehlversuche pro Adresse</value>
+  </data>
+  <data name="Web_LoginProtection_IpMaxAttempts_Hint" xml:space="preserve">
+    <value>Zählt alle Nutzernamen, die von einer Adresse aus probiert werden; danach ist die Adresse gesperrt.</value>
+  </data>
+  <data name="Web_LoginProtection_IpLockoutMinutes" xml:space="preserve">
+    <value>Sperrdauer der Adresse (Minuten)</value>
+  </data>
+  <data name="Web_LoginProtection_IpLockoutMinutes_Hint" xml:space="preserve">
+    <value>Während der Sperre kann sich von dieser Adresse aus kein Konto anmelden.</value>
+  </data>
+  <data name="Web_LoginProtection_ProxyHint" xml:space="preserve">
+    <value>Hinter einem Reverse Proxy erscheinen alle Clients mit der Adresse des Proxys, solange er nicht vertraut ist (ForwardedHeaders:KnownProxies) – ein einzelner Angreifer könnte dann alle aussperren. Siehe den Abschnitt zum Reverse Proxy in example/DETAILS.md.</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLink_Title" xml:space="preserve">
+    <value>Passwörter von Freigabe-Links</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLink_Desc" xml:space="preserve">
+    <value>Begrenzt das Erraten von Passwörtern bei passwortgeschützten Download- und Upload-Links.</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLinkPerAddress" xml:space="preserve">
+    <value>Falsche Passwörter pro Link und Adresse</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLinkPerAddress_Hint" xml:space="preserve">
+    <value>Danach kann diese Adresse den Link nicht mehr ausprobieren.</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLinkPerLink" xml:space="preserve">
+    <value>Falsche Passwörter pro Link</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLinkPerLink_Hint" xml:space="preserve">
+    <value>Über alle Adressen gezählt; danach ist der Link für alle gesperrt.</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLinkLockoutMinutes_Hint" xml:space="preserve">
+    <value>Wie lange ein gesperrter Link bzw. eine gesperrte Adresse gesperrt bleibt.</value>
+  </data>
+  <data name="Web_LoginProtection_Smb_Title" xml:space="preserve">
+    <value>SMB (Windows-Dateifreigabe)</value>
+  </data>
+  <data name="Web_LoginProtection_Smb_Desc" xml:space="preserve">
+    <value>Samba zählt fehlgeschlagene SMB-Anmeldungen pro Konto, unabhängig von der Adresse des Clients.</value>
+  </data>
+  <data name="Web_LoginProtection_Smb_Enabled" xml:space="preserve">
+    <value>Konten nach fehlgeschlagenen SMB-Anmeldungen sperren</value>
+  </data>
+  <data name="Web_LoginProtection_Smb_GlobalWarning" xml:space="preserve">
+    <value>Eine SMB-Sperre gilt global für das Konto, von jeder Adresse aus. Wer einen Nutzernamen kennt, kann diesen Nutzer gezielt aus SMB aussperren.</value>
+  </data>
+  <data name="Web_LoginProtection_SmbAttempts" xml:space="preserve">
+    <value>Fehlgeschlagene SMB-Anmeldungen</value>
+  </data>
+  <data name="Web_LoginProtection_SmbAttempts_Hint" xml:space="preserve">
+    <value>Danach ist das Konto für SMB gesperrt.</value>
+  </data>
+  <data name="Web_LoginProtection_SmbLockoutMinutes_Hint" xml:space="preserve">
+    <value>Danach wird das Konto automatisch entsperrt.</value>
+  </data>
+  <data name="Web_LoginProtection_Error_Range" xml:space="preserve">
+    <value>Erlaubt: {0}–{1}</value>
+  </data>
+  <data name="Web_LoginProtection_Error_Invalid" xml:space="preserve">
+    <value>Bitte die markierten Felder korrigieren.</value>
+  </data>
+  <data name="Web_LoginProtection_AccountWideFactor_HintUnknown" xml:space="preserve">
+    <value>Das Konto wird nach (Fehlversuche pro Nutzer und Adresse × Faktor) Fehlversuchen für alle Adressen gesperrt.</value>
+  </data>
+  <data name="Web_LoginProtection_NotYetEffective" xml:space="preserve">
+    <value>Noch nicht wirksam</value>
+  </data>
+  <data name="Web_LoginProtection_ShareLink_Pending" xml:space="preserve">
+    <value>Diese Werte werden gespeichert, wirken aber erst ab einer späteren Version. Bis dahin gilt eine feste Grenze: {0} falsche Passwörter pro Link (von allen Adressen) sperren den Link für {1} Minuten.</value>
+  </data>
+  <data name="Web_LoginProtection_Smb_Pending" xml:space="preserve">
+    <value>Diese Werte werden gespeichert, wirken aber erst ab einer späteren Version. Bis dahin sperrt Samba nach fehlgeschlagenen SMB-Anmeldungen kein Konto.</value>
+  </data>
 </root>

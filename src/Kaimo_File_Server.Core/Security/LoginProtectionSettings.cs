@@ -11,6 +11,9 @@ namespace Kaimo_File_Server.Core.Security;
 ///   <item>per account, across all addresses: <see cref="MaxAttempts"/> × <see cref="AccountWideFactor"/> failures;</item>
 ///   <item>per client address, across all user names: <see cref="IpMaxAttempts"/> failures lock the address for <see cref="IpLockoutMinutes"/>.</item>
 /// </list>
+///
+/// It also carries the share-link password budgets and the SMB account lockout, which the same
+/// settings page edits; see the respective properties.
 /// </summary>
 public sealed record LoginProtectionSettings
 {
@@ -20,12 +23,23 @@ public sealed record LoginProtectionSettings
     public const string AccountWideFactorKey = "security.login.accountWideFactor";
     public const string IpMaxAttemptsKey = "security.login.ipMaxAttempts";
     public const string IpLockoutMinutesKey = "security.login.ipLockoutMinutes";
+    public const string ShareLinkMaxAttemptsPerAddressKey = "security.sharelink.passwordMaxAttemptsPerAddress";
+    public const string ShareLinkMaxAttemptsPerLinkKey = "security.sharelink.passwordMaxAttemptsPerLink";
+    public const string ShareLinkLockoutMinutesKey = "security.sharelink.passwordLockoutMinutes";
+    public const string SmbLockoutEnabledKey = "services.smb.lockout.enabled";
+    public const string SmbLockoutAttemptsKey = "services.smb.lockout.attempts";
+    public const string SmbLockoutMinutesKey = "services.smb.lockout.minutes";
 
     public const int DefaultMaxAttempts = 5;
     public const int DefaultLockoutMinutes = 15;
     public const int DefaultAccountWideFactor = 10;
     public const int DefaultIpMaxAttempts = 15;
     public const int DefaultIpLockoutMinutes = 30;
+    public const int DefaultShareLinkMaxAttemptsPerAddress = 5;
+    public const int DefaultShareLinkMaxAttemptsPerLink = 50;
+    public const int DefaultShareLinkLockoutMinutes = 30;
+    public const int DefaultSmbLockoutAttempts = 10;
+    public const int DefaultSmbLockoutMinutes = 15;
 
     /// <summary>Upper bound of every attempt budget; beyond it the protection is effectively off.</summary>
     public const int MaxAttemptsLimit = 1000;
@@ -52,6 +66,24 @@ public sealed record LoginProtectionSettings
     /// <summary>Lockout of a client address, in minutes.</summary>
     public int IpLockoutMinutes { get; init; } = DefaultIpLockoutMinutes;
 
+    /// <summary>Wrong share-link passwords per (link, client address) before that pair is locked.</summary>
+    public int ShareLinkMaxAttemptsPerAddress { get; init; } = DefaultShareLinkMaxAttemptsPerAddress;
+
+    /// <summary>Wrong share-link passwords per link, across all addresses, before the link is locked for everyone.</summary>
+    public int ShareLinkMaxAttemptsPerLink { get; init; } = DefaultShareLinkMaxAttemptsPerLink;
+
+    /// <summary>Lockout of a share link (or link and address pair) after too many wrong passwords, in minutes.</summary>
+    public int ShareLinkLockoutMinutes { get; init; } = DefaultShareLinkLockoutMinutes;
+
+    /// <summary>Whether Samba locks an account after <see cref="SmbLockoutAttempts"/> failed SMB logins.</summary>
+    public bool SmbLockoutEnabled { get; init; } = true;
+
+    /// <summary>Failed SMB logins before Samba locks the account (for all addresses, as Samba has no per-address lockout).</summary>
+    public int SmbLockoutAttempts { get; init; } = DefaultSmbLockoutAttempts;
+
+    /// <summary>Duration of an SMB account lockout, in minutes.</summary>
+    public int SmbLockoutMinutes { get; init; } = DefaultSmbLockoutMinutes;
+
     public LoginThrottlePolicy UserPolicy => new(MaxAttempts, TimeSpan.FromMinutes(LockoutMinutes));
 
     public LoginThrottlePolicy AccountPolicy => new(MaxAttempts * AccountWideFactor, TimeSpan.FromMinutes(LockoutMinutes));
@@ -69,6 +101,12 @@ public sealed record LoginProtectionSettings
         AccountWideFactor = Bound(AccountWideFactor, DefaultAccountWideFactor, MaxAccountWideFactor),
         IpMaxAttempts = Bound(IpMaxAttempts, DefaultIpMaxAttempts, MaxAttemptsLimit),
         IpLockoutMinutes = Bound(IpLockoutMinutes, DefaultIpLockoutMinutes, MaxLockoutMinutes),
+        ShareLinkMaxAttemptsPerAddress = Bound(ShareLinkMaxAttemptsPerAddress, DefaultShareLinkMaxAttemptsPerAddress, MaxAttemptsLimit),
+        ShareLinkMaxAttemptsPerLink = Bound(ShareLinkMaxAttemptsPerLink, DefaultShareLinkMaxAttemptsPerLink, MaxAttemptsLimit),
+        ShareLinkLockoutMinutes = Bound(ShareLinkLockoutMinutes, DefaultShareLinkLockoutMinutes, MaxLockoutMinutes),
+        SmbLockoutEnabled = SmbLockoutEnabled,
+        SmbLockoutAttempts = Bound(SmbLockoutAttempts, DefaultSmbLockoutAttempts, MaxAttemptsLimit),
+        SmbLockoutMinutes = Bound(SmbLockoutMinutes, DefaultSmbLockoutMinutes, MaxLockoutMinutes),
     };
 
     private static int Bound(int value, int fallback, int max) => value <= 0 ? fallback : Math.Min(value, max);

@@ -38,6 +38,7 @@ internal static class ViewModelSetup
         builder.Services.AddScoped<FileServiceAccessViewModel>();
         builder.Services.AddScoped<MailServerSettingsViewModel>();
         builder.Services.AddScoped<AccessSettingsViewModel>();
+        builder.Services.AddScoped<LoginProtectionSettingsViewModel>();
         builder.Services.AddScoped<NotificationsViewModel>();
         builder.Services.AddScoped<CloudAccessViewModel>();
         builder.Services.AddScoped<CloudAccessShareBrowserViewModel>();

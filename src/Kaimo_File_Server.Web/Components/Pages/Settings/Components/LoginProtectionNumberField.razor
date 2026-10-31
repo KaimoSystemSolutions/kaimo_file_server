@@ -1,0 +1,36 @@
+@*
+    One numeric field of the "Login protection" tab: label, number input bounded 1..Max, hint,
+    and the validation message of the last save (marked with aria-invalid and linked through
+    aria-describedby, so screen readers announce it with the field; the tab's banner is the
+    single live alert, so several field errors are not read out at once).
+*@
+
+<div class="form-group login-protection-field">
+    <label for="@Id">@Label</label>
+    <input id="@Id" type="number" min="1" max="@Max" class="edit-input login-protection-number"
+           value="@Value" @onchange="OnChangeAsync" disabled="@Disabled"
+           aria-invalid="@(Error is null ? null : "true")"
+           aria-describedby="@DescribedBy" />
+    @if (Error is not null)
+    {
+        <span id="@($"{Id}-error")" class="login-protection-field-error">@Error</span>
+    }
+    <span id="@($"{Id}-hint")" class="form-hint">@Hint</span>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter] public string? Hint { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter, EditorRequired] public int Max { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public int Value { get; set; }
+    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+
+    private string DescribedBy => Error is null ? $"{Id}-hint" : $"{Id}-error {Id}-hint";
+
+    // An empty or non-numeric entry becomes 0, which the view model then reports as out of range.
+    private Task OnChangeAsync(ChangeEventArgs e)
+        => ValueChanged.InvokeAsync(int.TryParse(e.Value?.ToString(), out var value) ? value : 0);
+}

@@ -132,5 +132,6 @@ internal enum SettingsTab
     Domains,
     AccessRestrictions,
     HomeFolders,
-    Versioning
+    Versioning,
+    LoginProtection
 }

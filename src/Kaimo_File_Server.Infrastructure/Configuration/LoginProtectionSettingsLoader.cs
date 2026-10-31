@@ -16,6 +16,12 @@ public static class LoginProtectionSettingsLoader
             AccountWideFactor = await config.GetIntAsync(LoginProtectionSettings.AccountWideFactorKey, defaults.AccountWideFactor),
             IpMaxAttempts = await config.GetIntAsync(LoginProtectionSettings.IpMaxAttemptsKey, defaults.IpMaxAttempts),
             IpLockoutMinutes = await config.GetIntAsync(LoginProtectionSettings.IpLockoutMinutesKey, defaults.IpLockoutMinutes),
+            ShareLinkMaxAttemptsPerAddress = await config.GetIntAsync(LoginProtectionSettings.ShareLinkMaxAttemptsPerAddressKey, defaults.ShareLinkMaxAttemptsPerAddress),
+            ShareLinkMaxAttemptsPerLink = await config.GetIntAsync(LoginProtectionSettings.ShareLinkMaxAttemptsPerLinkKey, defaults.ShareLinkMaxAttemptsPerLink),
+            ShareLinkLockoutMinutes = await config.GetIntAsync(LoginProtectionSettings.ShareLinkLockoutMinutesKey, defaults.ShareLinkLockoutMinutes),
+            SmbLockoutEnabled = await config.GetBoolAsync(LoginProtectionSettings.SmbLockoutEnabledKey, defaults.SmbLockoutEnabled),
+            SmbLockoutAttempts = await config.GetIntAsync(LoginProtectionSettings.SmbLockoutAttemptsKey, defaults.SmbLockoutAttempts),
+            SmbLockoutMinutes = await config.GetIntAsync(LoginProtectionSettings.SmbLockoutMinutesKey, defaults.SmbLockoutMinutes),
         }.Normalize();
     }
 }

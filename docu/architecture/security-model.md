@@ -50,7 +50,7 @@ Common rules:
   cannot be enumerated.
 - **Lockout.** `LoginThrottle` (`src/Kaimo_File_Server.Core/Security/LoginThrottle.cs`) locks a key
   after consecutive failures. `CredentialLoginService` charges every attempt against three keys
-  (values in `LoginProtectionSettings`, configurable in `config_settings`):
+  (values in `LoginProtectionSettings`, editable under Settings → Login protection):
   - the client address across all user names (`security.login.ipMaxAttempts` 15,
     `security.login.ipLockoutMinutes` 30). Checked first, so once the address is locked further
     attempts cost neither a database lookup nor a password hash;
