@@ -16,7 +16,24 @@ search, mail, reverse proxy and troubleshooting.
 | `pki-init` | One-shot generator for the internal mTLS control-plane PKI | — |
 
 Only `web` and `samba` are reachable from the host. Every other service stays
-on the internal Compose network.
+on the internal Compose networks.
+
+### Networks
+
+| Network | Members | Purpose |
+| --- | --- | --- |
+| `default` | `web`, `host`, `samba` | Published ports and outbound traffic (mail, external storage) |
+| `database` (internal) | `db`, `web`, `host` | Database access |
+| `bridge-database` (internal) | `db`, `smb-bridge` | Database access for the SMB control plane |
+| `smb-control` (internal) | `samba`, `smb-bridge` | mTLS control plane for Samba |
+| `search` (internal) | `elasticsearch`, `web`, `host` | Elasticsearch, which runs without authentication |
+
+`internal` networks have no route to the outside. Elasticsearch is reachable
+only from `web` and `host` — not from `samba`, the Docker host or the LAN.
+
+**Upgrading from an older `docker-compose.yml`:** take over the new file and run
+`docker compose up -d`. Compose creates the `search` network and recreates
+`web`, `host` and `elasticsearch`; the search index is kept.
 
 ## 🔐 Secrets
 

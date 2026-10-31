@@ -24,8 +24,9 @@ flowchart LR
         samba["kaimo_samba<br/>smbd + VFS module + kaimo_authd"]
         web["kaimo_file_server_web<br/>ASP.NET: Blazor, REST, WebDAV"]
         host["kaimo_file_server<br/>Host worker (DB owner)"]
-        es[(Elasticsearch)]
     end
+
+    es[(Elasticsearch)]
 
     bridge["kaimo_smb_bridge<br/>gRPC control plane"]
     db[(PostgreSQL<br/>kaimo_file_server)]
@@ -37,8 +38,8 @@ flowchart LR
     bridge -- "kaimo_bridge_database" --> db
     web -- "kaimo_database" --> db
     host -- "kaimo_database" --> db
-    web --> es
-    host --> es
+    web -- "kaimo_search" --> es
+    host -- "kaimo_search" --> es
     samba --- pools
     web --- pools
     host --- pools
@@ -48,11 +49,11 @@ flowchart LR
 | Service (container) | Built from | Role | Published ports | Networks |
 |---|---|---|---|---|
 | `kaimo_smb_pki_init` | `src/samba-vfs/Dockerfile.pki` | One-shot generation of the control-plane mTLS PKI into `data/smb-control-plane` | – | default |
-| `kaimo_file_server.host` (`kaimo_file_server`) | `src/Kaimo_File_Server.Host/Dockerfile` | Database owner: restore, backup, migrations, seeding; data-service reconciliation; version-storage reconciliation | – | default, `kaimo_database` |
+| `kaimo_file_server.host` (`kaimo_file_server`) | `src/Kaimo_File_Server.Host/Dockerfile` | Database owner: restore, backup, migrations, seeding; data-service reconciliation; version-storage reconciliation | – | default, `kaimo_database`, `kaimo_search` |
 | `kaimo_smb_bridge` | `src/Kaimo_File_Server.SmbBridge/Dockerfile` | gRPC control plane for Samba (authentication, authorization, events, shares, configuration, snapshots) | – (5080 internal) | `kaimo_bridge_database`, `kaimo_smb_control` |
 | `kaimo_samba` | `src/samba-vfs/Dockerfile.vfs` | Native SMB data path: Samba built from source, the `kaimo_bridge` VFS module and the `kaimo_authd` sidecar | `445` | default, `kaimo_smb_control` |
-| `kaimo_file_server.web` (`kaimo_file_server_web`) | `src/Kaimo_File_Server.Web/Dockerfile` | Web UI, REST API, WebDAV, downloads and share links, search indexing, mail dispatch, external-storage sync | `8081→8080`, `8443→8443` | default, `kaimo_database` |
-| `elasticsearch` (`kaimo_elasticsearch`) | `elasticsearch:9.4.2` | Full-text index, single node | `127.0.0.1:9200` | default |
+| `kaimo_file_server.web` (`kaimo_file_server_web`) | `src/Kaimo_File_Server.Web/Dockerfile` | Web UI, REST API, WebDAV, downloads and share links, search indexing, mail dispatch, external-storage sync | `8081→8080`, `8443→8443` | default, `kaimo_database`, `kaimo_search` |
+| `elasticsearch` (`kaimo_elasticsearch`) | `elasticsearch:9.4.2` | Full-text index, single node | `127.0.0.1:9200` | `kaimo_search`, default (dev only, for the loopback port) |
 | `kaimo_file_server_db` | `postgres:17-alpine` | The single PostgreSQL database `kaimo_file_server` | – | `kaimo_database`, `kaimo_bridge_database` |
 | `adminer` | `adminer` | Database administration UI | `127.0.0.1:8080` | default, `kaimo_database` |
 
@@ -67,6 +68,10 @@ All non-default networks are `internal: true` (no route to the outside):
   default network and has no outbound connectivity.
 - **`kaimo_smb_control`** connects Samba to the bridge. It carries the gRPC control plane only;
   Samba has no database access.
+- **`kaimo_search`** connects Host and Web to Elasticsearch, which runs without authentication.
+  In the development stack Elasticsearch additionally joins `default` so `127.0.0.1:9200` can be
+  published; the example stack (`example/docker-compose.yml`, network `search`) keeps it on the
+  internal network only.
 
 ### Volumes
 

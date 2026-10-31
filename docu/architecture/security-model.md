@@ -28,9 +28,13 @@ flowchart LR
     bridge --> db
 ```
 
-- Only the Web host (HTTP/HTTPS) and Samba (SMB) accept external connections. Elasticsearch and
-  Adminer are bound to loopback.
-- The database and the SMB control plane sit on `internal` Docker networks.
+- Only the Web host (HTTP/HTTPS) and Samba (SMB) accept external connections. In the development
+  stack Elasticsearch and Adminer are bound to loopback; the example stack publishes neither.
+- The database, the SMB control plane and Elasticsearch (no authentication, `xpack.security`
+  disabled) sit on `internal` Docker networks. Only Web and Host join the search network.
+- Known residual risk: Web is on the search network, so a user with `ManageConnections` can still
+  point a WebDAV storage connection at `http://elasticsearch:9200`. There is no deny-list in the
+  connection test and no Elasticsearch authentication.
 - Every file operation, regardless of protocol, is authorized by the same `IAclService` in Core.
 
 ## Authentication

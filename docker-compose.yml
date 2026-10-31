@@ -66,6 +66,7 @@ services:
     networks:
       - default
       - kaimo_database
+      - kaimo_search
 
   # Internal, mutually authenticated gRPC control plane for Samba.
   kaimo_smb_bridge:
@@ -210,6 +211,7 @@ services:
     networks:
       - default
       - kaimo_database
+      - kaimo_search
 
   elasticsearch:
     container_name: kaimo_elasticsearch
@@ -231,6 +233,13 @@ services:
     # Security is disabled for local development: never publish beyond loopback.
     ports:
       - "127.0.0.1:9200:9200"
+    # web and host reach ES over the internal kaimo_search network. Dev only:
+    # ES also joins "default" so the loopback port above can be published
+    # (a container on internal networks only cannot publish ports). The
+    # example stack keeps ES on its internal network alone.
+    networks:
+      - default
+      - kaimo_search
     healthcheck:
       test: ["CMD-SHELL", "curl -fsSL 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s' || exit 1"]
       interval: 5s
@@ -284,4 +293,6 @@ networks:
   kaimo_database:
     internal: true
   kaimo_bridge_database:
+    internal: true
+  kaimo_search:
     internal: true

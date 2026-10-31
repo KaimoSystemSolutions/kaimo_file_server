@@ -69,6 +69,7 @@ services:
     networks:
       - default
       - database
+      - search
 
   smb-bridge:
     image: kaimosystem/kaimo_file_server.samba_bridge:${KAIMO_IMAGE_TAG:-latest}
@@ -166,10 +167,12 @@ services:
     networks:
       - default
       - database
+      - search
 
   # Full-text file search. The app tolerates Elasticsearch being unavailable
-  # (it falls back to filename search), so startup is not gated on it. Not
-  # published on the host; reachable only inside the Compose network.
+  # (it falls back to filename search), so startup is not gated on it.
+  # Security is disabled, so Elasticsearch sits only on the internal "search"
+  # network: reachable from web and host, not from samba, the host or the LAN.
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-9.4.2}
     restart: unless-stopped
@@ -187,7 +190,7 @@ services:
       retries: 30
       start_period: 30s
     networks:
-      - default
+      - search
 
 # secrets:
 #   kaimo-dp-certificate:
@@ -199,4 +202,6 @@ networks:
   database:
     internal: true
   bridge-database:
+    internal: true
+  search:
     internal: true
