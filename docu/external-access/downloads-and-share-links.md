@@ -57,7 +57,7 @@ links; both share one entity, repository and policy code.
 | Field | Download link | Upload link |
 |---|---|---|
 | Target (`ShareId`, `RootRelativePath`) | File or folder | Folder only |
-| `PasswordHash` | Optional, BCrypt, throttled | Same |
+| `PasswordHash` | Optional, BCrypt, throttled per link + address and per link ([Security model](../architecture/security-model.md)) | Same |
 | Start/end window, enabled flag | Yes | Yes |
 | `MaxAccessCount` / `AccessCount` | Downloads | Uploaded files |
 | `MaxBytesPerSecond` | Download rate | Upload rate |

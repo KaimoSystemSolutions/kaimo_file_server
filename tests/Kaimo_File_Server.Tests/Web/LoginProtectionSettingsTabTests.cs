@@ -166,7 +166,7 @@ public partial class LoginProtectionSettingsTabTests
     }
 
     [Fact]
-    public void ShareLinkAndSmbCards_AreMarkedAsNotYetEffective()
+    public void OnlySmbCard_IsMarkedAsNotYetEffective()
     {
         using var ctx = new BunitContext();
         var cut = Render(ctx, canManage: true);
@@ -177,21 +177,18 @@ public partial class LoginProtectionSettingsTabTests
         var sections = cut.FindAll(".detail-section");
         Assert.Equal(3, sections.Count);
         Assert.Empty(sections[0].QuerySelectorAll(".status-badge"));
-        Assert.Contains(label!, sections[1].QuerySelector(".status-badge")!.TextContent);
+        Assert.Empty(sections[1].QuerySelectorAll(".status-badge"));
         Assert.Contains(label!, sections[2].QuerySelector(".status-badge")!.TextContent);
     }
 
     [Fact]
-    public void ShareLinkCard_NamesTheLimitThatAppliesToday()
+    public void ShareLinkCard_HasNoPendingNote()
     {
         using var ctx = new BunitContext();
         var cut = Render(ctx, canManage: true);
-        var policy = ShareLinkService.PasswordPolicy;
 
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("input")), Timeout);
-        var note = cut.FindAll(".detail-section")[1].QuerySelector(".login-protection-pending")!.TextContent;
-        Assert.Contains(policy.MaxAttempts.ToString(), note);
-        Assert.Contains(((int)policy.LockoutDuration.TotalMinutes).ToString(), note);
+        Assert.Null(cut.FindAll(".detail-section")[1].QuerySelector(".login-protection-pending"));
     }
 
     [Fact]

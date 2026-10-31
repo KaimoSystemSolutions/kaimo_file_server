@@ -16,6 +16,7 @@
 @using Kaimo_File_Server.Web.Services
 
 @inject ShareLinkService ShareLinks
+@inject ClientConnectionInfo Client
 @inject PublicUploadService Uploads
 @inject IShareRepository Shares
 @inject PublicShareFileBrowserViewModel Vm
@@ -247,7 +248,7 @@ else if (_state == State.Upload)
     {
         if (_link is null) return;
 
-        var (ok, retryAfter) = ShareLinks.VerifyPassword(_link, _passwordInput);
+        var (ok, retryAfter) = await ShareLinks.VerifyPasswordAsync(_link, _passwordInput, Client.RemoteAddress);
         if (ok)
         {
             _unlocked = true;

@@ -7,6 +7,7 @@ using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Configuration;
+using Kaimo_File_Server.Infrastructure.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Kaimo_File_Server.Web.Services;
@@ -49,10 +50,6 @@ public sealed class ShareLinkService(
     IShareRepository? shares = null,
     IFileServiceFactory? fileServices = null)
 {
-    // Per link, across all addresses. Shown on the "Login protection" tab as the limit in force
-    // until the configurable share-link budgets of LoginProtectionSettings are wired in.
-    internal static readonly LoginThrottlePolicy PasswordPolicy = new(10, TimeSpan.FromMinutes(15));
-
     public async Task<ShareLinkSettings> GetSettingsAsync()
     {
         var settings = await config.GetAsync(ShareLinkSettings.ConfigKey, ShareLinkSettings.Default());
@@ -175,27 +172,47 @@ public sealed class ShareLinkService(
     }
 
     /// <summary>
-    /// Verifies a candidate password against the link, rate-limiting wrong guesses per token.
-    /// Returns whether the guess was correct and, when locked out, how long to wait.
+    /// Verifies a candidate password against the link, rate-limiting wrong guesses per
+    /// (link, client address) and per link with the share-link budgets of
+    /// <see cref="LoginProtectionSettings"/>: one address guessing only locks itself out, guessing
+    /// spread over many addresses locks the link for everyone. Without a known address only the
+    /// link budget applies. Returns whether the guess was correct and, when locked out, how long to wait.
     /// </summary>
-    public (bool Ok, TimeSpan RetryAfter) VerifyPassword(ShareLink link, string? candidate)
+    public async Task<(bool Ok, TimeSpan RetryAfter)> VerifyPasswordAsync(
+        ShareLink link, string? candidate, string? remoteAddress)
     {
         if (link.PasswordHash is null) return (true, TimeSpan.Zero);
 
-        var key = "sharelink:" + link.Id;
+        var settings = await config.LoadLoginProtectionAsync();
+        var linkKey = "sharelink:" + link.Id;
+        var addressKey = CredentialLoginService.AddressThrottleKey(remoteAddress);
+        var budget = new LoginBudget(throttle,
+            (addressKey.Length == 0 ? string.Empty : linkKey + addressKey, settings.ShareLinkAddressPolicy, LockoutScope.Address),
+            (linkKey, settings.ShareLinkPolicy, LockoutScope.Account));
+
         // Reserve the attempt before the (slow) BCrypt verify so parallel guesses
         // cannot all slip past the lockout check.
-        var status = throttle.BeginAttempt(key, PasswordPolicy);
+        var (status, _) = budget.Begin();
         if (status.IsLockedOut) return (false, status.RetryAfter);
 
-        if (!string.IsNullOrEmpty(candidate) && passwords.VerifyPassword(candidate, link.PasswordHash))
+        bool settled = false;
+        try
         {
-            throttle.Reset(key);
-            return (true, TimeSpan.Zero);
+            var ok = !string.IsNullOrEmpty(candidate) && passwords.VerifyPassword(candidate, link.PasswordHash);
+            settled = true;
+            if (ok)
+            {
+                budget.Reset();
+                return (true, TimeSpan.Zero);
+            }
+            var (failure, _) = budget.RegisterFailure();
+            return (false, failure.RetryAfter);
         }
-
-        var failure = throttle.RegisterFailure(key, PasswordPolicy);
-        return (false, failure.RetryAfter);
+        finally
+        {
+            // A hash error neither counts nor leaks a reservation.
+            if (!settled) budget.Release();
+        }
     }
 
     /// <summary>

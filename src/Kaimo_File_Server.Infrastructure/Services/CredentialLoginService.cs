@@ -158,7 +158,7 @@ public sealed class CredentialLoginService : ILoginService
     /// empty keys, so no address budget applies then.
     /// </summary>
     // Leading "|" cannot start a username, so this never collides with a (user, address) key.
-    internal static string AddressThrottleKey(string? remoteAddress)
+    public static string AddressThrottleKey(string? remoteAddress)
     {
         var trimmed = remoteAddress?.Trim();
         if (string.IsNullOrEmpty(trimmed))

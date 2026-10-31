@@ -60,6 +60,13 @@ Common rules:
   A successful login resets all three. The state is held in process memory. Known residual risk:
   an attacker with a valid account of their own can reset their address budget by signing in;
   the per-user and account-wide limits and the request limit below are not affected.
+- **Share-link passwords** use the same throttle (`ShareLinkService.VerifyPasswordAsync`) with two
+  keys: link + client address (`security.sharelink.passwordMaxAttemptsPerAddress` 5) and the link
+  across all addresses (`security.sharelink.passwordMaxAttemptsPerLink` 50), both locked for
+  `security.sharelink.passwordLockoutMinutes` (30). The address is checked first, so a locked
+  address neither costs a password hash nor counts toward the link limit: one address only locks
+  itself out, while guessing spread over many addresses still locks the link for everyone. Without
+  a known address only the link limit applies. A correct password resets both counters.
 - **Request limit.** `/api/v1/auth/*` (login, refresh, logout) is limited to 20 requests per minute
   and client address (`AuthApiController.RateLimitPolicy`), independent of the lockout.
 - **Lock scope.** `LoginResult.LockScope` tells an account lock (user name + address, or

@@ -8,8 +8,8 @@
 @*
     Settings tab for brute-force protection: thresholds of the credential login (web UI, client
     API, WebDAV), of share-link passwords and of the SMB account lockout. One save writes all
-    values; out-of-range fields are marked individually. The share-link and SMB values are stored
-    but not enforced yet, which both cards state with a badge and a note. Each area is a card with
+    values; out-of-range fields are marked individually. The SMB values are stored but not
+    enforced yet, which that card states with a badge and a note. Each area is a card with
     an icon header; field icons name what is counted (user, address, link) or limited (duration).
 *@
 
@@ -59,8 +59,7 @@ else
     </section>
 
     <section class="detail-section login-protection-card">
-        @CardHead("share.svg", "Web_LoginProtection_ShareLink_Title", "Web_LoginProtection_ShareLink_Desc", notYetEffective: true)
-        <p class="form-hint login-protection-pending">@ShareLinkPendingNote</p>
+        @CardHead("share.svg", "Web_LoginProtection_ShareLink_Title", "Web_LoginProtection_ShareLink_Desc", notYetEffective: false)
         <div class="admin-compact login-protection-fields">
             <LoginProtectionNumberField Id="login-protection-link-per-address" Icon="globe.svg"
                                         Label="@R("Web_LoginProtection_ShareLinkPerAddress")"
@@ -118,9 +117,6 @@ else
     private string AccountWideFactorHint => VM.AccountWideAttempts is { } attempts
         ? string.Format(R("Web_LoginProtection_AccountWideFactor_Hint"), attempts)
         : R("Web_LoginProtection_AccountWideFactor_HintUnknown");
-
-    private static string ShareLinkPendingNote => string.Format(R("Web_LoginProtection_ShareLink_Pending"),
-        ShareLinkService.PasswordPolicy.MaxAttempts, (int)ShareLinkService.PasswordPolicy.LockoutDuration.TotalMinutes);
 
     private RenderFragment CardHead(string icon, string titleKey, string descKey, bool notYetEffective) =>
         @<div class="login-protection-card-head">

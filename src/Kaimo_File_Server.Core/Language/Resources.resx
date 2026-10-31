@@ -8032,9 +8032,6 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_LoginProtection_NotYetEffective" xml:space="preserve">
     <value>Not effective yet</value>
   </data>
-  <data name="Web_LoginProtection_ShareLink_Pending" xml:space="preserve">
-    <value>These values are saved but only take effect in a later version. Until then a fixed limit applies: {0} wrong passwords per link (from all addresses) lock the link for {1} minutes.</value>
-  </data>
   <data name="Web_LoginProtection_Smb_Pending" xml:space="preserve">
     <value>These values are saved but only take effect in a later version. Until then Samba does not lock any account after failed SMB logins.</value>
   </data>

@@ -96,37 +96,7 @@ public sealed class ShareLinkCreatorTests
         shareLinks.Verify(r => r.TryConsumeAccessAsync(It.IsAny<string>()), Times.Never);
     }
 
-    [Fact]
-    public void VerifyPassword_LocksAfterTenWrongGuesses_AndCorrectOneResets()
-    {
-        _passwords.Setup(p => p.VerifyPassword("right", "link-hash")).Returns(true);
-        var service = Service();
-
-        Assert.True(service.VerifyPassword(_link, "right").Ok);
-        for (int i = 0; i < 9; i++)
-            Assert.False(service.VerifyPassword(_link, "wrong").Ok);
-        Assert.True(service.VerifyPassword(_link, "right").Ok);   // counter reset
-        for (int i = 0; i < 10; i++)
-            service.VerifyPassword(_link, "wrong");
-
-        var locked = service.VerifyPassword(_link, "right");
-        Assert.False(locked.Ok);
-        Assert.True(locked.RetryAfter > TimeSpan.Zero);
-    }
-
-    [Fact]
-    public void VerifyPassword_ParallelGuesses_VerifyAtMostBudget()
-    {
-        int verifications = 0;
-        _passwords.Setup(p => p.VerifyPassword(It.IsAny<string>(), "link-hash"))
-            .Returns(() => { Interlocked.Increment(ref verifications); Thread.Sleep(20); return false; });
-        var service = Service();
-
-        Parallel.For(0, 50, new ParallelOptions { MaxDegreeOfParallelism = 25 },
-            _ => service.VerifyPassword(_link, "guess"));
-
-        Assert.True(verifications <= 10, $"{verifications} hashes verified");
-    }
+    // Password throttling of links is covered by ShareLinkPasswordThrottleTests.
 
     private void ArrangeCreator(bool enabled)
     {

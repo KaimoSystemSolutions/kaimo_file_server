@@ -90,6 +90,10 @@ public sealed record LoginProtectionSettings
 
     public LoginThrottlePolicy IpPolicy => new(IpMaxAttempts, TimeSpan.FromMinutes(IpLockoutMinutes));
 
+    public LoginThrottlePolicy ShareLinkAddressPolicy => new(ShareLinkMaxAttemptsPerAddress, TimeSpan.FromMinutes(ShareLinkLockoutMinutes));
+
+    public LoginThrottlePolicy ShareLinkPolicy => new(ShareLinkMaxAttemptsPerLink, TimeSpan.FromMinutes(ShareLinkLockoutMinutes));
+
     /// <summary>
     /// Replaces unusable values (zero or negative) with the defaults and clamps values above the
     /// upper bounds, so a mistyped setting can neither disable nor overflow the protection.

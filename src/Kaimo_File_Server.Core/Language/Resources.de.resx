@@ -8032,9 +8032,6 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_LoginProtection_NotYetEffective" xml:space="preserve">
     <value>Noch nicht wirksam</value>
   </data>
-  <data name="Web_LoginProtection_ShareLink_Pending" xml:space="preserve">
-    <value>Diese Werte werden gespeichert, wirken aber erst ab einer späteren Version. Bis dahin gilt eine feste Grenze: {0} falsche Passwörter pro Link (von allen Adressen) sperren den Link für {1} Minuten.</value>
-  </data>
   <data name="Web_LoginProtection_Smb_Pending" xml:space="preserve">
     <value>Diese Werte werden gespeichert, wirken aber erst ab einer späteren Version. Bis dahin sperrt Samba nach fehlgeschlagenen SMB-Anmeldungen kein Konto.</value>
   </data>

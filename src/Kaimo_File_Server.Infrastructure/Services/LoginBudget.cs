@@ -10,8 +10,9 @@ namespace Kaimo_File_Server.Infrastructure.Services;
 /// a successful <see cref="Begin"/> with exactly one of <see cref="RegisterFailure"/>,
 /// <see cref="Reset"/> or <see cref="Release"/>. Empty keys are skipped by the throttle.
 /// Each key carries the <see cref="LockoutScope"/> its lock is reported with.
+/// Also used for share-link passwords (link + address, link).
 /// </summary>
-internal sealed class LoginBudget(
+public sealed class LoginBudget(
     ILoginThrottle throttle, params (string Key, LoginThrottlePolicy Policy, LockoutScope Scope)[] entries)
 {
     /// <summary>Reserves the attempt; when a key is locked, its status and scope.</summary>
