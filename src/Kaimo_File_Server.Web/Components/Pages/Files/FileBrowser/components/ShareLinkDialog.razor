@@ -78,6 +78,10 @@
                             <label class="hash-field-label">@(IsUpload ? T("Web_ShareLink_MaxFiles", "Max files") : T("Web_ShareLink_MaxAccess", "Max downloads"))</label>
                             <input type="number" min="1" class="edit-input"
                                    placeholder="@T("Web_ShareLink_Unlimited", "Unlimited")" @bind="_maxAccess" />
+                            @if (!IsUpload)
+                            {
+                                <div class="form-hint">@T("Web_ShareLink_MaxAccess_Hint", "Each preview and each download counts as one access.")</div>
+                            }
                         </div>
                         <div class="sharelink-col">
                             <label class="hash-field-label">@(IsUpload ? T("Web_ShareLink_MaxUploadRate", "Max upload rate") : T("Web_ShareLink_MaxRate", "Max rate"))</label>

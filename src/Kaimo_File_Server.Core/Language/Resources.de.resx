@@ -4506,6 +4506,9 @@
   <data name="Web_ShareLink_MaxAccess" xml:space="preserve">
     <value>Max. Downloads</value>
   </data>
+  <data name="Web_ShareLink_MaxAccess_Hint" xml:space="preserve">
+    <value>Jede Vorschau und jeder Download zählt als ein Zugriff.</value>
+  </data>
   <data name="Web_ShareLink_MaxRate" xml:space="preserve">
     <value>Max. Rate</value>
   </data>

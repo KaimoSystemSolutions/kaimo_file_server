@@ -12,7 +12,7 @@ public partial class FileBrowserViewModel
     // huge file can never blow up server memory. Larger files fall back to download.
     private long MaxPreviewSizeBytes => 25L * 1024 * 1024; // 25 MB
 
-    public async Task<(byte[] Data, string ContentType, PreviewKind Kind)?> ReadFileForPreviewAsync(FileMetadata file)
+    public virtual async Task<(byte[] Data, string ContentType, PreviewKind Kind)?> ReadFileForPreviewAsync(FileMetadata file)
     {
         if (_fileService is null || CurrentShare is null) return null;
 
@@ -95,7 +95,7 @@ public partial class FileBrowserViewModel
     /// Hashes a file's content with the requested algorithm, streaming it through the
     /// hasher so files of any size stay off the heap. Returns the lowercase hex digest.
     /// </summary>
-    public async Task<string?> ComputeFileHashAsync(
+    public virtual async Task<string?> ComputeFileHashAsync(
         FileMetadata file, HashAlgorithmName algorithm, CancellationToken cancellationToken = default)
     {
         if (_fileService is null || CurrentShare is null || file.IsDirectory) return null;

@@ -218,9 +218,11 @@ public sealed class ShareLinkService(
     /// <summary>
     /// Issues a one-time public download ticket for the given share-relative paths. The caller
     /// must already have validated the link's window and (if set) password on the circuit.
+    /// <paramref name="visitId"/> is the visitor's page session (one "link accessed" notification per visit).
     /// </summary>
-    public string IssueTicket(ShareLink link, IReadOnlyList<string> relativePaths, bool zip, string downloadName)
-        => tickets.Issue(new PublicDownloadTicket(link.Token, relativePaths.ToArray(), downloadName, zip));
+    public string IssueTicket(ShareLink link, IReadOnlyList<string> relativePaths, bool zip, string downloadName,
+        Guid? visitId = null)
+        => tickets.Issue(new PublicDownloadTicket(link.Token, relativePaths.ToArray(), downloadName, zip, visitId));
 
     /// <summary>
     /// The identity anonymous access runs under, or null when the creator no longer

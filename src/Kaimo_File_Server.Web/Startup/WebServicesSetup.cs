@@ -110,6 +110,8 @@ internal static class WebServicesSetup
         builder.Services.AddSingleton<FileDownloadTicketStore>();
         builder.Services.AddSingleton<ZipDownloadTicketStore>();
         builder.Services.AddSingleton<PublicDownloadTicketStore>();
+        builder.Services.AddSingleton<LinkAccessNotificationGate>();
+        builder.Services.AddScoped<PublicShareAccessPolicy>();
         builder.Services.AddSingleton<ICloudAccessSettingsStore, CloudAccessSettingsStore>();
         builder.Services.AddSingleton<CloudAccessDirectoryCache>();
         builder.Services.AddScoped<CloudAccessAuthorizationService>();

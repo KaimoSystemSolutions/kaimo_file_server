@@ -54,9 +54,9 @@ public sealed class ShareLinkHostRestrictionTests
     {
         var links = new Mock<IShareLinkRepository>();
         var tickets = new PublicDownloadTicketStore();
-        var controller = new PublicDownloadController(
-            tickets, links.Object, Mock.Of<IShareRepository>(), Mock.Of<IFileServiceFactory>(),
-            Mock.Of<IUserContextFactory>(), Config(new ServerDomainSettings { Addresses = ["https://files.example.com"] }))
+        var policy = new PublicShareAccessPolicy(links.Object, Mock.Of<IShareRepository>(), Mock.Of<IUserContextFactory>(),
+            Config(new ServerDomainSettings { Addresses = ["https://files.example.com"] }), new LinkAccessNotificationGate());
+        var controller = new PublicDownloadController(tickets, policy, Mock.Of<IFileServiceFactory>())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

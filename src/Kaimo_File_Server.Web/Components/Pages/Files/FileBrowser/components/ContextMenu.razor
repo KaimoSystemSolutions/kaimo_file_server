@@ -132,7 +132,7 @@
             "extract" => FileBrowser.VM.Capabilities.CanExtract,
 
             // Hashing streams the file server-side — only local shares can read content.
-            "hash" => FileBrowser.VM.CurrentShare is not null,
+            "hash" => FileBrowser.VM.Capabilities.CanHash && FileBrowser.VM.CurrentShare is not null,
 
             _ => true,
         };

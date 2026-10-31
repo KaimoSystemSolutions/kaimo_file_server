@@ -61,9 +61,9 @@ public sealed class ShareLinkCreatorTests
         shares.Setup(r => r.GetByIdAsync(_link.ShareId)).ReturnsAsync(
             new ShareDefinition("docs", "/data/docs") { Id = _link.ShareId });
         var fileServices = new Mock<IFileServiceFactory>();
-        var controller = new PublicDownloadController(
-            tickets, shareLinks.Object, shares.Object, fileServices.Object, _contexts.Object,
-            ShareLinkHostRestrictionTests.Config(new ServerDomainSettings(), restrict: false))
+        var policy = new PublicShareAccessPolicy(shareLinks.Object, shares.Object, _contexts.Object,
+            ShareLinkHostRestrictionTests.Config(new ServerDomainSettings(), restrict: false), new LinkAccessNotificationGate());
+        var controller = new PublicDownloadController(tickets, policy, fileServices.Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -84,9 +84,9 @@ public sealed class ShareLinkCreatorTests
         var config = new Mock<IConfigRepository>();
         config.Setup(c => c.GetAsync(ShareLinkSettings.ConfigKey, It.IsAny<ShareLinkSettings>()))
             .ReturnsAsync(new ShareLinkSettings { RestrictToDefaultDomain = false, AllowDownloadLinks = false });
-        var controller = new PublicDownloadController(
-            tickets, shareLinks.Object, Mock.Of<IShareRepository>(), Mock.Of<IFileServiceFactory>(),
-            _contexts.Object, config.Object)
+        var policy = new PublicShareAccessPolicy(shareLinks.Object, Mock.Of<IShareRepository>(), _contexts.Object,
+            config.Object, new LinkAccessNotificationGate());
+        var controller = new PublicDownloadController(tickets, policy, Mock.Of<IFileServiceFactory>())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

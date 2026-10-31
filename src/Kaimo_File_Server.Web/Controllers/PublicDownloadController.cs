@@ -1,5 +1,4 @@
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -12,21 +11,18 @@ namespace Kaimo_File_Server.Web.Controllers;
 /// <summary>
 /// Streams an anonymous public-share download (single file or ZIP of a selection) from a
 /// one-time <see cref="PublicDownloadTicket"/>. The link's policy is re-validated and one
-/// access is atomically consumed at stream time; the transfer runs under the link creator's
-/// identity through the ACL-enforcing <see cref="IFileService"/> and is confined to the
-/// shared item's subtree. An optional per-link bandwidth cap wraps the outgoing stream.
+/// access is atomically consumed at stream time (<see cref="PublicShareAccessPolicy"/>); the
+/// transfer runs under the link creator's identity through the ACL-enforcing
+/// <see cref="IFileService"/> and is confined to the shared item's subtree. An optional
+/// per-link bandwidth cap wraps the outgoing stream.
 /// </summary>
 [ApiController]
 [AllowAnonymous]
 [Route("api/public")]
 public sealed class PublicDownloadController(
     PublicDownloadTicketStore tickets,
-    IShareLinkRepository shareLinks,
-    IShareRepository shares,
-    IFileServiceFactory fileServiceFactory,
-    IUserContextFactory userContextFactory,
-    Infrastructure.Configuration.IConfigRepository config,
-    Core.Services.Notifications.INotificationPublisher? notifications = null) : ControllerBase
+    PublicShareAccessPolicy accessPolicy,
+    IFileServiceFactory fileServiceFactory) : ControllerBase
 {
     [HttpGet("download")]
     public async Task<IActionResult> Download(string ticket, CancellationToken ct)
@@ -35,56 +31,21 @@ public sealed class PublicDownloadController(
             || !tickets.TryConsume(ticket, out var download) || download is null)
             return BadRequest("The download link is invalid or has expired.");
 
-        // Defense in depth: tickets are only issued by the host-checked /shared page, but a
-        // download is also served only under an allowed host (checked after the cheap ticket gate).
-        if (!await ShareLinkSettings.AllowsHostAsync(config, Request.Host.Host))
-            return NotFound();
-
-        // Download links switched off globally: an already issued ticket stops working too.
-        if (!(await config.GetAsync(ShareLinkSettings.ConfigKey, ShareLinkSettings.Default())).AllowDownloadLinks)
-            return NotFound();
-
-        // Atomic policy gate: enabled + within window + not exhausted, plus one access consumed.
-        Core.Domain.ShareLink? link;
-        try
+        // Defense in depth: tickets are only issued by the host-checked /shared page, but the
+        // policy also serves a download only under an allowed host.
+        var access = await accessPolicy.ConsumeAsync(download.Token, Request.Host.Host, download.RelativePaths);
+        switch (access.Denial)
         {
-            link = await shareLinks.TryConsumeAccessAsync(download.Token);
+            case PublicShareDenial.None: break;
+            case PublicShareDenial.InvalidPath: return BadRequest("The download path is invalid.");
+            case PublicShareDenial.OutsideRoot: return Forbid();
+            default: return NotFound();
         }
-        catch (Core.Security.ReadOnlyDemoException)
-        {
-            // Read-only demo: the access counter cannot be persisted, so apply the same
-            // policy check without consuming an access.
-            link = await shareLinks.GetByTokenAsync(download.Token);
-            if (link is not null
-                && (link.Kind != Core.Domain.ShareLinkKind.Download || !link.IsCurrentlyActive(DateTime.UtcNow)))
-                link = null;
-        }
-        if (link is null)
-            return NotFound();
-
-        var share = await shares.GetByIdAsync(link.ShareId);
-        var actor = await userContextFactory.CreateByUserIdAsync(link.CreatedByUserId);
-        // Re-checked per download: a link stops working once its creator is disabled.
-        if (share is null || !share.IsEnabled || actor is null || !actor.User.IsEnabled)
-            return NotFound();
-
-        // Defense in depth: every requested path must sit within the shared item's subtree.
-        var root = ShareRelativePath.Normalize(link.RootRelativePath);
-        var requested = new List<string>();
-        foreach (var raw in download.RelativePaths)
-        {
-            if (!ShareRelativePath.TryNormalizeStrict(raw, out var rel, allowRoot: false))
-                return BadRequest("The download path is invalid.");
-            if (!IsWithin(rel, root))
-                return Forbid();
-            requested.Add(rel);
-        }
+        var (link, share, actor, requested) = (access.Link!, access.Share!, access.Actor!, access.Paths!);
         if (requested.Count == 0)
             return BadRequest("Nothing to download.");
 
-        if (notifications is not null)
-            await notifications.PublishAsync(Core.Services.Notifications.NotificationEvents.LinkAccessed(
-                link.Id, link.DisplayName, link.CreatedByUserId, download.DownloadName), CancellationToken.None);
+        await accessPolicy.NotifyAccessedAsync(link, download.VisitId, download.DownloadName);
 
         var fs = fileServiceFactory.CreateForShare(share);
 
@@ -125,9 +86,4 @@ public sealed class PublicDownloadController(
             return NotFound();
         }
     }
-
-    private static bool IsWithin(string path, string root)
-        => root.Length == 0
-           || string.Equals(path, root, StringComparison.OrdinalIgnoreCase)
-           || path.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase);
 }

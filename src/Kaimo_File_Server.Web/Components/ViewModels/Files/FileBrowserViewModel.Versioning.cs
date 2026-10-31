@@ -124,7 +124,7 @@ public partial class FileBrowserViewModel
         }
     }
 
-    private static async Task<byte[]> ReadAllBytesAsync(Stream stream)
+    protected static async Task<byte[]> ReadAllBytesAsync(Stream stream)
     {
         if (stream.Length > int.MaxValue)
             throw new IOException("The file is too large to return as a single byte array.");

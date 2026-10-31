@@ -180,8 +180,13 @@ else if (_state == State.Upload)
     private string? _passwordInput;
     private string? _passwordError;
 
+    // One visitor page session: "link accessed" is notified once per visit, not per file.
+    private readonly Guid _visitId = Guid.NewGuid();
+
     private static string T(string key, string fallback)
         => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    protected override void OnInitialized() => Vm.LinkUnavailable += OnLinkUnavailable;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -201,23 +206,9 @@ else if (_state == State.Upload)
             // driven from this page, so this one gate covers them all.
             if (!await ShareLinks.IsAllowedHostAsync(Client.Host)) { _state = State.NotFound; return; }
 
-            _link = await ShareLinks.GetByTokenAsync(Token);
-            if (_link is null) { _state = State.NotFound; return; }
+            if (await CheckLinkAsync() is { } denied) { _state = denied; return; }
 
-            if (!_link.IsWindowOpen(DateTime.UtcNow)) { _state = State.Unavailable; return; }
-
-            var share = await Shares.GetByIdAsync(_link.ShareId);
-            if (share is null || !share.IsEnabled) { _state = State.Unavailable; return; }
-            if (await ShareLinks.ResolveCreatorAsync(_link) is null) { _state = State.Unavailable; return; }
-            _shareName = share.Name;
-
-            // Both link kinds honour their global switch (uploads also demo mode) already on the landing page.
-            if (_link.Kind == ShareLinkKind.Upload && !await Uploads.IsUploadEnabledAsync())
-            { _state = State.Unavailable; return; }
-            if (_link.Kind == ShareLinkKind.Download && !(await ShareLinks.GetSettingsAsync()).AllowDownloadLinks)
-            { _state = State.Unavailable; return; }
-
-            if (_link.PasswordHash is not null && !_unlocked) { _state = State.Password; return; }
+            if (_link!.PasswordHash is not null && !_unlocked) { _state = State.Password; return; }
 
             if (_link.Kind == ShareLinkKind.Upload)
             {
@@ -225,7 +216,7 @@ else if (_state == State.Upload)
             }
             else if (_link.IsDirectory)
             {
-                Vm.Initialize(_link);
+                Vm.Initialize(_link, _visitId, Client.Host);
                 _state = State.Folder;
             }
             else
@@ -238,6 +229,37 @@ else if (_state == State.Upload)
             _state = State.NotFound;
         }
     }
+
+    /// <summary>
+    /// Re-reads the link and everything it depends on. Null when it is usable, otherwise the
+    /// state to show. A used-up link (access count or upload quota) is unavailable for both kinds.
+    /// </summary>
+    private async Task<State?> CheckLinkAsync()
+    {
+        _link = await ShareLinks.GetByTokenAsync(Token);
+        if (_link is null) return State.NotFound;
+
+        if (!_link.IsCurrentlyActive(DateTime.UtcNow)) return State.Unavailable;
+
+        var share = await Shares.GetByIdAsync(_link.ShareId);
+        if (share is null || !share.IsEnabled) return State.Unavailable;
+        if (await ShareLinks.ResolveCreatorAsync(_link) is null) return State.Unavailable;
+        _shareName = share.Name;
+
+        // Both link kinds honour their global switch (uploads also demo mode).
+        if (_link.Kind == ShareLinkKind.Upload && !await Uploads.IsUploadEnabledAsync()) return State.Unavailable;
+        if (_link.Kind == ShareLinkKind.Download && !(await ShareLinks.GetSettingsAsync()).AllowDownloadLinks)
+            return State.Unavailable;
+        return null;
+    }
+
+    // The folder browser found the link revoked, expired or used up.
+    private void OnLinkUnavailable()
+        => _ = InvokeAsync(() =>
+        {
+            _state = State.Unavailable;
+            StateHasChanged();
+        });
 
     private async Task OnPasswordKeyDown(KeyboardEventArgs e)
     {
@@ -260,7 +282,7 @@ else if (_state == State.Upload)
                 return;
             }
             _state = _link.IsDirectory ? State.Folder : State.File;
-            if (_link.IsDirectory) Vm.Initialize(_link);
+            if (_link.IsDirectory) Vm.Initialize(_link, _visitId, Client.Host);
         }
         else
         {
@@ -323,6 +345,13 @@ else if (_state == State.Upload)
         // Always take the registered folders so they can never leak into a later selection.
         var pending = Interlocked.Exchange(ref _pendingUploadPaths, null);
         if (_link is null || _busy) return;
+
+        // The link may have been used up, disabled or expired since the page opened.
+        if (await CheckLinkAsync() is { } denied)
+        {
+            _state = denied;
+            return;
+        }
 
         IReadOnlyList<IBrowserFile> files;
         try
@@ -424,6 +453,7 @@ else if (_state == State.Upload)
 
     public void Dispose()
     {
+        Vm.LinkUnavailable -= OnLinkUnavailable;
         _uploadCts?.Cancel();
         _dotNetRef?.Dispose();
     }
@@ -431,8 +461,13 @@ else if (_state == State.Upload)
     private async Task DownloadFileAsync()
     {
         if (_link is null) return;
-        var rel = ShareRelativePath.Normalize(_link.RootRelativePath);
-        var ticket = ShareLinks.IssueTicket(_link, new[] { rel }, zip: false, downloadName: _link.DisplayName);
+        if (await CheckLinkAsync() is { } denied)
+        {
+            _state = denied;
+            return;
+        }
+        var rel = ShareRelativePath.Normalize(_link!.RootRelativePath);
+        var ticket = ShareLinks.IssueTicket(_link, new[] { rel }, zip: false, downloadName: _link.DisplayName, _visitId);
         var url = "/api/public/download?ticket=" + Uri.EscapeDataString(ticket);
         await JS.InvokeVoidAsync("filePreview.downloadFromUrl", url, _link.DisplayName);
     }

@@ -34,5 +34,11 @@ public sealed class BrowserCapabilitiesReadOnlyTests
         Assert.True(_ro.HasProperties);
         Assert.True(_ro.HasSearchIntegration);
         Assert.True(_ro.ShowDirectorySizes);
+        Assert.True(_ro.CanHash);
     }
+
+    // Only the anonymous public browser opts out; every other backend keeps "Create hash".
+    [Fact]
+    public void Hashing_is_on_by_default()
+        => Assert.True(new BrowserCapabilities().CanHash);
 }

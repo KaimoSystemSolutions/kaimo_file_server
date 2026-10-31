@@ -28,6 +28,8 @@ public sealed record BrowserCapabilities
     public bool HasCloudSync { get; init; }
     public bool HasSearchIntegration { get; init; }
     public bool ShowDirectorySizes { get; init; }
+    /// <summary>"Create hash" reads the whole file server-side; the anonymous public browser opts out.</summary>
+    public bool CanHash { get; init; } = true;
 
     /// <summary>
     /// Same backend with every write/mutation action removed (read-only demo mode).
