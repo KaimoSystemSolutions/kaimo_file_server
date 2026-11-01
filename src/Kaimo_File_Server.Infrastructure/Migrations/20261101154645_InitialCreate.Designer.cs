@@ -6,24 +6,362 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using NpgsqlTypes;
 
 #nullable disable
 
 namespace Kaimo_File_Server.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260925121322_SecurityHardeningRound3")]
-    partial class SecurityHardeningRound3
+    [Migration("20261101154645_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AlertAfterDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ContentLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IncludeRecycleBin")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IncludeVersions")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastRunAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastScheduledSlotUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("LastStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("LastSuccessAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("RepositoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Retention")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Schedule")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("RepositoryId");
+
+                    b.ToTable("backup_jobs", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupJobSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PoolPath")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid?>("ShareId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobId");
+
+                    b.HasIndex("ShareId");
+
+                    b.ToTable("backup_job_sources", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupRepository", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Backend")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EncryptedPassword")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EncryptedSecrets")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsAppendOnly")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("KitConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("KitConfirmedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("KitDownloadedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastCheckAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool?>("LastCheckOk")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("LastMaintenanceSlotUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastReachableAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastReadDataAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MaintenanceSchedule")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("MinFreeSpaceGb")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("MirrorTargetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("ReadDataMonthly")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ResticRepositoryId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("SettingsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TestRestoreSampleSize")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MirrorTargetId");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("backup_repositories", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupRepositoryDepartment", b =>
+                {
+                    b.Property<Guid>("RepositoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("RepositoryId", "DepartmentId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.ToTable("backup_repository_departments", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("BytesAdded")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("BytesProcessed")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("DetailsJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("FilesChanged")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("FilesNew")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("FilesUnmodified")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("FinishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LogExcerpt")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("QueuedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RepositoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SnapshotIdsJson")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Trigger")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("WarningCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QueuedAtUtc");
+
+                    b.HasIndex("RepositoryId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("JobId", "QueuedAtUtc");
+
+                    b.ToTable("backup_runs", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupSnapshot", b =>
+                {
+                    b.Property<Guid>("RepositoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SnapshotId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("ContentLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("FileCount")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PathsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PoolPath")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid?>("RunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ShareId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TagsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("TimeUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("TotalBytes")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("RepositoryId", "SnapshotId");
+
+                    b.HasIndex("JobId");
+
+                    b.HasIndex("ShareId", "TimeUtc");
+
+                    b.ToTable("backup_snapshots", (string)null);
+                });
 
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.ClientSync.ClientRequestReceipt", b =>
                 {
@@ -216,6 +554,13 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<bool>("DisplayNameSetByAdmin")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("HardwareIdHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<DateTime>("LastSeenUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -237,6 +582,8 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "HardwareIdHash");
 
                     b.ToTable("sync_devices", (string)null);
                 });
@@ -451,12 +798,74 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
 
                     b.HasIndex("SnapshotTimestampUtc");
 
+                    b.HasIndex("StoragePath");
+
                     b.HasIndex("ShareId", "FilePath", "ContentHash");
 
                     b.HasIndex("ShareId", "FilePath", "SnapshotTimestampUtc")
                         .IsUnique();
 
                     b.ToTable("file_versions", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.FileVersionMissingPath", b =>
+                {
+                    b.Property<Guid>("ShareId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FilePath")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("MissingSinceUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("ShareId", "FilePath");
+
+                    b.ToTable("file_version_missing_paths", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.ClientActivityBucket", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("ApiRequests")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("HourUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastPath")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTime>("LastSeenUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("RejectedRequests")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("WebDavRequests")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LastSeenUtc");
+
+                    b.HasIndex("Address", "HourUtc")
+                        .IsUnique();
+
+                    b.ToTable("client_activity", (string)null);
                 });
 
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.Identity", b =>
@@ -475,6 +884,55 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.ToTable((string)null);
 
                     b.UseTpcMappingStrategy();
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.LoginAttemptRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("AtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime?>("LockedUntilUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("RepeatCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AtUtc");
+
+                    b.HasIndex("LockedUntilUtc");
+
+                    b.HasIndex("Username", "AtUtc");
+
+                    b.ToTable("login_attempts", (string)null);
                 });
 
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.RevokedWebToken", b =>
@@ -504,6 +962,269 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.HasKey("UserId", "GroupId");
 
                     b.ToTable("user_groups", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.UserRecoveryCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CodeHash");
+
+                    b.ToTable("user_recovery_codes", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.UserSecondFactor", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("LastUsedStep")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("SecretProtected")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("user_second_factors", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Notifications.MailDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DedupKey")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<long>("EventSeq")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("HtmlBody")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("NextAttemptUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RuleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("TextBody")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ToAddress")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<Guid?>("ToUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("Status", "NextAttemptUtc");
+
+                    b.HasIndex("RuleId", "DedupKey", "ToAddress", "CreatedAtUtc");
+
+                    b.ToTable("mail_deliveries", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Notifications.MailRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("RecipientsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("ThrottleMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventType");
+
+                    b.ToTable("mail_rules", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Notifications.MailTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("HtmlTemplate")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("SubjectTemplate")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("TextTemplate")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventType", "Language")
+                        .IsUnique();
+
+                    b.ToTable("mail_templates", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Notifications.NotificationEvent", b =>
+                {
+                    b.Property<long>("Seq")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Seq"));
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DedupKey")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("LeaseUntilUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SubjectUserIdsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Seq");
+
+                    b.HasIndex("Status", "Seq");
+
+                    b.ToTable("notification_events", (string)null);
                 });
 
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.ProviderProfile", b =>
@@ -561,6 +1282,45 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.HasIndex("ProviderId", "Enabled");
 
                     b.ToTable("provider_profiles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("e76c2a65-8bbd-4fac-b3f5-f663bc9df5df"),
+                            AllowedScopes = "offline_access Files.ReadWrite User.Read",
+                            AuthorizationMode = 0,
+                            CreatedAtUtc = new DateTime(2026, 8, 18, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Enabled = true,
+                            Name = "Kaimo Microsoft public client",
+                            ProviderId = "onedrive",
+                            PublicClientId = "e966f5be-e8a1-4c67-b322-aac34c1ab642",
+                            TenantOrOrganizationId = "common",
+                            UpdatedAtUtc = new DateTime(2026, 8, 18, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.RecycleBinEntry", b =>
+                {
+                    b.Property<Guid>("ShareId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Path")
+                        .HasColumnType("text");
+
+                    b.Property<long>("CtimeTicks")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("FirstSeenUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("ShareId", "Path");
+
+                    b.HasIndex("ShareId", "FirstSeenUtc");
+
+                    b.ToTable("recycle_bin_entries", (string)null);
                 });
 
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.SambaLifecycleEventReceipt", b =>
@@ -626,6 +1386,11 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.Property<bool>("IsShareHidden")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsUserHomes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -635,9 +1400,22 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<long?>("RecycleMaxSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("RecycleMaxSizeMode")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RecycleRetentionDays")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("DepartmentId");
+
+                    b.HasIndex("IsUserHomes")
+                        .IsUnique()
+                        .HasFilter("\"IsUserHomes\"");
 
                     b.HasIndex("Name")
                         .IsUnique();
@@ -653,6 +1431,10 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
 
                     b.Property<int>("AccessCount")
                         .HasColumnType("integer");
+
+                    b.Property<string>("AllowedExtensions")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<string>("BaseAddress")
                         .HasMaxLength(2000)
@@ -678,6 +1460,9 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
                     b.Property<string>("LegacyToken")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)")
@@ -687,6 +1472,12 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<long?>("MaxBytesPerSecond")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("MaxFileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("MaxTotalBytes")
                         .HasColumnType("bigint");
 
                     b.Property<string>("PasswordHash")
@@ -714,6 +1505,9 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("UploadedBytes")
+                        .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
@@ -1141,6 +1935,94 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.ToTable("config_settings", (string)null);
                 });
 
+            modelBuilder.Entity("Kaimo_File_Server.Infrastructure.Persistence.SearchDocumentRecord", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("AbsolutePath")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<NpgsqlTsVector>("ContentTsv")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tsvector")
+                        .HasDefaultValueSql("''::tsvector");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("FileModifiedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("FileType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("IndexedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDirectory")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ShareName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SharePath")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AbsolutePath");
+
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("AbsolutePath"), new[] { "text_pattern_ops" });
+
+                    b.HasIndex("ContentTsv");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ContentTsv"), "gin");
+
+                    b.HasIndex("FileName");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("FileName"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("FileName"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("ShareName", "SharePath");
+
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("ShareName", "SharePath"), new[] { "text_ops", "text_pattern_ops" });
+
+                    b.ToTable("search_documents", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Infrastructure.Persistence.SearchTermRecord", b =>
+                {
+                    b.Property<string>("Term")
+                        .HasColumnType("text");
+
+                    b.HasKey("Term");
+
+                    b.HasIndex("Term");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Term"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Term"), new[] { "gin_trgm_ops" });
+
+                    b.ToTable("search_terms", (string)null);
+                });
+
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.Group", b =>
                 {
                     b.HasBaseType("Kaimo_File_Server.Core.Domain.Identity.Identity");
@@ -1193,6 +2075,11 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<bool>("HomeDirectoryEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -1226,6 +2113,14 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<int>("ServiceAccess")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(15);
+
+                    b.Property<DateTime?>("SmbUnlockRequestedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -1235,6 +2130,70 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupJob", b =>
+                {
+                    b.HasOne("Kaimo_File_Server.Core.Domain.Backup.BackupRepository", null)
+                        .WithMany()
+                        .HasForeignKey("RepositoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupJobSource", b =>
+                {
+                    b.HasOne("Kaimo_File_Server.Core.Domain.Backup.BackupJob", null)
+                        .WithMany("Sources")
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Kaimo_File_Server.Core.Domain.ShareDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("ShareId")
+                        .OnDelete(DeleteBehavior.Cascade);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupRepository", b =>
+                {
+                    b.HasOne("Kaimo_File_Server.Core.Domain.Backup.BackupRepository", null)
+                        .WithMany()
+                        .HasForeignKey("MirrorTargetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupRepositoryDepartment", b =>
+                {
+                    b.HasOne("Kaimo_File_Server.Core.Domain.Department.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Kaimo_File_Server.Core.Domain.Backup.BackupRepository", null)
+                        .WithMany()
+                        .HasForeignKey("RepositoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupRun", b =>
+                {
+                    b.HasOne("Kaimo_File_Server.Core.Domain.Backup.BackupRepository", null)
+                        .WithMany()
+                        .HasForeignKey("RepositoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupSnapshot", b =>
+                {
+                    b.HasOne("Kaimo_File_Server.Core.Domain.Backup.BackupRepository", null)
+                        .WithMany()
+                        .HasForeignKey("RepositoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.ClientSync.ClientRequestReceipt", b =>
@@ -1288,6 +2247,33 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ConnectionId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.UserRecoveryCode", b =>
+                {
+                    b.HasOne("Kaimo_File_Server.Core.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.UserSecondFactor", b =>
+                {
+                    b.HasOne("Kaimo_File_Server.Core.Domain.Identity.User", null)
+                        .WithOne()
+                        .HasForeignKey("Kaimo_File_Server.Core.Domain.Identity.UserSecondFactor", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.RecycleBinEntry", b =>
+                {
+                    b.HasOne("Kaimo_File_Server.Core.Domain.ShareDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("ShareId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -1349,6 +2335,11 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .HasForeignKey("FileMetadataId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Backup.BackupJob", b =>
+                {
+                    b.Navigation("Sources");
                 });
 
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.FileMetadata", b =>

@@ -31,7 +31,9 @@ asynchronously from the change log.
 PostgreSQL 17 (Npgsql provider) is the only database. All .NET processes use one EF Core context,
 `ApplicationDbContext` (`src/Kaimo_File_Server.Infrastructure/Persistence/ApplicationDbContext.cs`),
 obtained through `IDbContextFactory<ApplicationDbContext>`. Migrations live in
-`src/Kaimo_File_Server.Infrastructure/Migrations/` and are applied only by the Host.
+`src/Kaimo_File_Server.Infrastructure/Migrations/` and are applied only by the Host. Release 1.0
+starts from a single baseline migration (`InitialCreate`); pre-1.0 beta databases cannot be
+upgraded, and the Host refuses any database whose migration history it does not know.
 
 Tables by area:
 

@@ -22,6 +22,22 @@ public partial class ApplicationDbContext
             entity.Property(x => x.AllowedScopes).HasColumnType("text");
             entity.HasIndex(x => x.Name).IsUnique();
             entity.HasIndex(x => new { x.ProviderId, x.Enabled });
+            // New OneDrive connections reference this profile; fixed values keep the
+            // seed stable so EF never generates an update migration for it.
+            var seededAt = new DateTime(2026, 8, 18, 0, 0, 0, DateTimeKind.Utc);
+            entity.HasData(new ProviderProfile
+            {
+                Id = WellKnownProviderProfiles.MicrosoftPublicClient,
+                ProviderId = "onedrive",
+                Name = "Kaimo Microsoft public client",
+                AuthorizationMode = StorageAuthorizationMode.DeviceCode,
+                TenantOrOrganizationId = "common",
+                PublicClientId = "e966f5be-e8a1-4c67-b322-aac34c1ab642",
+                AllowedScopes = "offline_access Files.ReadWrite User.Read",
+                Enabled = true,
+                CreatedAtUtc = seededAt,
+                UpdatedAtUtc = seededAt,
+            });
         });
 
         modelBuilder.Entity<StorageConnection>(entity =>

@@ -1279,6 +1279,21 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.HasIndex("ProviderId", "Enabled");
 
                     b.ToTable("provider_profiles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("e76c2a65-8bbd-4fac-b3f5-f663bc9df5df"),
+                            AllowedScopes = "offline_access Files.ReadWrite User.Read",
+                            AuthorizationMode = 0,
+                            CreatedAtUtc = new DateTime(2026, 8, 18, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Enabled = true,
+                            Name = "Kaimo Microsoft public client",
+                            ProviderId = "onedrive",
+                            PublicClientId = "e966f5be-e8a1-4c67-b322-aac34c1ab642",
+                            TenantOrOrganizationId = "common",
+                            UpdatedAtUtc = new DateTime(2026, 8, 18, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
                 });
 
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.RecycleBinEntry", b =>

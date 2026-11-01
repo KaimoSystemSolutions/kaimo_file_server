@@ -322,12 +322,4 @@ public partial class ResticBackupTests
         Assert.NotNull(node?.ModifiedUtc);
         Assert.Equal(new DateTime(2026, 10, 11, 15, 48, 48, DateTimeKind.Utc).AddTicks(883847), node!.ModifiedUtc!.Value);
     }
-
-    [Fact]
-    public void DefaultMaintenance_MatchesTheMigrationDefault()
-    {
-        // AddBackupIntegrity writes exactly this literal into existing repositories.
-        Assert.Equal("{\"Times\":[\"03:00:00\"],\"Days\":[0]}", BackupSchedule.Serialize(BackupSchedule.DefaultMaintenance()));
-        Assert.True(BackupRetention.Deserialize("{}").IsEmpty);
-    }
 }

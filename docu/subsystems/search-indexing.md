@@ -89,7 +89,7 @@ so the router replaces the `NoOpSearchService` fallback. The Elasticsearch URL d
 
 ## Local index
 
-- Table `search_documents` (migrations `AddLocalSearchIndex`, `AddSearchWordIndex`) with a trigram
+- Table `search_documents` with a trigram
   GIN index (`pg_trgm`) on `FileName`, a GIN index on the word vector `ContentTsv`, and
   `text_pattern_ops` b-tree indexes for prefix scans; table `search_terms` is the word dictionary
   (every word any document contains, trigram GIN index). `pg_trgm` is a trusted extension; external

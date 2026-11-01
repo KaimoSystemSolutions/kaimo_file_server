@@ -77,6 +77,10 @@ public static partial class ServiceCollectionExtensions
                     //    existing data (applied migrations) AND pending changes.
                     //    Skipped right after a restore (that dump IS the backup)
                     //    and on a fresh database (nothing to protect yet).
+                    // A beta database (or one from a newer release) must stop here, before
+                    // MigrateAsync tries to create tables that already exist.
+                    await ThrowIfUnknownMigrationsAsync(db);
+
                     if (!justRestored)
                     {
                         var applied = await db.Database.GetAppliedMigrationsAsync();
@@ -226,12 +230,7 @@ public static partial class ServiceCollectionExtensions
     internal static async Task<string?> CheckSchemaReadyAsync(ApplicationDbContext db)
     {
         var known = db.Database.GetMigrations().ToList();
-        var applied = (await db.Database.GetAppliedMigrationsAsync()).ToList();
-        var unknown = applied.Except(known, StringComparer.Ordinal).ToList();
-        if (unknown.Count > 0)
-            throw new SchemaVersionMismatchException(
-                "This container image is older than the database schema (unknown migrations: " +
-                string.Join(", ", unknown) + "). Update it to the same version as the Host.");
+        var applied = await ThrowIfUnknownMigrationsAsync(db);
 
         var pending = known.Except(applied, StringComparer.Ordinal).Count();
         if (pending > 0)
@@ -245,6 +244,24 @@ public static partial class ServiceCollectionExtensions
         return string.Equals(marker, expected, StringComparison.Ordinal)
             ? null
             : "seeding not finished yet";
+    }
+
+    /// <summary>
+    /// Throws <see cref="SchemaVersionMismatchException"/> when the database carries
+    /// migrations this build does not know: either a newer release, or a pre-1.0 beta
+    /// whose migration history was replaced by the 1.0 baseline. Returns the applied ids.
+    /// </summary>
+    internal static async Task<List<string>> ThrowIfUnknownMigrationsAsync(ApplicationDbContext db)
+    {
+        var known = db.Database.GetMigrations().ToHashSet(StringComparer.Ordinal);
+        var applied = (await db.Database.GetAppliedMigrationsAsync()).ToList();
+        var unknown = applied.Where(m => !known.Contains(m)).ToList();
+        if (unknown.Count > 0)
+            throw new SchemaVersionMismatchException(
+                "The database schema was created by a different version (unknown migrations: " +
+                string.Join(", ", unknown) + "). Either this image is older than the Host, or the " +
+                "database comes from a pre-1.0 beta, which 1.0 cannot upgrade: start with an empty database.");
+        return applied;
     }
 
     /// <summary>

@@ -121,8 +121,9 @@ connection was not silently re-established (which would have dropped the lock) a
 the startup sequence under a fresh lock. A Web or bridge process that starts while the Host seeds therefore waits even when the
 release changed seeding without adding a migration. Only a process that checks before the Host has
 connected at all still passes on the previous run's marker. A Web or bridge image that finds applied migrations it does not know is older than
-the schema; it stops at once with an explicit error instead of writing to a newer schema. Only the
-Host ever migrates.
+the schema; it stops at once with an explicit error instead of writing to a newer schema. The Host
+applies the same check before migrating, which also rejects pre-1.0 beta databases (their history
+predates the 1.0 baseline migration). Only the Host ever migrates.
 
 Host, bridge, Web, Samba, PostgreSQL and Elasticsearch run with `restart: unless-stopped`, so the
 stack comes back after a reboot or Docker restart, and a process that exits during startup (e.g. the
