@@ -40,6 +40,7 @@ MIB = 1024 * 1024
 def archive(tmp_path, monkeypatch):
     monkeypatch.setenv("KAIMO_LOG_ARCHIVE_ROOT", str(tmp_path / "logs"))
     monkeypatch.setenv("KAIMO_LOG_CONSOLE_LEVEL_FILE", str(tmp_path / "level"))
+    monkeypatch.setenv("KAIMO_AUTH_EVENT_SPOOL", str(tmp_path / "auth-events"))
     for name in (
         "KAIMO_LOG_ARCHIVE_MAX_FILE_BYTES",
         "KAIMO_LOG_ARCHIVE_RETENTION_DAYS",

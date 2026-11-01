@@ -58,13 +58,65 @@ public sealed class SecurityEventRepository(IDbContextFactory<ApplicationDbConte
         if (increments.Count == 0)
             return;
 
+        // A replay after a lost commit acknowledgement counts the batch twice; acceptable for a counter.
+        await dbFactory.ExecuteResilientAsync(async db =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            foreach (var (id, count) in increments)
+                await db.LoginAttempts
+                    .Where(a => a.Id == id)
+                    .ExecuteUpdateAsync(s => s.SetProperty(a => a.RepeatCount, a => a.RepeatCount + count), ct);
+            await transaction.CommitAsync(ct);
+        }, ct);
+    }
+
+    public async Task<IReadOnlyList<LoginAttemptRecord>> ListRecentAsync(
+        SecurityChannel channel, IReadOnlyCollection<string> usernames, IReadOnlyCollection<string?> addresses,
+        DateTime sinceUtc, CancellationToken ct = default)
+    {
+        if (usernames.Count == 0 && addresses.Count == 0)
+            return [];
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        foreach (var (id, count) in increments)
-            await db.LoginAttempts
-                .Where(a => a.Id == id)
-                .ExecuteUpdateAsync(s => s.SetProperty(a => a.RepeatCount, a => a.RepeatCount + count), ct);
-        await transaction.CommitAsync(ct);
+        var names = usernames.ToList();
+        var from = addresses.OfType<string>().ToList();
+        bool withoutAddress = addresses.Contains(null);
+        var list = await db.LoginAttempts.AsNoTracking()
+            .Where(a => a.Channel == channel
+                        && (a.AtUtc >= sinceUtc || (a.Outcome == LoginOutcome.LockedOut && a.LockedUntilUtc > sinceUtc))
+                        && (names.Contains(a.Username)
+                            || (a.Address != null && from.Contains(a.Address))
+                            || (withoutAddress && a.Address == null)))
+            .OrderBy(a => a.AtUtc).ThenBy(a => a.Id)
+            .ToListAsync(ct);
+        foreach (var a in list)
+        {
+            a.AtUtc = AsUtc(a.AtUtc);
+            if (a.LockedUntilUtc is { } until)
+                a.LockedUntilUtc = AsUtc(until);
+        }
+        return list;
+    }
+
+    public async Task<DateTime?> GetActiveLockUntilAsync(SecurityChannel channel, string username, DateTime sinceUtc, DateTime nowUtc)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var name = username.Trim().ToLowerInvariant();
+        var until = await db.LoginAttempts
+            .Where(a => a.Channel == channel && a.Username == name && a.Outcome == LoginOutcome.LockedOut
+                        && a.AtUtc >= sinceUtc && a.LockedUntilUtc > nowUtc)
+            .MaxAsync(a => a.LockedUntilUtc);
+        return until is { } value ? AsUtc(value) : null;
+    }
+
+    public async Task EndActiveLocksAsync(SecurityChannel channel, string username, DateTime nowUtc)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var name = username.Trim().ToLowerInvariant();
+        await db.LoginAttempts
+            .Where(a => a.Channel == channel && a.Username == name && a.Outcome == LoginOutcome.LockedOut
+                        && a.LockedUntilUtc > nowUtc)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.LockedUntilUtc, nowUtc));
     }
 
     public async Task<SecurityTotals> GetTotalsAsync(DateTime sinceUtc, DateTime nowUtc)
@@ -73,7 +125,8 @@ public sealed class SecurityEventRepository(IDbContextFactory<ApplicationDbConte
         var attempts = db.LoginAttempts.Where(a => a.AtUtc >= sinceUtc);
         var buckets = db.ClientActivityBuckets.Where(b => b.LastSeenUtc >= sinceUtc);
 
-        int successes = await attempts.CountAsync(a => a.Outcome == LoginOutcome.Success);
+        // SMB successes are stored as one counted row per account, address and hour.
+        int successes = await attempts.Where(a => a.Outcome == LoginOutcome.Success).SumAsync(a => a.RepeatCount);
         int failures = await attempts.Where(a => a.Outcome != LoginOutcome.Success).SumAsync(a => a.RepeatCount);
         // Accounts only: a locked address locks no account (see LoginOutcome.AddressLockedOut).
         int activeLockouts = await db.LoginAttempts
@@ -91,19 +144,22 @@ public sealed class SecurityEventRepository(IDbContextFactory<ApplicationDbConte
         DateTime sinceUtc, DateTime nowUtc, int limit)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        // Address lockouts are logged without an account and belong to no account summary.
-        var inPeriod = db.LoginAttempts.Where(a => a.AtUtc >= sinceUtc && a.Outcome != LoginOutcome.AddressLockedOut);
+        // Address lockouts and the SMB address rows of a user-name spray are logged without an
+        // account and belong to no account summary.
+        var inPeriod = db.LoginAttempts.Where(a => a.AtUtc >= sinceUtc && a.Outcome != LoginOutcome.AddressLockedOut
+                                                   && a.Username != "");
 
         var rows = await inPeriod
             .GroupBy(a => a.Username)
             .Select(g => new
             {
                 Username = g.Key,
-                Successes = g.Count(a => a.Outcome == LoginOutcome.Success),
-                Failures = g.Count(a => a.Outcome == LoginOutcome.InvalidCredentials
-                                        || a.Outcome == LoginOutcome.AccountDisabled
-                                        || a.Outcome == LoginOutcome.AddressNotAllowed
-                                        || a.Outcome == LoginOutcome.ServiceDisabled),
+                Successes = g.Sum(a => a.Outcome == LoginOutcome.Success ? a.RepeatCount : 0),
+                // SMB failures are counted rows, like SMB successes.
+                Failures = g.Sum(a => a.Outcome == LoginOutcome.InvalidCredentials
+                                      || a.Outcome == LoginOutcome.AccountDisabled
+                                      || a.Outcome == LoginOutcome.AddressNotAllowed
+                                      || a.Outcome == LoginOutcome.ServiceDisabled ? a.RepeatCount : 0),
                 Lockouts = g.Sum(a => a.Outcome == LoginOutcome.LockedOut ? a.RepeatCount : 0),
                 Addresses = g.Select(a => a.Address).Distinct().Count(),
                 LastAttemptUtc = g.Max(a => a.AtUtc),

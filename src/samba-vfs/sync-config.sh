@@ -42,6 +42,19 @@ if ! CONFIG_RECORD="$(printf '%s' "$OUT" | jq -s -e -r '
     def dialect:
         . == "SMB2_02" or . == "SMB2_10" or . == "SMB3_00"
         or . == "SMB3_02" or . == "SMB3_11";
+    def int_between($low; $high):
+        type == "number" and . == floor and . >= $low and . <= $high;
+    # Canonical CIDR only (the bridge normalizes): no separators, quotes or
+    # spaces can reach the `hosts allow` value.
+    def cidr4:
+        [match("^([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})/([0-9]{1,2})$")
+            .captures[].string | tonumber] as $p
+        | ($p | length) == 5 and ($p[0:4] | all(. <= 255)) and $p[4] <= 32;
+    # Dots: .NET writes IPv4-compatible/translated networks as ::10.0.0.0/104.
+    def cidr6:
+        length <= 50 and test("^[0-9A-Fa-f:]*:[0-9A-Fa-f:.]*/[0-9]{1,3}$")
+        and ((split("/")[1] | tonumber) <= 128);
+    def network: type == "string" and (cidr4 or cidr6);
     if length != 1 then error("expected exactly one JSON document")
     else .[0]
     end
@@ -52,7 +65,8 @@ if ! CONFIG_RECORD="$(printf '%s' "$OUT" | jq -s -e -r '
        or (.config | exact_keys([
             "min_protocol", "max_protocol", "require_signing",
             "require_encryption", "enabled", "enable_ws_discovery",
-            "enable_audit_log", "log_level"]) | not)
+            "enable_audit_log", "log_level", "lockout_enabled",
+            "lockout_attempts", "lockout_minutes", "hosts_allow"]) | not)
        or ((.config.min_protocol | type) != "string")
        or (.config.min_protocol | dialect | not)
        or ((.config.max_protocol | type) != "string")
@@ -67,6 +81,15 @@ if ! CONFIG_RECORD="$(printf '%s' "$OUT" | jq -s -e -r '
             or .config.log_level == "Information"
             or .config.log_level == "Warning"
             or .config.log_level == "Error") | not)
+       or (.config.lockout_enabled | type) != "boolean"
+       or (.config.lockout_attempts | int_between(0; 1000) | not)
+       or (.config.lockout_minutes | int_between(0; 10080) | not)
+       # An enabled lockout needs both values; an old bridge sends neither and false.
+       or (.config.lockout_enabled
+           and (.config.lockout_attempts < 1 or .config.lockout_minutes < 1))
+       or (.config.hosts_allow | type) != "array"
+       or (.config.hosts_allow | length) > 256
+       or (.config.hosts_allow | all(network) | not)
     then error("invalid config sync schema")
     else .config | [
         .min_protocol, .max_protocol,
@@ -75,14 +98,20 @@ if ! CONFIG_RECORD="$(printf '%s' "$OUT" | jq -s -e -r '
         (if .enabled then "1" else "0" end),
         (if .enable_ws_discovery then "1" else "0" end),
         (if .enable_audit_log then "1" else "0" end),
-        .log_level
+        .log_level,
+        (if .lockout_enabled then "1" else "0" end),
+        (.lockout_attempts | tostring),
+        (.lockout_minutes | tostring),
+        (.hosts_allow | join(" "))
     ] | @tsv
     end
 ')"; then
     echo "[sync-config] Invalid structured config response." >&2
     exit 1
 fi
-IFS=$'\t' read -r min_proto max_proto req_sign req_enc enabled wsdd_on audit_on app_log_level <<<"$CONFIG_RECORD"
+# hosts_allow stays last: an empty list is an empty trailing field.
+IFS=$'\t' read -r min_proto max_proto req_sign req_enc enabled wsdd_on audit_on app_log_level \
+    lockout_on lockout_attempts lockout_minutes hosts_allow <<<"$CONFIG_RECORD"
 
 dialect_rank() {
     case "$1" in
@@ -224,6 +253,66 @@ else
     apply "vfs objects"        "kaimo_bridge" || exit 1
 fi
 
+# --- AP8c: client networks (`hosts allow`) ---
+# Loopback always stays allowed: the container health checks connect locally.
+# An empty list removes the parameter (every network allowed).
+hosts_changed=0
+if [ -n "$hosts_allow" ]; then
+    desired_hosts="127.0.0.1 ::1 $hosts_allow"
+    [ "${global_params[hosts allow]-}" = "$desired_hosts" ] || hosts_changed=1
+    apply "hosts allow" "$desired_hosts" || exit 1
+elif [ -n "${global_params[hosts allow]+set}" ]; then
+    net conf delparm global "hosts allow" >/dev/null 2>&1 || {
+        echo "[sync-config] FAILED to remove 'hosts allow'." >&2
+        exit 1
+    }
+    echo "[sync-config] hosts allow: removed (every network allowed)."
+    changed=1
+    hosts_changed=1
+fi
+
+# --- AP8b: SMB account lockout (tdbsam account policies) ---
+# Samba keeps these in the passdb, not in the registry. The applied values are
+# remembered on tmpfs so a steady cycle costs no pdbedit call; after a restart
+# they are applied once more, which is idempotent. Switched off, only the
+# attempt threshold drops to 0; existing locks still expire after their duration.
+LOCKOUT_STATE_FILE="${KAIMO_SMB_LOCKOUT_STATE_FILE:-/var/run/kaimo/smb-lockout-applied}"
+if [ "$lockout_on" = "1" ]; then
+    desired_lockout="$lockout_attempts $lockout_minutes"
+else
+    desired_lockout="0 -"
+fi
+set_policy() {
+    local policy="$1" value="$2" actual
+    pdbedit -P "$policy" -C "$value" >/dev/null 2>&1 || {
+        echo "[sync-config] FAILED to set account policy '$policy'." >&2
+        return 1
+    }
+    actual="$(pdbedit -P "$policy" 2>/dev/null | sed -n 's/.*value is: \(-\{0,1\}[0-9][0-9]*\).*/\1/p' | tail -n 1)"
+    if [ "$actual" != "$value" ]; then
+        echo "[sync-config] FAILED verification for account policy '$policy': '$actual' != '$value'." >&2
+        return 1
+    fi
+}
+if [ "$(cat -- "$LOCKOUT_STATE_FILE" 2>/dev/null)" != "$desired_lockout" ]; then
+    rm -f -- "$LOCKOUT_STATE_FILE"
+    if [ "$lockout_on" = "1" ]; then
+        set_policy "bad lockout attempt" "$lockout_attempts" || exit 1
+        set_policy "lockout duration" "$lockout_minutes" || exit 1
+        set_policy "reset count minutes" "$lockout_minutes" || exit 1
+        echo "[sync-config] smb lockout: $lockout_attempts attempts, $lockout_minutes minutes."
+    else
+        set_policy "bad lockout attempt" "0" || exit 1
+        echo "[sync-config] smb lockout: off."
+    fi
+    lockout_tmp="${LOCKOUT_STATE_FILE}.tmp.$$"
+    printf '%s\n' "$desired_lockout" >"$lockout_tmp" && mv -f -- "$lockout_tmp" "$LOCKOUT_STATE_FILE" || {
+        rm -f -- "$lockout_tmp"
+        echo "[sync-config] cannot record the applied lockout policy." >&2
+        exit 1
+    }
+fi
+
 if [ "$changed" = "1" ]; then
     if pidof smbd >/dev/null 2>&1; then
         if smbcontrol smbd reload-config >/dev/null 2>&1; then
@@ -231,6 +320,13 @@ if [ "$changed" = "1" ]; then
         else
             echo "[sync-config] reload-config failed." >&2
             exit 1
+        fi
+        # Clients outside a narrowed network list must not keep their sessions.
+        if [ "$hosts_changed" = "1" ]; then
+            "${KAIMO_SESSION_REVOKER:-/usr/local/bin/revoke-samba-sessions.sh}" "hosts allow changed" || {
+                echo "[sync-config] cannot disconnect sessions after a hosts allow change." >&2
+                exit 1
+            }
         fi
     else
         echo "[sync-config] smbd not yet running - registry will be read at startup."

@@ -4782,6 +4782,30 @@
   <data name="Web_Security_RepeatCount_Hint" xml:space="preserve">
     <value>{0} attempts during this lockout</value>
   </data>
+  <data name="Web_Security_RepeatCount_SuccessHint" xml:space="preserve">
+    <value>{0} successful logins in this hour</value>
+  </data>
+  <data name="Web_Security_RepeatCount_FailureHint" xml:space="preserve">
+    <value>{0} failed logins in this hour</value>
+  </data>
+  <data name="Web_User_SmbLock_Label" xml:space="preserve">
+    <value>SMB lockout</value>
+  </data>
+  <data name="Web_User_SmbLock_NotLocked" xml:space="preserve">
+    <value>Not locked</value>
+  </data>
+  <data name="Web_User_SmbLock_Pending" xml:space="preserve">
+    <value>Unlock pending</value>
+  </data>
+  <data name="Web_User_SmbLock_Unlock" xml:space="preserve">
+    <value>Unlock SMB</value>
+  </data>
+  <data name="Web_User_SmbLock_Hint" xml:space="preserve">
+    <value>Lifts a lockout after failed SMB logins. Samba applies it with its next user sync, within a minute.</value>
+  </data>
+  <data name="Web_User_SmbLock_Requested" xml:space="preserve">
+    <value>Unlock requested. Samba applies it within a minute.</value>
+  </data>
   <data name="Web_Security_LockedUntil" xml:space="preserve">
     <value>Locked until {0}</value>
   </data>
@@ -7438,6 +7462,9 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_AccessRestrictions_Error_Network" xml:space="preserve">
     <value>Invalid IP range: {0}</value>
   </data>
+  <data name="Web_AccessRestrictions_Error_TooManySmbNetworks" xml:space="preserve">
+    <value>At most {0} SMB networks are allowed.</value>
+  </data>
   <data name="Web_AccessRestrictions_Error_SelfLockout" xml:space="preserve">
     <value>Not saved: this change would block your own current connection ({0} · {1}).</value>
   </data>
@@ -8032,10 +8059,22 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_LoginProtection_AccountWideFactor_HintUnknown" xml:space="preserve">
     <value>The account is locked for all addresses after (attempts per user and address × factor) failed attempts.</value>
   </data>
-  <data name="Web_LoginProtection_NotYetEffective" xml:space="preserve">
-    <value>Not effective yet</value>
+  <data name="Web_AccessRestrictions_Smb_Title" xml:space="preserve">
+    <value>SMB</value>
   </data>
-  <data name="Web_LoginProtection_Smb_Pending" xml:space="preserve">
-    <value>These values are saved but only take effect in a later version. Until then Samba does not lock any account after failed SMB logins.</value>
+  <data name="Web_AccessRestrictions_Smb_Hint" xml:space="preserve">
+    <value>Networks Samba accepts connections from, for every user. The rules above do not apply to SMB. A change disconnects all active SMB sessions; clients reconnect automatically.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Smb_ProxyHint" xml:space="preserve">
+    <value>Samba sees the address a connection comes from. Through Docker's userland proxy (IPv6 or hairpin connections) that is the Docker gateway, not the client, so a narrow list can block everybody. Publish port 445 so Samba sees real client addresses, or include the gateway network. Loopback is always allowed for the container health checks.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Smb_Networks" xml:space="preserve">
+    <value>Allowed client networks</value>
+  </data>
+  <data name="Web_AccessRestrictions_Smb_NetworksHint" xml:space="preserve">
+    <value>One per line: CIDR range (192.168.1.0/24) or single address (IPv4 or IPv6). Leave empty to allow every network.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Smb_RecoveryHint" xml:space="preserve">
+    <value>Locked out? Start the smb-bridge container with KAIMO_ACCESS_RESTRICTIONS_DISABLED=true; Samba then accepts every network again.</value>
   </data>
 </root>

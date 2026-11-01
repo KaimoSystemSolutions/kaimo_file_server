@@ -23,6 +23,7 @@ export IMPORT_CAPTURE="$WORK/imported.smbpasswd"
 export IMPORT_PATH_LOG="$WORK/import-path"
 export IMPORT_MODE_LOG="$WORK/import-mode"
 export IMPORT_RUNTIME_LOG="$WORK/import-runtime"
+export IMPORT_CALL_LOG="$WORK/import-calls"
 export SESSION_REVOKE_LOG="$WORK/session-revoke.log"
 export KAIMO_SYNC_RUNTIME_DIR="$WORK/runtime"
 export KAIMO_SYNC_STATE_DIR="$WORK/state"
@@ -34,9 +35,10 @@ cat >"$PASSWD_FILE" <<'EOF'
 stale.user:1401
 kaimotest:1402
 EOF
+# `pdbedit -L -w` (smbpasswd) layout: user:uid:LM:NT:[flags]:LCT:
 cat >"$PASSDB_FILE" <<'EOF'
-stale.user:1401:Stale Kaimo user
-kaimotest:1402:Reserved test user
+stale.user:1401:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:11111111111111111111111111111111:[U          ]:LCT-00000000:
+kaimotest:1402:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:22222222222222222222222222222222:[U          ]:LCT-00000000:
 EOF
 cat >"$GROUP_STATE" <<'EOF'
 kaimo:stale.user
@@ -137,6 +139,8 @@ EOF
 cat >"$WORK/bin/pdbedit" <<'EOF'
 #!/bin/bash
 if [ "${1:-}" = "-L" ]; then
+    # The hash-aware smbpasswd listing is what keeps unchanged users untouched.
+    [ "${2:-}" = "-w" ] || exit 3
     printf '%s\n' \
         'added interface eth0 ip=172.21.0.4 bcast=172.21.255.255 netmask=255.255.0.0' \
         >&2
@@ -164,16 +168,19 @@ for arg in "$@"; do
     case "$arg" in smbpasswd:*) import_path="${arg#smbpasswd:}" ;; esac
 done
 [ -n "$import_path" ] || exit 2
+printf 'import\n' >>"$IMPORT_CALL_LOG"
 cp -- "$import_path" "$IMPORT_CAPTURE"
 printf '%s\n' "$import_path" >"$IMPORT_PATH_LOG"
 stat -c '%a' -- "$import_path" >"$IMPORT_MODE_LOG"
 find "$KAIMO_SYNC_RUNTIME_DIR" -maxdepth 1 -type f -printf '%f\n' \
     | sort >"$IMPORT_RUNTIME_LOG"
 [ "${PDBEDIT_EXIT_CODE:-0}" -eq 0 ] || exit "$PDBEDIT_EXIT_CODE"
-while IFS=: read -r user uid _; do
+# Like tdbsam: an imported record replaces the old one, including its flags.
+while IFS= read -r record; do
+    user="${record%%:*}"
     awk -F: -v user="$user" '$1 != user' "$PASSDB_FILE" >"$PASSDB_FILE.tmp"
     mv "$PASSDB_FILE.tmp" "$PASSDB_FILE"
-    printf '%s:%s:Kaimo managed\n' "$user" "$uid" >>"$PASSDB_FILE"
+    printf '%s\n' "$record" >>"$PASSDB_FILE"
 done <"$import_path"
 EOF
 
@@ -284,6 +291,10 @@ fi
 # 6) Failed import returns failure, cleans files, and does not publish a new
 # managed state (P1-16 must not forget stale identities on a partial run).
 cp "$KAIMO_SYNC_STATE_DIR/managed-users" "$WORK/state-before-failure"
+# Only a changed hash is imported; give admin a new one so the import runs.
+jq '(.users[] | select(.username == "admin") | .nt_hash) = "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"' \
+    "$AUTH_USERS_FILE" >"$AUTH_USERS_FILE.tmp"
+mv "$AUTH_USERS_FILE.tmp" "$AUTH_USERS_FILE"
 export PDBEDIT_EXIT_CODE=7
 bash "$SUT" >/dev/null 2>&1
 failed_rc=$?
@@ -405,6 +416,107 @@ if PDBEDIT_LIST_EXIT_CODE=1 bash "$SUT" >/dev/null 2>&1 \
     echo "FAIL: failed pdbedit listing was accepted or mutated state"; fail=1
 else
     note "ok: failed pdbedit listing fails before local mutation"
+fi
+
+# 13) AP8b: re-importing a user resets Samba's lockout flag and bad-password
+# counter, so a cycle without changes must not import anybody.
+: >"$IMPORT_CALL_LOG"
+if ! bash "$SUT" >/dev/null 2>&1 || [ -s "$IMPORT_CALL_LOG" ]; then
+    echo "FAIL: unchanged users were re-imported"; fail=1
+else
+    note "ok: unchanged users are not re-imported"
+fi
+
+# 14) A locked account ([UL]) with an unchanged hash keeps its passdb record.
+awk -F: 'BEGIN { OFS = ":" } $1 == "anna.weber" { $5 = "[UL         ]" } { print }' \
+    "$PASSDB_FILE" >"$PASSDB_FILE.tmp" && mv "$PASSDB_FILE.tmp" "$PASSDB_FILE"
+locked_record="$(grep '^anna.weber:' "$PASSDB_FILE")"
+if ! bash "$SUT" >/dev/null 2>&1 \
+    || [ "$(grep '^anna.weber:' "$PASSDB_FILE")" != "$locked_record" ]; then
+    echo "FAIL: sync cleared the lockout of an unchanged account"; fail=1
+else
+    note "ok: a locked account with an unchanged hash stays locked"
+fi
+
+# 15) A changed hash imports exactly that user (case-insensitive compare).
+jq '(.users[] | select(.username == "marco.hanisch") | .nt_hash) = "ddddddddddddddddddddddddddddddd1"' \
+    "$AUTH_USERS_FILE" >"$AUTH_USERS_FILE.tmp"
+mv "$AUTH_USERS_FILE.tmp" "$AUTH_USERS_FILE"
+: >"$IMPORT_CALL_LOG"
+if ! bash "$SUT" >/dev/null 2>&1 \
+    || [ "$(wc -l <"$IMPORT_CALL_LOG")" -ne 1 ] \
+    || [ "$(cut -d: -f1 "$IMPORT_CAPTURE")" != "marco.hanisch" ] \
+    || [ "$(cut -d: -f4 "$IMPORT_CAPTURE")" != "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD1" ] \
+    || [ "$(grep '^anna.weber:' "$PASSDB_FILE")" != "$locked_record" ]; then
+    echo "FAIL: changed hash did not import exactly the changed user"; fail=1
+else
+    note "ok: only users with a changed hash are imported"
+fi
+
+# 16) AP8e: a new SMB unlock request re-imports that user once, which clears
+# Samba's lockout flag and bad-password counter.
+jq '(.users[] | select(.username == "anna.weber")) += {"unlock_requested_at": 1793474721584}' \
+    "$AUTH_USERS_FILE" >"$AUTH_USERS_FILE.tmp"
+mv "$AUTH_USERS_FILE.tmp" "$AUTH_USERS_FILE"
+: >"$IMPORT_CALL_LOG"
+if ! bash "$SUT" >/dev/null 2>&1 \
+    || [ "$(wc -l <"$IMPORT_CALL_LOG")" -ne 1 ] \
+    || [ "$(cut -d: -f1 "$IMPORT_CAPTURE")" != "anna.weber" ] \
+    || [ "$(grep '^anna.weber:' "$PASSDB_FILE" | cut -d: -f5)" != "[U          ]" ]; then
+    echo "FAIL: unlock request did not re-import (unlock) the locked user"; fail=1
+else
+    note "ok: an unlock request clears the SMB lockout"
+fi
+
+# 17) The same request is applied only once, also across restarts (persistent state).
+: >"$IMPORT_CALL_LOG"
+if ! bash "$SUT" >/dev/null 2>&1 || [ -s "$IMPORT_CALL_LOG" ] \
+    || [ "$(stat -c '%a' "$KAIMO_SYNC_STATE_DIR/smb-unlocks" 2>/dev/null)" != "600" ]; then
+    echo "FAIL: an applied unlock request was applied again or its state is not private"; fail=1
+else
+    note "ok: an applied unlock request is remembered privately"
+fi
+
+# 18) A newer request unlocks again.
+jq '(.users[] | select(.username == "anna.weber") | .unlock_requested_at) = 1793474799999' \
+    "$AUTH_USERS_FILE" >"$AUTH_USERS_FILE.tmp"
+mv "$AUTH_USERS_FILE.tmp" "$AUTH_USERS_FILE"
+: >"$IMPORT_CALL_LOG"
+if ! bash "$SUT" >/dev/null 2>&1 || [ "$(wc -l <"$IMPORT_CALL_LOG")" -ne 1 ]; then
+    echo "FAIL: a newer unlock request was not applied"; fail=1
+else
+    note "ok: a newer unlock request is applied"
+fi
+
+# 19) The timestamp must be a non-negative integer.
+cp "$AUTH_USERS_FILE" "$WORK/auth-users-valid"
+cp "$PASSDB_FILE" "$WORK/passdb-before-invalid-unlock"
+for invalid_unlock in '"1793474721584"' '-1' '1.5' 'null'; do
+    jq --argjson v "$invalid_unlock" '(.users[0]) += {"unlock_requested_at": $v}' \
+        "$WORK/auth-users-valid" >"$AUTH_USERS_FILE"
+    if bash "$SUT" >/dev/null 2>&1 \
+        || ! cmp -s "$WORK/passdb-before-invalid-unlock" "$PASSDB_FILE"; then
+        echo "FAIL: invalid unlock timestamp $invalid_unlock was accepted"; fail=1
+    fi
+done
+cp "$WORK/auth-users-valid" "$AUTH_USERS_FILE"
+[ "$fail" -eq 0 ] && note "ok: invalid unlock timestamps fail before passdb mutation"
+
+# 20) An unsafe unlock state (foreign mode or a symlink) fails before passdb mutation.
+cp "$PASSDB_FILE" "$WORK/passdb-before-unsafe-unlock"
+chmod 0644 "$KAIMO_SYNC_STATE_DIR/smb-unlocks"
+bash "$SUT" >/dev/null 2>&1; unsafe_mode_rc=$?
+chmod 0600 "$KAIMO_SYNC_STATE_DIR/smb-unlocks"
+mv "$KAIMO_SYNC_STATE_DIR/smb-unlocks" "$WORK/smb-unlocks.real"
+ln -s "$WORK/smb-unlocks.real" "$KAIMO_SYNC_STATE_DIR/smb-unlocks"
+bash "$SUT" >/dev/null 2>&1; unsafe_link_rc=$?
+rm -f "$KAIMO_SYNC_STATE_DIR/smb-unlocks"
+mv "$WORK/smb-unlocks.real" "$KAIMO_SYNC_STATE_DIR/smb-unlocks"
+if [ "$unsafe_mode_rc" -eq 0 ] || [ "$unsafe_link_rc" -eq 0 ] \
+    || ! cmp -s "$WORK/passdb-before-unsafe-unlock" "$PASSDB_FILE"; then
+    echo "FAIL: an unsafe unlock state file was accepted"; fail=1
+else
+    note "ok: an unsafe unlock state file is rejected"
 fi
 
 if [ "$fail" -eq 0 ]; then

@@ -38,6 +38,14 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         }
 
         /// <inheritdoc />
+        public async Task<User?> GetByUsernameIgnoreCaseAsync(string username)
+        {
+            var name = username.Trim().ToLowerInvariant();
+            await using var db = await dbFactory.CreateDbContextAsync();
+            return await db.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == name);
+        }
+
+        /// <inheritdoc />
         public async Task<IEnumerable<User>> GetAllAsync()
         {
             await using var db = await dbFactory.CreateDbContextAsync();
@@ -66,7 +74,8 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
                 .Take(count)
                 .Select(user => new SambaCredentialSource(
                     user.Username,
-                    user.NtHash))
+                    user.NtHash,
+                    user.SmbUnlockRequestedAtUtc))
                 .ToListAsync(cancellationToken);
         }
 
@@ -276,6 +285,19 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
                 ?? throw new KeyNotFoundException($"User {userId} not found");
 
             user.ServiceAccess = access;
+
+            await db.SaveChangesAsync();
+        }
+
+        /// <inheritdoc />
+        public async Task RequestSmbUnlockAsync(Guid userId, DateTime requestedAtUtc)
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            var user = await db.Users.FindAsync(userId)
+                ?? throw new KeyNotFoundException($"User {userId} not found");
+
+            user.SmbUnlockRequestedAtUtc = requestedAtUtc;
 
             await db.SaveChangesAsync();
         }

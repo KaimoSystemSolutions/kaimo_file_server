@@ -67,7 +67,7 @@ for generated in kaimo_smb_bridge.pb.cc kaimo_smb_bridge.grpc.pb.cc; do
     g++ -std=c++17 -O1 "-I$PROTO_BUILD" "${GRPC_FLAGS[@]}" \
         -c "$PROTO_BUILD/$generated" -o "$GCOV_BUILD/sidecars/$generated.o"
 done
-for sidecar in authd authsync sharesync configsync; do
+for sidecar in authd authsync sharesync configsync authreport; do
     echo "-- kaimo_$sidecar"
     # Separate compile step: .gcno/.gcda land next to the object in $GCOV_BUILD.
     g++ -std=c++17 -O0 -g --coverage -pthread "-I$MODULE" "-I$PROTO_BUILD" \

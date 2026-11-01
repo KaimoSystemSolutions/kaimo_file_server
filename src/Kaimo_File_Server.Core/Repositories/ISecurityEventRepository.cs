@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Security;
 
 namespace Kaimo_File_Server.Core.Repositories;
 
@@ -43,6 +44,30 @@ public interface ISecurityEventRepository
     /// of each row id grows by the given amount, in one transaction. Unknown ids are ignored.
     /// </summary>
     Task AddLockoutRepeatsAsync(IReadOnlyDictionary<long, int> increments, CancellationToken ct = default);
+
+    /// <summary>
+    /// Saved attempts of <paramref name="channel"/> by any of <paramref name="usernames"/> or from
+    /// any of <paramref name="addresses"/> (null matches attempts without an address) since
+    /// <paramref name="sinceUtc"/>, plus older lockouts still running after it, oldest first. Lets a
+    /// writer that receives events in batches (SMB) fold them into rows it saved earlier.
+    /// </summary>
+    Task<IReadOnlyList<LoginAttemptRecord>> ListRecentAsync(
+        SecurityChannel channel, IReadOnlyCollection<string> usernames, IReadOnlyCollection<string?> addresses,
+        DateTime sinceUtc, CancellationToken ct = default);
+
+    /// <summary>
+    /// End of the latest lockout of <paramref name="username"/> on <paramref name="channel"/> that
+    /// began at or after <paramref name="sinceUtc"/> and is still running at <paramref name="nowUtc"/>;
+    /// null when there is none.
+    /// </summary>
+    Task<DateTime?> GetActiveLockUntilAsync(SecurityChannel channel, string username, DateTime sinceUtc, DateTime nowUtc);
+
+    /// <summary>
+    /// Ends every lockout of <paramref name="username"/> on <paramref name="channel"/> that still runs
+    /// at <paramref name="nowUtc"/> (an administrator lifted it), so the overview no longer counts it
+    /// and a later lockout is recorded as a new one.
+    /// </summary>
+    Task EndActiveLocksAsync(SecurityChannel channel, string username, DateTime nowUtc);
 
     /// <summary>
     /// Totals of the period. Failures include attempts refused by a locked address;

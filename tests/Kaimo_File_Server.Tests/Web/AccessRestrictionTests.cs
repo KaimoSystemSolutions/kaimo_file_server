@@ -88,6 +88,19 @@ public class AccessRestrictionTests
         Assert.True(network.Contains(System.Net.IPAddress.Parse("10.200.0.1")));
     }
 
+    // Client addresses are mapped back to IPv4 (ParseAddress), so a mapped range must be as well:
+    // otherwise it never matches, and Samba's config sync rejects its dotted IPv6 text.
+    [Fact]
+    public void TryParseNetwork_MapsIPv4MappedRangesToIPv4()
+    {
+        Assert.True(AccessRestrictionSettings.TryParseNetwork("::ffff:10.0.0.0/104", out var network));
+        Assert.Equal("10.0.0.0/8", network.ToString());
+
+        var settings = With(new AccessRule { UserIds = [UserId], Networks = ["::ffff:10.0.0.0/104"] });
+        Assert.True(Allowed(settings, "10.1.2.3"));
+        Assert.True(Allowed(settings, "::ffff:10.1.2.3"));
+    }
+
     [Fact]
     public async Task Service_ExpandsDepartmentAncestors()
     {

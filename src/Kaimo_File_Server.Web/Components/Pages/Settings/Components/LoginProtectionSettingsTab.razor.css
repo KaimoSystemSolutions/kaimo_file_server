@@ -51,7 +51,6 @@
     padding-bottom: 0;
 }
 
-.login-protection-pending,
 .login-protection-toggle,
 .login-protection-warning {
     margin: 0 0 var(--space-3);

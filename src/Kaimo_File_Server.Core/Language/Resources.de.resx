@@ -4782,6 +4782,30 @@
   <data name="Web_Security_RepeatCount_Hint" xml:space="preserve">
     <value>{0} Versuche während dieser Sperre</value>
   </data>
+  <data name="Web_Security_RepeatCount_SuccessHint" xml:space="preserve">
+    <value>{0} erfolgreiche Anmeldungen in dieser Stunde</value>
+  </data>
+  <data name="Web_Security_RepeatCount_FailureHint" xml:space="preserve">
+    <value>{0} fehlgeschlagene Anmeldungen in dieser Stunde</value>
+  </data>
+  <data name="Web_User_SmbLock_Label" xml:space="preserve">
+    <value>SMB-Sperre</value>
+  </data>
+  <data name="Web_User_SmbLock_NotLocked" xml:space="preserve">
+    <value>Nicht gesperrt</value>
+  </data>
+  <data name="Web_User_SmbLock_Pending" xml:space="preserve">
+    <value>Entsperrung ausstehend</value>
+  </data>
+  <data name="Web_User_SmbLock_Unlock" xml:space="preserve">
+    <value>SMB-Sperre aufheben</value>
+  </data>
+  <data name="Web_User_SmbLock_Hint" xml:space="preserve">
+    <value>Hebt eine Sperre nach fehlgeschlagenen SMB-Anmeldungen auf. Samba übernimmt das mit dem nächsten Nutzerabgleich, spätestens nach einer Minute.</value>
+  </data>
+  <data name="Web_User_SmbLock_Requested" xml:space="preserve">
+    <value>Entsperrung angefordert. Samba übernimmt sie spätestens nach einer Minute.</value>
+  </data>
   <data name="Web_Security_LockedUntil" xml:space="preserve">
     <value>Gesperrt bis {0}</value>
   </data>
@@ -7438,6 +7462,9 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_AccessRestrictions_Error_Network" xml:space="preserve">
     <value>Ungültiger IP-Bereich: {0}</value>
   </data>
+  <data name="Web_AccessRestrictions_Error_TooManySmbNetworks" xml:space="preserve">
+    <value>Es sind höchstens {0} SMB-Netze erlaubt.</value>
+  </data>
   <data name="Web_AccessRestrictions_Error_SelfLockout" xml:space="preserve">
     <value>Nicht gespeichert: Diese Änderung würde Ihre eigene aktuelle Verbindung sperren ({0} · {1}).</value>
   </data>
@@ -8032,10 +8059,22 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_LoginProtection_AccountWideFactor_HintUnknown" xml:space="preserve">
     <value>Das Konto wird nach (Fehlversuche pro Nutzer und Adresse × Faktor) Fehlversuchen für alle Adressen gesperrt.</value>
   </data>
-  <data name="Web_LoginProtection_NotYetEffective" xml:space="preserve">
-    <value>Noch nicht wirksam</value>
+  <data name="Web_AccessRestrictions_Smb_Title" xml:space="preserve">
+    <value>SMB</value>
   </data>
-  <data name="Web_LoginProtection_Smb_Pending" xml:space="preserve">
-    <value>Diese Werte werden gespeichert, wirken aber erst ab einer späteren Version. Bis dahin sperrt Samba nach fehlgeschlagenen SMB-Anmeldungen kein Konto.</value>
+  <data name="Web_AccessRestrictions_Smb_Hint" xml:space="preserve">
+    <value>Netze, aus denen Samba Verbindungen annimmt, für alle Nutzer. Die Regeln oben gelten nicht für SMB. Eine Änderung trennt alle aktiven SMB-Sitzungen; Clients verbinden sich automatisch neu.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Smb_ProxyHint" xml:space="preserve">
+    <value>Samba sieht die Adresse, von der eine Verbindung kommt. Über den Userland-Proxy von Docker (IPv6- oder Hairpin-Verbindungen) ist das das Docker-Gateway, nicht der Client; eine enge Liste kann dann alle aussperren. Port 445 so veröffentlichen, dass Samba echte Client-Adressen sieht, oder das Gateway-Netz aufnehmen. Loopback ist für die Healthchecks des Containers immer erlaubt.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Smb_Networks" xml:space="preserve">
+    <value>Erlaubte Client-Netze</value>
+  </data>
+  <data name="Web_AccessRestrictions_Smb_NetworksHint" xml:space="preserve">
+    <value>Einer pro Zeile: CIDR-Bereich (192.168.1.0/24) oder einzelne Adresse (IPv4 oder IPv6). Leer lassen, um jedes Netz zu erlauben.</value>
+  </data>
+  <data name="Web_AccessRestrictions_Smb_RecoveryHint" xml:space="preserve">
+    <value>Ausgesperrt? Den smb-bridge-Container mit KAIMO_ACCESS_RESTRICTIONS_DISABLED=true starten; Samba nimmt dann wieder jedes Netz an.</value>
   </data>
 </root>

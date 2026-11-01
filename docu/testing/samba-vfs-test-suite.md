@@ -220,7 +220,7 @@ per area. The minimums sit just below the measured values, so coverage can only 
 | VFS module | `vfs_kaimo_bridge.c` | 76.6 % / 48.0 % | 75 / 46 |
 | Header libraries | `module/*.h` | 90.4 % / 76.7 % | 89 / 75 |
 | authd sidecar | `authd.cpp` | 87.8 % / 70.7 % | 86 / 69 |
-| Sync clients | `authsync.cpp`, `sharesync.cpp`, `configsync.cpp` | 94.2 % / 93.1 % | 93 / 91 |
+| Sync clients | `authsync.cpp`, `sharesync.cpp`, `configsync.cpp`, `authreport.cpp` | 94.2 % / 93.1 % | 93 / 91 |
 | Shell scripts | `*.sh` | 76.1 % / – | 75 / – |
 | Python helpers | `*.py` | 99.3 % / 97.8 % | 98 / 96 |
 

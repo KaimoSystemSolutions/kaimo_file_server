@@ -13,8 +13,9 @@ export NET_FAIL_PARAMETER=""
 export NET_IGNORE_PARAMETER=""
 export KAIMO_SAMBA_PATH_PREFIX=""
 export KAIMO_LOG_CONSOLE_LEVEL_FILE="$WORK/console-log-level"
+export KAIMO_SMB_LOCKOUT_STATE_FILE="$WORK/lockout-applied"
 mkdir -p "$WORK/bin"
-printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":true,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}' >"$CONFIG_RESPONSE"
+printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":true,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning","lockout_enabled":false,"lockout_attempts":0,"lockout_minutes":0,"hosts_allow":[]}}' >"$CONFIG_RESPONSE"
 : >"$CONFIG_STATE"
 
 cat >"$WORK/bin/kaimo_configsync" <<'EOF'
@@ -59,6 +60,12 @@ cat >"$WORK/bin/pgrep" <<'EOF'
 #!/bin/bash
 exit 1
 EOF
+# Account policies (SMB lockout) are covered by test-sync-config-smb-protection.sh.
+cat >"$WORK/bin/pdbedit" <<'EOF'
+#!/bin/bash
+[ "${3:-}" = -C ] && exit 0
+echo "account policy \"$2\" value is: 0"
+EOF
 cat >"$WORK/bin/wsdd" <<'EOF'
 #!/bin/bash
 exit 0
@@ -90,7 +97,7 @@ if ! bash "$SUT" >/dev/null 2>&1 \
 fi
 unset KAIMO_LOG_LEVEL
 
-printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":true,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Information"}}' >"$CONFIG_RESPONSE"
+printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":true,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Information","lockout_enabled":false,"lockout_attempts":0,"lockout_minutes":0,"hosts_allow":[]}}' >"$CONFIG_RESPONSE"
 if ! bash "$SUT" >/dev/null 2>&1 \
     || ! grep -q $'^log level\t5$' "$CONFIG_STATE"; then
     echo "FAIL: Settings Information level was not mapped to Samba DBGLVL_INFO (5)."
@@ -98,7 +105,7 @@ if ! bash "$SUT" >/dev/null 2>&1 \
 fi
 
 export NET_FAIL_PARAMETER="server signing"
-printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_10","max_protocol":"SMB3_11","require_signing":false,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}' >"$CONFIG_RESPONSE"
+printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_10","max_protocol":"SMB3_11","require_signing":false,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning","lockout_enabled":false,"lockout_attempts":0,"lockout_minutes":0,"hosts_allow":[]}}' >"$CONFIG_RESPONSE"
 if bash "$SUT" >/dev/null 2>&1; then
     echo "FAIL: failed setparm mutation reported success."
     exit 1
@@ -116,11 +123,11 @@ cp "$CONFIG_STATE" "$WORK/config-before-invalid"
 for invalid_case in \
     '' \
     '{"version":2,"config":{}}' \
-    '{"version":1,"config":{"min_protocol":"NT1","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}' \
-    '{"version":1,"config":{"min_protocol":"SMB3_11","max_protocol":"SMB2_02","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}' \
-    '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":"true","require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}' \
+    '{"version":1,"config":{"min_protocol":"NT1","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning","lockout_enabled":false,"lockout_attempts":0,"lockout_minutes":0,"hosts_allow":[]}}' \
+    '{"version":1,"config":{"min_protocol":"SMB3_11","max_protocol":"SMB2_02","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning","lockout_enabled":false,"lockout_attempts":0,"lockout_minutes":0,"hosts_allow":[]}}' \
+    '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":"true","require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning","lockout_enabled":false,"lockout_attempts":0,"lockout_minutes":0,"hosts_allow":[]}}' \
     '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning","unexpected":true}}' \
-    '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}} {"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}'; do
+    '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning","lockout_enabled":false,"lockout_attempts":0,"lockout_minutes":0,"hosts_allow":[]}} {"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning","lockout_enabled":false,"lockout_attempts":0,"lockout_minutes":0,"hosts_allow":[]}}'; do
     printf '%s\n' "$invalid_case" >"$CONFIG_RESPONSE"
     if bash "$SUT" >/dev/null 2>&1 \
         || ! cmp -s "$WORK/config-before-invalid" "$CONFIG_STATE"; then

@@ -114,7 +114,10 @@ namespace Kaimo_File_Server.Infrastructure.Services
 
                     credentials.Add(new SambaCredential(
                         source.Username,
-                        hash));
+                        hash,
+                        source.SmbUnlockRequestedAtUtc is { } unlock
+                            ? new DateTimeOffset(DateTime.SpecifyKind(unlock, DateTimeKind.Utc)).ToUnixTimeMilliseconds()
+                            : 0));
                 }
                 catch (Exception exception) when (
                     exception is FormatException

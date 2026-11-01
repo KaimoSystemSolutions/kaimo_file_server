@@ -54,7 +54,7 @@ class Pki:
 
     def client_env(self, address: str) -> dict[str, str]:
         env = {"KAIMO_BRIDGE_ADDR": address, "KAIMO_BRIDGE_CA_CERT": str(self.ca)}
-        for prefix in ("RUNTIME", "AUTH_SYNC", "SHARE_SYNC", "CONFIG_SYNC"):
+        for prefix in ("RUNTIME", "AUTH_SYNC", "SHARE_SYNC", "CONFIG_SYNC", "AUTH_REPORT"):
             env[f"KAIMO_BRIDGE_{prefix}_CERT"] = str(self.client_cert)
             env[f"KAIMO_BRIDGE_{prefix}_KEY"] = str(self.client_key)
         return env

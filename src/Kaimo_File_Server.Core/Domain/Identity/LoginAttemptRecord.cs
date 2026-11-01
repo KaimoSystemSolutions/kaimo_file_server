@@ -18,7 +18,8 @@ public sealed class LoginAttemptRecord
 
     /// <summary>
     /// Entered user name, trimmed and lower-cased (logins are case-insensitive); empty for
-    /// <see cref="LoginOutcome.AddressLockedOut"/>, whose lock covers every user name.
+    /// <see cref="LoginOutcome.AddressLockedOut"/>, whose lock covers every user name, and for the
+    /// SMB row that counts the failures of one address beyond its per-hour row budget.
     /// </summary>
     public string Username { get; set; } = string.Empty;
 
@@ -36,7 +37,8 @@ public sealed class LoginAttemptRecord
     /// <summary>
     /// Attempts this row stands for. Every attempt during a lockout returns LockedOut again, so the
     /// repeats of one lock (same channel, account and address) are folded into the row of its first
-    /// LockedOut attempt; all other rows stand for exactly one attempt.
+    /// LockedOut attempt. SMB successes and failures are counted the same way, one row per
+    /// account, address, outcome and hour. All other rows stand for exactly one attempt.
     /// </summary>
     public int RepeatCount { get; set; } = 1;
 }

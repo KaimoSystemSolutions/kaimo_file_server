@@ -96,6 +96,12 @@ namespace Kaimo_File_Server.Core.Domain.Identity
         /// </summary>
         public UserServiceAccess ServiceAccess { get; set; } = UserServiceAccess.All;
 
+        /// <summary>
+        /// When an administrator last asked to lift this user's SMB account lockout; null when
+        /// never. The Samba user sync applies each new value once (see <c>sync-users.sh</c>).
+        /// </summary>
+        public DateTime? SmbUnlockRequestedAtUtc { get; set; }
+
         /// <summary>Creates a fresh, unpredictable <see cref="SecurityStamp"/> value.</summary>
         public static string NewSecurityStamp() => Guid.NewGuid().ToString("N");
 

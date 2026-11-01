@@ -173,6 +173,7 @@ public sealed class AuthGrpcService : AuthService.AuthServiceBase
                 {
                     Username = credential.Username,
                     NtHash = ByteString.CopyFrom(credential.NtHash),
+                    UnlockRequestedAt = Math.Max(0, credential.UnlockRequestedAtUnixMs),
                 });
             }
 

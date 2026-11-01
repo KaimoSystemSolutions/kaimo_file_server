@@ -153,7 +153,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends wsdd procps jq \
     && rm -rf /var/lib/apt/lists/*
 
-# Phase 1: build gRPC C++ clients (authsync/authd/sharesync/configsync) for
+# Phase 1: build gRPC C++ clients (authsync/authd/sharesync/configsync/authreport) for
 # NT-Hash + share + config sync. Toolchain already present from sambabuild.
 WORKDIR /build/authsync
 COPY protos/kaimo_smb_bridge.proto ./
@@ -161,6 +161,7 @@ COPY module/authsync.cpp ./
 COPY module/authd.cpp ./
 COPY module/sharesync.cpp ./
 COPY module/configsync.cpp ./
+COPY module/authreport.cpp ./
 # Header libraries and their standalone component tests (all of them; a new
 # tests/test-*.cpp is picked up automatically and gates the image build).
 COPY module/*.h ./
@@ -187,6 +188,11 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
        $(pkg-config --cflags grpc++ protobuf) \
        $(pkg-config --libs grpc++ protobuf) \
        -o /usr/local/bin/kaimo_configsync \
+    && g++ -std=c++17 -O2 \
+       authreport.cpp kaimo_smb_bridge.pb.cc kaimo_smb_bridge.grpc.pb.cc \
+       $(pkg-config --cflags grpc++ protobuf) \
+       $(pkg-config --libs grpc++ protobuf) \
+       -o /usr/local/bin/kaimo_authreport \
     && for test_source in test-*.cpp; do \
            g++ -std=c++17 -O2 -pthread -I. "$test_source" -o /tmp/component-test \
            && /tmp/component-test \
@@ -196,7 +202,8 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && test -x /usr/local/bin/kaimo_authsync \
     && test -x /usr/local/bin/kaimo_authd \
     && test -x /usr/local/bin/kaimo_sharesync \
-    && test -x /usr/local/bin/kaimo_configsync
+    && test -x /usr/local/bin/kaimo_configsync \
+    && test -x /usr/local/bin/kaimo_authreport
 
 # Real VFS module: overwrite the stub and relink ONLY this target (no reconfigure).
 # This is the layer that reruns on a module edit -> a single object + relink.

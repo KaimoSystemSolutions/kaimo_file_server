@@ -36,6 +36,38 @@ public class LoginAttemptResultTests
         Assert.Equal(repeat.GetAttribute("title"), repeat.GetAttribute("aria-label"));
     }
 
+    // SMB successes are one counted row per account, address and hour (AP8d).
+    [Fact]
+    public void CountedSuccesses_ShowTheCountAsSuccessfulLogins()
+    {
+        using var ctx = new BunitContext();
+
+        var cut = Render(ctx, LoginOutcome.Success, 4);
+
+        var repeat = cut.Find(".login-attempt-repeat");
+        Assert.Equal("×4", repeat.TextContent.Trim());
+        var hint = Resources.ResourceManager.GetString("Web_Security_RepeatCount_SuccessHint");
+        Assert.False(string.IsNullOrEmpty(hint));
+        Assert.Equal(string.Format(hint!, 4), repeat.GetAttribute("title"));
+    }
+
+    // SMB failures are folded the same way, per account (or address), address and hour.
+    [Theory]
+    [InlineData(LoginOutcome.InvalidCredentials)]
+    [InlineData(LoginOutcome.AccountDisabled)]
+    public void CountedFailures_ShowTheCountAsFailedLogins(LoginOutcome outcome)
+    {
+        using var ctx = new BunitContext();
+
+        var cut = Render(ctx, outcome, 5);
+
+        var repeat = cut.Find(".login-attempt-repeat");
+        Assert.Equal("×5", repeat.TextContent.Trim());
+        var hint = Resources.ResourceManager.GetString("Web_Security_RepeatCount_FailureHint");
+        Assert.False(string.IsNullOrEmpty(hint));
+        Assert.Equal(string.Format(hint!, 5), repeat.GetAttribute("title"));
+    }
+
     [Theory]
     [InlineData(LoginOutcome.LockedOut)]
     [InlineData(LoginOutcome.InvalidCredentials)]

@@ -139,6 +139,25 @@ else
         }
     </div>
 
+    @* SMB has no per-user rules: this network list (Samba `hosts allow`) applies to everybody. *@
+    <div class="detail-section access-smb">
+        <span class="detail-label">@R("Web_AccessRestrictions_Smb_Title")</span>
+        <p class="settings-description">
+            @R("Web_AccessRestrictions_Smb_Hint")
+            <InfoButton Text="@R("Web_AccessRestrictions_Smb_ProxyHint")" />
+        </p>
+        <div class="form-group admin-compact">
+            <label for="access-smb-networks">@R("Web_AccessRestrictions_Smb_Networks")</label>
+            <textarea id="access-smb-networks" class="edit-input access-networks" rows="4" spellcheck="false"
+                      placeholder="192.168.1.0/24&#10;10.8.0.0/16" @bind="VM.SmbNetworks"></textarea>
+            <span class="form-hint">@R("Web_AccessRestrictions_Smb_NetworksHint")</span>
+            <span class="form-hint">@R("Web_AccessRestrictions_Smb_RecoveryHint")</span>
+        </div>
+        <div class="settings-actions">
+            <button type="button" class="btn-primary" disabled="@VM.IsSaving" @onclick="VM.SaveSmbNetworksAsync">@Resources.Web_Settings_Button_Save</button>
+        </div>
+    </div>
+
     @if (VM.PendingDelete is { } pending)
     {
         <div class="modal-backdrop" @onclick="() => VM.PendingDelete = null">

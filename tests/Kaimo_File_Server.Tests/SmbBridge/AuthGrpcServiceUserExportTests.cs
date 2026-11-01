@@ -95,6 +95,25 @@ public sealed class AuthGrpcServiceUserExportTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    // AP8e: the Samba user sync unlocks the account once per new request time.
+    [Fact]
+    public async Task ListUsers_ExportsTheSmbUnlockRequestTime()
+    {
+        var auth = new Mock<IAuthenticationLookup>();
+        auth.Setup(lookup => lookup.GetSambaCredentialBatchAsync(0, 10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SambaCredentialBatch(
+                [
+                    new SambaCredential("alice", Convert.FromHexString("0123456789ABCDEF0123456789ABCDEF"), 1793474721584),
+                    new SambaCredential("bob", Convert.FromHexString("0123456789ABCDEF0123456789ABCDEF")),
+                ],
+                [], 2, HasMore: false));
+        var sut = BuildSut(auth);
+
+        ListUsersReply reply = await sut.ListUsers(new ListUsersRequest { PageSize = 10 }, new UnitServerCallContext());
+
+        Assert.Equal([1793474721584L, 0L], reply.Users.Select(u => u.UnlockRequestedAt));
+    }
+
     [Fact]
     public async Task ListUsers_RejectsOversizedPageBeforeAuthenticationLookup()
     {

@@ -31,7 +31,7 @@ else
     </p>
 
     <section class="detail-section login-protection-card">
-        @CardHead("devices.svg", "Web_LoginProtection_Login_Title", "Web_LoginProtection_Login_Desc", notYetEffective: false)
+        @CardHead("devices.svg", "Web_LoginProtection_Login_Title", "Web_LoginProtection_Login_Desc")
         <div class="admin-compact login-protection-fields">
             <LoginProtectionNumberField Id="login-protection-max-attempts" Icon="user.svg"
                                         Label="@R("Web_LoginProtection_MaxAttempts")"
@@ -59,7 +59,7 @@ else
     </section>
 
     <section class="detail-section login-protection-card">
-        @CardHead("share.svg", "Web_LoginProtection_ShareLink_Title", "Web_LoginProtection_ShareLink_Desc", notYetEffective: false)
+        @CardHead("share.svg", "Web_LoginProtection_ShareLink_Title", "Web_LoginProtection_ShareLink_Desc")
         <div class="admin-compact login-protection-fields">
             <LoginProtectionNumberField Id="login-protection-link-per-address" Icon="globe.svg"
                                         Label="@R("Web_LoginProtection_ShareLinkPerAddress")"
@@ -77,8 +77,7 @@ else
     </section>
 
     <section class="detail-section login-protection-card">
-        @CardHead("connection_smb.svg", "Web_LoginProtection_Smb_Title", "Web_LoginProtection_Smb_Desc", notYetEffective: true)
-        <p class="form-hint login-protection-pending">@R("Web_LoginProtection_Smb_Pending")</p>
+        @CardHead("connection_smb.svg", "Web_LoginProtection_Smb_Title", "Web_LoginProtection_Smb_Desc")
         <div class="toggle-row login-protection-toggle">
             <span class="toggle-label-text">@R("Web_LoginProtection_Smb_Enabled")</span>
             <label class="toggle-switch">
@@ -118,16 +117,12 @@ else
         ? string.Format(R("Web_LoginProtection_AccountWideFactor_Hint"), attempts)
         : R("Web_LoginProtection_AccountWideFactor_HintUnknown");
 
-    private RenderFragment CardHead(string icon, string titleKey, string descKey, bool notYetEffective) =>
+    private RenderFragment CardHead(string icon, string titleKey, string descKey) =>
         @<div class="login-protection-card-head">
             <span class="tile-icon tile-icon--neutral" aria-hidden="true">@Assets.SVG(icon, new SvgOptions(Width: 18, Height: 18))</span>
             <div class="login-protection-card-titles">
                 <div class="login-protection-heading">
                     <h2 class="login-protection-card-title">@R(titleKey)</h2>
-                    @if (notYetEffective)
-                    {
-                        <StatusBadge Tone="StatusTone.Warning" Label="@R("Web_LoginProtection_NotYetEffective")" />
-                    }
                 </div>
                 <p class="login-protection-card-desc">@R(descKey)</p>
             </div>

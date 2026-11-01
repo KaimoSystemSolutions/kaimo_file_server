@@ -39,9 +39,10 @@ static void secure_zero(void* data, std::size_t size) noexcept {
 struct credential {
     std::string username;
     std::array<unsigned char, 16> nt_hash{};
+    std::int64_t unlock_requested_at = 0;  // AP8e: unix ms, 0 = none
 
-    credential(std::string name, const std::string& hash)
-        : username(std::move(name)) {
+    credential(std::string name, const std::string& hash, std::int64_t unlock)
+        : username(std::move(name)), unlock_requested_at(unlock) {
         std::copy(hash.begin(), hash.end(), nt_hash.begin());
     }
 
@@ -49,7 +50,8 @@ struct credential {
     credential& operator=(const credential&) = delete;
 
     credential(credential&& other) noexcept
-        : username(std::move(other.username)), nt_hash(other.nt_hash) {
+        : username(std::move(other.username)), nt_hash(other.nt_hash),
+          unlock_requested_at(other.unlock_requested_at) {
         secure_zero(other.nt_hash.data(), other.nt_hash.size());
     }
 
@@ -57,6 +59,7 @@ struct credential {
         if (this != &other) {
             secure_zero(nt_hash.data(), nt_hash.size());
             username = std::move(other.username);
+            unlock_requested_at = other.unlock_requested_at;
             nt_hash = other.nt_hash;
             secure_zero(other.nt_hash.data(), other.nt_hash.size());
         }
@@ -188,7 +191,8 @@ int main() {
         for (auto& user : *reply.mutable_users()) {
             const std::string& hash = user.nt_hash();
             if (!kaimo::sync_json::valid_username(user.username())
-                || hash.size() != 16) {
+                || hash.size() != 16
+                || user.unlock_requested_at() < 0) {
                 clear_reply_hashes(reply);
                 std::cerr << "kaimo_authsync: invalid user record rejected."
                           << std::endl;
@@ -203,7 +207,7 @@ int main() {
                     << std::endl;
                 return 1;
             }
-            users.emplace_back(user.username(), hash);
+            users.emplace_back(user.username(), hash, user.unlock_requested_at());
             // The move-only credential owns the only application-level copy
             // retained across pages. Release protobuf's mutable copy now.
             user.clear_nt_hash();
@@ -223,6 +227,9 @@ int main() {
                   << kaimo::sync_json::quote(user.username)
                   << ",\"nt_hash\":";
         write_hex(std::cout, user.nt_hash);
+        // Only when set, so the document stays unchanged for users without a request.
+        if (user.unlock_requested_at > 0)
+            std::cout << ",\"unlock_requested_at\":" << user.unlock_requested_at;
         std::cout << '}';
     }
     std::cout << "]}\n";

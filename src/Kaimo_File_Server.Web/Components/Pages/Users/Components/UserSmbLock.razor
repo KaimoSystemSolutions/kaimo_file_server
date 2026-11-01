@@ -1,0 +1,52 @@
+@using Kaimo_File_Server.Core.Domain.Identity
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.ViewModels
+@inject SmbLockViewModel VM
+@inject DateFormatService DateFmt
+
+@*
+    User details → SMB lockout (AP8e): Samba's account lock after failed SMB logins, as the
+    bridge recorded it, and the "Unlock SMB" action. The Samba user sync applies the unlock with
+    its next cycle, so the button explains that delay instead of promising an immediate effect.
+*@
+
+<PropertyRow Label="@R("Web_User_SmbLock_Label")">
+    @if (VM.LockedUntilUtc is { } until)
+    {
+        <StatusBadge Tone="StatusTone.Warning" Label="@string.Format(R("Web_Security_LockedUntil"), DateFmt.FormatDateTime(until))" />
+    }
+    else
+    {
+        <StatusBadge ShowDot="false" Tone="StatusTone.Neutral"
+                     Label="@R(VM.UnlockRequested ? "Web_User_SmbLock_Pending" : "Web_User_SmbLock_NotLocked")" />
+    }
+</PropertyRow>
+
+@if (VM.CanUnlock)
+{
+    <div class="smb-lock-actions">
+        <button type="button" class="btn-secondary btn-secondary--sm" disabled="@VM.IsBusy" @onclick="VM.UnlockAsync">
+            @R("Web_User_SmbLock_Unlock")
+        </button>
+        <span class="form-hint" role="status">@R(VM.UnlockRequested ? "Web_User_SmbLock_Requested" : "Web_User_SmbLock_Hint")</span>
+    </div>
+}
+@if (VM.ErrorMessage is not null)
+{
+    <div class="error-banner" role="alert">@VM.ErrorMessage</div>
+}
+
+@code {
+    [Parameter, EditorRequired] public User User { get; set; } = default!;
+
+    private Guid _loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (User.Id == _loadedFor) return;
+        _loadedFor = User.Id;
+        await VM.LoadAsync(User);
+    }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+}

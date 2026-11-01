@@ -280,6 +280,8 @@ def test_configsync_exports_settings(bridge):
         min_protocol="SMB3_00", max_protocol="SMB3_11", require_signing=True,
         require_encryption=True, enabled=False, enable_ws_discovery=True,
         enable_audit_log=True, log_level="Debug",
+        lockout_enabled=True, lockout_attempts=10, lockout_minutes=15,
+        hosts_allow=["10.0.0.0/8", "fd00::/8"],
     ))
     run = run_sidecar("configsync", bridge)
     assert run.returncode == 0, run.stderr
@@ -287,7 +289,51 @@ def test_configsync_exports_settings(bridge):
         "min_protocol": "SMB3_00", "max_protocol": "SMB3_11",
         "require_signing": True, "require_encryption": True, "enabled": False,
         "enable_ws_discovery": True, "enable_audit_log": True, "log_level": "Debug",
+        "lockout_enabled": True, "lockout_attempts": 10, "lockout_minutes": 15,
+        "hosts_allow": ["10.0.0.0/8", "fd00::/8"],
     }}
+
+
+def test_authsync_exports_the_unlock_request_only_when_set(bridge):
+    reply = bridge.pb.ListUsersReply(next_offset=2, users=[
+        bridge.pb.UserEntry(username="alice", nt_hash=HASH_A, unlock_requested_at=1793474721584),
+        bridge.pb.UserEntry(username="bob", nt_hash=HASH_B),
+    ])
+    bridge.on("ListUsers", reply)
+    run = run_sidecar("authsync", bridge)
+    assert run.returncode == 0, run.stderr
+    assert run.json()["users"] == [
+        {"username": "alice", "nt_hash": HASH_A.hex().upper(), "unlock_requested_at": 1793474721584},
+        {"username": "bob", "nt_hash": HASH_B.hex().upper()},
+    ]
+
+
+def test_authsync_rejects_a_negative_unlock_request(bridge):
+    bridge.on("ListUsers", bridge.pb.ListUsersReply(next_offset=1, users=[
+        bridge.pb.UserEntry(username="alice", nt_hash=HASH_A, unlock_requested_at=-1)]))
+    run = run_sidecar("authsync", bridge)
+    assert run.returncode == 1
+    assert run.stdout == ""
+
+
+def test_configsync_old_bridge_defaults_export_lockout_off(bridge):
+    bridge.on("GetProtocolSettings", bridge.pb.ProtocolSettingsReply(
+        min_protocol="SMB2_10", max_protocol="SMB3_11"))
+    run = run_sidecar("configsync", bridge)
+    assert run.returncode == 0, run.stderr
+    config = run.json()["config"]
+    assert (config["lockout_enabled"], config["lockout_attempts"],
+            config["lockout_minutes"], config["hosts_allow"]) == (False, 0, 0, [])
+
+
+def test_configsync_rejects_control_characters_in_hosts_allow(bridge):
+    bridge.on("GetProtocolSettings", bridge.pb.ProtocolSettingsReply(
+        min_protocol="SMB2_10", max_protocol="SMB3_11",
+        hosts_allow=["10.0.0.0/8\n0.0.0.0/0"]))
+    run = run_sidecar("configsync", bridge)
+    assert run.returncode == 1
+    assert run.stdout == ""
+    assert "invalid hosts_allow entry" in run.stderr
 
 
 @pytest.mark.parametrize("dialects", [

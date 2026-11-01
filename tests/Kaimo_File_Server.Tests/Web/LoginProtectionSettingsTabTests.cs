@@ -165,30 +165,21 @@ public partial class LoginProtectionSettingsTabTests
         Assert.Null(cut.Find("#login-protection-max-attempts").GetAttribute("disabled"));
     }
 
+    // Every card is in effect: share links since AP5, the SMB lockout since AP8.
     [Fact]
-    public void OnlySmbCard_IsMarkedAsNotYetEffective()
+    public void NoCard_IsMarkedAsNotYetEffective()
     {
         using var ctx = new BunitContext();
         var cut = Render(ctx, canManage: true);
-        var label = Resources.ResourceManager.GetString("Web_LoginProtection_NotYetEffective");
-        Assert.False(string.IsNullOrEmpty(label));
 
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("input")), Timeout);
         var sections = cut.FindAll(".detail-section");
         Assert.Equal(3, sections.Count);
-        Assert.Empty(sections[0].QuerySelectorAll(".status-badge"));
-        Assert.Empty(sections[1].QuerySelectorAll(".status-badge"));
-        Assert.Contains(label!, sections[2].QuerySelector(".status-badge")!.TextContent);
-    }
-
-    [Fact]
-    public void ShareLinkCard_HasNoPendingNote()
-    {
-        using var ctx = new BunitContext();
-        var cut = Render(ctx, canManage: true);
-
-        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("input")), Timeout);
-        Assert.Null(cut.FindAll(".detail-section")[1].QuerySelector(".login-protection-pending"));
+        Assert.All(sections, section =>
+        {
+            Assert.Empty(section.QuerySelectorAll(".status-badge"));
+            Assert.Null(section.QuerySelector(".login-protection-pending"));
+        });
     }
 
     [Fact]

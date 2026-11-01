@@ -17,8 +17,9 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 /// addresses and the rules that limit where users, groups or departments may sign in from.
 /// Gated by <see cref="ManagementPermission.ManageSystemSettings"/>, re-checked on every
 /// mutation. A save that would block the admin's own current connection is refused.
+/// The SMB network list (<c>hosts allow</c>) lives in <c>AccessSettingsViewModel.Smb.cs</c>.
 /// </summary>
-public sealed class AccessSettingsViewModel(
+public sealed partial class AccessSettingsViewModel(
     AuthenticationStateProvider authState,
     IUserContextFactory userContextFactory,
     IManagementAuthService mgmtAuth,
@@ -78,7 +79,9 @@ public sealed class AccessSettingsViewModel(
             if (!CanManage) return;
 
             await LoadDomainsAsync();
-            Rules = (await access.GetSettingsAsync()).Rules.Select(r => r.Clone()).ToList();
+            var restrictions = await access.GetSettingsAsync();
+            Rules = restrictions.Rules.Select(r => r.Clone()).ToList();
+            LoadSmbNetworks(restrictions);
 
             UserItems = (await users.GetAllAsync()).OrderBy(u => u.Name)
                 .Select(u => new PrincipalPickerItem(u.Id, u.Name, PrincipalKind.User,
@@ -269,7 +272,10 @@ public sealed class AccessSettingsViewModel(
     /// <summary>Persists <paramref name="rules"/> unless they would block the admin's own connection.</summary>
     private async Task<bool> SaveRulesAsync(List<AccessRule> rules)
     {
-        var candidate = new AccessRestrictionSettings { Rules = rules };
+        // Both lists share one stored blob; saving the rules keeps the SMB networks as stored now,
+        // not as this tab loaded them (another admin may have changed them meanwhile).
+        _smbAllowedNetworks = (await access.GetSettingsAsync()).SmbAllowedNetworks.ToList();
+        var candidate = new AccessRestrictionSettings { Rules = rules, SmbAllowedNetworks = _smbAllowedNetworks.ToList() };
         if (_actor is null || !await access.IsAllowedAsync(_actor, client.RemoteAddress, client.Host, candidate))
         {
             ErrorMessage = string.Format(R("Web_AccessRestrictions_Error_SelfLockout"), ClientAddress, ClientHost);

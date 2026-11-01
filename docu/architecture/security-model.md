@@ -154,8 +154,18 @@ evaluated by `AccessRestrictionService`).
   403 `address_not_allowed`; Blazor hub connect: the session cookie is ignored, so the circuit starts
   anonymous on the login page), and the periodic circuit revalidation.
 - Not covered: SMB, anonymous share links, and download tickets issued inside an already checked circuit.
+  SMB has its own network list instead (`SmbAllowedNetworks`, applied by `sync-config.sh` as Samba
+  `hosts allow`, loopback always prepended; a change disconnects all SMB sessions), and Samba's own
+  account lockout (tdbsam account policies from the "Login protection" tab). SMB login events reach
+  the security overview through the log forwarder → `kaimo_authreport` → `SecurityEventService`.
+  `SmbAuthenticationRecorder` stores successes and failures as counted rows (account, address,
+  outcome, hour); one address starts at most 20 failure rows per hour, further accounts' failures
+  share one row of that address without an account, so a user-name spray cannot grow the table
+  without bound. LockedOut events for unknown accounts are dropped (Samba answers LockedOut only
+  for passdb accounts, so such a line is forged) and never notify.
 - Saving rules that would block the saving administrator's own connection is refused. For recovery,
-  `KAIMO_ACCESS_RESTRICTIONS_DISABLED=true` on the web container ignores every rule.
+  `KAIMO_ACCESS_RESTRICTIONS_DISABLED=true` on the web container ignores every rule; on the
+  `smb-bridge` container it also lifts the SMB network list.
 - Rules and each user's resolved groups/departments are cached for 30 seconds.
 
 ## File authorization (ACL)

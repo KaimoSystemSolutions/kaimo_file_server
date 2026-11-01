@@ -42,6 +42,7 @@ builder.Services.AddSingleton<ControlPlaneAuthorizationInterceptor>();
 builder.Services.Configure<HashExportRateLimitOptions>(
     builder.Configuration.GetSection(HashExportRateLimitOptions.SectionName));
 builder.Services.AddSingleton<HashExportRateLimiter>();
+builder.Services.AddScoped<SmbAuthenticationRecorder>();
 builder.Services.AddGrpc(options =>
     options.Interceptors.Add<ControlPlaneAuthorizationInterceptor>());
 
@@ -103,6 +104,7 @@ app.MapGrpcService<FileEventGrpcService>();  // Phase 3: Close-Hooks (Version/In
 app.MapGrpcService<ShareGrpcService>();      // Phase 4: Share-Provisioning (ListShares -> net conf)
 app.MapGrpcService<ConfigGrpcService>();     // Phase 4: Protokoll-Settings (GetProtocolSettings -> net conf global) + Enabled-Flag (Phase 5)
 app.MapGrpcService<SnapshotGrpcService>();   // Phase 5: ACL-filtered @GMT snapshots/materialization
+app.MapGrpcService<SecurityEventGrpcService>(); // AP8d: SMB login events -> security overview
 app.MapGet("/", () => "Kaimo SMB Bridge (mutually authenticated gRPC on :5080).");
 
 app.Run();

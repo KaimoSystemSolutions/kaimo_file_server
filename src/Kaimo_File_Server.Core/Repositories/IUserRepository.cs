@@ -23,6 +23,12 @@ namespace Kaimo_File_Server.Core.Repositories
         Task<User?> GetByUsernameAsync(string username);
 
         /// <summary>
+        /// Retrieves a user by login name ignoring case, for names a client typed in any case
+        /// (SMB login events); null when there is none.
+        /// </summary>
+        Task<User?> GetByUsernameIgnoreCaseAsync(string username);
+
+        /// <summary>
         /// Returns every user in the system.
         /// </summary>
         Task<IEnumerable<User>> GetAllAsync();
@@ -126,10 +132,14 @@ namespace Kaimo_File_Server.Core.Repositories
 
         /// <summary>Sets which file services (app, web, SMB, WebDAV) the user may use.</summary>
         Task UpdateServiceAccessAsync(Guid userId, UserServiceAccess access);
+
+        /// <summary>Records a request to lift the user's SMB account lockout (see <see cref="User.SmbUnlockRequestedAtUtc"/>).</summary>
+        Task RequestSmbUnlockAsync(Guid userId, DateTime requestedAtUtc);
     }
 
     /// <summary>Minimal database projection used by Samba credential export.</summary>
     public sealed record SambaCredentialSource(
         string Username,
-        string StoredNtHash);
+        string StoredNtHash,
+        DateTime? SmbUnlockRequestedAtUtc = null);
 }

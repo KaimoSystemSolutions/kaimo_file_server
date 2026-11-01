@@ -267,6 +267,17 @@ public sealed class SecurityMonitorAggregationTests : DatabaseTestBase
             throw new InvalidOperationException("database down");
         }
 
+        public Task<IReadOnlyList<LoginAttemptRecord>> ListRecentAsync(SecurityChannel channel,
+            IReadOnlyCollection<string> usernames, IReadOnlyCollection<string?> addresses, DateTime sinceUtc,
+            CancellationToken ct = default)
+            => inner.ListRecentAsync(channel, usernames, addresses, sinceUtc, ct);
+
+        public Task<DateTime?> GetActiveLockUntilAsync(SecurityChannel channel, string username, DateTime sinceUtc, DateTime nowUtc)
+            => inner.GetActiveLockUntilAsync(channel, username, sinceUtc, nowUtc);
+
+        public Task EndActiveLocksAsync(SecurityChannel channel, string username, DateTime nowUtc)
+            => inner.EndActiveLocksAsync(channel, username, nowUtc);
+
         public Task<SecurityTotals> GetTotalsAsync(DateTime sinceUtc, DateTime nowUtc) => inner.GetTotalsAsync(sinceUtc, nowUtc);
 
         public Task<IReadOnlyList<AccountLoginSummary>> SummarizeAccountsAsync(DateTime sinceUtc, DateTime nowUtc, int limit)

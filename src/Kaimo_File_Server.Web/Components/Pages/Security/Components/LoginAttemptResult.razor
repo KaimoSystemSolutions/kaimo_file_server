@@ -6,13 +6,20 @@
 @*
     Result cell of the security overview's attempt list: the outcome badge and, when repeated
     LockedOut attempts of one lockout (account or address) were folded into the row, a "×N" badge with the count.
+    SMB successes and failures are counted the same way (one row per account, address and hour).
 *@
 
 <span class="login-attempt-result">
     <StatusBadge Tone="OutcomeTone(Attempt.Outcome)" Label="@OutcomeLabel(Attempt.Outcome)" />
     @if (Attempt.RepeatCount > 1)
     {
-        var hint = string.Format(T("Web_Security_RepeatCount_Hint", "{0} attempts during this lockout"), Attempt.RepeatCount);
+        var hint = Attempt.Outcome switch
+        {
+            LoginOutcome.Success => string.Format(T("Web_Security_RepeatCount_SuccessHint", "{0} successful logins in this hour"), Attempt.RepeatCount),
+            LoginOutcome.LockedOut or LoginOutcome.AddressLockedOut
+                => string.Format(T("Web_Security_RepeatCount_Hint", "{0} attempts during this lockout"), Attempt.RepeatCount),
+            _ => string.Format(T("Web_Security_RepeatCount_FailureHint", "{0} failed logins in this hour"), Attempt.RepeatCount),
+        };
         <StatusBadge Tone="StatusTone.Neutral" ShowDot="false" Class="login-attempt-repeat"
                      Label="@($"×{Attempt.RepeatCount}")" title="@hint" aria-label="@hint" />
     }

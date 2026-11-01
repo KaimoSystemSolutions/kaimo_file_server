@@ -102,28 +102,36 @@ is_valid_sync_username() {
         && [[ "$candidate" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
 }
 
+# NT hash per local passdb user (upper-case), filled by enumerate_local_passdb_users.
+declare -A local_hashes=()
+
 enumerate_local_passdb_users() {
     : >"$PDBEDIT_LOG"
     : >"$PDBEDIT_USERS_RAW"
     : >"$LOCAL_PASSDB_USERS"
+    local_hashes=()
 
     # Samba diagnostics follow its configured logging target. With
     # "logging = stdout", pdbedit still writes interface-discovery messages to
     # stderr. Never merge stderr into the machine-readable `pdbedit -L` data:
     # doing so previously persisted "added interface ..." as managed users.
-    if ! pdbedit -L >"$PDBEDIT_USERS_RAW" 2>"$PDBEDIT_LOG"; then
+    # `-w` lists smbpasswd records (user:uid:LM:NT:[flags]:LCT:) so unchanged
+    # users can be skipped below.
+    if ! pdbedit -L -w >"$PDBEDIT_USERS_RAW" 2>"$PDBEDIT_LOG"; then
         echo "[sync-users] Cannot enumerate local tdbsam users."
         return 1
     fi
 
-    while IFS=: read -r passdb_user passdb_uid _; do
+    while IFS=: read -r passdb_user passdb_uid _ passdb_hash _; do
         if ! is_valid_sync_username "$passdb_user" \
             || ! [[ "$passdb_uid" =~ ^[0-9]+$ ]]; then
             echo "[sync-users] Invalid pdbedit list record rejected." >&2
             return 1
         fi
         printf '%s\n' "$passdb_user" >>"$LOCAL_PASSDB_USERS"
+        local_hashes["$passdb_user"]="${passdb_hash^^}"
     done <"$PDBEDIT_USERS_RAW"
+    unset passdb_hash
     sort -u -o "$LOCAL_PASSDB_USERS" "$LOCAL_PASSDB_USERS"
 }
 
@@ -205,15 +213,20 @@ if ! jq -s -e -r '
        or (.users | length) > 100000
        or (all(.users[];
             type == "object"
-            and exact_keys(["username", "nt_hash"])
+            and (exact_keys(["username", "nt_hash"])
+                 or exact_keys(["username", "nt_hash", "unlock_requested_at"]))
             and (.username | type == "string"
                  and test("^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$"))
             and (.nt_hash | type == "string"
-                 and test("^[0-9A-Fa-f]{32}$"))) | not)
+                 and test("^[0-9A-Fa-f]{32}$"))
+            # AP8e: unix ms of the latest SMB unlock request (absent = none).
+            and ((if has("unlock_requested_at") then .unlock_requested_at else 0 end) | type == "number"
+                 and . == floor and . >= 0 and . < 1e15)) | not)
        or (([.users[].username | ascii_downcase] | length)
            != ([.users[].username | ascii_downcase] | unique | length))
     then error("invalid user sync schema")
-    else .users[] | [.username, (.nt_hash | ascii_upcase)] | @tsv
+    else .users[] | [.username, (.nt_hash | ascii_upcase),
+                     (if has("unlock_requested_at") then .unlock_requested_at else 0 end | tostring)] | @tsv
     end
 ' "$AUTH_JSON" >"$USER_RECORDS"; then
     echo "[sync-users] Invalid structured user response."
@@ -222,7 +235,7 @@ fi
 rm -f -- "$AUTH_JSON"
 AUTH_JSON=""
 unset AUTH_JSON_BYTES
-while IFS=$'\t' read -r validated_user validated_hash; do
+while IFS=$'\t' read -r validated_user validated_hash _; do
     [ -z "${validated_user:-}" ] && continue
     if is_reserved_posix_user "$validated_user"; then
         echo "[sync-users] Reserved local username rejected: '$validated_user'."
@@ -230,6 +243,23 @@ while IFS=$'\t' read -r validated_user validated_hash; do
     fi
 done <"$USER_RECORDS"
 unset validated_hash
+
+# AP8e: SMB unlock requests already applied (user<TAB>unix ms). Persistent, so
+# a container restart does not re-apply an old request to a newer lockout.
+UNLOCK_STATE="$STATE_DIR/smb-unlocks"
+declare -A applied_unlocks=()
+if [ -e "$UNLOCK_STATE" ] || [ -L "$UNLOCK_STATE" ]; then
+    if [ -L "$UNLOCK_STATE" ] || [ ! -f "$UNLOCK_STATE" ] \
+        || [ "$(stat -c '%u' -- "$UNLOCK_STATE" 2>/dev/null)" != "$(id -u)" ] \
+        || [ "$(stat -c '%a' -- "$UNLOCK_STATE" 2>/dev/null)" != "600" ]; then
+        echo "[sync-users] Unlock state must be a current-user-owned mode-0600 regular file."
+        exit 1
+    fi
+    while IFS=$'\t' read -r unlock_user unlock_at; do
+        is_valid_sync_username "${unlock_user:-}" && [[ "${unlock_at:-}" =~ ^[0-9]+$ ]] \
+            && applied_unlocks["$unlock_user"]="$unlock_at"
+    done <"$UNLOCK_STATE"
+fi
 
 # Capture local passdb state before importing. On the first P1-16 run, existing
 # tdbsam users are adopted as Kaimo-managed except for explicitly reserved
@@ -274,13 +304,16 @@ fi
 LM="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 LCT="$(printf 'LCT-%08X' "$(date +%s)")"
 count=0
+unchanged=0
+declare -A desired_hashes=()
+declare -A requested_unlocks=()
 
 # IMPORTANT: Each Kaimo user gets their OWN, distinct UID. Samba derives the
 # SID from the UID (rid = 2*uid + base) and does getpwuid lookups; a shared
 # UID collapses all users to the same SID/name -> auth/connect breaks.
 # (Storage write permission is solved via groups/FS permissions, NOT via
 #  shared UIDs or `force user` -- both destroy per-user identity.)
-while IFS=$'\t' read -r user nthash; do
+while IFS=$'\t' read -r user nthash unlock_at; do
     [ -z "${user:-}" ] && continue
     # Create POSIX user (Samba passdb needs getpwnam). Allow dots in names.
     if ! id "$user" >/dev/null 2>&1; then
@@ -307,8 +340,22 @@ while IFS=$'\t' read -r user nthash; do
         echo "[sync-users] Cannot resolve POSIX identity for '$user'."
         exit 1
     }
-    printf '%s:%s:%s:%s:[U          ]:%s:\n' "$user" "$uid" "$LM" "$nthash" "$LCT" >> "$SMBPASSWD"
     printf '%s\n' "$user" >>"$DESIRED_USERS"
+    desired_hashes["$user"]="$nthash"
+    # AP8b: importing a record resets Samba's lockout flag and bad-password
+    # counter (and its bad-password time). Only new users and changed hashes
+    # are imported, so a running SMB lockout survives every sync cycle; a
+    # password change deliberately ends it. AP8e: so does a new unlock request
+    # from the user details, which forces one import of an unchanged user.
+    [ "${unlock_at:-0}" = "0" ] || requested_unlocks["$user"]="$unlock_at"
+    if [ "${local_hashes[$user]-}" = "$nthash" ] \
+        && { [ "${unlock_at:-0}" = "0" ] || [ "${applied_unlocks[$user]-}" = "$unlock_at" ]; }; then
+        unchanged=$((unchanged + 1))
+        continue
+    fi
+    [ "${unlock_at:-0}" = "0" ] || [ "${applied_unlocks[$user]-}" = "$unlock_at" ] \
+        || echo "[sync-users] SMB unlock requested for '$user'."
+    printf '%s:%s:%s:%s:[U          ]:%s:\n' "$user" "$uid" "$LM" "$nthash" "$LCT" >> "$SMBPASSWD"
     count=$((count + 1))
 done <"$USER_RECORDS"
 unset nthash
@@ -323,11 +370,12 @@ if [ "$count" -gt 0 ]; then
     fi
     rm -f -- "$SMBPASSWD"
     SMBPASSWD=""
-    echo "[sync-users] $count users imported into tdbsam."
+    echo "[sync-users] $count users imported into tdbsam ($unchanged unchanged)."
 else
     rm -f -- "$SMBPASSWD"
     SMBPASSWD=""
-    echo "[sync-users] no active users received."
+    [ "$unchanged" -gt 0 ] && echo "[sync-users] $unchanged users unchanged." \
+        || echo "[sync-users] no active users received."
 fi
 
 # Remove credentials no longer present in the bridge response. POSIX identities
@@ -368,6 +416,10 @@ while IFS= read -r desired_user; do
         echo "[sync-users] Verification failed: missing tdbsam user '$desired_user'."
         exit 1
     fi
+    if [ "${local_hashes[$desired_user]-}" != "${desired_hashes[$desired_user]-}" ]; then
+        echo "[sync-users] Verification failed: stale credential for '$desired_user'."
+        exit 1
+    fi
     for desired_group in "${KAIMO_STORAGE_GROUP:-kaimo}" "${KAIMO_AUTHD_GROUP:-kaimo-authd}"; do
         if ! id -nG "$desired_user" 2>/dev/null | tr ' ' '\n' | grep -Fqx "$desired_group"; then
             echo "[sync-users] Verification failed: '$desired_user' is not in '$desired_group'."
@@ -401,4 +453,16 @@ publish_managed_state "$DESIRED_USERS" || {
     echo "[sync-users] Cannot publish reconciled managed-user state."
     exit 1
 }
+
+# Remember the unlock requests this run applied (verified import above). A
+# failed run publishes nothing, so its requests are applied by the retry.
+STATE_TMP="$(mktemp "$STATE_DIR/smb-unlocks.XXXXXX")" || exit 1
+for unlock_user in "${!requested_unlocks[@]}"; do
+    printf '%s\t%s\n' "$unlock_user" "${requested_unlocks[$unlock_user]}"
+done >"$STATE_TMP" || exit 1
+chmod 0600 "$STATE_TMP" && mv -f -- "$STATE_TMP" "$UNLOCK_STATE" || {
+    echo "[sync-users] Cannot publish the applied SMB unlock state."
+    exit 1
+}
+STATE_TMP=""
 exit 0

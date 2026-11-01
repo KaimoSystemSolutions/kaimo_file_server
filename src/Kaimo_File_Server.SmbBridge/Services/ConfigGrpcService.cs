@@ -1,6 +1,8 @@
 using Grpc.Core;
 using Kaimo_File_Server.Core.Logging;
+using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Infrastructure.Logging;
 using Kaimo_File_Server.SmbBridge.Grpc;
 
@@ -18,21 +20,26 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 /// Samba-agnostic. WS-Discovery and Audit-Log are transported as booleans and
 /// applied by <c>sync-config.sh</c> via their own Samba mechanisms (the <c>wsdd</c>
 /// responder daemon and the <c>full_audit</c> VFS module), not via smb.conf globals.
+/// The SMB account lockout and the allowed client networks (<c>hosts allow</c>) come from the
+/// login-protection and access-restriction settings.
 /// </summary>
 public sealed class ConfigGrpcService : ConfigService.ConfigServiceBase
 {
     private readonly ISmbConfigStore _config;
+    private readonly IConfigRepository _settings;
     private readonly ILoggingConfigStore _loggingConfig;
     private readonly LoggingLevelConfigurationSource _loggingSource;
     private readonly ILogger<ConfigGrpcService> _logger;
 
     public ConfigGrpcService(
         ISmbConfigStore config,
+        IConfigRepository settings,
         ILoggingConfigStore loggingConfig,
         LoggingLevelConfigurationSource loggingSource,
         ILogger<ConfigGrpcService> logger)
     {
         _config = config;
+        _settings = settings;
         _loggingConfig = loggingConfig;
         _loggingSource = loggingSource;
         _logger = logger;
@@ -51,6 +58,14 @@ public sealed class ConfigGrpcService : ConfigService.ConfigServiceBase
             .WaitAsync(cancellationToken);
         string effectiveLogLevel =
             _loggingSource.ResolveLevel(databaseLogLevel) ?? LoggingConfigKeys.DefaultLevel;
+        // Fresh reads: the web UI writes both in another process, and this cache would hold them for minutes.
+        var protection = await _settings.LoadLoginProtectionAsync(fresh: true)
+            .WaitAsync(cancellationToken);
+        // The recovery switch must also lift hosts allow, or a wrong list would lock everyone out of SMB.
+        var restrictions = AccessRestrictionSettings.DisabledByEnvironment
+            ? AccessRestrictionSettings.Default()
+            : await _settings.GetFreshAsync(AccessRestrictionSettings.ConfigKey, AccessRestrictionSettings.Default())
+                  .WaitAsync(cancellationToken) ?? AccessRestrictionSettings.Default();
 
         var reply = new ProtocolSettingsReply
         {
@@ -62,12 +77,17 @@ public sealed class ConfigGrpcService : ConfigService.ConfigServiceBase
             EnableWsDiscovery = s.EnableWsDiscovery,
             EnableAuditLog = s.EnableAuditLog,
             LogLevel = effectiveLogLevel,
+            LockoutEnabled = protection.SmbLockoutEnabled,
+            LockoutAttempts = protection.SmbLockoutAttempts,
+            LockoutMinutes = protection.SmbLockoutMinutes,
         };
+        reply.HostsAllow.AddRange(restrictions.SmbHostsAllow());
 
         _logger.LogInformation(
-            "GetProtocolSettings -> min={Min} max={Max} signing={Sign} encrypt={Enc} enabled={Enabled} wsdd={Wsdd} audit={Audit} log={LogLevel}",
+            "GetProtocolSettings -> min={Min} max={Max} signing={Sign} encrypt={Enc} enabled={Enabled} wsdd={Wsdd} audit={Audit} log={LogLevel} lockout={Lockout}/{Attempts}/{Minutes} hostsAllow={HostsAllow}",
             reply.MinProtocol, reply.MaxProtocol, reply.RequireSigning, reply.RequireEncryption,
-            reply.Enabled, reply.EnableWsDiscovery, reply.EnableAuditLog, reply.LogLevel);
+            reply.Enabled, reply.EnableWsDiscovery, reply.EnableAuditLog, reply.LogLevel,
+            reply.LockoutEnabled, reply.LockoutAttempts, reply.LockoutMinutes, reply.HostsAllow.Count);
         return reply;
     }
 

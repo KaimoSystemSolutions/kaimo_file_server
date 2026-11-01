@@ -24,6 +24,7 @@ export CALL_LOG="$WORK/calls.log"
 export WSDD_STATE="$WORK/wsdd.running"
 export KAIMO_SAMBA_PATH_PREFIX=""
 export KAIMO_LOG_CONSOLE_LEVEL_FILE="$WORK/console-log-level"
+export KAIMO_SMB_LOCKOUT_STATE_FILE="$WORK/lockout-applied"
 mkdir -p "$WORK/bin"
 
 cat > "$WORK/bin/kaimo_configsync" <<'EOF'
@@ -76,6 +77,12 @@ echo "pkill $*" >> "$CALL_LOG"
 [ "${PKILL_EXIT:-0}" = 0 ] || exit "$PKILL_EXIT"
 [ "${PKILL_NOOP:-0}" = 1 ] || rm -f "$WSDD_STATE"
 EOF
+# Account policies (SMB lockout) are covered by test-sync-config-smb-protection.sh.
+cat >"$WORK/bin/pdbedit" <<'EOF'
+#!/bin/bash
+[ "${3:-}" = -C ] && exit 0
+echo "account policy \"$2\" value is: 0"
+EOF
 cat > "$WORK/bin/wsdd" <<'EOF'
 #!/bin/bash
 touch "$WSDD_STATE"
@@ -86,7 +93,7 @@ export PATH="$WORK/bin:$PATH"
 
 response() {
     local enabled="$1" wsdd="$2" audit="$3" level="${4:-Warning}"
-    printf '{"version":1,"config":{"min_protocol":"SMB2_10","max_protocol":"SMB3_11","require_signing":false,"require_encryption":false,"enabled":%s,"enable_ws_discovery":%s,"enable_audit_log":%s,"log_level":"%s"}}\n' \
+    printf '{"version":1,"config":{"min_protocol":"SMB2_10","max_protocol":"SMB3_11","require_signing":false,"require_encryption":false,"enabled":%s,"enable_ws_discovery":%s,"enable_audit_log":%s,"log_level":"%s","lockout_enabled":false,"lockout_attempts":0,"lockout_minutes":0,"hosts_allow":[]}}\n' \
         "$enabled" "$wsdd" "$audit" "$level" > "$CONFIG_RESPONSE"
 }
 param() { awk -F '\t' -v p="$1" '$1 == p { print $2 }' "$CONFIG_STATE"; }

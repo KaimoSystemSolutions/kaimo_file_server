@@ -38,6 +38,10 @@ message ListUsersRequest {
 message UserEntry {
   string username = 1;
   bytes  nt_hash  = 2; // raw 16 bytes
+  // AP8e: unix ms of the latest "Unlock SMB" request from the user details;
+  // 0 = none. sync-users.sh re-imports the user once per new value, which
+  // clears Samba's lockout flag and bad-password counter.
+  int64  unlock_requested_at = 3;
 }
 
 message ListUsersReply {
@@ -243,6 +247,20 @@ message ProtocolSettingsReply {
   // Global application log level from Settings (or KAIMO_LOG_LEVEL when set).
   // sync-config.sh maps this to Samba's numeric `log level`.
   string log_level           = 8;
+
+  // SMB account lockout ("Login protection" settings, services.smb.lockout.*).
+  // sync-config.sh applies them as the tdbsam account policies "bad lockout
+  // attempt" (0 when disabled), "lockout duration" and "reset count minutes".
+  // Samba locks the account itself, for all client addresses.
+  bool   lockout_enabled     = 9;
+  int32  lockout_attempts    = 10;
+  int32  lockout_minutes     = 11;
+
+  // Client networks in canonical CIDR notation that Samba accepts (`hosts
+  // allow`). Empty = every network; also empty while the recovery switch
+  // KAIMO_ACCESS_RESTRICTIONS_DISABLED is set on the bridge. sync-config.sh
+  // always prepends loopback for the container health checks.
+  repeated string hosts_allow = 12;
 }
 
 // Snapshots / "Previous Versions" over SMB (Phase 5). Windows requests the list
@@ -306,4 +324,29 @@ message ReleaseVersionLeaseRequest {
 
 message ReleaseVersionLeaseReply {
   bool released = 1;
+}
+
+// SMB login events for the security overview (AP8d). The Samba log forwarder
+// reduces Samba's auth_json_audit lines to these four fields and spools them;
+// kaimo_authreport sends the batches. The bridge records failures and lockouts
+// as login attempts (channel SMB), counts successes, and raises the same
+// account-locked notification as web logins. Purely informational: Samba
+// itself enforces the lockout.
+service SecurityEventService {
+  rpc ReportAuthentication(ReportAuthenticationRequest) returns (ReportAuthenticationReply);
+}
+
+message AuthenticationEvent {
+  int64  at_unix_ms = 1;
+  string username   = 2; // account the client sent (clientAccount)
+  string address    = 3; // client IP without port; empty when unknown
+  string status     = 4; // Samba NT status, e.g. NT_STATUS_WRONG_PASSWORD
+}
+
+message ReportAuthenticationRequest {
+  repeated AuthenticationEvent events = 1; // at most 1000 per call
+}
+
+message ReportAuthenticationReply {
+  uint32 accepted = 1; // events processed (stored or deliberately skipped)
 }

@@ -47,9 +47,11 @@ namespace Kaimo_File_Server.Core.Security
         Task<bool> CanAccessShareAsync(Guid shareID, Guid principalId);
     }
 
+    /// <param name="UnlockRequestedAtUnixMs">Latest SMB unlock request in unix milliseconds; 0 = none.</param>
     public sealed record SambaCredential(
         string Username,
-        byte[] NtHash);
+        byte[] NtHash,
+        long UnlockRequestedAtUnixMs = 0);
 
     public sealed record SambaCredentialBatch(
         IReadOnlyList<SambaCredential> Credentials,

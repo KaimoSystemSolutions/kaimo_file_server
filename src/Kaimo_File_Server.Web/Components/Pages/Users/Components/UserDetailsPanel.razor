@@ -373,6 +373,10 @@
                                  Label="@R(allowed ? "Web_FileServices_Allowed" : "Web_FileServices_Blocked")" />
                 </PropertyRow>
             }
+            @if (user.ServiceAccess.HasFlag(UserServiceAccess.Smb))
+            {
+                <UserSmbLock User="user" />
+            }
         </DetailSection>
 
         @* One list for every role assignment; Global (the whole system) is just the topmost

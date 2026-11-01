@@ -2052,6 +2052,9 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(15);
 
+                    b.Property<DateTime?>("SmbUnlockRequestedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(100)

@@ -59,6 +59,13 @@ int main() {
         std::cerr << "kaimo_configsync: invalid protocol range." << std::endl;
         return 1;
     }
+    // Value checks (ranges, CIDR shape) happen in sync-config.sh before any mutation.
+    for (const std::string& network : reply.hosts_allow()) {
+        if (!kaimo::sync_json::valid_text(network, 64)) {
+            std::cerr << "kaimo_configsync: invalid hosts_allow entry." << std::endl;
+            return 1;
+        }
+    }
 
     std::cout << "{\"version\":1,\"config\":{"
               << "\"min_protocol\":" << kaimo::sync_json::quote(reply.min_protocol())
@@ -69,7 +76,13 @@ int main() {
               << ",\"enable_ws_discovery\":" << kaimo::sync_json::boolean(reply.enable_ws_discovery())
               << ",\"enable_audit_log\":" << kaimo::sync_json::boolean(reply.enable_audit_log())
               << ",\"log_level\":" << kaimo::sync_json::quote(reply.log_level())
-              << "}}\n";
+              << ",\"lockout_enabled\":" << kaimo::sync_json::boolean(reply.lockout_enabled())
+              << ",\"lockout_attempts\":" << reply.lockout_attempts()
+              << ",\"lockout_minutes\":" << reply.lockout_minutes()
+              << ",\"hosts_allow\":[";
+    for (int i = 0; i < reply.hosts_allow_size(); ++i)
+        std::cout << (i == 0 ? "" : ",") << kaimo::sync_json::quote(reply.hosts_allow(i));
+    std::cout << "]}}\n";
     std::cerr << "kaimo_configsync: settings received (addr=" << addr << ")." << std::endl;
     return 0;
 }

@@ -57,7 +57,8 @@ public sealed class BridgeRpcCancellationTests
             .Returns(new TaskCompletionSource<SmbProtocolSettings>(
                 TaskCreationOptions.RunContinuationsAsynchronously).Task);
         var sut = new ConfigGrpcService(
-            config.Object, Mock.Of<ILoggingConfigStore>(),
+            config.Object, Mock.Of<Kaimo_File_Server.Infrastructure.Configuration.IConfigRepository>(),
+            Mock.Of<ILoggingConfigStore>(),
             new LoggingLevelConfigurationSource(),
             NullLogger<ConfigGrpcService>.Instance);
 

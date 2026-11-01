@@ -125,6 +125,19 @@ start_periodic_sync users "$USER_SYNC_INTERVAL_SECONDS" "$SCRIPT_DIR/sync-users.
 start_periodic_sync shares "$SHARE_SYNC_INTERVAL_SECONDS" "$SCRIPT_DIR/sync-shares.sh"
 start_periodic_sync config "$CONFIG_SYNC_INTERVAL_SECONDS" "$SCRIPT_DIR/sync-config.sh"
 
+# --- AP8d: SMB login events -> bridge security overview ---
+# The log forwarder spools auth events; kaimo_authreport sends complete batches.
+# Informational only: a failed report keeps its batch for the next run and,
+# unlike the reconcilers above, never closes sessions or stops Samba.
+AUTH_REPORT_INTERVAL_SECONDS="${KAIMO_AUTH_REPORT_INTERVAL_SECONDS:-5}"
+"$SCRIPT_DIR/validate-sync-interval.sh" \
+    KAIMO_AUTH_REPORT_INTERVAL_SECONDS "$AUTH_REPORT_INTERVAL_SECONDS" 1 60
+(
+    while sleep "$AUTH_REPORT_INTERVAL_SECONDS"; do
+        kaimo_authreport >/dev/null 2>/tmp/authreport.err || true
+    done
+) &
+
 # --- Phase 2: Start authorization sidecar (Unix socket <-> gRPC) ---
 # The VFS module (connect hook) asks here "may <user> access <share>?".
 install -d -m 0750 -o root -g "$KAIMO_AUTHD_GROUP" /var/run/kaimo
