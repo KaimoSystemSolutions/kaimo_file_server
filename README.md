@@ -1,18 +1,17 @@
 # 🐢 Kaimo File Server
 
-The Kaimo File Server is a selfhosted fileserver, which allows you to use the fileserver how you like it.
-It is a docker compose solutions, which is meant to be running on a VM / LXC of a hypervisor like Proxmox for example.
+The Kaimo File Server is a self-hosted file server, which allows you to use the file server however you like.
+It is a Docker Compose solution, which is meant to run on a VM / LXC of a hypervisor like Proxmox for example.
 
-🚧 Kaimo File Server is still under developement, make backups if you use it with sensible data. 
-Please feel free to test the active beta and let me know your feedback on it.
-For your information beta version are **not** supported for upgrading to the full 1.0 release.
+⚠️ Databases created by a beta release can **not** be upgraded to 1.0 — start 1.0 with an empty database.
+As with any file server, keep regular backups of sensitive data.
 
 
 
 ## ✨ Features
 
 ### 📁 Storage
-- Multiple custom storage pools, with differnt mountpoints
+- Multiple custom storage pools, with different mount points
 - Shares are based on one of these storage pools
 - Virtual shares to access external storage from the built-in filebrowser
 
@@ -34,7 +33,7 @@ For your information beta version are **not** supported for upgrading to the ful
 - Departments which can handle scoped access to resources
 
 ### 🔍 Search
-- In-text file search powered by Elasticsearch (if ram is short, just use the regular filename search)
+- In-text file search powered by Elasticsearch (if RAM is short, just don't use the ES container, we have a fallback)
 
 ### ✉️ Notifications
 - Can be sent over E-Mail
@@ -44,13 +43,13 @@ For your information beta version are **not** supported for upgrading to the ful
 ### 🔄 Coming soon: Syncing to your local devices on
 - Windows
 - Linux
-- MacOS
+- macOS
 - Android
-- IOS
+- iOS
 
 ## How to run it
 
-Under [/example](/example) you find more infos about it
+Under [/example](/example) you can find more information about it.
 
 ## 📜 License
 
@@ -84,7 +83,7 @@ Agreement so the project can continue to be offered under both licenses.
 
 ## Why I built this
 
-I have been running a synology for a long time, tried to switch to TrueNas but I didn't got what I expected. 
-The best case for TrueNAS is to directly attach your drives to the VM, which doesn't made sense for me, because I wanted to use a hypervisor for all of my stuff and not only some parts of it. 
-I've searched a long time but I didn't found something I wanted to work with and to trust my whole sensitive files on.
-So I thought I just could do it by myself, just a fileserver which fits my needs the most. 
+I have been running a Synology for a long time and tried to switch to TrueNAS, but I didn't get what I expected. 
+The best case for TrueNAS is to attach your drives directly to the VM, which didn't make sense for me, because I wanted to use a hypervisor for all of my stuff and not only some parts of it. 
+I searched for a long time, but I didn't find anything I wanted to work with and trust with all my sensitive files.
+So I thought I could just build it myself: a file server that fits my needs best. 

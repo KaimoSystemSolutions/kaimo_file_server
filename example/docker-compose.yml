@@ -46,7 +46,7 @@ services:
       - bridge-database
 
   host:
-    image: kaimosystem/kaimo_file_server:${KAIMO_IMAGE_TAG:-latest}
+    image: kaimosystem/kaimo_file_server:${KAIMO_IMAGE_TAG:?Set KAIMO_IMAGE_TAG in .env}
     restart: unless-stopped
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Host.dll"]
     environment:
@@ -69,7 +69,7 @@ services:
       - search
 
   smb-bridge:
-    image: kaimosystem/kaimo_file_server.samba_bridge:${KAIMO_IMAGE_TAG:-latest}
+    image: kaimosystem/kaimo_file_server.samba_bridge:${KAIMO_IMAGE_TAG:?Set KAIMO_IMAGE_TAG in .env}
     restart: unless-stopped
     logging: *bounded-logging
     environment:
@@ -95,7 +95,7 @@ services:
           - kaimo_smb_bridge
 
   samba:
-    image: kaimosystem/kaimo_file_server.samba:${KAIMO_IMAGE_TAG:-latest}
+    image: kaimosystem/kaimo_file_server.samba:${KAIMO_IMAGE_TAG:?Set KAIMO_IMAGE_TAG in .env}
     restart: unless-stopped
     logging: *bounded-logging
     dns_search:
@@ -130,7 +130,7 @@ services:
       start_period: 20s
 
   web:
-    image: kaimosystem/kaimo_file_server.web:${KAIMO_IMAGE_TAG:-latest}
+    image: kaimosystem/kaimo_file_server.web:${KAIMO_IMAGE_TAG:?Set KAIMO_IMAGE_TAG in .env}
     restart: unless-stopped
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Web.dll"]
     ports:
