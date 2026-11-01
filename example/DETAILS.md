@@ -288,6 +288,131 @@ list the public URL so the browser connection is accepted:
 Never publish `8080` on a public or untrusted interface: browsers would be
 redirected, but anything else sent there crosses the network in clear text.
 
+## 🌍 Running on the internet
+
+The example stack publishes `8443` (web) and `445` (SMB) on every host
+interface. That is fine inside a trusted LAN, but **not** on a server reachable
+from the internet. For internet operation:
+
+| Port | Public? | How |
+| --- | --- | --- |
+| `443` (and `80`) | Yes | Reverse proxy with a Let's Encrypt certificate; `80` only answers the certificate challenge and redirects to HTTPS. |
+| `8443` | No | Remove the mapping; the proxy talks to `web` inside Docker. |
+| `8080` | No | Never published; the proxy forwards to `web:8080` over the Docker network. |
+| `445` | **Never** | Only through a VPN or a firewall restricted to fixed source addresses (see [SMB](#smb-445)). |
+
+### Reverse proxy with Caddy
+
+Caddy obtains and renews the certificate automatically, passes the `Host` header
+through unchanged, supports WebSockets (needed by the web UI) and sets
+`X-Forwarded-For` / `X-Forwarded-Proto` itself, ignoring such headers sent by
+clients. Put it on its own network together with `web` and give it a fixed
+address, so exactly that address can be trusted.
+
+`Caddyfile` next to `docker-compose.yml` (replace the domain; its DNS record must
+point to the server):
+
+```text
+files.example.com {
+	reverse_proxy web:8080
+}
+```
+
+Changes in `docker-compose.yml`:
+
+```yaml
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy:/data          # certificates; keep across restarts
+    networks:
+      proxy:
+        ipv4_address: 172.30.0.10
+
+  web:
+    # Remove the whole "ports:" block — neither 8443 nor 8080 is published.
+    environment:
+      <<: *dotnet-environment
+      # ... existing web variables ...
+      ForwardedHeaders__KnownProxies__0: 172.30.0.10   # Caddy, and only Caddy
+    networks:
+      - default
+      - database
+      - search
+      - proxy
+
+networks:
+  # ... existing networks ...
+  proxy:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+```
+
+Then run `docker compose up -d`. Pick another subnet if `172.30.0.0/24` is
+already used on the host.
+
+**Traefik** works the same way: a router on the HTTPS entrypoint with a Let's
+Encrypt certificate resolver, the service port set to `8080`
+(`traefik.http.services.kaimo.loadbalancer.server.port=8080`), and Traefik's
+fixed address listed in `ForwardedHeaders__KnownProxies__0`. Traefik also passes
+the `Host` header through by default. **nginx** additionally needs the WebSocket
+upgrade headers and a raised `client_max_body_size` for uploads.
+
+Checklist for every proxy (details in
+[Behind a reverse proxy](#-behind-a-reverse-proxy) and
+[Plain HTTP port 8080](#-plain-http-port-8080)):
+
+- The proxy's address is listed in `ForwardedHeaders__KnownProxies__N` (or its
+  network in `ForwardedHeaders__KnownNetworks__N`). **An untrusted proxy is the
+  most common misconfiguration:** every client then appears with the proxy's
+  address, the client API answers `426`, and a few failed logins from anyone
+  lock out *all* logins for that address — i.e. for everyone.
+- The proxy sends `X-Forwarded-Proto: https` and passes the original `Host`
+  header. If it rewrites `Host`, set `Web__AllowedOrigins` to the public URL
+  (e.g. `https://files.example.com`).
+- `8443` is no longer published, so nobody can bypass the proxy.
+
+Afterwards review **Settings → Login protection**: per-user, per-address and
+account-wide limits for web, client API and WebDAV logins, share-link passwords
+and the SMB account lockout. The **Security** page in the navigation shows
+failed logins and locked accounts, including SMB.
+
+### SMB (445)
+
+SMB is not designed for the open internet: it is a frequent target of automated
+password guessing and of exploits. **Never publish `445` publicly.** Instead:
+
+- **VPN (recommended):** WireGuard or Tailscale. Bind the port to the VPN
+  address only, e.g. `"10.8.0.1:445:445"` in the `samba` service instead of
+  `"445:445"`. The address must exist when the container starts, so bring the
+  VPN up before Docker.
+- **Firewall on fixed source addresses:** only if all clients have static
+  public addresses. Note that Docker-published ports **bypass `ufw`/`firewalld`
+  rules**; filter in the `DOCKER-USER` iptables chain or bind the port to a
+  specific address as above.
+
+In both cases additionally restrict SMB to the expected client networks under
+**Settings → Access restrictions → SMB** (Samba `hosts allow`; loopback is
+always allowed for the health checks). Samba must see the real client address
+for this: with Docker's IPv4 port forwarding it does, behind Docker's userland
+proxy (IPv6, hairpin) every client appears as the bridge gateway. If you lock
+yourself out, set `KAIMO_ACCESS_RESTRICTIONS_DISABLED=true` on `web` **and**
+`smb-bridge` (see
+[`OPTIONAL_ENVIRONMENT_VARIABLES.md`](OPTIONAL_ENVIRONMENT_VARIABLES.md)).
+
+The SMB account lockout (**Settings → Login protection**, default on: 10 failed
+attempts, then 15 minutes locked) limits password guessing but also lets anyone
+who can reach `445` lock out an account on purpose — one more reason to keep the
+port off the internet. Administrators can lift a lock early under
+**Users → user details → Unlock SMB**.
+
 ## 🩺 Troubleshooting
 
 ### NT hash key mismatch

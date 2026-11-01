@@ -1,3 +1,8 @@
+# DEVELOPMENT ONLY. This stack ships Adminer, default passwords (e.g. "change_me")
+# and fallback secrets, and publishes extra ports for debugging.
+# Never run it on a server or expose it to a network: use example/docker-compose.yml
+# for any real deployment (see example/DETAILS.md, "Running on the internet").
+
 x-storage-pool-01: &storage-pool-01
   ${LOCATION_STORAGE_01:-./data/storage/pool01}:/data/storage/pool01
 x-storage-pool-02: &storage-pool-02

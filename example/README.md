@@ -51,6 +51,10 @@ Open `https://localhost:8443` and sign in as `admin` with your
 `SEED_ADMIN_PASSWORD`; you are then asked to choose a new password. SMB listens
 on port `445`.
 
+> ⚠️ **Reachable from the internet?** This stack is meant for a trusted LAN.
+> Before exposing it, follow [Running on the internet](DETAILS.md#-running-on-the-internet):
+> only `443` through a reverse proxy, and **never publish SMB port `445`**.
+
 ## 🔧 Operating the stack
 
 ```bash
@@ -73,4 +77,5 @@ See [`DETAILS.md`](DETAILS.md) for:
 - [Database backup & restore](DETAILS.md#️-database-backup--restore)
 - [Search](DETAILS.md#-search-elasticsearch) and [mail notifications](DETAILS.md#️-mail-notifications)
 - [Reverse proxy](DETAILS.md#-behind-a-reverse-proxy) and [plain HTTP port 8080](DETAILS.md#-plain-http-port-8080)
+- [Running on the internet](DETAILS.md#-running-on-the-internet) (Caddy example, SMB only via VPN)
 - [Troubleshooting](DETAILS.md#-troubleshooting)
