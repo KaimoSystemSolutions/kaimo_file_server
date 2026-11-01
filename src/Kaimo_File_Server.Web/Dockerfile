@@ -130,6 +130,11 @@ RUN dotnet publish "./Kaimo_File_Server.Web.csproj" \
 # restore layer from reaching Docker Hub as a seemingly healthy web image.
 RUN grep -q '"Route":"_framework/blazor.web.js"' \
     /app/publish/Kaimo_File_Server.Web.staticwebassets.endpoints.json
+# Same for the TypeScript output (wwwroot/js is generated, not checked in): without
+# it the theme, the session cookie handoff and therefore the login are broken.
+RUN grep -q '"Route":"js/session.js"' \
+    /app/publish/Kaimo_File_Server.Web.staticwebassets.endpoints.json \
+    && test -f /app/publish/wwwroot/js/themeInit.js
 
 #RUN dotnet publish "./Kaimo_File_Server.Web.csproj" \
 #    -c $BUILD_CONFIGURATION \

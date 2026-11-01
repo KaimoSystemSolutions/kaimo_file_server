@@ -31,6 +31,15 @@ jobs:
       - name: Build
         run: dotnet build Kaimo_File_Server.slnx --no-restore --configuration Release
 
+      # wwwroot/js is generated from Scripts/*.ts and not checked in, so only a clean
+      # checkout shows whether the published web app actually ships the scripts
+      # (theme, session handoff/login). Same check as in the Web Dockerfile.
+      - name: Verify web scripts are published
+        run: |
+          dotnet publish src/Kaimo_File_Server.Web/Kaimo_File_Server.Web.csproj --no-build --configuration Release -o publish-web
+          grep -q '"Route":"js/session.js"' publish-web/Kaimo_File_Server.Web.staticwebassets.endpoints.json
+          test -f publish-web/wwwroot/js/themeInit.js
+
       - name: Test
         # Coverage uses the collector bundled with Microsoft.NET.Test.Sdk (no extra package).
         run: dotnet test Kaimo_File_Server.slnx --no-build --configuration Release --verbosity normal --logger trx --results-directory TestResults --collect:"Code Coverage;Format=cobertura"

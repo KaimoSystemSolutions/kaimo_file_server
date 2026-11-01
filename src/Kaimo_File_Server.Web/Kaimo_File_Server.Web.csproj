@@ -49,4 +49,15 @@
 	  <PackageReference Include="Microsoft.TypeScript.MSBuild" />
 	</ItemGroup>
 
+	<!-- The TypeScript package emits wwwroot/js during CoreCompile but never adds the files to Content.
+	     On a clean checkout (wwwroot/js is gitignored) they did not exist at evaluation time, so static
+	     web assets (resolved later, in PrepareForRun) would leave them out of build and publish: the
+	     released image served no scripts. Re-globbing here, at execution time, picks them up. -->
+	<Target Name="IncludeTypeScriptOutputInContent" AfterTargets="RunTscCompile">
+		<ItemGroup>
+			<Content Remove="wwwroot\js\*.js" />
+			<Content Include="wwwroot\js\*.js" />
+		</ItemGroup>
+	</Target>
+
 </Project>
