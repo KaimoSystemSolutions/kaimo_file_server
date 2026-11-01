@@ -108,6 +108,12 @@ public interface ISearchConfigStore
     /// <summary>Persists the selected engine.</summary>
     Task SetEngineAsync(SearchEngine engine);
 
+    /// <summary>
+    /// Whether any search key was ever stored (engine, legacy Elasticsearch flag, an index cursor
+    /// or a build marker). False only on an installation whose search never ran or was configured.
+    /// </summary>
+    Task<bool> HasSearchStateAsync();
+
     /// <summary>Reads the change-log cursor of an index-backed engine (0 when unset).</summary>
     Task<long> GetIndexCursorAsync(SearchEngine engine);
 

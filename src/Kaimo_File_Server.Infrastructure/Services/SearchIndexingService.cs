@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Storage;
 using Kaimo_File_Server.Search;
@@ -36,7 +38,8 @@ public sealed class SearchIndexingService(
     ISearchService search,
     ISearchAdminService searchAdmin,
     ISearchConfigStore configStore,
-    ILogger<SearchIndexingService> logger) : BackgroundService
+    ILogger<SearchIndexingService> logger,
+    DemoModeOptions? demo = null) : BackgroundService
 {
     private const int BatchSize = 200;
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(3);
@@ -52,8 +55,21 @@ public sealed class SearchIndexingService(
     private long _unavailableSeq = -1;
     private int _unavailableAttempts;
 
+    // A fresh compose stack starts this process well before Elasticsearch answers (~30-60 s).
+    // ponytail: fixed grace window; make it configurable if slow hosts need longer.
+    private static readonly TimeSpan InitialEsGrace = TimeSpan.FromMinutes(3);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        try
+        {
+            await SelectInitialEngineAsync(InitialEsGrace, EsInactiveInterval, stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            return;
+        }
+
         // Each index engine keeps its own cursor, so switching engines never makes one index
         // skip the changes it missed while the other was active.
         SearchEngine? cursorEngine = null;
@@ -130,6 +146,67 @@ public sealed class SearchIndexingService(
             if (delay > TimeSpan.Zero)
                 await Sleep(delay, stoppingToken);
         }
+    }
+
+    /// <summary>
+    /// First start only (no search key stored, no file change logged): keeps Elasticsearch when it
+    /// answers within <paramref name="grace"/>, otherwise selects the local PostgreSQL index, so an
+    /// install without an Elasticsearch container still gets full-text search. The choice is
+    /// persisted, so a later Elasticsearch outage never switches the engine; an existing
+    /// installation keeps its behavior. Never throws except on cancel.
+    /// </summary>
+    internal async Task SelectInitialEngineAsync(TimeSpan grace, TimeSpan retryInterval, CancellationToken ct)
+    {
+        // The read-only demo can never persist a choice; waiting would only delay the indexer.
+        if (demo?.ReadOnly == true)
+            return;
+
+        try
+        {
+            if (await HasLoggedChangesAsync(ct))
+                return;
+
+            // Monotonic: a wall-clock step (NTP right after boot) must not cut the window short.
+            var waited = Stopwatch.StartNew();
+            while (true)
+            {
+                // Re-checked every round, so an engine the admin picks meanwhile always wins
+                // (once Local is selected, GetStateAsync reports it as reachable).
+                if (await configStore.HasSearchStateAsync())
+                    return;
+                if ((await searchAdmin.GetStateAsync(ct)).Reachable)
+                {
+                    await searchAdmin.SetEngineAsync(SearchEngine.Elasticsearch, ct);
+                    return;
+                }
+                if (waited.Elapsed >= grace)
+                {
+                    logger.LogWarning(
+                        "Elasticsearch is not reachable on first start; using the local search index instead.");
+                    await searchAdmin.SetEngineAsync(SearchEngine.Local, ct);
+                    return;
+                }
+                await Task.Delay(retryInterval, ct);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Nothing stored: the next start decides again; until then the default applies.
+            logger.LogWarning(ex, "Could not select the initial search engine.");
+        }
+    }
+
+    // An install that ran on the defaults never stored a search key; logged file changes still
+    // show it is not new. ponytail: a long-idle install whose log was fully pruned looks new.
+    private async Task<bool> HasLoggedChangesAsync(CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<IFileChangeLogRepository>()
+            .GetHeadSeqGlobalAsync(ct) > 0;
     }
 
     /// <summary>

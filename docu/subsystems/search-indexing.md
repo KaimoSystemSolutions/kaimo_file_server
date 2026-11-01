@@ -82,6 +82,12 @@ so the router replaces the `NoOpSearchService` fallback. The Elasticsearch URL d
   the legacy flag `search.elasticsearch.enabled` decides (true → Elasticsearch, false → Filename);
   saving an engine also writes the legacy flag, so a downgrade keeps using Elasticsearch only when
   it was selected.
+- First start (no `search.*` key stored and no file change logged yet): `SearchIndexingService`
+  waits up to 3 minutes for Elasticsearch to answer. If it does, `Elasticsearch` is stored; otherwise
+  `Local` is stored, so an install without an Elasticsearch container gets full-text search from the
+  PostgreSQL index. Once stored, a later Elasticsearch outage never switches the engine. An engine the
+  admin selects during the wait always wins; an existing installation (any search key such as an
+  index cursor, or a non-empty change log) is never switched; the read-only demo skips the selection.
 - Each index engine keeps its own change-log cursor (`search.index.cursor` for Elasticsearch,
   `search.local.cursor` for the local index). The inactive engine's index is kept and catches up from
   the log when it is selected again (or is rebuilt if the log was pruned past its cursor).

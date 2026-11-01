@@ -56,6 +56,14 @@ public sealed class SearchConfigStore : ISearchConfigStore
         await config.SetAsync(SearchConfigKeys.ElasticEnabledKey, engine == SearchEngine.Elasticsearch);
     }
 
+    public async Task<bool> HasSearchStateAsync()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var config = scope.ServiceProvider.GetRequiredService<IConfigRepository>();
+        // Every search key shares this prefix; an uncached read, like all reads here.
+        return (await config.GetSectionAsync("search.")).Count > 0;
+    }
+
     public async Task<long> GetIndexCursorAsync(SearchEngine engine)
     {
         using var scope = _scopeFactory.CreateScope();
