@@ -413,6 +413,24 @@ who can reach `445` lock out an account on purpose — one more reason to keep t
 port off the internet. Administrators can lift a lock early under
 **Users → user details → Unlock SMB**.
 
+### Two-factor sign-in
+
+Turn on **Settings → Two-factor sign-in** (TOTP codes from an authenticator app)
+and require it at least for everyone with management permissions. It protects
+the **web login only**: the client app, WebDAV and SMB keep signing in with the
+password alone, so switch those services off for accounts that do not need them
+(**Settings → File services**). Before you rely on it:
+
+- The codes depend on the server clock. Keep NTP running on the Docker host.
+- The secrets are encrypted with the Data Protection key ring. A database
+  restore without that key ring makes every second factor unreadable; the
+  affected users then need an administrator reset (**Users → user details →
+  Reset two-factor sign-in**).
+- If the last administrator is locked out, start `web` once with
+  `KAIMO_MFA_DISABLED=true` (see
+  [`OPTIONAL_ENVIRONMENT_VARIABLES.md`](OPTIONAL_ENVIRONMENT_VARIABLES.md)) and
+  remove it right after the reset.
+
 ## 🩺 Troubleshooting
 
 ### NT hash key mismatch

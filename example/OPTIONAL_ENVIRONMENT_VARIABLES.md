@@ -48,6 +48,7 @@ Add these variables to `web`.
 | `ForwardedHeaders__KnownNetworks__0` | Empty (= loopback only) | Trusted proxy range in CIDR notation, e.g. `172.18.0.0/16`. Setting this or `KnownProxies` replaces the loopback default. |
 | `HttpsRedirection__HttpsPort` | `8443` | Public HTTPS port browsers on plain HTTP are redirected to. Set it when HTTPS is published under another port or a reverse proxy serves it on `443`. The client API is never redirected; it rejects plain HTTP with `426`. |
 | `KAIMO_ACCESS_RESTRICTIONS_DISABLED` | `false` | Set to `true` to ignore every access restriction rule (Settings → Access restrictions), e.g. after locking yourself out. Remove it again afterwards. Set it on `smb-bridge` as well to lift the SMB network list (Settings → Access restrictions → SMB). |
+| `KAIMO_MFA_DISABLED` | `false` | Set to `true` on `web` to ask nobody for a second factor at the web login (Settings → Two-factor sign-in), e.g. when the last administrator lost the authenticator app and the recovery codes. Every start logs a warning while it is set. Reset the second factor, then remove it again. |
 | `Security__EventRetentionDays` | `365` | Days that login attempts and per-client API/WebDAV activity (tables `login_attempts`, `client_activity`) are kept for the security overview. |
 
 ## SMB bridge only

@@ -20,6 +20,8 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<Role> Roles { get; set; }
         public DbSet<UserGroup> UserGroups { get; set; }
         public DbSet<RevokedWebToken> RevokedWebTokens { get; set; }
+        public DbSet<UserSecondFactor> UserSecondFactors { get; set; }
+        public DbSet<UserRecoveryCode> UserRecoveryCodes { get; set; }
         public DbSet<LoginAttemptRecord> LoginAttempts { get; set; }
         public DbSet<ClientActivityBucket> ClientActivityBuckets { get; set; }
 

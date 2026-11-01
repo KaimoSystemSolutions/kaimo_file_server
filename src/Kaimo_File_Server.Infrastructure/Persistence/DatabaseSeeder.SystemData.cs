@@ -108,7 +108,7 @@ public partial class DatabaseSeeder
     /// </summary>
     private static readonly (string Name, ManagementPermission Perms, bool IsSystem, Guid uuid)[] RoleDefinitions =
     [
-        // ManageHomes/AccessHomeContents stay outside FullAdmin: FullAdmin doubles as the "is global admin" test, so a
+        // ResetSecondFactor/ManageHomes/AccessHomeContents stay outside FullAdmin: FullAdmin doubles as the "is global admin" test, so a
         // new bit there would demote custom roles that were built from the FullAdmin preset.
         ("Administrator",     ManagementPermission.Administrator,                                  true, WellKnownGUIDs.ROLE_ADMIN),
         ("UserManager",       ManagementPermission.UserAdmin | ManagementPermission.AssignGroups,   true, WellKnownGUIDs.ROLE_USER_MANAGER), 

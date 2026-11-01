@@ -109,6 +109,9 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddSingleton<ILoginThrottle, LoginThrottle>();
             services.AddScoped<AccessRestrictionService>();
             services.AddScoped<ILoginService, CredentialLoginService>();
+            // Web-login second factor (TOTP): storage and policy evaluation.
+            services.AddScoped<ISecondFactorRepository, SecondFactorRepository>();
+            services.AddScoped<SecondFactorPolicyService>();
 
             // -- Search engine config flag (cross-process, read by the search router) --
             services.AddSingleton<ISearchConfigStore, Configuration.SearchConfigStore>();

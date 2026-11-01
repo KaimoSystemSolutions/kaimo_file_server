@@ -31,6 +31,23 @@ public class JwtTokenService
     public const string SecurityStampClaim = "sstamp";
 
     /// <summary>
+    /// How the web session was signed in: <see cref="PasswordMethod"/>, plus
+    /// <see cref="SecondFactorMethod"/> after a TOTP or recovery code. A custom name instead of
+    /// the registered <c>amr</c>, which the JWT handlers remap to another claim type.
+    /// </summary>
+    public const string AuthMethodsClaim = "auth_methods";
+    public const string PasswordMethod = "pwd";
+    public const string SecondFactorMethod = "otp";
+
+    /// <summary>Whether the session token was confirmed with a second factor.</summary>
+    public static bool HasSecondFactor(ClaimsPrincipal principal)
+        => principal.FindAll(AuthMethodsClaim).Any(c => c.Value == SecondFactorMethod);
+
+    /// <summary>The sign-in methods for a new web session token.</summary>
+    public static string[] AuthMethods(bool secondFactor)
+        => secondFactor ? [PasswordMethod, SecondFactorMethod] : [PasswordMethod];
+
+    /// <summary>
     /// Secrets that have shipped in source control / documentation and are
     /// therefore public knowledge. Since forging a valid token requires nothing
     /// more than the signing secret, a well-known value is equivalent to having
@@ -103,9 +120,11 @@ public class JwtTokenService
     /// </param>
     /// <param name="securityStamp">The account's current security stamp (see <see cref="SecurityStampClaim"/>).</param>
     /// <param name="lifetime">Token lifetime; defaults to <c>Jwt:ExpirationHours</c>.</param>
+    /// <param name="authMethods">Web sessions only: <see cref="AuthMethodsClaim"/> values (see <see cref="AuthMethods"/>).</param>
     public string GenerateToken(
         Guid userId, string username, string displayName, IEnumerable<string> roles,
-        Guid? deviceId = null, string? securityStamp = null, TimeSpan? lifetime = null)
+        Guid? deviceId = null, string? securityStamp = null, TimeSpan? lifetime = null,
+        IEnumerable<string>? authMethods = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -126,6 +145,9 @@ public class JwtTokenService
 
         foreach (var role in roles)
             claims.Add(new Claim(ClaimTypes.Role, role));
+
+        foreach (var method in authMethods ?? [])
+            claims.Add(new Claim(AuthMethodsClaim, method));
 
         var token = new JwtSecurityToken(
             issuer: _issuer,

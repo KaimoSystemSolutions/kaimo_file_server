@@ -54,6 +54,26 @@ public partial class ApplicationDbContext
             entity.HasIndex(e => e.ExpiresAtUtc);
         });
 
+        // -- Web-login second factor (TOTP) and recovery codes; both go with the user --
+        modelBuilder.Entity<UserSecondFactor>(entity =>
+        {
+            entity.ToTable("user_second_factors");
+            entity.HasKey(e => e.UserId);
+            entity.Property(e => e.SecretProtected).IsRequired().HasMaxLength(1024);
+            entity.HasOne<User>().WithOne().HasForeignKey<UserSecondFactor>(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserRecoveryCode>(entity =>
+        {
+            entity.ToTable("user_recovery_codes");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.CodeHash).IsRequired().HasMaxLength(64);
+            entity.HasIndex(e => new { e.UserId, e.CodeHash });
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // -- Security overview: login attempts and hourly API/WebDAV activity per client --
         modelBuilder.Entity<LoginAttemptRecord>(entity =>
         {

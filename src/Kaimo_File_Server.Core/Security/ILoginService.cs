@@ -32,6 +32,28 @@ public enum LoginOutcome
     /// every user name, so it is logged without one and never counts as a locked account.
     /// </summary>
     AddressLockedOut,
+
+    /// <summary>
+    /// Only in the security log: the password was correct, but the second factor of the web
+    /// login (TOTP code or recovery code) was wrong. A strong sign that the password is known
+    /// to someone else.
+    /// </summary>
+    SecondFactorFailed,
+
+    /// <summary>
+    /// Only in the security log: a correct password on the web login of an account that also
+    /// needs a second factor. Neither a success nor a failure; the sign-in is logged as
+    /// <see cref="Success"/> only once the second factor was accepted.
+    /// </summary>
+    PasswordAccepted,
+
+    /// <summary>
+    /// Only in the security log: the account-wide budget of second-factor codes is used up, so
+    /// the web login refuses every code until the lock ends. Kept apart from
+    /// <see cref="LockedOut"/> (the password budget) because an administrator's second-factor
+    /// reset lifts this lock alone.
+    /// </summary>
+    SecondFactorLockedOut,
 }
 
 /// <summary>Which budget a <see cref="LoginOutcome.LockedOut"/> result comes from.</summary>

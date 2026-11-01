@@ -8077,4 +8077,208 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_AccessRestrictions_Smb_RecoveryHint" xml:space="preserve">
     <value>Ausgesperrt? Den smb-bridge-Container mit KAIMO_ACCESS_RESTRICTIONS_DISABLED=true starten; Samba nimmt dann wieder jedes Netz an.</value>
   </data>
+  <data name="Web_Login_SecondFactor_Title" xml:space="preserve">
+    <value>Bestätigung mit zweitem Faktor</value>
+  </data>
+  <data name="Web_Login_SecondFactor_Hint" xml:space="preserve">
+    <value>Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App oder einen Ihrer Wiederherstellungscodes ein.</value>
+  </data>
+  <data name="Web_Login_SecondFactor_Submit" xml:space="preserve">
+    <value>Bestätigen</value>
+  </data>
+  <data name="Web_Login_SecondFactor_Back" xml:space="preserve">
+    <value>Zurück zur Anmeldung</value>
+  </data>
+  <data name="Web_Login_SecondFactor_Invalid" xml:space="preserve">
+    <value>Der Code ist ungültig.</value>
+  </data>
+  <data name="Web_Login_SecondFactor_LockedOut" xml:space="preserve">
+    <value>Zu viele falsche Codes. Bitte versuchen Sie es in {0} Minuten erneut.</value>
+  </data>
+  <data name="Web_Login_SecondFactor_Unavailable" xml:space="preserve">
+    <value>Der zweite Faktor kann nicht geprüft werden. Bitte wenden Sie sich an Ihren Administrator.</value>
+  </data>
+  <data name="Web_Login_SecondFactor_Expired" xml:space="preserve">
+    <value>Die Anmeldung hat zu lange gedauert. Bitte melden Sie sich erneut an.</value>
+  </data>
+  <data name="Web_SecondFactor_Enroll_RequiredHint" xml:space="preserve">
+    <value>Für Ihr Konto ist die Zwei-Faktor-Anmeldung vorgeschrieben. Richten Sie sie jetzt ein.</value>
+  </data>
+  <data name="Web_SecondFactor_Enroll_Step1" xml:space="preserve">
+    <value>Installieren Sie eine Authenticator-App auf Ihrem Smartphone.</value>
+  </data>
+  <data name="Web_SecondFactor_Enroll_Step2" xml:space="preserve">
+    <value>Scannen Sie den QR-Code mit der App.</value>
+  </data>
+  <data name="Web_SecondFactor_Enroll_Step3" xml:space="preserve">
+    <value>Geben Sie den 6-stelligen Code ein, den die App anzeigt.</value>
+  </data>
+  <data name="Web_SecondFactor_QrAlt" xml:space="preserve">
+    <value>QR-Code für die Authenticator-App</value>
+  </data>
+  <data name="Web_SecondFactor_ManualKey" xml:space="preserve">
+    <value>Scannen nicht möglich? Geben Sie diesen Schlüssel in der App ein:</value>
+  </data>
+  <data name="Web_SecondFactor_Label_Code" xml:space="preserve">
+    <value>Bestätigungscode</value>
+  </data>
+  <data name="Web_SecondFactor_Enroll_Confirm" xml:space="preserve">
+    <value>Aktivieren</value>
+  </data>
+  <data name="Web_SecondFactor_RecoveryCodes_Title" xml:space="preserve">
+    <value>Wiederherstellungscodes</value>
+  </data>
+  <data name="Web_SecondFactor_RecoveryCodes_Hint" xml:space="preserve">
+    <value>Bewahren Sie diese Wiederherstellungscodes sicher auf. Jeder Code funktioniert einmal anstelle eines Codes aus der App. Sie werden nur jetzt angezeigt.</value>
+  </data>
+  <data name="Web_SecondFactor_RecoveryCodes_Copy" xml:space="preserve">
+    <value>Codes kopieren</value>
+  </data>
+  <data name="Web_SecondFactor_RecoveryCodes_Continue" xml:space="preserve">
+    <value>Ich habe die Codes gespeichert</value>
+  </data>
+  <data name="Web_SecondFactor_Section_Title" xml:space="preserve">
+    <value>Zwei-Faktor-Anmeldung</value>
+  </data>
+  <data name="Web_SecondFactor_Section_Info" xml:space="preserve">
+    <value>Gilt nur für die Web-Anmeldung: Nach dem Passwort wird ein Code aus einer Authenticator-App verlangt. Client-App, WebDAV und SMB verwenden weiterhin nur das Passwort.</value>
+  </data>
+  <data name="Web_SecondFactor_Label_Status" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="Web_SecondFactor_Status_ActiveSince" xml:space="preserve">
+    <value>Aktiv seit {0}</value>
+  </data>
+  <data name="Web_SecondFactor_Status_RequiredMissing" xml:space="preserve">
+    <value>Vorgeschrieben, nicht eingerichtet</value>
+  </data>
+  <data name="Web_SecondFactor_Status_NotSetUp" xml:space="preserve">
+    <value>Nicht eingerichtet</value>
+  </data>
+  <data name="Web_SecondFactor_Label_RecoveryCodesLeft" xml:space="preserve">
+    <value>Unbenutzte Wiederherstellungscodes</value>
+  </data>
+  <data name="Web_SecondFactor_PasswordHint" xml:space="preserve">
+    <value>Bestätigen Sie mit Ihrem aktuellen Passwort, um die Zwei-Faktor-Anmeldung einzurichten.</value>
+  </data>
+  <data name="Web_SecondFactor_Continue" xml:space="preserve">
+    <value>Weiter</value>
+  </data>
+  <data name="Web_SecondFactor_DisableHint" xml:space="preserve">
+    <value>Geben Sie einen Code aus Ihrer Authenticator-App ein, um die Zwei-Faktor-Anmeldung zu entfernen.</value>
+  </data>
+  <data name="Web_SecondFactor_RegenerateHint" xml:space="preserve">
+    <value>Geben Sie einen Code aus Ihrer Authenticator-App ein. Die bisherigen Wiederherstellungscodes werden ungültig.</value>
+  </data>
+  <data name="Web_SecondFactor_Disable" xml:space="preserve">
+    <value>Zwei-Faktor-Anmeldung entfernen</value>
+  </data>
+  <data name="Web_SecondFactor_Regenerate" xml:space="preserve">
+    <value>Neue Wiederherstellungscodes</value>
+  </data>
+  <data name="Web_SecondFactor_SetUp" xml:space="preserve">
+    <value>Zwei-Faktor-Anmeldung einrichten</value>
+  </data>
+  <data name="Web_SecondFactor_Reset" xml:space="preserve">
+    <value>Zwei-Faktor-Anmeldung zurücksetzen</value>
+  </data>
+  <data name="Web_SecondFactor_ResetConfirm" xml:space="preserve">
+    <value>Die Zwei-Faktor-Anmeldung von {0} zurücksetzen? Authenticator-App und alle Wiederherstellungscodes werden ungültig. Schreibt die Richtlinie die Zwei-Faktor-Anmeldung vor, muss sie bei der nächsten Web-Anmeldung neu eingerichtet werden.</value>
+  </data>
+  <data name="Web_SecondFactor_ResetNothingToReset" xml:space="preserve">
+    <value>Es gab nichts zurückzusetzen: Die Zwei-Faktor-Anmeldung dieses Benutzers ist nicht mehr eingerichtet.</value>
+  </data>
+  <data name="Web_Settings_Tab_SecondFactor" xml:space="preserve">
+    <value>Zwei-Faktor-Anmeldung</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_Intro" xml:space="preserve">
+    <value>Ein zweiter Faktor schützt die Web-Anmeldung zusätzlich zum Passwort mit einem Code aus einer Authenticator-App (TOTP).</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_RecoveryHint" xml:space="preserve">
+    <value>Wer das Smartphone verliert, meldet sich mit einem Wiederherstellungscode an; ein Administrator mit der Berechtigung „Passwörter zurücksetzen" kann den zweiten Faktor in den Benutzerdetails zurücksetzen. Ist der letzte Administrator ausgesperrt, den Web-Container mit KAIMO_MFA_DISABLED=true starten. Die Codes hängen von der Serveruhr ab (NTP aktiv lassen), und die Geheimnisse sind mit dem Data-Protection-Schlüsselring verschlüsselt, den eine Wiederherstellung mitbringen muss.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_WebOnly" xml:space="preserve">
+    <value>Gilt nur für die Web-Anmeldung. Client-App, WebDAV und SMB melden sich weiterhin nur mit dem Passwort an; schalten Sie diese Dienste für Konten ab, die sie nicht brauchen.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_Mode" xml:space="preserve">
+    <value>Modus</value>
+  </data>
+  <data name="Web_SecondFactor_Mode_Off" xml:space="preserve">
+    <value>Aus</value>
+  </data>
+  <data name="Web_SecondFactor_Mode_Optional" xml:space="preserve">
+    <value>Optional</value>
+  </data>
+  <data name="Web_SecondFactor_Mode_Required" xml:space="preserve">
+    <value>Vorgeschrieben</value>
+  </data>
+  <data name="Web_SecondFactor_Mode_Off_Hint" xml:space="preserve">
+    <value>Niemand wird nach einem zweiten Faktor gefragt. Bereits eingerichtete Faktoren bleiben erhalten.</value>
+  </data>
+  <data name="Web_SecondFactor_Mode_Optional_Hint" xml:space="preserve">
+    <value>Benutzer können im Profil einen zweiten Faktor einrichten; wer einen hat, wird danach gefragt.</value>
+  </data>
+  <data name="Web_SecondFactor_Mode_Required_Hint" xml:space="preserve">
+    <value>Wie optional, und die unten gewählten Benutzer müssen ihn bei der nächsten Web-Anmeldung einrichten.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_AppliesToAll" xml:space="preserve">
+    <value>Für alle Benutzer vorgeschrieben</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_ManagementRoles" xml:space="preserve">
+    <value>Immer vorgeschrieben für Benutzer mit Verwaltungsberechtigungen</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_Roles" xml:space="preserve">
+    <value>Rollen</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_RolesHint" xml:space="preserve">
+    <value>Zählt in jedem Bereich: systemweit, Abteilung oder Freigabe.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_Issuer" xml:space="preserve">
+    <value>Name in der Authenticator-App</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_IssuerHint" xml:space="preserve">
+    <value>Wird in der App neben dem Benutzernamen angezeigt. Eine Änderung gilt nur für neue Einrichtungen.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_Counts" xml:space="preserve">
+    <value>{0} Benutzer haben einen zweiten Faktor eingerichtet. Die gespeicherte Richtlinie schreibt ihn {1} Benutzern vor; davon haben {2} ihn noch nicht eingerichtet.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_SelfNotEnrolled" xml:space="preserve">
+    <value>Diese Richtlinie würde für Ihr eigenes Konto einen zweiten Faktor verlangen, den es noch nicht hat. Richten Sie die Zwei-Faktor-Anmeldung zuerst in Ihrem Profil ein.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_DisabledByEnvironment" xml:space="preserve">
+    <value>Auf diesem Server ist KAIMO_MFA_DISABLED gesetzt: Derzeit wird unabhängig von dieser Einstellung kein zweiter Faktor abgefragt.</value>
+  </data>
+  <data name="Web_Security_Outcome_SecondFactorFailed" xml:space="preserve">
+    <value>Falscher zweiter Faktor</value>
+  </data>
+  <data name="Web_Security_Outcome_SecondFactorLocked" xml:space="preserve">
+    <value>Zweiter Faktor gesperrt</value>
+  </data>
+  <data name="Web_Security_Outcome_PasswordAccepted" xml:space="preserve">
+    <value>Passwort korrekt, zweiter Faktor ausstehend</value>
+  </data>
+  <data name="Web_Perm_ResetSecondFactor" xml:space="preserve">
+    <value>Zwei-Faktor-Anmeldung zurücksetzen</value>
+  </data>
+  <data name="Notification_Event_security_second_factor_changed" xml:space="preserve">
+    <value>Zwei-Faktor-Anmeldung geändert</value>
+  </data>
+  <data name="Notification_Event_security_second_factor_changed_Desc" xml:space="preserve">
+    <value>Sicherheitshinweis, wenn die Zwei-Faktor-Anmeldung eingerichtet, entfernt oder zurückgesetzt oder ein Wiederherstellungscode verwendet wird.</value>
+  </data>
+  <data name="Notification_Event_security_second_factor_failed" xml:space="preserve">
+    <value>Falscher Zwei-Faktor-Code</value>
+  </data>
+  <data name="Notification_Event_security_second_factor_failed_Desc" xml:space="preserve">
+    <value>Das Passwort war richtig, der Zwei-Faktor-Code aber falsch: Möglicherweise kennt jemand anderes das Passwort.</value>
+  </data>
+  <data name="Notification_Role_security_second_factor_changed_affected" xml:space="preserve">
+    <value>Der Benutzer selbst</value>
+  </data>
+  <data name="Notification_Role_security_second_factor_changed_actor" xml:space="preserve">
+    <value>Wer die Änderung vorgenommen hat</value>
+  </data>
+  <data name="Notification_Role_security_second_factor_failed_affected" xml:space="preserve">
+    <value>Inhaber des Kontos</value>
+  </data>
 </root>

@@ -108,4 +108,20 @@ public class LoginAttemptResultTests
         Assert.NotEqual(Resources.ResourceManager.GetString("Web_Security_Outcome_Locked"), label);
         Assert.Equal("×7", cut.Find(".login-attempt-repeat").TextContent.Trim());
     }
+
+    [Fact]
+    public void SecondFactorLockout_HasItsOwnLabel_AndCountsAttemptsDuringTheLock()
+    {
+        using var ctx = new BunitContext();
+
+        var cut = Render(ctx, LoginOutcome.SecondFactorLockedOut, 4);
+
+        var outcome = cut.FindAll(".status-badge")[0];
+        Assert.Contains("status-badge--warning", outcome.ClassName);
+        var label = Resources.ResourceManager.GetString("Web_Security_Outcome_SecondFactorLocked");
+        Assert.False(string.IsNullOrEmpty(label));
+        Assert.Equal(label, outcome.TextContent.Trim());
+        var hint = Resources.ResourceManager.GetString("Web_Security_RepeatCount_Hint");
+        Assert.Equal(string.Format(hint!, 4), cut.Find(".login-attempt-repeat").GetAttribute("title"));
+    }
 }

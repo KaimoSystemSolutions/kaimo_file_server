@@ -83,7 +83,8 @@ public sealed class SecurityEventRepository(IDbContextFactory<ApplicationDbConte
         bool withoutAddress = addresses.Contains(null);
         var list = await db.LoginAttempts.AsNoTracking()
             .Where(a => a.Channel == channel
-                        && (a.AtUtc >= sinceUtc || (a.Outcome == LoginOutcome.LockedOut && a.LockedUntilUtc > sinceUtc))
+                        && (a.AtUtc >= sinceUtc || ((a.Outcome == LoginOutcome.LockedOut || a.Outcome == LoginOutcome.SecondFactorLockedOut)
+                                                    && a.LockedUntilUtc > sinceUtc))
                         && (names.Contains(a.Username)
                             || (a.Address != null && from.Contains(a.Address))
                             || (withoutAddress && a.Address == null)))
@@ -109,12 +110,13 @@ public sealed class SecurityEventRepository(IDbContextFactory<ApplicationDbConte
         return until is { } value ? AsUtc(value) : null;
     }
 
-    public async Task EndActiveLocksAsync(SecurityChannel channel, string username, DateTime nowUtc)
+    public async Task EndActiveLocksAsync(SecurityChannel channel, string username, DateTime nowUtc,
+        LoginOutcome lockOutcome = LoginOutcome.LockedOut)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var name = username.Trim().ToLowerInvariant();
         await db.LoginAttempts
-            .Where(a => a.Channel == channel && a.Username == name && a.Outcome == LoginOutcome.LockedOut
+            .Where(a => a.Channel == channel && a.Username == name && a.Outcome == lockOutcome
                         && a.LockedUntilUtc > nowUtc)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.LockedUntilUtc, nowUtc));
     }
@@ -127,10 +129,13 @@ public sealed class SecurityEventRepository(IDbContextFactory<ApplicationDbConte
 
         // SMB successes are stored as one counted row per account, address and hour.
         int successes = await attempts.Where(a => a.Outcome == LoginOutcome.Success).SumAsync(a => a.RepeatCount);
-        int failures = await attempts.Where(a => a.Outcome != LoginOutcome.Success).SumAsync(a => a.RepeatCount);
+        // A correct password before the second factor is neither (see LoginOutcome.PasswordAccepted).
+        int failures = await attempts.Where(a => a.Outcome != LoginOutcome.Success && a.Outcome != LoginOutcome.PasswordAccepted)
+            .SumAsync(a => a.RepeatCount);
         // Accounts only: a locked address locks no account (see LoginOutcome.AddressLockedOut).
         int activeLockouts = await db.LoginAttempts
-            .Where(a => a.Outcome == LoginOutcome.LockedOut && a.LockedUntilUtc > nowUtc)
+            .Where(a => (a.Outcome == LoginOutcome.LockedOut || a.Outcome == LoginOutcome.SecondFactorLockedOut)
+                        && a.LockedUntilUtc > nowUtc)
             .Select(a => a.Username)
             .Distinct()
             .CountAsync();
@@ -159,8 +164,10 @@ public sealed class SecurityEventRepository(IDbContextFactory<ApplicationDbConte
                 Failures = g.Sum(a => a.Outcome == LoginOutcome.InvalidCredentials
                                       || a.Outcome == LoginOutcome.AccountDisabled
                                       || a.Outcome == LoginOutcome.AddressNotAllowed
-                                      || a.Outcome == LoginOutcome.ServiceDisabled ? a.RepeatCount : 0),
-                Lockouts = g.Sum(a => a.Outcome == LoginOutcome.LockedOut ? a.RepeatCount : 0),
+                                      || a.Outcome == LoginOutcome.ServiceDisabled
+                                      || a.Outcome == LoginOutcome.SecondFactorFailed ? a.RepeatCount : 0),
+                Lockouts = g.Sum(a => a.Outcome == LoginOutcome.LockedOut || a.Outcome == LoginOutcome.SecondFactorLockedOut
+                    ? a.RepeatCount : 0),
                 Addresses = g.Select(a => a.Address).Distinct().Count(),
                 LastAttemptUtc = g.Max(a => a.AtUtc),
                 LockedUntilUtc = g.Max(a => a.LockedUntilUtc),
@@ -232,7 +239,7 @@ public sealed class SecurityEventRepository(IDbContextFactory<ApplicationDbConte
         var query = db.LoginAttempts.AsNoTracking().Where(a => a.AtUtc >= sinceUtc);
 
         if (failedOnly)
-            query = query.Where(a => a.Outcome != LoginOutcome.Success);
+            query = query.Where(a => a.Outcome != LoginOutcome.Success && a.Outcome != LoginOutcome.PasswordAccepted);
 
         var term = search?.Trim().ToLowerInvariant();
         if (!string.IsNullOrEmpty(term))

@@ -1,0 +1,36 @@
+.second-factor-enroll {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.second-factor-steps {
+    margin: 0;
+    padding-left: var(--space-5);
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.second-factor-qr {
+    align-self: center;
+    width: 200px;
+    height: 200px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    image-rendering: pixelated;
+}
+
+.second-factor-key {
+    display: block;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    word-break: break-all;
+    user-select: all;
+}

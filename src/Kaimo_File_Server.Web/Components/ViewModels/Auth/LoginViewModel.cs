@@ -1,30 +1,53 @@
+using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.SecondFactor;
 using Microsoft.Extensions.Logging;
 using Kaimo_File_Server.Core.Language;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
-public class LoginViewModel
+/// <summary>
+/// The web login: the password step (here) and the second-factor steps that may follow it
+/// (code, forced enrollment, recovery codes; see <c>LoginViewModel.SecondFactor.cs</c>).
+/// </summary>
+public partial class LoginViewModel
 {
     private readonly ILoginService _loginService;
     private readonly JwtTokenService _jwtService;
     private readonly JwtAuthenticationStateProvider _authState;
     private readonly ILogger<LoginViewModel> _logger;
     private readonly ClientConnectionInfo _client;
+    private readonly SecondFactorPolicyService? _secondFactorPolicy;
+    private readonly SecondFactorService? _secondFactor;
+    private readonly IUserContextFactory? _userContexts;
+    private readonly TimeProvider _time;
+    private readonly SecurityMonitor? _monitor;
 
     public LoginViewModel(
         ILoginService loginService,
         JwtTokenService jwtService,
         JwtAuthenticationStateProvider authState,
         ILogger<LoginViewModel> logger,
-        ClientConnectionInfo client)
+        ClientConnectionInfo client,
+        SecondFactorPolicyService? secondFactorPolicy = null,
+        SecondFactorService? secondFactor = null,
+        IUserContextFactory? userContexts = null,
+        TimeProvider? timeProvider = null,
+        SecurityMonitor? monitor = null)
     {
+        _monitor = monitor;
         _client = client;
         _loginService = loginService;
         _jwtService = jwtService;
         _authState = authState;
         _logger = logger;
+        _secondFactorPolicy = secondFactorPolicy;
+        _secondFactor = secondFactor;
+        _userContexts = userContexts;
+        _time = timeProvider ?? TimeProvider.System;
     }
 
     // -- State --
@@ -58,26 +81,9 @@ public class LoginViewModel
             switch (result.Outcome)
             {
                 case LoginOutcome.Success:
-                    var context = result.UserContext!;
-                    _logger.LogInformation("Login successful for user {Username}", context.User.Username);
-
-                    var roleNames = context.Roles.Select(r => r.Name);
-                    var token = _jwtService.GenerateToken(
-                        context.User.Id, context.User.Username, context.User.Name, roleNames,
-                        securityStamp: context.User.SecurityStamp);
                     // Remove the password from memory immediately.
                     Password = "";
-
-                    // Without the session cookie the sign-in would not survive a reload
-                    // (e.g. the page is served over plain HTTP, where Secure cookies are refused).
-                    if (!await _authState.StoreSessionTokenAsync(token))
-                    {
-                        ErrorMessage = Resources.Web_Login_Failed;
-                        return false;
-                    }
-
-                    IsAuthenticated = true;
-                    return true;
+                    return await ContinueAfterPasswordAsync(result.UserContext!);
 
                 case LoginOutcome.AccountDisabled:
                     _logger.LogWarning("Login abgelehnt – Konto deaktiviert: {Username}", Username);
@@ -134,5 +140,36 @@ public class LoginViewModel
         IsAuthenticated = false;
         Username = "";
         Password = "";
+        ResetSecondFactor();
+    }
+
+    /// <summary>
+    /// Issues the web session token. Its auth methods record whether a second factor
+    /// confirmed it; the session check refuses a password-only token where one is needed.
+    /// </summary>
+    private async Task<bool> CompleteSignInAsync(UserContext context, bool secondFactor)
+    {
+        _logger.LogInformation("Login successful for user {Username} (second factor: {SecondFactor})",
+            context.User.Username, secondFactor);
+
+        var token = _jwtService.GenerateToken(
+            context.User.Id, context.User.Username, context.User.Name, context.Roles.Select(r => r.Name),
+            securityStamp: context.User.SecurityStamp, authMethods: JwtTokenService.AuthMethods(secondFactor));
+
+        // Without the session cookie the sign-in would not survive a reload
+        // (e.g. the page is served over plain HTTP, where Secure cookies are refused).
+        if (!await _authState.StoreSessionTokenAsync(token))
+        {
+            ErrorMessage = Resources.Web_Login_Failed;
+            return false;
+        }
+
+        // The password step was logged as PasswordAccepted (MonitoredLoginService); this is the sign-in.
+        if (secondFactor)
+            _monitor?.RecordLogin(SecurityChannel.Web, context.User.Username, _client.RemoteAddress, LoginResult.ForSuccess(context));
+
+        ResetSecondFactor();
+        IsAuthenticated = true;
+        return true;
     }
 }

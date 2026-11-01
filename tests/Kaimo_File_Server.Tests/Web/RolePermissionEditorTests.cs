@@ -54,6 +54,18 @@ public class RolePermissionEditorTests
     }
 
     [Fact]
+    public void ResetSecondFactor_IsItsOwnRight_NextToTheOtherUserRights()
+    {
+        Assert.Contains(UserGroup.Flags, f => f.Flag == ManagementPermission.ResetSecondFactor);
+        // Not part of the presets that also reset passwords, and not of the global-admin test.
+        Assert.False(ManagementPermission.UserAdmin.HasFlag(ManagementPermission.ResetSecondFactor));
+        Assert.False(ManagementPermission.DepartmentAdmin.HasFlag(ManagementPermission.ResetSecondFactor));
+        Assert.False(ManagementPermission.FullAdmin.HasFlag(ManagementPermission.ResetSecondFactor));
+        Assert.True(ManagementPermission.Administrator.HasFlag(ManagementPermission.ResetSecondFactor));
+        Assert.False(UserListViewModel.IsGlobalOnly(ManagementPermission.ResetSecondFactor));
+    }
+
+    [Fact]
     public void EveryGroup_HasAnIcon()
         => Assert.All(UserListViewModel.PermissionGroups, g => Assert.EndsWith(".svg", g.Icon));
 

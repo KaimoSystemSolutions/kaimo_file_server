@@ -1,0 +1,43 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+@inject IJSRuntime JS
+@inject ToastService Toasts
+
+@*
+    Recovery codes of the second factor, shown exactly once (after enrollment or regeneration).
+    Each code works once in place of an authenticator code.
+*@
+
+<div class="recovery-codes">
+    <div class="warning-banner">@Text("Web_SecondFactor_RecoveryCodes_Hint", "Store these recovery codes in a safe place. Each one works once instead of a code from the app. They are shown only now.")</div>
+    <ul class="recovery-codes-list" aria-label="@Text("Web_SecondFactor_RecoveryCodes_Title", "Recovery codes")">
+        @foreach (var recoveryCode in Codes)
+        {
+            <li>@recoveryCode</li>
+        }
+    </ul>
+    <button type="button" class="btn btn-secondary btn-secondary--sm recovery-codes-copy" @onclick="CopyAsync">
+        @Assets.SVG("copy.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2f))
+        <span>@Text("Web_SecondFactor_RecoveryCodes_Copy", "Copy codes")</span>
+    </button>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<string> Codes { get; set; } = [];
+
+    private async Task CopyAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", string.Join(Environment.NewLine, Codes));
+            Toasts.Show(Text("Web_Detail_Copied", "Copied to clipboard"), ToastType.Success);
+        }
+        catch (JSException)
+        {
+            Toasts.Show(Text("Web_Detail_CopyFailed", "Could not copy to the clipboard"), ToastType.Error);
+        }
+    }
+
+    private static string Text(string key, string fallback) => Resources.ResourceManager.GetString(key) ?? fallback;
+}

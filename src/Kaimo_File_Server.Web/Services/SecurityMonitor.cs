@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services.Notifications;
+using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Controllers.WebDav;
 
 namespace Kaimo_File_Server.Web.Services;
@@ -34,7 +35,7 @@ public sealed class SecurityMonitor(DemoModeOptions? demo = null, TimeProvider? 
     public void RecordLogin(SecurityChannel channel, string username, string? address, LoginResult result)
     {
         var now = _time.GetUtcNow().UtcDateTime;
-        bool locked = result.Outcome == LoginOutcome.LockedOut;
+        bool locked = result.Outcome is LoginOutcome.LockedOut or LoginOutcome.SecondFactorLockedOut;
         // A locked address refuses every user name; it is logged without one, so the
         // overview neither shows the names tried as locked accounts nor splits its repeats.
         bool addressLocked = locked && result.LockScope == LockoutScope.Address;
@@ -270,7 +271,8 @@ public sealed class MonitoredLoginService(
     SecurityMonitor monitor,
     IHttpContextAccessor http,
     INotificationPublisher? notifications = null,
-    IUserRepository? users = null) : ILoginService
+    IUserRepository? users = null,
+    SecondFactorPolicyService? secondFactor = null) : ILoginService
 {
     // Every attempt during a lock returns LockedOut again; publish only the first one per lock.
     // ponytail: in-memory per process and cleared wholesale at the cap; the dispatcher's
@@ -281,7 +283,7 @@ public sealed class MonitoredLoginService(
     {
         var result = await inner.AuthenticateAsync(username, password, remoteAddress, host);
         var channel = SecurityMonitorMiddleware.ChannelOf(http.HttpContext?.Request.Path);
-        monitor.RecordLogin(channel, username, remoteAddress, result);
+        monitor.RecordLogin(channel, username, remoteAddress, await RecordedResultAsync(result, channel));
         if (result.Outcome == LoginOutcome.LockedOut && notifications is not null)
         {
             // A notification must never affect the login result (the publisher itself never throws).
@@ -297,6 +299,29 @@ public sealed class MonitoredLoginService(
             catch (Exception) { /* user lookup failed; the lock itself is already in effect */ }
         }
         return result;
+    }
+
+    /// <summary>
+    /// A correct web password of an account that also needs a second factor is no sign-in yet:
+    /// it is logged as <see cref="LoginOutcome.PasswordAccepted"/>, and the login page logs the
+    /// success once the second factor was accepted. Other transports are password-only.
+    /// </summary>
+    private async Task<LoginResult> RecordedResultAsync(LoginResult result, SecurityChannel channel)
+    {
+        if (result.Outcome != LoginOutcome.Success || channel != SecurityChannel.Web
+            || secondFactor is null || result.UserContext is not { } context)
+            return result;
+        try
+        {
+            // The same uncached decision the login page makes, so the two logs never disagree.
+            return await secondFactor.GetLoginStepAsync(context) != SecondFactorLoginStep.None
+                ? new LoginResult(LoginOutcome.PasswordAccepted)
+                : result;
+        }
+        catch (Exception)
+        {
+            return result; // logging must never affect the login; the login page fails on its own
+        }
     }
 
     private async Task NotifyLockedAsync(string username, string? remoteAddress, TimeSpan retryAfter)

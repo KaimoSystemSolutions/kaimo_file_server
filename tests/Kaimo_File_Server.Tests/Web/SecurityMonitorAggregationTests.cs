@@ -202,6 +202,28 @@ public sealed class SecurityMonitorAggregationTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task SecondFactorLockout_IsFoldedAndCountedAsALockedAccount()
+    {
+        var lockedUntil = _time.Now + Lock;
+        for (int i = 0; i < 3; i++)
+        {
+            _monitor.RecordLogin(SecurityChannel.Web, "admin", "10.0.0.1",
+                new LoginResult(LoginOutcome.SecondFactorLockedOut, RetryAfter: lockedUntil - _time.Now));
+            _time.Advance(TimeSpan.FromSeconds(1));
+        }
+        await _monitor.FlushAsync(_repo);
+
+        var row = Assert.Single(await RowsAsync());
+        Assert.Equal(LoginOutcome.SecondFactorLockedOut, row.Outcome);
+        Assert.Equal(3, row.RepeatCount);
+        Assert.NotNull(row.LockedUntilUtc);
+        Assert.Equal(1, (await _repo.GetTotalsAsync(Since, NowUtc)).ActiveLockouts);
+        var admin = Assert.Single(await _repo.SummarizeAccountsAsync(Since, NowUtc, 10));
+        Assert.Equal(3, admin.Lockouts);
+        Assert.NotNull(admin.LockedUntilUtc);
+    }
+
+    [Fact]
     public async Task Overview_DoesNotCountAddressLockoutsAsLockedAccounts()
     {
         _monitor.RecordLogin(SecurityChannel.Web, "guess0", "10.0.0.9", LoginResult.InvalidCredentials);
@@ -275,8 +297,9 @@ public sealed class SecurityMonitorAggregationTests : DatabaseTestBase
         public Task<DateTime?> GetActiveLockUntilAsync(SecurityChannel channel, string username, DateTime sinceUtc, DateTime nowUtc)
             => inner.GetActiveLockUntilAsync(channel, username, sinceUtc, nowUtc);
 
-        public Task EndActiveLocksAsync(SecurityChannel channel, string username, DateTime nowUtc)
-            => inner.EndActiveLocksAsync(channel, username, nowUtc);
+        public Task EndActiveLocksAsync(SecurityChannel channel, string username, DateTime nowUtc,
+            LoginOutcome lockOutcome = LoginOutcome.LockedOut)
+            => inner.EndActiveLocksAsync(channel, username, nowUtc, lockOutcome);
 
         public Task<SecurityTotals> GetTotalsAsync(DateTime sinceUtc, DateTime nowUtc) => inner.GetTotalsAsync(sinceUtc, nowUtc);
 

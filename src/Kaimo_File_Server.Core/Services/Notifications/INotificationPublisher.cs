@@ -34,6 +34,20 @@ public static class NotificationEvents
         => Build(C.UserPasswordChanged, userId, Roles((R.Affected, userId)),
             [("user.displayName", displayName), ("user.username", username)]);
 
+    /// <param name="change">
+    /// <c>enabled</c>, <c>disabled</c>, <c>reset</c> (by an administrator), <c>recovery_code_used</c>
+    /// or <c>recovery_codes_regenerated</c>; the templates word each one.
+    /// </param>
+    public static NotificationEvent SecondFactorChanged(Guid userId, string displayName, string username, string change, Guid? actorId)
+        => Build(C.SecondFactorChanged, actorId, Roles((R.Affected, userId), (R.Actor, actorId)),
+            [("user.displayName", displayName), ("user.username", username), ("change", change)]);
+
+    /// <remarks>One dedup key per account, so the throttle turns a guessing run into one mail.</remarks>
+    public static NotificationEvent SecondFactorFailed(Guid userId, string username, string? remoteAddress)
+        => Build(C.SecondFactorFailed, null, Roles((R.Affected, userId)),
+            [("user.username", username), ("remoteAddress", remoteAddress ?? "-")],
+            "second-factor:" + userId.ToString("N"));
+
     /// <remarks>
     /// Locks of unknown user names share one dedup key: otherwise spraying invented names
     /// would send one mail per name to the security administrators despite the throttle.

@@ -55,6 +55,8 @@ public static class NotificationEventCatalog
     public const string UserPasswordChanged = "user.password_changed";
     public const string AccountLocked = "security.account_locked";
     public const string AddressLocked = "security.address_locked";
+    public const string SecondFactorChanged = "security.second_factor_changed";
+    public const string SecondFactorFailed = "security.second_factor_failed";
     public const string UploadReceived = "sharelink.upload_received";
     public const string LinkAccessed = "sharelink.accessed";
     public const string SyncFailed = "sync.failed";
@@ -100,6 +102,14 @@ public static class NotificationEventCatalog
             [Role(NotificationContextRoles.Affected)]),
         new(AccountLocked, "security", [NotificationContextRoles.Affected],
             [P("user.username", "erika"), P("remoteAddress", "203.0.113.7"), P("lockedMinutes", "15")],
+            [Role(NotificationContextRoles.Affected), Holders("ViewSecurityMonitor")],
+            DefaultThrottleMinutes: 60),
+        // change: enabled | disabled | reset | recovery_code_used | recovery_codes_regenerated
+        new(SecondFactorChanged, "security", [NotificationContextRoles.Affected, NotificationContextRoles.Actor],
+            [P("user.displayName", "Erika Mustermann"), P("user.username", "erika"), P("change", "enabled")],
+            [Role(NotificationContextRoles.Affected)]),
+        new(SecondFactorFailed, "security", [NotificationContextRoles.Affected],
+            [P("user.username", "erika"), P("remoteAddress", "203.0.113.7")],
             [Role(NotificationContextRoles.Affected), Holders("ViewSecurityMonitor")],
             DefaultThrottleMinutes: 60),
         new(AddressLocked, "security", [],

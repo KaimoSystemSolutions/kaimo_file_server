@@ -1,0 +1,125 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Security
+@using Kaimo_File_Server.Web.Components.ViewModels
+@inject SecondFactorSettingsViewModel VM
+
+@*
+    Settings tab for the TOTP second factor of the web login: off / optional / required, who it
+    is required from (everyone, or users, groups, roles in any scope, departments with their
+    sub-departments, plus everyone with management permissions) and the issuer name the
+    authenticator app shows. The client app, WebDAV and SMB keep using the password alone,
+    which the tab says up front.
+*@
+
+@if (VM.IsLoading)
+{
+    <p class="settings-description">@R("Web_Common_Loading")</p>
+}
+else if (!VM.CanManage)
+{
+    <div class="error-banner">@R("Web_Error_NoPermission")</div>
+}
+else
+{
+    @if (VM.ErrorMessage is not null) { <div class="error-banner" role="alert">@VM.ErrorMessage</div> }
+    @if (VM.DisabledByEnvironment) { <div class="warning-banner" role="status">@R("Web_SecondFactor_Settings_DisabledByEnvironment")</div> }
+
+    <div class="detail-section">
+        <span class="detail-label">@R("Web_Settings_Tab_SecondFactor")</span>
+        <p class="settings-description">
+            @R("Web_SecondFactor_Settings_Intro")
+            <InfoButton Text="@R("Web_SecondFactor_Settings_RecoveryHint")" />
+        </p>
+        <div class="warning-banner second-factor-scope-note" role="note">@R("Web_SecondFactor_Settings_WebOnly")</div>
+
+        <div class="admin-compact second-factor-settings">
+            <div class="form-group">
+                <label id="second-factor-mode-label">@R("Web_SecondFactor_Settings_Mode")</label>
+                <div class="toggle-button-group" role="radiogroup" aria-labelledby="second-factor-mode-label">
+                    @ModeChoice(SecondFactorMode.Off, "Web_SecondFactor_Mode_Off")
+                    @ModeChoice(SecondFactorMode.Optional, "Web_SecondFactor_Mode_Optional")
+                    @ModeChoice(SecondFactorMode.Required, "Web_SecondFactor_Mode_Required")
+                </div>
+                <span class="form-hint">@R($"Web_SecondFactor_Mode_{VM.Mode}_Hint")</span>
+            </div>
+
+            @if (VM.Mode == SecondFactorMode.Required)
+            {
+                @Toggle("Web_SecondFactor_Settings_AppliesToAll", VM.AppliesToAll, v => VM.AppliesToAll = v)
+                @Toggle("Web_SecondFactor_Settings_ManagementRoles", VM.RequireForManagementRoles, v => VM.RequireForManagementRoles = v)
+
+                @if (!VM.AppliesToAll)
+                {
+                    <div class="form-group">
+                        <label>@R("Web_AccessRestrictions_Users")</label>
+                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.UserItems" SelectedIds="VM.UserIds"
+                                              SelectedIdsChanged="ids => VM.UserIds = ids.ToList()"
+                                              Title="@R("Web_AccessRestrictions_Users")" Placeholder="@R("Web_AccessRestrictions_None")" />
+                    </div>
+                    <div class="form-group">
+                        <label>@R("Web_AccessRestrictions_Groups")</label>
+                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.GroupItems" SelectedIds="VM.GroupIds"
+                                              SelectedIdsChanged="ids => VM.GroupIds = ids.ToList()"
+                                              Title="@R("Web_AccessRestrictions_Groups")" Placeholder="@R("Web_AccessRestrictions_None")" />
+                    </div>
+                    <div class="form-group">
+                        <label>@R("Web_SecondFactor_Settings_Roles")</label>
+                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.RoleItems" SelectedIds="VM.RoleIds"
+                                              SelectedIdsChanged="ids => VM.RoleIds = ids.ToList()"
+                                              Title="@R("Web_SecondFactor_Settings_Roles")" Placeholder="@R("Web_AccessRestrictions_None")" />
+                        <span class="form-hint">@R("Web_SecondFactor_Settings_RolesHint")</span>
+                    </div>
+                    <div class="form-group">
+                        <label>@R("Web_AccessRestrictions_Departments")</label>
+                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.DepartmentItems" SelectedIds="VM.DepartmentIds"
+                                              SelectedIdsChanged="ids => VM.DepartmentIds = ids.ToList()"
+                                              Title="@R("Web_AccessRestrictions_Departments")" Placeholder="@R("Web_AccessRestrictions_None")" />
+                        <span class="form-hint">@R("Web_AccessRestrictions_DepartmentsHint")</span>
+                    </div>
+                }
+            }
+
+            @if (VM.Mode != SecondFactorMode.Off)
+            {
+                <div class="form-group">
+                    <label for="second-factor-issuer">@R("Web_SecondFactor_Settings_Issuer")</label>
+                    <input id="second-factor-issuer" class="edit-input" maxlength="@SecondFactorPolicy.MaxIssuerLength" @bind="VM.Issuer" />
+                    <span class="form-hint">@R("Web_SecondFactor_Settings_IssuerHint")</span>
+                </div>
+            }
+        </div>
+
+        <p class="form-hint second-factor-counts" role="status">
+            @string.Format(R("Web_SecondFactor_Settings_Counts"), VM.EnrolledCount, VM.RequiredCount, VM.RequiredNotEnrolledCount)
+        </p>
+
+        <div class="settings-actions">
+            <button type="button" class="btn btn-primary" disabled="@VM.IsSaving" @onclick="VM.SaveAsync">@Resources.Web_Settings_Button_Save</button>
+        </div>
+    </div>
+}
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        VM.ClearMessages();
+        await VM.LoadAsync();
+    }
+
+    private RenderFragment ModeChoice(SecondFactorMode mode, string labelKey) =>
+        @<button type="button" role="radio" aria-checked="@(VM.Mode == mode ? "true" : "false")"
+                 class="toggle-btn @(VM.Mode == mode ? "toggle-btn--active" : null)"
+                 disabled="@VM.IsSaving" @onclick="() => VM.Mode = mode">@R(labelKey)</button>;
+
+    private RenderFragment Toggle(string labelKey, bool value, Action<bool> set) =>
+        @<div class="toggle-row">
+            <span class="toggle-label-text">@R(labelKey)</span>
+            <label class="toggle-switch">
+                <input type="checkbox" checked="@value" aria-label="@R(labelKey)"
+                       @onchange="e => set(e.Value is true)" />
+                <span class="toggle-slider"></span>
+            </label>
+        </div>;
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+}

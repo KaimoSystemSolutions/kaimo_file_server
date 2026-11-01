@@ -1,0 +1,153 @@
+@using Kaimo_File_Server.Core.Domain.Identity
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.ViewModels
+@inject UserSecondFactorViewModel VM
+@inject DateFormatService DateFmt
+
+@*
+    User details → two-factor sign-in (web login only). The own account sets up, removes or
+    renews its recovery codes here; an administrator sees the status and can reset it. The
+    section is hidden while the policy is off and the account has no factor.
+*@
+
+@if (VM.IsVisible && VM.Status is { } status)
+{
+    <DetailSection Title="@R("Web_SecondFactor_Section_Title")">
+        <TitleInfo>
+            <InfoButton Text="@R("Web_SecondFactor_Section_Info")" />
+        </TitleInfo>
+        <ChildContent>
+            <PropertyRow Label="@R("Web_SecondFactor_Label_Status")">
+                @if (status.IsEnrolled)
+                {
+                    <StatusBadge Tone="StatusTone.Positive"
+                                 Label="@string.Format(R("Web_SecondFactor_Status_ActiveSince"), DateFmt.FormatDateTime(status.ConfirmedAtUtc!.Value))" />
+                }
+                else if (status.IsRequired)
+                {
+                    <StatusBadge Tone="StatusTone.Warning" Label="@R("Web_SecondFactor_Status_RequiredMissing")" />
+                }
+                else
+                {
+                    <StatusBadge ShowDot="false" Tone="StatusTone.Neutral" Label="@R("Web_SecondFactor_Status_NotSetUp")" />
+                }
+            </PropertyRow>
+            @if (status.IsEnrolled && VM.IsSelf)
+            {
+                <PropertyRow Label="@R("Web_SecondFactor_Label_RecoveryCodesLeft")" Value="@status.RecoveryCodesLeft.ToString()" />
+            }
+        </ChildContent>
+        <Body>
+            @if (VM.ErrorMessage is not null)
+            {
+                <div class="error-banner" role="alert">@VM.ErrorMessage</div>
+            }
+
+            @if (VM.RecoveryCodes is { } codes)
+            {
+                <div class="user-second-factor-block">
+                    <RecoveryCodeList Codes="codes" />
+                    <button type="button" class="btn btn-primary" @onclick="VM.DismissRecoveryCodes">@R("Web_SecondFactor_RecoveryCodes_Continue")</button>
+                </div>
+            }
+            else if (VM.Mode == SecondFactorPanelMode.Setup)
+            {
+                <div class="user-second-factor-block admin-compact">
+                    @if (VM.Enrollment is { } enrollment)
+                    {
+                        <SecondFactorEnrollmentPanel Enrollment="enrollment" IdPrefix="profile-enroll" Disabled="VM.IsBusy"
+                                                     Code="@VM.Code" CodeChanged="c => VM.Code = c" OnSubmit="VM.ConfirmSetupAsync" />
+                        @Actions(R("Web_SecondFactor_Enroll_Confirm"), VM.ConfirmSetupAsync, danger: false)
+                    }
+                    else
+                    {
+                        <div class="form-group">
+                            <label for="second-factor-password">@R("Web_Admin_Label_CurrentPassword")</label>
+                            <input id="second-factor-password" class="edit-input" type="password" autocomplete="current-password"
+                                   @bind="VM.Password" @bind:event="oninput" disabled="@VM.IsBusy"
+                                   @onkeydown="e => OnEnter(e, VM.BeginSetupAsync)" />
+                            <span class="form-hint">@R("Web_SecondFactor_PasswordHint")</span>
+                        </div>
+                        @Actions(R("Web_SecondFactor_Continue"), VM.BeginSetupAsync, danger: false)
+                    }
+                </div>
+            }
+            else if (VM.Mode is SecondFactorPanelMode.Disable or SecondFactorPanelMode.Regenerate)
+            {
+                <div class="user-second-factor-block admin-compact">
+                    <div class="form-group">
+                        <label for="second-factor-code">@R("Web_SecondFactor_Label_Code")</label>
+                        <input id="second-factor-code" class="edit-input" type="text" inputmode="numeric" autocomplete="one-time-code"
+                               maxlength="9" spellcheck="false" @bind="VM.Code" @bind:event="oninput" disabled="@VM.IsBusy"
+                               @onkeydown="e => OnEnter(e, VM.SubmitCodeAsync)" />
+                        <span class="form-hint">@R(VM.Mode == SecondFactorPanelMode.Disable ? "Web_SecondFactor_DisableHint" : "Web_SecondFactor_RegenerateHint")</span>
+                    </div>
+                    @Actions(R(VM.Mode == SecondFactorPanelMode.Disable ? "Web_SecondFactor_Disable" : "Web_SecondFactor_Regenerate"),
+                             VM.SubmitCodeAsync, danger: VM.Mode == SecondFactorPanelMode.Disable)
+                </div>
+            }
+            else
+            {
+                <div class="user-second-factor-actions">
+                    @if (VM.CanSetUp)
+                    {
+                        <button type="button" class="btn btn-primary btn-secondary--sm" @onclick="VM.StartSetup">@R("Web_SecondFactor_SetUp")</button>
+                    }
+                    @if (VM.CanRegenerate)
+                    {
+                        <button type="button" class="btn btn-secondary btn-secondary--sm" @onclick="VM.StartRegenerate">@R("Web_SecondFactor_Regenerate")</button>
+                    }
+                    @if (VM.CanDisable)
+                    {
+                        <button type="button" class="btn btn-secondary btn-secondary--sm" @onclick="VM.StartDisable">@R("Web_SecondFactor_Disable")</button>
+                    }
+                    @if (VM.CanReset)
+                    {
+                        <button type="button" class="btn btn-danger btn-secondary--sm" @onclick="() => VM.ConfirmingReset = true">@R("Web_SecondFactor_Reset")</button>
+                    }
+                </div>
+            }
+        </Body>
+    </DetailSection>
+
+    @if (VM.ConfirmingReset)
+    {
+        <div class="modal-backdrop" @onclick="() => VM.ConfirmingReset = false">
+            <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="second-factor-reset-title" @onclick:stopPropagation="true">
+                <h3 class="modal-title" id="second-factor-reset-title">@R("Web_SecondFactor_Reset")</h3>
+                <p class="modal-text">@string.Format(R("Web_SecondFactor_ResetConfirm"), User.Name)</p>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" @onclick="() => VM.ConfirmingReset = false">@R("Web_Button_Cancel")</button>
+                    <button type="button" class="btn btn-danger" disabled="@VM.IsBusy" @onclick="VM.ResetAsync">@R("Web_SecondFactor_Reset")</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public User User { get; set; } = default!;
+
+    private Guid _loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (User.Id == _loadedFor) return;
+        _loadedFor = User.Id;
+        await VM.LoadAsync(User);
+    }
+
+    private RenderFragment Actions(string submitLabel, Func<Task> submit, bool danger) =>
+        @<div class="create-form-actions">
+            <button type="button" class="btn btn-secondary" disabled="@VM.IsBusy" @onclick="VM.Cancel">@R("Web_Button_Cancel")</button>
+            <button type="button" class="btn @(danger ? "btn-danger" : "btn-primary")" disabled="@VM.IsBusy" @onclick="submit">@submitLabel</button>
+        </div>;
+
+    private static async Task OnEnter(KeyboardEventArgs e, Func<Task> action)
+    {
+        if (e.Key == "Enter")
+            await action();
+    }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+}

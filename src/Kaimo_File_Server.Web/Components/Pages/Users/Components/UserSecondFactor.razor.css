@@ -1,0 +1,18 @@
+.user-second-factor-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    max-width: 420px;
+    margin-top: var(--space-2);
+}
+
+    .user-second-factor-block > .btn-primary {
+        align-self: flex-start;
+    }
+
+.user-second-factor-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}

@@ -65,6 +65,8 @@ public partial class UserListViewModel
             new(ManagementPermission.DeleteUsers, Resources.Web_Perm_DeleteUsers),
             new(ManagementPermission.EditUserProfiles, Resources.Web_Perm_EditProfiles),
             new(ManagementPermission.ResetPasswords, Resources.Web_Perm_ResetPasswords),
+            new(ManagementPermission.ResetSecondFactor,
+                Resources.ResourceManager.GetString("Web_Perm_ResetSecondFactor") ?? "Reset two-factor sign-in"),
             new(ManagementPermission.ManageHomes,
                 Resources.ResourceManager.GetString("Web_Perm_ManageHomes") ?? "Manage home folders"),
             new(ManagementPermission.AccessHomeContents,

@@ -40,6 +40,8 @@ internal static class ViewModelSetup
         builder.Services.AddScoped<AccessSettingsViewModel>();
         builder.Services.AddScoped<LoginProtectionSettingsViewModel>();
         builder.Services.AddScoped<SmbLockViewModel>();
+        builder.Services.AddScoped<UserSecondFactorViewModel>();
+        builder.Services.AddScoped<SecondFactorSettingsViewModel>();
         builder.Services.AddScoped<NotificationsViewModel>();
         builder.Services.AddScoped<CloudAccessViewModel>();
         builder.Services.AddScoped<CloudAccessShareBrowserViewModel>();

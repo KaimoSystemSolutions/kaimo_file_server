@@ -185,7 +185,8 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider,
                 principal,
                 scope.ServiceProvider.GetRequiredService<IUserRepository>(),
                 scope.ServiceProvider.GetRequiredService<IRevokedWebTokenRepository>(),
-                scope.ServiceProvider.GetRequiredService<ServiceAccessGate>());
+                scope.ServiceProvider.GetRequiredService<ServiceAccessGate>(),
+                scope.ServiceProvider.GetService<SecondFactorPolicyService>());
 
             // Access restriction rules may have changed since the hub connection was checked.
             if (failure is null

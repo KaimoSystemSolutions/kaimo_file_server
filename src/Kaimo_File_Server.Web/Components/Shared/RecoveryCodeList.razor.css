@@ -1,0 +1,25 @@
+.recovery-codes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.recovery-codes-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: var(--space-1) var(--space-3);
+    margin: 0;
+    padding: var(--space-3);
+    list-style: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-tertiary);
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: 13px;
+    color: var(--text-primary);
+    user-select: all;
+}
+
+.recovery-codes-copy {
+    align-self: flex-start;
+}

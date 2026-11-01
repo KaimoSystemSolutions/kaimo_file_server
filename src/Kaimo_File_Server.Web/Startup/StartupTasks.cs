@@ -25,6 +25,12 @@ internal static class StartupTasks
                 "data, so a copy of that volume or its backups can decrypt all stored external-storage credentials. " +
                 "Move it to a separate secret and set DataProtection:CertificatePath (see the deployment README).");
 
+        if (Kaimo_File_Server.Core.Security.SecondFactorPolicy.DisabledByEnvironment)
+            preflightLogger.LogWarning(
+                "{Variable}=true: the web login asks nobody for a second factor. This is a break-glass switch; " +
+                "remove it as soon as the locked-out administrator has signed in and reset the second factor.",
+                Kaimo_File_Server.Core.Security.SecondFactorPolicy.DisableEnvironmentVariable);
+
         if (app.Environment.IsDevelopment())
             preflightLogger.LogInformation("Skipping writable-directory preflight in Development.");
         else

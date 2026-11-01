@@ -14,60 +14,126 @@
             @BrandAssets.RawSVG("icon_kaimo.svg", 42, 42)
         </div>
         <h1>Kaimo File Server</h1>
-        <p class="subtitle">@Resources.Web_Login_Subtitle</p>
+        <p class="subtitle">@Subtitle</p>
 
         @if (VM.ErrorMessage is not null)
         {
-            <div class="error-banner">@VM.ErrorMessage</div>
+            <div class="error-banner" role="alert">@VM.ErrorMessage</div>
         }
 
-        <div class="login-form">
-            <div class="form-group">
-                <label for="login-username">@Resources.Web_Login_Label_Username</label>
-                <input id="login-username"
-                       type="text"
-                       name="username"
-                       autocomplete="username"
-                       placeholder="@Resources.Web_Login_Placeholder_Username"
-                       @bind="VM.Username"
-                       @bind:event="oninput"
-                       @onkeydown="HandleKeyDown"
-                       disabled="@VM.IsLoading" />
-            </div>
+        @switch (VM.Stage)
+        {
+            case LoginStage.SecondFactor:
+                <div class="login-form">
+                    <div class="form-group">
+                        <label for="login-code">@R("Web_SecondFactor_Label_Code")</label>
+                        <input id="login-code"
+                               type="text"
+                               name="code"
+                               inputmode="text"
+                               autocomplete="one-time-code"
+                               spellcheck="false"
+                               maxlength="24"
+                               @bind="VM.Code"
+                               @bind:event="oninput"
+                               @onkeydown="e => OnEnter(e, VerifyCode)"
+                               disabled="@VM.IsLoading" />
+                        <span class="form-hint">@R("Web_Login_SecondFactor_Hint")</span>
+                    </div>
+                    <button class="btn btn-primary" type="button" @onclick="VerifyCode" disabled="@VM.IsLoading">
+                        @R("Web_Login_SecondFactor_Submit")
+                    </button>
+                    <button class="btn btn-secondary" type="button" @onclick="VM.CancelSecondFactor" disabled="@VM.IsLoading">
+                        @R("Web_Login_SecondFactor_Back")
+                    </button>
+                </div>
+                break;
 
-            <div class="form-group">
-                <label for="login-password">@Resources.Web_Login_Label_Password</label>
-                <input id="login-password"
-                       type="password"
-                       name="password"
-                       autocomplete="current-password"
-                       placeholder="@Resources.Web_Login_Placeholder_Password"
-                       @bind="VM.Password"
-                       @bind:event="oninput"
-                       @onkeydown="HandleKeyDown"
-                       disabled="@VM.IsLoading" />
-            </div>
+            case LoginStage.Enrollment when VM.Enrollment is not null:
+                <div class="login-form">
+                    <SecondFactorEnrollmentPanel Enrollment="VM.Enrollment" IdPrefix="login-enroll"
+                                                 Code="@VM.Code" CodeChanged="c => VM.Code = c"
+                                                 OnSubmit="ConfirmEnrollment" Disabled="VM.IsLoading" />
+                    <button class="btn btn-primary" type="button" @onclick="ConfirmEnrollment" disabled="@VM.IsLoading">
+                        @R("Web_SecondFactor_Enroll_Confirm")
+                    </button>
+                    <button class="btn btn-secondary" type="button" @onclick="VM.CancelSecondFactor" disabled="@VM.IsLoading">
+                        @R("Web_Login_SecondFactor_Back")
+                    </button>
+                </div>
+                break;
 
-            <button class="btn btn-primary" type="button" @onclick="HandleLogin" disabled="@VM.IsLoading">
-                @(VM.IsLoading ? Resources.Web_Login_LoggingIn : Resources.Web_Login_Submit)
-            </button>
-        </div>
+            case LoginStage.RecoveryCodes when VM.RecoveryCodes is not null:
+                <div class="login-form">
+                    <RecoveryCodeList Codes="VM.RecoveryCodes" />
+                    <button class="btn btn-primary" type="button" @onclick="FinishEnrollment" disabled="@VM.IsLoading">
+                        @R("Web_SecondFactor_RecoveryCodes_Continue")
+                    </button>
+                </div>
+                break;
+
+            default:
+                <div class="login-form">
+                    <div class="form-group">
+                        <label for="login-username">@Resources.Web_Login_Label_Username</label>
+                        <input id="login-username"
+                               type="text"
+                               name="username"
+                               autocomplete="username"
+                               placeholder="@Resources.Web_Login_Placeholder_Username"
+                               @bind="VM.Username"
+                               @bind:event="oninput"
+                               @onkeydown="e => OnEnter(e, HandleLogin)"
+                               disabled="@VM.IsLoading" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="login-password">@Resources.Web_Login_Label_Password</label>
+                        <input id="login-password"
+                               type="password"
+                               name="password"
+                               autocomplete="current-password"
+                               placeholder="@Resources.Web_Login_Placeholder_Password"
+                               @bind="VM.Password"
+                               @bind:event="oninput"
+                               @onkeydown="e => OnEnter(e, HandleLogin)"
+                               disabled="@VM.IsLoading" />
+                    </div>
+
+                    <button class="btn btn-primary" type="button" @onclick="HandleLogin" disabled="@VM.IsLoading">
+                        @(VM.IsLoading ? Resources.Web_Login_LoggingIn : Resources.Web_Login_Submit)
+                    </button>
+                </div>
+                break;
+        }
     </div>
 </div>
 
 @code {
-    private async Task HandleLogin()
+    private string Subtitle => VM.Stage switch
     {
-        var success = await VM.LoginAsync();
-        if (success)
-        {
+        LoginStage.SecondFactor => R("Web_Login_SecondFactor_Title"),
+        LoginStage.Enrollment => R("Web_SecondFactor_Enroll_RequiredHint"),
+        LoginStage.RecoveryCodes => R("Web_SecondFactor_RecoveryCodes_Title"),
+        _ => Resources.Web_Login_Subtitle,
+    };
+
+    private Task HandleLogin() => NavigateWhen(VM.LoginAsync());
+    private Task VerifyCode() => NavigateWhen(VM.VerifySecondFactorAsync());
+    private Task ConfirmEnrollment() => NavigateWhen(VM.ConfirmEnrollmentAsync());
+    private Task FinishEnrollment() => NavigateWhen(VM.FinishEnrollmentAsync());
+
+    private async Task NavigateWhen(Task<bool> signIn)
+    {
+        if (await signIn)
             Nav.NavigateTo("/", forceLoad: false);
-        }
     }
 
-    private async Task HandleKeyDown(KeyboardEventArgs e)
+    private static async Task OnEnter(KeyboardEventArgs e, Func<Task> action)
     {
         if (e.Key == "Enter")
-            await HandleLogin();
+            await action();
     }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 }

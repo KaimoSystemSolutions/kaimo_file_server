@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace Kaimo_File_Server.Web.Services;
@@ -23,15 +24,20 @@ public static class WebSessionValidation
             context.Principal,
             services.GetRequiredService<IUserRepository>(),
             services.GetRequiredService<IRevokedWebTokenRepository>(),
-            services.GetRequiredService<ServiceAccessGate>());
+            services.GetRequiredService<ServiceAccessGate>(),
+            services.GetService<SecondFactorPolicyService>());
         if (failure is not null)
             context.Fail(failure);
     }
 
     /// <summary>Returns <c>null</c> when the session is acceptable, otherwise the rejection reason.</summary>
+    /// <param name="secondFactor">
+    /// When given, a token without a second factor is refused for an account the second factor
+    /// applies to (set up, or required by the policy) — e.g. a session from before the policy changed.
+    /// </param>
     internal static async Task<string?> CheckAsync(
         ClaimsPrincipal? principal, IUserRepository users, IRevokedWebTokenRepository revokedTokens,
-        ServiceAccessGate serviceAccess)
+        ServiceAccessGate serviceAccess, SecondFactorPolicyService? secondFactor = null)
     {
         if (principal is null)
             return "No principal.";
@@ -57,6 +63,10 @@ public static class WebSessionValidation
 
         if (!await serviceAccess.IsAllowedAsync(user, UserServiceAccess.Web))
             return "Web login is switched off for this account.";
+
+        if (secondFactor is not null && !JwtTokenService.HasSecondFactor(principal)
+            && await secondFactor.SessionRequiresSecondFactorAsync(user.Id))
+            return "The session was not confirmed with the second factor this account needs.";
 
         var jti = principal.FindFirstValue(JwtRegisteredClaimNames.Jti);
         if (!string.IsNullOrEmpty(jti) && await revokedTokens.IsRevokedAsync(jti))

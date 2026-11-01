@@ -127,10 +127,14 @@ internal static class AuthenticationSetup
             sp.GetRequiredService<SecurityMonitor>(),
             sp.GetRequiredService<IHttpContextAccessor>(),
             sp.GetRequiredService<Kaimo_File_Server.Core.Services.Notifications.INotificationPublisher>(),
-            sp.GetRequiredService<IUserRepository>()));
+            sp.GetRequiredService<IUserRepository>(),
+            sp.GetService<Kaimo_File_Server.Infrastructure.Services.SecondFactorPolicyService>()));
 
         // Issues/rotates client-API access + refresh tokens.
         builder.Services.AddScoped<ApiTokenService>();
+
+        // TOTP second factor of the web login (enrollment, code checks, admin reset).
+        builder.Services.AddScoped<Services.SecondFactor.SecondFactorService>();
 
         builder.Services.AddRateLimiter(ConfigureRateLimiter);
 

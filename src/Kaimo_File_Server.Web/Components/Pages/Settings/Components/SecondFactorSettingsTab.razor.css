@@ -1,0 +1,14 @@
+.second-factor-scope-note {
+    margin-bottom: var(--space-4);
+}
+
+.second-factor-settings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    max-width: 560px;
+}
+
+.second-factor-counts {
+    margin-top: var(--space-4);
+}

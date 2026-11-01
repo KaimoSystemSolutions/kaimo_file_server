@@ -43,6 +43,10 @@ public static class DefaultMailTemplates
     private const string DeTrigger = """{% case backup.trigger %}{% when "Scheduled" %}geplant{% when "CatchUp" %}nachgeholt{% else %}manuell{% endcase %}""";
     private const string EnTrigger = """{% case backup.trigger %}{% when "Scheduled" %}scheduled{% when "CatchUp" %}caught up{% else %}manual{% endcase %}""";
 
+    // change carries a language-neutral key (see NotificationEvents.SecondFactorChanged).
+    private const string DeSecondFactorChange = """{% case change %}{% when "enabled" %}die Zwei-Faktor-Anmeldung eingerichtet{% when "disabled" %}die Zwei-Faktor-Anmeldung entfernt{% when "reset" %}die Zwei-Faktor-Anmeldung von einem Administrator zurückgesetzt{% when "recovery_code_used" %}ein Wiederherstellungscode zur Anmeldung verwendet{% else %}neue Wiederherstellungscodes erzeugt{% endcase %}""";
+    private const string EnSecondFactorChange = """{% case change %}{% when "enabled" %}two-factor sign-in was set up{% when "disabled" %}two-factor sign-in was removed{% when "reset" %}two-factor sign-in was reset by an administrator{% when "recovery_code_used" %}a recovery code was used to sign in{% else %}new recovery codes were generated{% endcase %}""";
+
     private static readonly Dictionary<(string Type, string Language), MailTemplateSource> Templates = new()
     {
         [(C.UserCreated, "de")] = new("Willkommen bei {{ server.name }}",
@@ -59,6 +63,16 @@ public static class DefaultMailTemplates
             "<p>Hallo {{ user.displayName }},</p><p>das Passwort deines Kontos <strong>{{ user.username }}</strong> wurde am {{ event.time }} geändert. Warst du das nicht, wende dich bitte sofort an deinen Administrator.</p>"),
         [(C.UserPasswordChanged, "en")] = new("Your password was changed",
             "<p>Hello {{ user.displayName }},</p><p>the password of your account <strong>{{ user.username }}</strong> was changed on {{ event.time }}. If this was not you, contact your administrator immediately.</p>"),
+
+        [(C.SecondFactorChanged, "de")] = new("Zwei-Faktor-Anmeldung deines Kontos geändert",
+            "<p>Hallo {{ user.displayName }},</p><p>für dein Konto <strong>{{ user.username }}</strong> wurde am {{ event.time }} " + DeSecondFactorChange + ".</p><p>Warst du das nicht, wende dich bitte sofort an deinen Administrator.</p>" + LoginLink),
+        [(C.SecondFactorChanged, "en")] = new("Two-factor sign-in of your account changed",
+            "<p>Hello {{ user.displayName }},</p><p>on {{ event.time }}, " + EnSecondFactorChange + " for your account <strong>{{ user.username }}</strong>.</p><p>If this was not you, contact your administrator immediately.</p>" + LoginLink),
+
+        [(C.SecondFactorFailed, "de")] = new("Falscher Bestätigungscode für {{ user.username }}",
+            "<p>Bei der Anmeldung am Konto <strong>{{ user.username }}</strong> wurde das richtige Passwort, aber ein falscher Bestätigungscode der Zwei-Faktor-Anmeldung eingegeben.</p><p>Quelle: {{ remoteAddress }}<br>Zeitpunkt: {{ event.time }}</p><p>Warst du das nicht, kennt jemand anderes dein Passwort: Ändere es bitte sofort.</p>"),
+        [(C.SecondFactorFailed, "en")] = new("Wrong verification code for {{ user.username }}",
+            "<p>Someone signed in to the account <strong>{{ user.username }}</strong> with the correct password but entered a wrong two-factor verification code.</p><p>Source: {{ remoteAddress }}<br>Time: {{ event.time }}</p><p>If this was not you, someone else knows your password: change it immediately.</p>"),
 
         [(C.AccountLocked, "de")] = new("Konto {{ user.username }} vorübergehend gesperrt",
             "<p>Nach zu vielen fehlgeschlagenen Anmeldeversuchen wurde das Konto <strong>{{ user.username }}</strong> für {{ lockedMinutes }} Minuten gesperrt.</p><p>Letzte Quelle: {{ remoteAddress }}<br>Zeitpunkt: {{ event.time }}</p>"),

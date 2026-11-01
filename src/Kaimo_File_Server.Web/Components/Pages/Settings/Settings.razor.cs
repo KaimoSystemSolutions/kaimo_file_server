@@ -133,5 +133,6 @@ internal enum SettingsTab
     AccessRestrictions,
     HomeFolders,
     Versioning,
-    LoginProtection
+    LoginProtection,
+    SecondFactor
 }

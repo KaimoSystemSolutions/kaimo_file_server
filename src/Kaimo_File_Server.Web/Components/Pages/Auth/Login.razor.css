@@ -63,6 +63,12 @@
         margin-top: 4px;
     }
 
+    /* "Back to sign-in" under the second-factor steps (not buttons inside child panels). */
+    .login-form > .btn-secondary {
+        width: 100%;
+        padding: 10px;
+    }
+
 .login-form ::deep input {
     min-height: 40px;
     border: 1px solid var(--border-strong);

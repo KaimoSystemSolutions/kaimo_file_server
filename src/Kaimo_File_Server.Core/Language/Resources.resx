@@ -8077,4 +8077,208 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_AccessRestrictions_Smb_RecoveryHint" xml:space="preserve">
     <value>Locked out? Start the smb-bridge container with KAIMO_ACCESS_RESTRICTIONS_DISABLED=true; Samba then accepts every network again.</value>
   </data>
+  <data name="Web_Login_SecondFactor_Title" xml:space="preserve">
+    <value>Two-factor verification</value>
+  </data>
+  <data name="Web_Login_SecondFactor_Hint" xml:space="preserve">
+    <value>Enter the 6-digit code from your authenticator app or one of your recovery codes.</value>
+  </data>
+  <data name="Web_Login_SecondFactor_Submit" xml:space="preserve">
+    <value>Verify</value>
+  </data>
+  <data name="Web_Login_SecondFactor_Back" xml:space="preserve">
+    <value>Back to sign-in</value>
+  </data>
+  <data name="Web_Login_SecondFactor_Invalid" xml:space="preserve">
+    <value>The code is not valid.</value>
+  </data>
+  <data name="Web_Login_SecondFactor_LockedOut" xml:space="preserve">
+    <value>Too many wrong codes. Try again in {0} minutes.</value>
+  </data>
+  <data name="Web_Login_SecondFactor_Unavailable" xml:space="preserve">
+    <value>The second factor cannot be checked. Please contact your administrator.</value>
+  </data>
+  <data name="Web_Login_SecondFactor_Expired" xml:space="preserve">
+    <value>The sign-in took too long. Please sign in again.</value>
+  </data>
+  <data name="Web_SecondFactor_Enroll_RequiredHint" xml:space="preserve">
+    <value>Your account requires two-factor sign-in. Set it up now.</value>
+  </data>
+  <data name="Web_SecondFactor_Enroll_Step1" xml:space="preserve">
+    <value>Install an authenticator app on your phone.</value>
+  </data>
+  <data name="Web_SecondFactor_Enroll_Step2" xml:space="preserve">
+    <value>Scan the QR code with the app.</value>
+  </data>
+  <data name="Web_SecondFactor_Enroll_Step3" xml:space="preserve">
+    <value>Enter the 6-digit code the app shows.</value>
+  </data>
+  <data name="Web_SecondFactor_QrAlt" xml:space="preserve">
+    <value>QR code for the authenticator app</value>
+  </data>
+  <data name="Web_SecondFactor_ManualKey" xml:space="preserve">
+    <value>Cannot scan? Enter this key in the app:</value>
+  </data>
+  <data name="Web_SecondFactor_Label_Code" xml:space="preserve">
+    <value>Verification code</value>
+  </data>
+  <data name="Web_SecondFactor_Enroll_Confirm" xml:space="preserve">
+    <value>Activate</value>
+  </data>
+  <data name="Web_SecondFactor_RecoveryCodes_Title" xml:space="preserve">
+    <value>Recovery codes</value>
+  </data>
+  <data name="Web_SecondFactor_RecoveryCodes_Hint" xml:space="preserve">
+    <value>Store these recovery codes in a safe place. Each one works once instead of a code from the app. They are shown only now.</value>
+  </data>
+  <data name="Web_SecondFactor_RecoveryCodes_Copy" xml:space="preserve">
+    <value>Copy codes</value>
+  </data>
+  <data name="Web_SecondFactor_RecoveryCodes_Continue" xml:space="preserve">
+    <value>I have stored the codes</value>
+  </data>
+  <data name="Web_SecondFactor_Section_Title" xml:space="preserve">
+    <value>Two-factor sign-in</value>
+  </data>
+  <data name="Web_SecondFactor_Section_Info" xml:space="preserve">
+    <value>Applies to the web login only: after the password, a code from an authenticator app is required. The client app, WebDAV and SMB keep using the password alone.</value>
+  </data>
+  <data name="Web_SecondFactor_Label_Status" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="Web_SecondFactor_Status_ActiveSince" xml:space="preserve">
+    <value>Active since {0}</value>
+  </data>
+  <data name="Web_SecondFactor_Status_RequiredMissing" xml:space="preserve">
+    <value>Required, not set up</value>
+  </data>
+  <data name="Web_SecondFactor_Status_NotSetUp" xml:space="preserve">
+    <value>Not set up</value>
+  </data>
+  <data name="Web_SecondFactor_Label_RecoveryCodesLeft" xml:space="preserve">
+    <value>Unused recovery codes</value>
+  </data>
+  <data name="Web_SecondFactor_PasswordHint" xml:space="preserve">
+    <value>Confirm with your current password to set up two-factor sign-in.</value>
+  </data>
+  <data name="Web_SecondFactor_Continue" xml:space="preserve">
+    <value>Continue</value>
+  </data>
+  <data name="Web_SecondFactor_DisableHint" xml:space="preserve">
+    <value>Enter a code from your authenticator app to remove two-factor sign-in.</value>
+  </data>
+  <data name="Web_SecondFactor_RegenerateHint" xml:space="preserve">
+    <value>Enter a code from your authenticator app. The previous recovery codes stop working.</value>
+  </data>
+  <data name="Web_SecondFactor_Disable" xml:space="preserve">
+    <value>Remove two-factor sign-in</value>
+  </data>
+  <data name="Web_SecondFactor_Regenerate" xml:space="preserve">
+    <value>New recovery codes</value>
+  </data>
+  <data name="Web_SecondFactor_SetUp" xml:space="preserve">
+    <value>Set up two-factor sign-in</value>
+  </data>
+  <data name="Web_SecondFactor_Reset" xml:space="preserve">
+    <value>Reset two-factor sign-in</value>
+  </data>
+  <data name="Web_SecondFactor_ResetConfirm" xml:space="preserve">
+    <value>Reset the two-factor sign-in of {0}? The authenticator app and all recovery codes stop working. If the policy requires two-factor sign-in, it has to be set up again at the next web login.</value>
+  </data>
+  <data name="Web_SecondFactor_ResetNothingToReset" xml:space="preserve">
+    <value>There was nothing to reset: the two-factor sign-in of this user is no longer set up.</value>
+  </data>
+  <data name="Web_Settings_Tab_SecondFactor" xml:space="preserve">
+    <value>Two-factor sign-in</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_Intro" xml:space="preserve">
+    <value>A second factor protects the web login with a code from an authenticator app (TOTP) in addition to the password.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_RecoveryHint" xml:space="preserve">
+    <value>Users who lose their phone sign in with a recovery code; an administrator with the "Reset passwords" permission can reset their second factor in the user details. If the last administrator is locked out, start the web container with KAIMO_MFA_DISABLED=true. The codes depend on the server clock (keep NTP running), and the secrets are encrypted with the Data Protection key ring, which a restore must bring back.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_WebOnly" xml:space="preserve">
+    <value>Applies to the web login only. The client app, WebDAV and SMB keep signing in with the password alone; switch these services off for accounts that do not need them.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_Mode" xml:space="preserve">
+    <value>Mode</value>
+  </data>
+  <data name="Web_SecondFactor_Mode_Off" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="Web_SecondFactor_Mode_Optional" xml:space="preserve">
+    <value>Optional</value>
+  </data>
+  <data name="Web_SecondFactor_Mode_Required" xml:space="preserve">
+    <value>Required</value>
+  </data>
+  <data name="Web_SecondFactor_Mode_Off_Hint" xml:space="preserve">
+    <value>Nobody is asked for a second factor. Factors already set up are kept.</value>
+  </data>
+  <data name="Web_SecondFactor_Mode_Optional_Hint" xml:space="preserve">
+    <value>Users can set up a second factor in their profile; whoever has one is asked for it.</value>
+  </data>
+  <data name="Web_SecondFactor_Mode_Required_Hint" xml:space="preserve">
+    <value>Like optional, and the users chosen below must set one up at their next web login.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_AppliesToAll" xml:space="preserve">
+    <value>Required for all users</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_ManagementRoles" xml:space="preserve">
+    <value>Always required for users with management permissions</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_Roles" xml:space="preserve">
+    <value>Roles</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_RolesHint" xml:space="preserve">
+    <value>Counts in every scope: system wide, department or share.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_Issuer" xml:space="preserve">
+    <value>Name in the authenticator app</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_IssuerHint" xml:space="preserve">
+    <value>Shown next to the user name in the app. Changing it affects new set-ups only.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_Counts" xml:space="preserve">
+    <value>{0} users have set up a second factor. The saved policy requires it from {1} users; {2} of them have not set it up yet.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_SelfNotEnrolled" xml:space="preserve">
+    <value>This policy would require a second factor from your own account, which has none. Set up two-factor sign-in in your profile first.</value>
+  </data>
+  <data name="Web_SecondFactor_Settings_DisabledByEnvironment" xml:space="preserve">
+    <value>KAIMO_MFA_DISABLED is set on this server: no second factor is asked at the moment, whatever is configured here.</value>
+  </data>
+  <data name="Web_Security_Outcome_SecondFactorFailed" xml:space="preserve">
+    <value>Wrong second factor</value>
+  </data>
+  <data name="Web_Security_Outcome_SecondFactorLocked" xml:space="preserve">
+    <value>Second factor locked</value>
+  </data>
+  <data name="Web_Security_Outcome_PasswordAccepted" xml:space="preserve">
+    <value>Password correct, second factor pending</value>
+  </data>
+  <data name="Web_Perm_ResetSecondFactor" xml:space="preserve">
+    <value>Reset two-factor sign-in</value>
+  </data>
+  <data name="Notification_Event_security_second_factor_changed" xml:space="preserve">
+    <value>Two-factor sign-in changed</value>
+  </data>
+  <data name="Notification_Event_security_second_factor_changed_Desc" xml:space="preserve">
+    <value>Security notice when two-factor sign-in is set up, removed or reset, or a recovery code is used.</value>
+  </data>
+  <data name="Notification_Event_security_second_factor_failed" xml:space="preserve">
+    <value>Wrong two-factor code</value>
+  </data>
+  <data name="Notification_Event_security_second_factor_failed_Desc" xml:space="preserve">
+    <value>The password was correct, but the two-factor code was wrong: someone else may know the password.</value>
+  </data>
+  <data name="Notification_Role_security_second_factor_changed_affected" xml:space="preserve">
+    <value>The user themselves</value>
+  </data>
+  <data name="Notification_Role_security_second_factor_changed_actor" xml:space="preserve">
+    <value>Who made the change</value>
+  </data>
+  <data name="Notification_Role_security_second_factor_failed_affected" xml:space="preserve">
+    <value>Owner of the account</value>
+  </data>
 </root>

@@ -70,7 +70,7 @@ internal sealed class LockoutRepeatFolder
     }
 
     private static bool IsLockout(LoginOutcome outcome)
-        => outcome is LoginOutcome.LockedOut or LoginOutcome.AddressLockedOut;
+        => outcome is LoginOutcome.LockedOut or LoginOutcome.AddressLockedOut or LoginOutcome.SecondFactorLockedOut;
 
     /// <summary>The batch from <see cref="Fold"/> was written: later hits go to the saved rows.</summary>
     public void BatchSaved(DateTime nowUtc)

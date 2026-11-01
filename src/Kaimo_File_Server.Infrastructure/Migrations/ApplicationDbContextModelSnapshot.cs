@@ -961,6 +961,54 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.ToTable("user_groups", (string)null);
                 });
 
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.UserRecoveryCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CodeHash");
+
+                    b.ToTable("user_recovery_codes", (string)null);
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.UserSecondFactor", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("LastUsedStep")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("SecretProtected")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("user_second_factors", (string)null);
+                });
+
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Notifications.MailDelivery", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2181,6 +2229,24 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ConnectionId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.UserRecoveryCode", b =>
+                {
+                    b.HasOne("Kaimo_File_Server.Core.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.UserSecondFactor", b =>
+                {
+                    b.HasOne("Kaimo_File_Server.Core.Domain.Identity.User", null)
+                        .WithOne()
+                        .HasForeignKey("Kaimo_File_Server.Core.Domain.Identity.UserSecondFactor", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

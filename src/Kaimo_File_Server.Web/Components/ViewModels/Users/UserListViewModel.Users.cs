@@ -47,9 +47,13 @@ public partial class UserListViewModel
         if (context is null)
             return;
 
+        // The renewed token keeps the sign-in methods of the current one: a session confirmed
+        // with a second factor must not turn into a password-only one, which would end it.
+        var current = (await provider.GetAuthenticationStateAsync()).User;
         var token = _jwt.GenerateToken(
             context.User.Id, context.User.Username, context.User.Name,
-            context.Roles.Select(r => r.Name), securityStamp: context.User.SecurityStamp);
+            context.Roles.Select(r => r.Name), securityStamp: context.User.SecurityStamp,
+            authMethods: JwtTokenService.AuthMethods(JwtTokenService.HasSecondFactor(current)));
         if (!await provider.StoreSessionTokenAsync(token))
             _logger.LogWarning("Could not renew the session cookie after the password change; " +
                                "this session ends at the next revalidation");

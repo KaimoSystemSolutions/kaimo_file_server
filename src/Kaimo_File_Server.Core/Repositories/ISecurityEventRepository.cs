@@ -65,9 +65,12 @@ public interface ISecurityEventRepository
     /// <summary>
     /// Ends every lockout of <paramref name="username"/> on <paramref name="channel"/> that still runs
     /// at <paramref name="nowUtc"/> (an administrator lifted it), so the overview no longer counts it
-    /// and a later lockout is recorded as a new one.
+    /// and a later lockout is recorded as a new one. <paramref name="lockOutcome"/> picks the kind of
+    /// lock: the password lock (<see cref="LoginOutcome.LockedOut"/>) or the second-factor lock
+    /// (<see cref="LoginOutcome.SecondFactorLockedOut"/>).
     /// </summary>
-    Task EndActiveLocksAsync(SecurityChannel channel, string username, DateTime nowUtc);
+    Task EndActiveLocksAsync(SecurityChannel channel, string username, DateTime nowUtc,
+        LoginOutcome lockOutcome = LoginOutcome.LockedOut);
 
     /// <summary>
     /// Totals of the period. Failures include attempts refused by a locked address;

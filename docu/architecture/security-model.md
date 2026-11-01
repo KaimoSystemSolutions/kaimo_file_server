@@ -41,7 +41,7 @@ flowchart LR
 
 | Channel | Mechanism | Implementation |
 |---|---|---|
-| Web UI (Blazor Server) | Username/password → JWT in the HttpOnly session cookie `__Host-kaimo_session` (see [Web session](#web-session)); logout revokes the token ID (`jti`) in `revoked_web_tokens` | `src/Kaimo_File_Server.Web/Services/JwtTokenService.cs`, `JwtAuthenticationStateProvider.cs`, `WebSessionCookie.cs` |
+| Web UI (Blazor Server) | Username/password (+ optional TOTP second factor, see [Second factor](#second-factor-web-login)) → JWT in the HttpOnly session cookie `__Host-kaimo_session` (see [Web session](#web-session)); logout revokes the token ID (`jti`) in `revoked_web_tokens` | `src/Kaimo_File_Server.Web/Services/JwtTokenService.cs`, `JwtAuthenticationStateProvider.cs`, `WebSessionCookie.cs` |
 | REST API `/api/v1` | Device-scoped JWT bearer + rotating refresh tokens | `src/Kaimo_File_Server.Web/Controllers/Api/AuthApiController.cs`, `Services/Api/ApiTokenService.cs` |
 | WebDAV `/dav` | HTTP Basic (verified against the user store) or the device-scoped JWT bearer | `src/Kaimo_File_Server.Web/Controllers/WebDav/WebDavBasicAuthenticationHandler.cs` |
 | SMB | NTLMv2 by Samba against NT hashes provisioned from the database | [SMB control plane](../external-access/smb/control-plane-grpc.md) |
@@ -167,6 +167,66 @@ evaluated by `AccessRestrictionService`).
   `KAIMO_ACCESS_RESTRICTIONS_DISABLED=true` on the web container ignores every rule; on the
   `smb-bridge` container it also lifts the SMB network list.
 - Rules and each user's resolved groups/departments are cached for 30 seconds.
+
+### Second factor (web login)
+
+The web login can ask for a TOTP code (RFC 6238: HMAC-SHA1, 6 digits, 30-second steps) after the
+password. It applies to the **web login only**; the REST API, WebDAV and SMB keep authenticating
+with the password alone (a deliberate decision, documented as residual risk in the policy tab and in
+`example/DETAILS.md`).
+
+- **Policy.** `SecondFactorPolicy` (config key `security.mfa.policy`, Settings → Two-factor sign-in,
+  `ManageSystemSettings`): `Off` (nobody is asked; factors are kept), `Optional` (whoever set one up
+  is asked), `Required` (additionally required from everyone, or from users, groups, roles held in
+  any scope, departments with their sub-departments, and — default on — everyone holding any
+  management permission). `SecondFactorPolicyService` evaluates it; the policy and the per-user
+  session result are cached for 30 seconds. Saving a policy that would require a factor from the
+  saving administrator, who has none, is refused.
+- **Storage.** `user_second_factors` (secret, confirmation time, last used step) and
+  `user_recovery_codes` (SHA-256 of 80-bit codes, single use), both deleted with the user. The secret
+  is encrypted with Data Protection, purpose bound to the user id, so a row copied to another user
+  does not decrypt. An unreadable secret (key ring lost on restore) fails closed: the code check
+  reports `Unavailable` and an administrator has to reset the factor.
+- **Login flow** (`LoginViewModel.SecondFactor.cs`). After a correct password no token is issued.
+  The circuit keeps only the user id and security stamp for 5 minutes (a forced enrollment gets
+  15 minutes from when it is shown, to install an app); every step re-reads the user
+  and drops the pending sign-in when it is disabled or its stamp changed. An account with a factor
+  enters a code or a recovery code; an account the policy requires one from, but which has none,
+  sets it up inside the login page (QR code + key, first code, recovery codes shown once) before
+  any session exists. Known residual risk: whoever knows the password of a not yet enrolled account
+  can enroll their own authenticator; the `security.second_factor_changed` notification tells the user.
+- **Replay and guessing.** A code is accepted for ±1 step and only for a step later than the stored
+  one (conditional update, so two parallel logins cannot use one code). All code checks of an
+  account share one account-wide budget (`|mfa|<userId>`, sized like the per-user login budget):
+  the caller already knows the password, so a per-address budget would not slow them down. Wrong
+  codes are logged as `LoginOutcome.SecondFactorFailed` and raise `security.second_factor_failed`
+  (one dedup key per account). A used-up budget is logged as `LoginOutcome.SecondFactorLockedOut`,
+  apart from the password lock (`LockedOut`): the overview counts both as locked accounts, but the
+  administrator reset ends only the second-factor lock entry, as it lifts only that budget.
+- **Security log.** `MonitoredLoginService` logs a correct web password of an account that needs a
+  second factor as `LoginOutcome.PasswordAccepted` (neither success nor failure in the overview;
+  this also covers the password re-checks on the profile). `LoginViewModel` logs the `Success` once
+  the code, a recovery code or the forced enrollment is done. API and WebDAV logins stay `Success`.
+- **Session.** The web token carries `auth_methods` (`pwd`, plus `otp` after a second factor;
+  a custom name because the JWT handlers remap the registered `amr`). `WebSessionValidation` refuses a
+  token without `otp` once the account has a factor or the policy requires one, at hub connect and
+  in the periodic revalidation; so turning the policy on, or setting up a factor, ends
+  password-only sessions within the cache TTL. Setting up a factor on the own profile renews the own
+  session with `otp`; a password change keeps the current session's methods. Self-service changes
+  do not rotate the security stamp, so client-API tokens are unaffected; the administrator reset
+  does (see below).
+- **Self-service and reset.** Users set up a factor on their profile after a password re-check
+  (through the throttled login service), remove it (only when not required) or regenerate the
+  recovery codes after a valid TOTP code. An administrator with `ResetSecondFactor` on the user
+  resets it in the user details (never their own). The right is separate from `ResetPasswords` and
+  outside `UserAdmin`/`FullAdmin`, so only roles that are given both can take over an account with
+  a second factor; the built-in Administrator role holds it (the seeder adds it on startup). The reset rotates the security stamp in the same
+  transaction, ending every web session and client-API access token of the account — including a
+  session of someone who set up their own authenticator with a stolen password. Refresh tokens are
+  not revoked (that is what a password reset is for). Each change raises
+  `security.second_factor_changed`.
+- **Recovery.** `KAIMO_MFA_DISABLED=true` on the web container asks nobody for a second factor;
+  every start logs a warning while it is set.
 
 ## File authorization (ACL)
 

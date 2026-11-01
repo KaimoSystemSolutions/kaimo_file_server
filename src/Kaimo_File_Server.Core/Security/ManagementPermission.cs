@@ -19,6 +19,9 @@
         EditUserProfiles = 1L << 2,
         ResetPasswords = 1L << 3,
         EnableDisableUsers = 1L << 4,
+        // Separate from ResetPasswords, so no role resets both factors of an account unless it
+        // holds both rights. Kept outside UserAdmin/FullAdmin (see the File backup note below).
+        ResetSecondFactor = 1L << 5,
 
         // -- Group Management --
         CreateGroups = 1L << 8,
@@ -114,7 +117,7 @@
 
         // Everything the built-in Administrator role holds: FullAdmin plus the bits deliberately
         // kept outside it (see the File backup note above). The role editor's "FullAdmin" preset.
-        Administrator = FullAdmin | ManageHomes | AccessHomeContents
+        Administrator = FullAdmin | ResetSecondFactor | ManageHomes | AccessHomeContents
                       | ManageMailServer | ManageNotifications | FileBackupAdmin,
     }
 }

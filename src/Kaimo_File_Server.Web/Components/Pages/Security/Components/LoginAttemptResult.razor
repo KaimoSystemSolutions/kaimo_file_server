@@ -16,7 +16,7 @@
         var hint = Attempt.Outcome switch
         {
             LoginOutcome.Success => string.Format(T("Web_Security_RepeatCount_SuccessHint", "{0} successful logins in this hour"), Attempt.RepeatCount),
-            LoginOutcome.LockedOut or LoginOutcome.AddressLockedOut
+            LoginOutcome.LockedOut or LoginOutcome.AddressLockedOut or LoginOutcome.SecondFactorLockedOut
                 => string.Format(T("Web_Security_RepeatCount_Hint", "{0} attempts during this lockout"), Attempt.RepeatCount),
             _ => string.Format(T("Web_Security_RepeatCount_FailureHint", "{0} failed logins in this hour"), Attempt.RepeatCount),
         };
@@ -36,9 +36,11 @@
         LoginOutcome.Success => StatusTone.Positive,
         LoginOutcome.LockedOut => StatusTone.Warning,
         LoginOutcome.AddressLockedOut => StatusTone.Warning,
+        LoginOutcome.SecondFactorLockedOut => StatusTone.Warning,
         LoginOutcome.AccountDisabled => StatusTone.Neutral,
         LoginOutcome.AddressNotAllowed => StatusTone.Warning,
         LoginOutcome.ServiceDisabled => StatusTone.Neutral,
+        LoginOutcome.PasswordAccepted => StatusTone.Neutral,
         _ => StatusTone.Negative,
     };
 
@@ -50,6 +52,9 @@
         LoginOutcome.AccountDisabled => T("Web_Security_Outcome_Disabled", "Account disabled"),
         LoginOutcome.AddressNotAllowed => T("Web_Security_Outcome_AddressNotAllowed", "Address not allowed"),
         LoginOutcome.ServiceDisabled => T("Web_Security_Outcome_ServiceDisabled", "Service switched off"),
+        LoginOutcome.SecondFactorFailed => T("Web_Security_Outcome_SecondFactorFailed", "Wrong second factor"),
+        LoginOutcome.SecondFactorLockedOut => T("Web_Security_Outcome_SecondFactorLocked", "Second factor locked"),
+        LoginOutcome.PasswordAccepted => T("Web_Security_Outcome_PasswordAccepted", "Password correct, second factor pending"),
         _ => T("Web_Security_Outcome_Invalid", "Invalid credentials"),
     };
 }
