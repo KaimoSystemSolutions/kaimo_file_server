@@ -93,23 +93,6 @@ jobs:
           tags: ${{ steps.meta_samba_bridge.outputs.tags }}
           labels: ${{ steps.meta_samba_bridge.outputs.labels }}
 
-      # 5. SMB control-plane PKI bootstrap
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta_samba_pki
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: kaimosystem/kaimo_file_server.samba_pki
-
-      - name: Build and push Docker image
-        id: push_samba_pki
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: ./src/samba-vfs
-          file: ./src/samba-vfs/Dockerfile.pki
-          push: true
-          tags: ${{ steps.meta_samba_pki.outputs.tags }}
-          labels: ${{ steps.meta_samba_pki.outputs.labels }}
-
       #- name: Generate artifact attestation
       #  uses: actions/attest@v4
       #  with:

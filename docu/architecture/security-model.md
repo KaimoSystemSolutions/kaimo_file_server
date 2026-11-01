@@ -286,7 +286,7 @@ with the password alone (a deliberate decision, documented as residual risk in t
 | Connection credentials, SMTP password | Database | Web | `ICredentialVault` → `DataProtectionCredentialVault`; ciphertext bound to connection ID, provider ID, credential kind and format version |
 | Share-link tokens | Database | Web | Looked up by SHA-256 hash; the displayable token is stored encrypted with Data Protection (`ShareLinkTokenProtector`) |
 | HTTPS certificate | `/data/kaimo-system/.certs/` | Web | Data Protection |
-| SMB control-plane PKI | `data/smb-control-plane/` | Samba, SmbBridge | File permissions, mounted read-only per container |
+| SMB control-plane PKI | `data/smb-control-plane/` | Host (generates; holds the CA key), Samba, SmbBridge | File permissions; Samba and the bridge each mount only their own subfolder read-only. The Host mounts the whole folder because it generates it; it already holds the database and the NT-hash key, so this adds no new trust |
 
 `CredentialRewrapService` upgrades credential envelopes written in an older vault format at Web startup.
 

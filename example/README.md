@@ -10,11 +10,10 @@ else like secrets, data layout, backups, reverse proxy, troubleshooting you find
 | --- | --- | --- |
 | `web` | Web UI and REST/sync API | `8443` (HTTPS) |
 | `samba` | Native SMB file access | `445` |
-| `host` | Background worker; owns the database schema | — |
+| `host` | Background worker; owns the database schema and generates the internal mTLS control-plane PKI | — |
 | `smb-bridge` | Authorization and configuration control plane for Samba | — |
 | `db` | PostgreSQL database | internal only |
 | `elasticsearch` | Full-text file search | internal only |
-| `pki-init` | One-shot generator for the internal mTLS control-plane PKI | — |
 
 Only `web` and `samba` are reachable from the host. Every other service stays
 on the internal Compose network.
@@ -35,8 +34,9 @@ on the internal Compose network.
    [Secrets](DETAILS.md#-secrets).
 3. Create the data directories with the right owners:
    ```bash
-   mkdir -p data/storage/pool01 data/kaimo-system data/logs data/backups data/elasticsearch
-   sudo chown -R 1654:1654 data/storage data/kaimo-system data/logs data/backups
+   mkdir -p data/storage/pool01 data/kaimo-system data/logs data/backups data/elasticsearch \
+     data/smb-control-plane/bridge data/smb-control-plane/samba
+   sudo chown -R 1654:1654 data/storage data/kaimo-system data/logs data/backups data/smb-control-plane
    sudo chown -R 1000:1000 data/elasticsearch
    ```
 4. Start the stack:

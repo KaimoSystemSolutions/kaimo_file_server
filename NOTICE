@@ -25,6 +25,10 @@ Samba's smbd. It is a derivative work of Samba (GPL-3.0-or-later) and is
 therefore distributed under the GPL. It communicates with the AGPL .NET
 control plane only over an arm's-length local socket / gRPC boundary; that
 process boundary is what keeps the two license domains separate.
+The PKI generator script from this directory
+(src/samba-vfs/generate-control-plane-certs.sh) is also shipped in the Host
+image, as a separate program the Host only executes, with its GPL text in
+/usr/share/doc/kaimo/generate-control-plane-certs.LICENSE.
 
 ================================================================================
 Commercial / proprietary use
@@ -165,11 +169,14 @@ install additional distribution packages:
     /usr/share/dotnet/LICENSE.txt and /usr/share/dotnet/ThirdPartyNotices.txt.
     Added packages: libgssapi-krb5-2 (all three), postgresql-client-17 (Host,
     Web; from the PostgreSQL Global Development Group (PGDG) apt repository),
-    openssh-client, rsync, smbclient, ca-certificates (Web).
+    openssh-client, rsync, smbclient, ca-certificates (Web), openssl (Host).
   - kaimo_file_server.samba: Ubuntu 24.04 LTS (ubuntu:24.04), plus the shared
     libraries the self-built Samba and the Kaimo helpers link against, python3,
     jq, wsdd and a few base utilities.
-  - kaimo_file_server.samba_pki: Alpine Linux 3.22 (alpine:3.22) plus openssl.
+  - kaimo_file_server.samba_pki (discontinued; its PKI generator now runs in
+    the Host image): Alpine Linux 3.22 (alpine:3.22) plus openssl. Listed so
+    the source directions and the written offer below keep covering images
+    published before.
 
 These packages are redistributed unmodified, as built by Ubuntu, PGDG and
 Alpine. They are under a variety of licenses. Many are permissive (MIT, BSD,
@@ -179,10 +186,10 @@ include, among others:
   - all Ubuntu-based images: the base system (bash, coreutils, dash,
     diffutils, findutils, grep, sed, tar, util-linux, ... -- GPL-2.0/GPL-3.0;
     the GNU C library and other runtime libraries -- LGPL-2.1+/LGPL-3.0+);
-  - Samba PKI (Alpine): BusyBox and apk-tools (GPL-2.0-only);
   - Web: rsync (GPL-3.0+), smbclient and the Samba client libraries
     (GPL-3.0+/LGPL-3.0+), talloc/tdb/tevent (LGPL-3.0+), avahi, dbus and
     libtirpc client libraries (LGPL-2.1+/GPL-2.0+);
+  - Samba PKI (Alpine, discontinued): BusyBox and apk-tools (GPL-2.0-only);
   - Host and Web: GNU readline (GPL-3.0+, used by psql), gdbm (GPL-3.0+), perl
     (GPL-1.0+ or Artistic), postgresql-client-common (GPL-2.0+);
   - Samba: acl/libacl (GPL-2.0+/LGPL-2.1+), GNU readline (GPL-3.0+), the Ceph

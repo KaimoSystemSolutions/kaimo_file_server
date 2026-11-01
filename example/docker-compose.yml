@@ -26,12 +26,6 @@ x-dotnet-environment: &dotnet-environment
   Backup__RestoreFromPath: ${KAIMO_DB_RESTORE_FROM:-}
 
 services:
-  pki-init:
-    image: kaimosystem/kaimo_file_server.samba_pki:${KAIMO_IMAGE_TAG:-latest}
-    volumes:
-      - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}:/pki
-    restart: "no"
-
   db:
     image: postgres:${POSTGRES_VERSION:-17-alpine}
     restart: unless-stopped
@@ -63,6 +57,9 @@ services:
       - *app-data
       - *logs
       - *backups
+      # The Host generates the internal mTLS control-plane PKI here on startup
+      # (idempotent). Externally managed certificates can use the same layout.
+      - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}:/data/smb-control-plane
     depends_on:
       db:
         condition: service_healthy
@@ -87,11 +84,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      # Host owns the schema; the bridge waits for it in-app and never migrates.
+      # Host owns the schema and the control-plane PKI; the bridge waits for
+      # both in-app and never migrates.
       host:
         condition: service_started
-      pki-init:
-        condition: service_completed_successfully
     networks:
       bridge-database:
       smb-control:

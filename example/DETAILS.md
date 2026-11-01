@@ -9,11 +9,10 @@ search, mail, reverse proxy and troubleshooting.
 | --- | --- | --- |
 | `web` | Web UI and REST/sync API | `8443` (HTTPS) |
 | `samba` | Native SMB file access | `445` |
-| `host` | Background worker; owns the database schema | — |
+| `host` | Background worker; owns the database schema and generates the internal mTLS control-plane PKI | — |
 | `smb-bridge` | Authorization and configuration control plane for Samba | — |
 | `db` | PostgreSQL database | internal only |
 | `elasticsearch` | Full-text file search | internal only |
-| `pki-init` | One-shot generator for the internal mTLS control-plane PKI | — |
 
 Only `web` and `samba` are reachable from the host. Every other service stays
 on the internal Compose networks.
@@ -107,16 +106,24 @@ run as **non-root** users and cannot write to root-owned directories. Create and
 own the directories on the host **before the first `docker compose up`**:
 
 ```bash
-mkdir -p data/storage/pool01 data/kaimo-system data/logs data/backups data/elasticsearch
+mkdir -p data/storage/pool01 data/kaimo-system data/logs data/backups data/elasticsearch \
+  data/smb-control-plane/bridge data/smb-control-plane/samba
 # App (host/web/smb-bridge) and Samba share UID/GID 1654 (the ".NET app" user
 # and the shared "kaimo" storage group).
-sudo chown -R 1654:1654 data/storage data/kaimo-system data/logs data/backups
+sudo chown -R 1654:1654 data/storage data/kaimo-system data/logs data/backups data/smb-control-plane
 # Elasticsearch runs as UID 1000 and does not fix ownership itself.
 sudo chown -R 1000:1000 data/elasticsearch
 ```
 
-`data/postgres` and `data/smb-control-plane` need no manual `chown`: PostgreSQL
-adjusts its own data directory on startup, and `pki-init` runs as `root`.
+`data/postgres` needs no manual `chown`: PostgreSQL adjusts its own data
+directory on startup. `data/smb-control-plane` and its `bridge/` and `samba/`
+subfolders must belong to UID 1654 because the Host generates the
+control-plane certificates there on its first start. Create the subfolders
+up front: the bridge and Samba mount them, and Docker would otherwise create
+them as `root`. If the Host cannot write there, it logs the error and keeps
+running, but the SMB bridge does not start. An existing PKI from an earlier
+version (created by the former root-run `pki-init` container) is kept as it
+is and needs no `chown`.
 
 If you redirect a location with a `LOCATION_*` variable, apply the matching
 ownership to that path instead. On Windows/WSL bind mounts (drvfs/9p) POSIX

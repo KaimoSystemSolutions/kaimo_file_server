@@ -9,8 +9,9 @@ USER root
 # database: it takes the scheduled and pre-migration backups and runs the
 # one-shot startup restore. Pulled from the PGDG apt repo so the client version
 # matches the PostgreSQL 17 server (pg_dump must be >= the server version).
+# openssl is used by the SMB control-plane PKI generator (see below).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libgssapi-krb5-2 ca-certificates curl gnupg \
+        libgssapi-krb5-2 ca-certificates curl gnupg openssl \
     && install -d /usr/share/postgresql-common/pgdg \
     && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
         -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
@@ -26,6 +27,13 @@ COPY --chmod=0644 LICENSE NOTICE /usr/share/doc/kaimo/
 RUN chmod 0755 /usr/share/doc/kaimo \
     && dpkg-query -W -f='${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n' \
         | sort > /usr/share/doc/kaimo/os-packages.txt
+# SMB control-plane PKI generator, run idempotently on every Host start by
+# ControlPlanePkiBootstrap (formerly the separate pki-init image). It lives in
+# src/samba-vfs/ and is GPL-3.0-or-later: a separate program the Host only
+# executes, shipped with its license text. Kept in the base stage so Visual
+# Studio's fast-mode debugging (which runs the base stage) has it too.
+COPY --chmod=0755 src/samba-vfs/generate-control-plane-certs.sh /usr/local/bin/generate-control-plane-certs
+COPY --chmod=0644 src/samba-vfs/LICENSE /usr/share/doc/kaimo/generate-control-plane-certs.LICENSE
 USER $APP_UID
 WORKDIR /app
 

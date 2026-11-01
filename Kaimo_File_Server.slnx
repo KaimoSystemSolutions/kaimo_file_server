@@ -3,7 +3,6 @@
 
   <Folder Name="/src/samba-vfs/">
     <File Path="src/samba-vfs/Dockerfile" />
-    <File Path="src/samba-vfs/Dockerfile.pki" />
     <File Path="src/samba-vfs/Dockerfile.src" />
     <File Path="src/samba-vfs/Dockerfile.vfs" />
     <File Path="src/samba-vfs/README.md" />

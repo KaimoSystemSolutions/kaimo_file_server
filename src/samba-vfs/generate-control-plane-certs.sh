@@ -65,13 +65,28 @@ $samba_output/samba.key
 # mode (0644) are tightened too. If the bridge key cannot be handed to its UID
 # (script not run as root), fall back to the previous mode rather than breaking
 # the bridge, and say so.
+# The Host runs this script as the .NET app UID; a PKI created earlier by the
+# former root-run pki-init container stays root-owned and was already tightened
+# then, so files this UID does not own are left as they are.
+restrict() {
+    restrict_mode="$1"
+    shift
+    for restrict_path in "$@"; do
+        if [ "$(id -u)" -eq 0 ] || [ -O "$restrict_path" ]; then
+            chmod "$restrict_mode" "$restrict_path"
+        fi
+    done
+}
+
 restrict_leaf_keys() {
-    chmod 700 "$authority_output"
-    chmod 755 "$bridge_output" "$samba_output"
-    chmod 600 "$authority_output/ca.key"
-    chmod 644 "$bridge_output"/*.crt "$samba_output"/*.crt
-    chmod 600 "$samba_output/samba.key"
-    if chown "${KAIMO_BRIDGE_UID:-1654}" "$bridge_output/server.key" 2>/dev/null; then
+    restrict 700 "$authority_output"
+    restrict 755 "$bridge_output" "$samba_output"
+    restrict 600 "$authority_output/ca.key"
+    restrict 644 "$bridge_output"/*.crt "$samba_output"/*.crt
+    restrict 600 "$samba_output/samba.key"
+    if [ "$(id -u)" -ne 0 ] && [ ! -O "$bridge_output/server.key" ]; then
+        : # owned by another UID: a root run already handed it over
+    elif chown "${KAIMO_BRIDGE_UID:-1654}" "$bridge_output/server.key" 2>/dev/null; then
         chmod 600 "$bridge_output/server.key"
     else
         chmod 644 "$bridge_output/server.key"
@@ -89,10 +104,25 @@ for path in $required_files; do
     fi
 done
 
+# Present only while a fresh generation runs. The Host can be stopped or time
+# out mid-run; the next run then starts over instead of refusing the incomplete
+# PKI forever. Nothing can trust a PKI whose generation never finished.
+generating="$authority_output/.generating"
+
 if [ "$missing" -eq 0 ]; then
+    # Stopped after the last file but before the marker was removed: complete.
+    [ ! -e "$generating" ] || rm -f "$generating"
     restrict_leaf_keys
     echo "SMB control-plane PKI already present in $output"
     exit 0
+fi
+
+if [ -e "$generating" ]; then
+    echo "previous PKI generation in $output was interrupted; starting over" >&2
+    rm -f "$authority_output"/ca.* "$authority_output"/*.csr "$authority_output"/*.ext \
+        "$bridge_output/ca.crt" "$bridge_output"/server.* \
+        "$samba_output/ca.crt" "$samba_output"/samba.*
+    present=0
 fi
 
 # Migrate PKI produced by the former four-client layout without rotating the
@@ -112,6 +142,7 @@ else
         exit 1
     fi
 
+    : > "$generating"
     openssl req -x509 -newkey rsa:3072 -sha256 -nodes \
         -days 3650 \
         -subj "/CN=Kaimo SMB Control Plane CA" \
@@ -123,6 +154,7 @@ else
 
     cp "$authority_output/ca.crt" "$bridge_output/ca.crt"
     cp "$authority_output/ca.crt" "$samba_output/ca.crt"
+    rm -f "$generating"
 fi
 
 # Remove obsolete credentials from the old layout after successful migration.

@@ -1,5 +1,5 @@
-Kaimo File Server -- Samba and Samba PKI container images
-==========================================================
+Kaimo File Server -- Samba container image
+==========================================
 
 Shipped in the image as /usr/share/doc/kaimo/SOURCE.txt.
 
@@ -19,7 +19,7 @@ Corresponding Source:
     release tarball is published at
     https://download.samba.org/pub/samba/stable/samba-<SAMBA_VERSION>.tar.gz
   - patches, VFS module, helper sources and the build and installation
-    scripts (Dockerfile.vfs, Dockerfile.pki and the scripts next to them):
+    scripts (Dockerfile.vfs and the scripts next to them):
     directory src/samba-vfs/ of
     https://github.com/KaimoSystemSolutions/kaimo_kile_kerver_core
     at the release tag of this image.

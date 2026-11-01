@@ -37,17 +37,6 @@ x-dotnet-environment: &dotnet-environment
   Backup__RestoreFromPath: ${KAIMO_DB_RESTORE_FROM:-}
 
 services:
-  # Generates the local mTLS control-plane PKI once. Externally managed
-  # production certificates can use the same directory layout.
-  kaimo_smb_pki_init:
-    image: ${KAIMO_PKI_IMAGE:-kaimosmbpki}
-    build:
-      context: ./src/samba-vfs
-      dockerfile: Dockerfile.pki
-    volumes:
-      - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}:/pki
-    restart: "no"
-
   kaimo_file_server.host:
     image: ${KAIMO_HOST_IMAGE:-kaimofileserver}
     container_name: kaimo_file_server
@@ -65,6 +54,9 @@ services:
       - *app-data
       - *logs
       - *backups
+      # The Host generates the local mTLS control-plane PKI here on startup
+      # (idempotent). Externally managed certificates can use the same layout.
+      - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}:/data/smb-control-plane
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
@@ -105,11 +97,10 @@ services:
         condition: service_healthy
       # Host owns the schema; the bridge waits for it in-app
       # (WaitForDatabaseReadyAsync) and never migrates. service_started is only a
-      # container-ordering hint — the in-app wait is the real guarantee.
+      # container-ordering hint — the in-app wait is the real guarantee. The same
+      # applies to the control-plane certificates the Host generates on startup.
       kaimo_file_server.host:
         condition: service_started
-      kaimo_smb_pki_init:
-        condition: service_completed_successfully
     networks:
       - kaimo_bridge_database
       - kaimo_smb_control

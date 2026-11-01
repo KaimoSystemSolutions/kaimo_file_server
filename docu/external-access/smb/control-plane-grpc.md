@@ -20,9 +20,16 @@ Related: [Samba VFS integration](samba-vfs-integration.md) ·
 
 ### PKI
 
-The one-shot `kaimo_smb_pki_init` service runs `src/samba-vfs/generate-control-plane-certs.sh` and
-writes into `data/smb-control-plane/` (overridable with `KAIMO_SMB_CONTROL_PKI` for externally
-managed certificates):
+On every start the Host runs `src/samba-vfs/generate-control-plane-certs.sh` (shipped in the Host
+image as `/usr/local/bin/generate-control-plane-certs`, invoked by `ControlPlanePkiBootstrap` before
+the database migration) and writes into `data/smb-control-plane/` (overridable with
+`KAIMO_SMB_CONTROL_PKI` for externally managed certificates). The script is idempotent: an existing
+PKI is kept, and files owned by another UID (a PKI created by the former root-run `pki-init`
+container) are left as they are. A fresh generation writes `authority/.generating` until it has
+finished; if the Host is stopped mid-run, the next start discards the partial files and generates
+again instead of refusing the incomplete PKI. A failure is logged and does not stop the Host. The bridge waits
+up to two minutes for its certificate files (`ControlPlaneTls.Load`) instead of depending on a
+one-shot container:
 
 | Material | Subject | Usage | Mounted into |
 |---|---|---|---|

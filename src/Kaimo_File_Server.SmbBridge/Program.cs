@@ -36,7 +36,8 @@ builder.Services.AddCoreServices(poolStoragePaths, applicationDataPath);
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<IConfigRepository, ConfigRepository>();
 
-var controlPlaneTls = ControlPlaneTls.Load(builder.Configuration);
+// The Host generates the control-plane PKI on its startup; wait for it.
+var controlPlaneTls = ControlPlaneTls.Load(builder.Configuration, TimeSpan.FromMinutes(2));
 builder.Services.AddSingleton(controlPlaneTls);
 builder.Services.AddSingleton<ControlPlaneAuthorizationInterceptor>();
 builder.Services.Configure<HashExportRateLimitOptions>(

@@ -1,7 +1,8 @@
 #!/bin/bash
 # generate-control-plane-certs.sh: fresh PKI, idempotent re-run with key-mode
 # repair, migration from the former four-client layout, refusal to overwrite
-# an incomplete PKI, and the missing-openssl / foreign-UID fallbacks.
+# an incomplete PKI, restart after an interrupted generation, the missing-openssl / foreign-UID fallbacks, and runs as
+# the Host's non-root app UID.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -83,11 +84,71 @@ rc=$?
 check "incomplete PKI is never overwritten" \
     '[ "$rc" -ne 0 ] && grep -q "refusing to overwrite incomplete PKI" <<<"$output" && [ "$(digest "$pki/samba/samba.crt")" = "$before_samba" ]'
 
+# ---------------------------------------------------------------- interrupted
+# The Host may be stopped, or time out, in the middle of a fresh generation. The
+# marker that run leaves behind lets the next start begin again instead of
+# refusing the incomplete PKI forever.
+interrupted="$WORK/interrupted"
+bash "$SUT" "$interrupted" >/dev/null 2>&1
+check "a finished generation leaves no marker" '[ ! -e "$interrupted/authority/.generating" ]'
+before_interrupted_ca="$(digest "$interrupted/authority/ca.crt")"
+: > "$interrupted/authority/.generating"
+rm "$interrupted/samba/ca.crt"
+output="$(bash "$SUT" "$interrupted" 2>&1)"
+rc=$?
+check "interrupted generation starts over" \
+    '[ "$rc" -eq 0 ] && grep -q "PKI generated" <<<"$output" && [ "$(digest "$interrupted/authority/ca.crt")" != "$before_interrupted_ca" ]'
+check "restarted generation is complete and consistent" \
+    'openssl verify -CAfile "$interrupted/samba/ca.crt" "$interrupted/bridge/server.crt" "$interrupted/samba/samba.crt" >/dev/null && [ ! -e "$interrupted/authority/.generating" ]'
+
+# Stopped after the last file was written but before the marker was removed:
+# the PKI is complete and may already be in use, so it is kept.
+before_interrupted_ca="$(digest "$interrupted/authority/ca.crt")"
+: > "$interrupted/authority/.generating"
+output="$(bash "$SUT" "$interrupted" 2>&1)"
+rc=$?
+check "complete PKI with a leftover marker is kept" \
+    '[ "$rc" -eq 0 ] && grep -q "already present" <<<"$output" && [ "$(digest "$interrupted/authority/ca.crt")" = "$before_interrupted_ca" ] && [ ! -e "$interrupted/authority/.generating" ]'
+
 # ---------------------------------------------------------------- fallbacks
 output="$(KAIMO_BRIDGE_UID=not-a-user bash "$SUT" "$WORK/fallback" 2>&1)"
 rc=$?
 check "unassignable bridge key falls back with a warning" \
     '[ "$rc" -eq 0 ] && grep -q "could not assign" <<<"$output" && [ "$(mode "$WORK/fallback/bridge/server.key")" = 644 ]'
+
+# ---------------------------------------------------------------- non-root owner
+# The Host runs the generator as the .NET app UID. A PKI created earlier by the
+# former root-run pki-init container stays root-owned: it must be accepted as
+# present without failing on chmod of files the UID does not own.
+if [ "$(id -u)" -eq 0 ] && command -v setpriv >/dev/null 2>&1; then
+    chmod 711 "$WORK"
+    # The pristine source, not a kcov wrapper: kcov cannot write its output as the app UID.
+    APP_SUT="${KAIMO_SCRIPT_SOURCES:-$(dirname "$SUT")}/generate-control-plane-certs.sh"
+    as_app() { setpriv --reuid=1654 --regid=1654 --clear-groups bash "$APP_SUT" "$@"; }
+
+    # Docker created the bind-mount directory itself as root:root 0755.
+    root_pki="$WORK/root-owned"
+    install -d -m 755 "$root_pki"
+    bash "$SUT" "$root_pki" >/dev/null 2>&1
+    before_root_ca="$(digest "$root_pki/authority/ca.crt")"
+    output="$(as_app "$root_pki" 2>&1)"
+    rc=$?
+    check "app UID accepts a root-owned PKI as present" \
+        '[ "$rc" -eq 0 ] && grep -q "already present" <<<"$output"'
+    check "app UID leaves the root-owned PKI untouched" \
+        '[ "$(digest "$root_pki/authority/ca.crt")" = "$before_root_ca" ] && [ "$(mode "$root_pki/samba/samba.key")" = 600 ]'
+
+    app_pki="$WORK/app-owned"
+    install -d -o 1654 -g 1654 "$app_pki"
+    output="$(as_app "$app_pki" 2>&1)"
+    rc=$?
+    check "app UID generates a fresh PKI without warnings" \
+        '[ "$rc" -eq 0 ] && grep -q "PKI generated" <<<"$output" && ! grep -q "warning" <<<"$output"'
+    check "app UID keeps every private key private" \
+        '[ "$(mode "$app_pki/samba/samba.key")" = 600 ] && [ "$(mode "$app_pki/bridge/server.key")" = 600 ] && [ "$(mode "$app_pki/authority/ca.key")" = 600 ]'
+else
+    echo "  skip: non-root owner cases need root and setpriv"
+fi
 
 mkdir "$WORK/nossl"
 for tool in mkdir chmod; do ln -s "$(command -v "$tool")" "$WORK/nossl/$tool"; done

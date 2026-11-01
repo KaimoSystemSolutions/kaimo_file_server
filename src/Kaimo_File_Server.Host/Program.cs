@@ -63,6 +63,13 @@ var host = builder.Build();
 // Skipped in Development so local runs work without the container's mount layout.
 var preflightLogger = host.Services.GetRequiredService<ILoggerFactory>()
     .CreateLogger("Kaimo_File_Server.Infrastructure.Startup");
+
+// Prepare the SMB control-plane mTLS PKI (formerly the pki-init container)
+// first, so the SMB bridge, which waits for it, is not held up by migrations.
+// Never throws: a PKI problem only stops the bridge, not the Host.
+Kaimo_File_Server.Infrastructure.Startup.ControlPlanePkiBootstrap.RunFromConfiguration(
+    preflightLogger, builder.Configuration);
+
 if (builder.Environment.IsDevelopment())
     preflightLogger.LogInformation("Skipping writable-directory preflight in Development.");
 else

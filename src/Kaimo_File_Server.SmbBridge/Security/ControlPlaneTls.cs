@@ -22,7 +22,34 @@ public sealed class ControlPlaneTls : IDisposable
 
     public X509Certificate2 ServerCertificate { get; }
 
-    public static ControlPlaneTls Load(IConfiguration configuration)
+    public static ControlPlaneTls Load(IConfiguration configuration) =>
+        Load(configuration, TimeSpan.Zero);
+
+    /// <summary>
+    /// Loads the identity, waiting up to <paramref name="waitForFiles"/> for the
+    /// certificate files: the Host generates them on its own startup, so they may
+    /// not exist yet, or still be written, when the bridge starts. Configuration
+    /// errors are not retried.
+    /// </summary>
+    public static ControlPlaneTls Load(IConfiguration configuration, TimeSpan waitForFiles)
+    {
+        DateTime deadline = DateTime.UtcNow + waitForFiles;
+        while (true)
+        {
+            try
+            {
+                return LoadOnce(configuration);
+            }
+            catch (Exception exception) when (
+                exception is FileNotFoundException or CryptographicException
+                && DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(TimeSpan.FromMilliseconds(500));
+            }
+        }
+    }
+
+    private static ControlPlaneTls LoadOnce(IConfiguration configuration)
     {
         string serverCertificatePath = RequireFile(
             configuration["ControlPlane:Tls:ServerCertificatePath"],
