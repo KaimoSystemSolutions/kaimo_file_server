@@ -50,10 +50,13 @@
 	</ItemGroup>
 
 	<!-- The TypeScript package emits wwwroot/js during CoreCompile but never adds the files to Content.
-	     On a clean checkout (wwwroot/js is gitignored) they did not exist at evaluation time, so static
-	     web assets (resolved later, in PrepareForRun) would leave them out of build and publish: the
-	     released image served no scripts. Re-globbing here, at execution time, picks them up. -->
-	<Target Name="IncludeTypeScriptOutputInContent" AfterTargets="RunTscCompile">
+	     Static web assets are collected earlier (ResolveProjectStaticWebAssets runs before
+	     AssignTargetPaths), so on a clean checkout (wwwroot/js is gitignored) the scripts were left out
+	     of build and publish: the released image served none. Compile first, then re-glob at execution
+	     time; CoreCompile later skips the already-run TypeScript targets. -->
+	<Target Name="IncludeTypeScriptOutputInContent"
+	        BeforeTargets="ResolveProjectStaticWebAssets"
+	        DependsOnTargets="SetTscExecutable;RunTscCompile">
 		<ItemGroup>
 			<Content Remove="wwwroot\js\*.js" />
 			<Content Include="wwwroot\js\*.js" />
