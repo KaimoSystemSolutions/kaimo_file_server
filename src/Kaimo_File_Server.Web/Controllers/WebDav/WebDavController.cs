@@ -340,13 +340,20 @@ public sealed partial class WebDavController : ControllerBase
         {
             var meta = await target.Fs.GetMetadataAsync(target.Path, target.User);
 
-            // The only property we persist is the last-modified time Office sets after a save.
-            // Every other Win32* property is accepted and ignored (reported 200), which is what
-            // Explorer and Office expect.
+            // We persist the last-modified time (Office sets it after a save) and the creation time
+            // (Explorer and Kaimo's WebDAV sync send it for a copied item). Every other Win32*
+            // property is accepted and ignored (reported 200), which is what Explorer and Office expect.
             var requested = ParseProppatchProps(body);
-            var modified = TryReadWin32ModifiedTime(body);
-            if (modified is { } when)
-                await target.Fs.SetModifiedAtAsync(target.Path, target.User, when);
+            var modified = TryReadWin32Time(body, "Win32LastModifiedTime");
+            var created = TryReadWin32Time(body, "Win32CreationTime");
+            // Only an earlier creation time is taken. Windows echoes the value it read from PROPFIND
+            // (whole seconds) in routine PROPPATCHes, possibly from a listing older than a sync that
+            // moved it back; writing it would revert that, drop the sub-seconds, log a Modified feed
+            // entry, and refuse a read-only user's routine request with 403.
+            if (created is { } sent && sent >= TruncateToSeconds(meta.CreatedAt))
+                created = null;
+            if (modified is not null || created is not null)
+                await target.Fs.SetModifiedAtAsync(target.Path, target.User, modified, created);
 
             var props = requested.Count > 0 ? requested : [Dav + "getlastmodified"];
             var propElements = props.Select(name => new XElement(name));

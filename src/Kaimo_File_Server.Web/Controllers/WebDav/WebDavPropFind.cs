@@ -25,13 +25,20 @@ public sealed record WebDavEntry(
 /// <summary>
 /// Parses PROPFIND/PROPPATCH request bodies and writes the <c>207 Multi-Status</c>
 /// XML. Only the property set clients actually consume is implemented
-/// (RFC 4918 §15 live properties plus <c>supportedlock</c>/<c>lockdiscovery</c>);
+/// (RFC 4918 §15 live properties plus <c>supportedlock</c>/<c>lockdiscovery</c>, and
+/// <c>Win32CreationTime</c> when named);
 /// any other named property is reported as <c>404</c> inside the multistatus,
 /// which is what the specification requires and what clients expect.
 /// </summary>
 public static class WebDavPropFind
 {
     public static readonly XNamespace Dav = "DAV:";
+
+    /// <summary>
+    /// The creation time in the Microsoft namespace, answered only when named: Kaimo's WebDAV sync
+    /// prefers it to <c>creationdate</c>, which some servers fill with the inode change time.
+    /// </summary>
+    private static readonly XName Win32CreationTime = XName.Get("Win32CreationTime", "urn:schemas-microsoft-com:");
 
     /// <summary>How a PROPFIND asked for properties.</summary>
     public enum PropMode { AllProp, PropName, Named }
@@ -120,6 +127,8 @@ public static class WebDavPropFind
                 found.Add(new XElement(name, entry.LastModifiedUtc.ToUniversalTime().ToString("R", CultureInfo.InvariantCulture)));
             else if (name == Dav + "creationdate")
                 found.Add(new XElement(name, entry.CreationTimeUtc.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture)));
+            else if (name == Win32CreationTime)
+                found.Add(new XElement(name, entry.CreationTimeUtc.ToUniversalTime().ToString("R", CultureInfo.InvariantCulture)));
             else if (name == Dav + "getcontentlength")
                 Emit(name, () => entry.IsCollection ? null : new XElement(name, entry.ContentLength));
             else if (name == Dav + "getcontenttype")

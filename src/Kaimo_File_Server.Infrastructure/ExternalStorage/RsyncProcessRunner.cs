@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
+using Kaimo_File_Server.Infrastructure.Storage;
 
 namespace Kaimo_File_Server.Infrastructure.ExternalStorage;
 
@@ -61,16 +62,40 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
 
         // Only a pull writes into the local tree; a push changes nothing here.
         var received = request.Direction == OptimizedSyncDirection.Pull ? new List<string>() : null;
+        var created = request.Direction == OptimizedSyncDirection.Pull ? new List<string>() : null;
         void CollectReceived(string line)
         {
-            if (received is null || received.Count >= MaximumItemizedPaths)
+            if (received is null || created is null)
                 return;
-            if (ReceivedFileAbsolutePath(localPath, line) is { } absolute)
+            if (received.Count < MaximumItemizedPaths && ReceivedFileAbsolutePath(localPath, line) is { } absolute)
                 received.Add(absolute);
+            if (created.Count < MaximumItemizedPaths && CreatedEntryAbsolutePath(localPath, line) is { } entry)
+                created.Add(entry);
         }
 
-        await RunAsync("rsync", arguments, cancellationToken, throwOnFailure: true, CollectReceived);
+        await RunThenStampCreatedAsync(
+            () => RunAsync("rsync", arguments, cancellationToken, throwOnFailure: true, CollectReceived),
+            created);
         return received ?? (IReadOnlyList<string>)[];
+    }
+
+    /// <summary>
+    /// Runs rsync, then stamps the creation times of what it created (<paramref name="created"/>,
+    /// <c>null</c> for a push). Stamping runs after the run because rsync stamps folder times only
+    /// once their content is complete, and also after a failed or cancelled run: the next run no
+    /// longer itemizes those entries as new, so this is the only chance to stamp them.
+    /// </summary>
+    internal static async Task RunThenStampCreatedAsync(Func<Task> run, IReadOnlyCollection<string>? created)
+    {
+        try
+        {
+            await run();
+        }
+        finally
+        {
+            if (created is not null)
+                StampCreationFromModified(created);
+        }
     }
 
     /// <summary>
@@ -82,10 +107,28 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
     /// content additions and are skipped.
     /// </summary>
     internal static string? ReceivedFileAbsolutePath(string localRoot, string itemizeLine)
+        => itemizeLine.StartsWith(">f", StringComparison.Ordinal)
+            ? ItemizedAbsolutePath(localRoot, itemizeLine)
+            : null;
+
+    /// <summary>
+    /// The files and folders rsync created (<c>&gt;f+++++++++</c>, <c>cd+++++++++</c>): their creation
+    /// time is the time of the pull. An updated file (e.g. <c>&gt;f.st......</c>) is skipped: its new
+    /// mtime is the latest edit, which must not become its creation time.
+    /// </summary>
+    // ponytail: rsync replaces an updated file via temp file + rename, so it still shows the pull time
+    // as created; keeping the old value would need a dry-run pre-scan of the files about to change.
+    internal static string? CreatedEntryAbsolutePath(string localRoot, string itemizeLine)
+        => itemizeLine.StartsWith(">f+++++++++", StringComparison.Ordinal)
+           || itemizeLine.StartsWith("cd+++++++++", StringComparison.Ordinal)
+            ? ItemizedAbsolutePath(localRoot, itemizeLine)
+            : null;
+
+    private static string? ItemizedAbsolutePath(string localRoot, string itemizeLine)
     {
-        if (itemizeLine.Length < 13 || itemizeLine[0] != '>' || itemizeLine[1] != 'f')
+        if (itemizeLine.Length < 13)
             return null;
-        string relative = itemizeLine[12..].Trim();
+        string relative = itemizeLine[12..].Trim().TrimEnd('/');
         if (relative.Length == 0)
             return null;
         string absolute = Path.GetFullPath(
@@ -95,6 +138,29 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
                || absolute.StartsWith(localRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal)
             ? absolute
             : null;
+    }
+
+    /// <summary>
+    /// Linux rsync cannot transfer creation times (<c>--crtimes</c> is macOS-only), so what it created
+    /// would show the time of the pull as created. The modification time rsync preserved
+    /// (<c>--archive</c>) stands in for it, as for every other pull. Best effort per entry.
+    /// </summary>
+    // ponytail: capped like the index list (MaximumItemizedPaths); beyond it entries keep the pull time.
+    internal static void StampCreationFromModified(IEnumerable<string> absolutePaths)
+    {
+        foreach (string path in absolutePaths)
+        {
+            try
+            {
+                FileSystemInfo info = Directory.Exists(path) ? new DirectoryInfo(path) : new FileInfo(path);
+                if (info.Exists)
+                    FileBirthTime.TrySetUtc(info, info.LastWriteTimeUtc);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // Vanished or unreadable since rsync created it; it keeps the pull time.
+            }
+        }
     }
 
     private static List<string> BuildTransferArguments(OptimizedSyncRequest request)

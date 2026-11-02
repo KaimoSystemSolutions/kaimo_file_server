@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Kaimo_File_Server.Tests;
 
-public sealed class OneDriveConnectionTests
+public sealed partial class OneDriveConnectionTests
 {
     [Fact]
     public async Task GetAccountInfoAsync_RefreshesTokenAndExposesRotationForPersistence()

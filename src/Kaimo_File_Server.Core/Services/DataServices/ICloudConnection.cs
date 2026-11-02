@@ -46,6 +46,18 @@ public interface ICloudConnection
         Stream data,
         DateTime modifiedTime,
         CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Same, plus the source creation time (<c>null</c> = leave the remote one unchanged).
+    /// Providers that cannot set a creation time keep this default, which drops it.
+    /// </summary>
+    Task UploadAsync(
+        string path,
+        Stream data,
+        DateTime modifiedTime,
+        DateTime? createdTime,
+        CancellationToken cancellationToken = default)
+        => UploadAsync(path, data, modifiedTime, cancellationToken);
+
     /// <summary>Streams a remote file into the supplied target stream.</summary>
     Task DownloadAsync(
         string path,
@@ -71,6 +83,14 @@ public interface ICloudConnection
     Task TrySetDirectoryModifiedTimeAsync(
         string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
+
+    /// <summary>
+    /// Same, plus the creation time of a folder the sync just created (<c>null</c> = leave it
+    /// unchanged). Providers that cannot set a creation time keep this default, which drops it.
+    /// </summary>
+    Task TrySetDirectoryTimesAsync(
+        string path, DateTime modifiedUtc, DateTime? createdUtc, CancellationToken cancellationToken = default)
+        => TrySetDirectoryModifiedTimeAsync(path, modifiedUtc, cancellationToken);
 
     /// <summary>Recursively calculates the total size used for sync progress reporting.</summary>
     Task<long> GetDirectorySizeAsync(string path, CancellationToken cancellationToken = default);

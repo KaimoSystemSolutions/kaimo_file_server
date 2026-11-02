@@ -17,18 +17,27 @@ internal sealed class RemoteFileStoreSyncAdapter(
 
     public Task Dispose() => Task.CompletedTask;
 
+    public Task UploadAsync(
+        string path,
+        Stream data,
+        DateTime modifiedTime,
+        CancellationToken cancellationToken = default)
+        => UploadAsync(path, data, modifiedTime, createdTime: null, cancellationToken);
+
     public async Task UploadAsync(
         string path,
         Stream data,
         DateTime modifiedTime,
+        DateTime? createdTime,
         CancellationToken cancellationToken = default)
     {
         await remoteFiles.WriteAsync(path, data, overwrite: true, cancellationToken);
         try
         {
             // Keep the source mtime so the next two-way run does not see the pushed copy
-            // as newer. Best-effort: the content is already uploaded.
-            await remoteFiles.TrySetModifiedTimeAsync(path, modifiedTime, cancellationToken);
+            // as newer, and the creation time so it does not show the upload time.
+            // Best-effort: the content is already uploaded.
+            await remoteFiles.TrySetTimesAsync(path, modifiedTime, createdTime, cancellationToken);
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
@@ -41,6 +50,10 @@ internal sealed class RemoteFileStoreSyncAdapter(
     public Task TrySetDirectoryModifiedTimeAsync(
         string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
         => remoteFiles.TrySetDirectoryModifiedTimeAsync(path, modifiedUtc, cancellationToken);
+
+    public Task TrySetDirectoryTimesAsync(
+        string path, DateTime modifiedUtc, DateTime? createdUtc, CancellationToken cancellationToken = default)
+        => remoteFiles.TrySetDirectoryTimesAsync(path, modifiedUtc, createdUtc, cancellationToken);
 
     public async Task DownloadAsync(
         string path,
@@ -81,6 +94,7 @@ internal sealed class RemoteFileStoreSyncAdapter(
                 item.Name,
                 item.Path,
                 item.Size ?? 0,
-                item.ModifiedAtUtc ?? DateTime.UnixEpoch))
+                item.ModifiedAtUtc ?? DateTime.UnixEpoch,
+                item.CreatedAtUtc))
             .ToArray();
 }

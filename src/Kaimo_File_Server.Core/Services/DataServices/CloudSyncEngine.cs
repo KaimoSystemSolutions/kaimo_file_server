@@ -149,6 +149,21 @@ internal sealed partial class CloudSyncEngine
     }
 
     /// <summary>
+    /// A local creation time, or <c>null</c> when storage reported none (<see cref="DateTime.MinValue"/>).
+    /// </summary>
+    private static DateTime? KnownCreatedAt(FileMetadata local)
+        => local.CreatedAt > DateTime.MinValue ? local.CreatedAt : null;
+
+    /// <summary>
+    /// The source creation time an overwrite should stamp, or <c>null</c> to keep the target's.
+    /// A later source time is no better: Google Drive keeps the first-upload time as creation time,
+    /// OneDrive reports the upload time for items pushed without one, and a copy synced before
+    /// creation times were carried shows the time of that sync.
+    /// </summary>
+    private static DateTime? EarlierCreatedAt(DateTime? source, DateTime? target)
+        => source is { } created && (target is not { } existing || created < existing) ? created : null;
+
+    /// <summary>
     /// Compares timestamps with a tolerance because providers store modification
     /// times at coarser precision than the local file system (Dropbox, SFTP v3 and
     /// WebDAV <c>getlastmodified</c> keep whole seconds, FAT two). A tighter window
@@ -345,11 +360,13 @@ internal sealed partial class CloudSyncEngine
                 return (false, false);
 
             _newManifest.Paths.Add(localChild);
-            await UploadDirectoryRecursiveAsync(localChild, remoteChild, local.ModifiedAt);
+            await UploadDirectoryRecursiveAsync(localChild, remoteChild, local.ModifiedAt, KnownCreatedAt(local));
             return (false, true);
         }
 
-        if (await PushFileAsync(localChild, remoteChild, local.Name, local.ModifiedAt, local.Size))
+        // A new remote copy: without a known creation time the modification time stands in for it.
+        if (await PushFileAsync(localChild, remoteChild, local.Name, local.ModifiedAt,
+                KnownCreatedAt(local) ?? local.ModifiedAt, local.Size))
         {
             // Manifest only on success: a file that failed to upload does
             // not exist remotely, so it must not look converged next run.
@@ -404,7 +421,10 @@ internal sealed partial class CloudSyncEngine
             return (false, false);
         }
 
-        if (await PullFileAsync(localChild, remoteChild, remote.Name, remote.ModifiedAt, remote.Size))
+        // A new local copy: providers without creation times (smbclient, SFTP) fall back to
+        // the modification time, which is the oldest time known for the item.
+        if (await PullFileAsync(localChild, remoteChild, remote.Name, remote.ModifiedAt,
+                remote.CreatedAt ?? remote.ModifiedAt, remote.Size))
         {
             _newManifest.Paths.Add(localChild);
             return (true, false);
@@ -437,13 +457,14 @@ internal sealed partial class CloudSyncEngine
 
         int newer = CompareModifiedTime(local.ModifiedAt, local.Size, remote.ModifiedAt, remote.Size);
 
+        // An overwrite carries the source creation time only when it is earlier than the target's.
         if (newer > 0 && _mode != SyncMode.Pull)
             return (false, await PushFileAsync(localChild, remoteChild,
-                local.Name, local.ModifiedAt, local.Size));
+                local.Name, local.ModifiedAt, EarlierCreatedAt(KnownCreatedAt(local), remote.CreatedAt), local.Size));
 
         if (newer < 0 && _mode != SyncMode.Push)
             return (await PullFileAsync(localChild, remoteChild,
-                remote.Name, remote.ModifiedAt, remote.Size), false);
+                remote.Name, remote.ModifiedAt, EarlierCreatedAt(remote.CreatedAt, KnownCreatedAt(local)), remote.Size), false);
 
         return (false, false);
     }
@@ -457,6 +478,8 @@ internal sealed partial class CloudSyncEngine
     /// <c>rsync -t</c> does): writing children moved the target folder's mtime to "now". Only a
     /// one-sided change has a source; a folder changed on both sides keeps its times. Providers
     /// without folder times (Dropbox) report <see cref="DateTime.MinValue"/> and are skipped.
+    /// A folder this pass created (<paramref name="local"/> is <c>null</c>) also gets the remote
+    /// creation time, or the modification time when the provider reports none.
     /// Best-effort: a failed stamp never fails the run.
     /// </summary>
     private async Task StampDirectoryAsync(
@@ -469,7 +492,8 @@ internal sealed partial class CloudSyncEngine
         try
         {
             if (changes.Local && !changes.Remote && remote.ModifiedAt > DateTime.MinValue)
-                await _local.SetModifiedAtAsync(localDir, _user, remote.ModifiedAt);
+                await _local.SetModifiedAtAsync(localDir, _user, remote.ModifiedAt,
+                    local is null ? remote.CreatedAt ?? remote.ModifiedAt : null);
             else if (changes.Remote && !changes.Local && local is not null && local.ModifiedAt > DateTime.MinValue)
                 await _remote.TrySetDirectoryModifiedTimeAsync(remoteDir, local.ModifiedAt, _cancellationToken);
         }

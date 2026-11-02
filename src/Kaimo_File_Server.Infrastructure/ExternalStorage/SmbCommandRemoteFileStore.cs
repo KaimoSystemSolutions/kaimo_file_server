@@ -102,6 +102,41 @@ internal sealed class SmbCommandRemoteFileStore(
             $"rename {QuoteRemote(source)} {QuoteRemote(destination)}", false, cancellationToken);
     }
 
+    public Task TrySetModifiedTimeAsync(
+        string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
+        => TrySetTimesAsync(path, modifiedUtc, createdUtc: null, cancellationToken);
+
+    /// <summary>
+    /// Stamps the times with smbclient's <c>utimes &lt;name&gt; &lt;create&gt; &lt;access&gt; &lt;write&gt; &lt;change&gt;</c>
+    /// ("-1" = unchanged). It is path based, so it works for files and folders alike. The access
+    /// time follows the write time: the copy was not opened since it was written.
+    /// </summary>
+    public async Task TrySetTimesAsync(
+        string path, DateTime modifiedUtc, DateTime? createdUtc, CancellationToken cancellationToken = default)
+    {
+        (string share, string relative) = SplitFile(path);
+        string modified = UtimesTime(modifiedUtc);
+        string created = createdUtc is { } creation ? UtimesTime(creation) : "-1";
+        await RunAsync(share, $"utimes {QuoteRemote(relative)} {created} {modified} {modified} -1",
+            false, cancellationToken, environment: UtcEnvironment);
+    }
+
+    public Task TrySetDirectoryTimesAsync(
+        string path, DateTime modifiedUtc, DateTime? createdUtc, CancellationToken cancellationToken = default)
+        => TrySetTimesAsync(path, modifiedUtc, createdUtc, cancellationToken);
+
+    /// <summary>
+    /// smbclient converts <c>utimes</c> arguments with mktime on a zeroed struct tm (<c>tm_isdst</c> = 0),
+    /// which reads them as standard time: in a local zone on summer time every stamp would land an hour
+    /// off. <c>TZ=UTC0</c> (a POSIX zone string, no tzdata needed) has no DST, so UTC times are exact.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> UtcEnvironment =
+        new Dictionary<string, string> { ["TZ"] = "UTC0" };
+
+    /// <summary>A time in <c>utimes</c> syntax, as UTC wall-clock time (see <see cref="UtcEnvironment"/>).</summary>
+    internal static string UtimesTime(DateTime utc)
+        => utc.ToUniversalTime().ToString("yyyy:MM:dd-HH:mm:ss", CultureInfo.InvariantCulture);
+
     /// <summary>smbclient's debug line (level 5) for a message it sent encrypted.</summary>
     internal const string EncryptedMessageMarker = "Encrypted SMB2 message";
 
@@ -121,7 +156,8 @@ internal sealed class SmbCommandRemoteFileStore(
         bool listShares,
         CancellationToken cancellationToken,
         bool throwOnFailure = true,
-        bool encryptionProbe = false)
+        bool encryptionProbe = false,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
         string authFile = ProtocolTemporaryFile.CreatePath();
         try
@@ -151,7 +187,9 @@ internal sealed class SmbCommandRemoteFileStore(
                 arguments.Add("--client-protection=encrypt");
             if (command is not null)
                 arguments.AddRange(["-c", command]);
-            return await runner.RunAsync("smbclient", arguments, cancellationToken, throwOnFailure);
+            return environment is null
+                ? await runner.RunAsync("smbclient", arguments, cancellationToken, throwOnFailure)
+                : await runner.RunAsync("smbclient", arguments, environment, cancellationToken, throwOnFailure);
         }
         finally { File.Delete(authFile); }
     }

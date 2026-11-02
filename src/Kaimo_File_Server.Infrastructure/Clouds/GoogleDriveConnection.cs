@@ -126,10 +126,20 @@ public class GoogleDriveConnection : ICloudConnection
     }
 
     /// <inheritdoc />
+    public Task UploadAsync(
+        string path,
+        Stream data,
+        DateTime modifiedTime,
+        CancellationToken cancellationToken = default)
+        => UploadAsync(path, data, modifiedTime, createdTime: null, cancellationToken);
+
+    /// <inheritdoc />
+    /// <remarks>Drive accepts <c>createdTime</c> only when a file is created; an update keeps it.</remarks>
     public async Task UploadAsync(
         string path,
         Stream data,
         DateTime modifiedTime,
+        DateTime? createdTime,
         CancellationToken cancellationToken = default)
     {
         EnsureWritable();
@@ -180,6 +190,8 @@ public class GoogleDriveConnection : ICloudConnection
         {
             // Create new file
             file.Parents = new[] { parentId };
+            if (createdTime is { } created)
+                file.CreatedTimeDateTimeOffset = created.ToUniversalTime();
 
             var request = _service.Files.Create(
                 file,
@@ -220,7 +232,7 @@ public class GoogleDriveConnection : ICloudConnection
 
         var request = _service.Files.List();
         request.Q = $"'{parentId}' in parents and trashed = false";
-        request.Fields = "files(id,name,mimeType,modifiedTime,size)";
+        request.Fields = "files(id,name,mimeType,modifiedTime,createdTime,size)";
 
         var result = await request.ExecuteAsync(cancellationToken);
 
@@ -229,9 +241,19 @@ public class GoogleDriveConnection : ICloudConnection
             Name: f.Name,
             Path: path.TrimEnd('/') + "/" + f.Name,
             ModifiedAt: f.ModifiedTimeDateTimeOffset?.UtcDateTime ?? DateTime.MinValue,
-            Size: f.Size ?? 0
+            Size: f.Size ?? 0,
+            CreatedAt: ParseCreatedAt(f.CreatedTimeDateTimeOffset,
+                f.ModifiedTimeDateTimeOffset?.UtcDateTime ?? DateTime.MinValue)
         )).ToList();
     }
+
+    /// <summary>
+    /// Drive's <c>createdTime</c>, unless it is after the modification time: Drive records the first
+    /// upload as creation time when the uploader sets none, so a later value is that upload, not the
+    /// file's creation. The sync then falls back to the modification time.
+    /// </summary>
+    internal static DateTime? ParseCreatedAt(DateTimeOffset? created, DateTime modifiedUtc)
+        => created?.UtcDateTime is { } utc && utc <= modifiedUtc ? utc : null;
 
     /// <inheritdoc />
     public async Task<long> GetDirectorySizeAsync(

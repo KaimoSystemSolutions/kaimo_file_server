@@ -98,9 +98,8 @@ public sealed partial class OneDriveConnection : ICloudConnection, IAsyncDisposa
     {
         var normalizedPath = NormalizePath(path);
         var requestUrl = normalizedPath.Length == 0
-            ? "/me/drive/root/children?$select=id,name,size,lastModifiedDateTime,folder,file,package,specialFolder"
-            : $"/me/drive/root:/{EncodePath(normalizedPath)}:/children" +
-              "?$select=id,name,size,lastModifiedDateTime,folder,file,package,specialFolder";
+            ? "/me/drive/root/children?$select=" + SyncListFields
+            : $"/me/drive/root:/{EncodePath(normalizedPath)}:/children?$select=" + SyncListFields;
         var result = new List<CloudItemMeta>();
 
         while (!string.IsNullOrEmpty(requestUrl))
@@ -143,7 +142,8 @@ public sealed partial class OneDriveConnection : ICloudConnection, IAsyncDisposa
                     name,
                     CombinePath(normalizedPath, name),
                     size,
-                    modifiedAt));
+                    modifiedAt,
+                    ParseCreatedAt(item, modifiedAt)));
             }
 
             requestUrl = GetOptionalString(json.RootElement, "@odata.nextLink") ?? "";
@@ -185,6 +185,14 @@ public sealed partial class OneDriveConnection : ICloudConnection, IAsyncDisposa
     }
 
     /// <inheritdoc />
+    public Task UploadAsync(
+        string path,
+        Stream data,
+        DateTime modifiedTime,
+        CancellationToken cancellationToken = default)
+        => UploadAsync(path, data, modifiedTime, createdTime: null, cancellationToken);
+
+    /// <inheritdoc />
     /// <remarks>
     /// Small files use direct upload; large seekable streams use a chunked,
     /// preauthenticated upload session. Both paths honor cancellation.
@@ -193,6 +201,7 @@ public sealed partial class OneDriveConnection : ICloudConnection, IAsyncDisposa
         string path,
         Stream data,
         DateTime modifiedTime,
+        DateTime? createdTime,
         CancellationToken cancellationToken = default)
     {
         var normalizedPath = RequireFilePath(path);
@@ -208,19 +217,65 @@ public sealed partial class OneDriveConnection : ICloudConnection, IAsyncDisposa
 
         // Preserve the source timestamp; the generic two-way sync compares it
         // to decide which side is newer on the next run.
-        var body = JsonSerializer.Serialize(new
-        {
-            fileSystemInfo = new
-            {
-                lastModifiedDateTime = modifiedTime.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
-            }
-        });
         using var response = await SendGraphAsync(
             HttpMethod.Patch,
             $"/me/drive/items/{Uri.EscapeDataString(itemId)}",
-            new StringContent(body, Encoding.UTF8, "application/json"),
+            FileSystemInfoContent(modifiedTime, createdTime),
             cancellationToken: cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task TrySetDirectoryModifiedTimeAsync(
+        string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
+        => TrySetDirectoryTimesAsync(path, modifiedUtc, createdUtc: null, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task TrySetDirectoryTimesAsync(
+        string path, DateTime modifiedUtc, DateTime? createdUtc, CancellationToken cancellationToken = default)
+    {
+        var normalizedPath = NormalizePath(path);
+        if (normalizedPath.Length == 0)
+            return;
+        using var response = await SendGraphAsync(
+            HttpMethod.Patch,
+            $"/me/drive/root:/{EncodePath(normalizedPath)}",
+            FileSystemInfoContent(modifiedUtc, createdUtc),
+            cancellationToken: cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    /// <summary>Properties a sync listing needs; Graph returns only selected ones.</summary>
+    private const string SyncListFields =
+        "id,name,size,lastModifiedDateTime,createdDateTime,fileSystemInfo,folder,file,package,specialFolder";
+
+    /// <summary>
+    /// The creation time Windows shows (<c>fileSystemInfo</c>, set by clients and by our push),
+    /// else the time the item was created in OneDrive. That fallback is the upload time, so it is
+    /// dropped when after <paramref name="modifiedAt"/>; a client-set value may legitimately be later.
+    /// </summary>
+    private static DateTime? ParseCreatedAt(JsonElement item, DateTime modifiedAt)
+    {
+        var created = item.TryGetProperty("fileSystemInfo", out var fileSystemInfo)
+            ? ParseGraphDate(fileSystemInfo, "createdDateTime")
+            : DateTime.MinValue;
+        if (created > DateTime.MinValue)
+            return created;
+        created = ParseGraphDate(item, "createdDateTime");
+        return created > DateTime.MinValue && created <= modifiedAt ? created : null;
+    }
+
+    /// <summary>The client-side times (<c>fileSystemInfo</c>); a null creation time is left unchanged.</summary>
+    private static StringContent FileSystemInfoContent(DateTime modifiedUtc, DateTime? createdUtc)
+    {
+        var fileSystemInfo = new Dictionary<string, string>
+        {
+            ["lastModifiedDateTime"] = modifiedUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
+        };
+        if (createdUtc is { } created)
+            fileSystemInfo["createdDateTime"] = created.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+        return new StringContent(
+            JsonSerializer.Serialize(new { fileSystemInfo }), Encoding.UTF8, "application/json");
     }
 
     /// <inheritdoc />

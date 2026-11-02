@@ -13,11 +13,13 @@ internal sealed partial class CloudSyncEngine
     /// Returns true only when the upload succeeded; a definitive failure is
     /// recorded in the failure sink and the caller continues.
     /// </summary>
+    /// <param name="createdAt">Creation time to send, or <c>null</c> to keep the remote one.</param>
     private async Task<bool> PushFileAsync(
         string localChild,
         string remoteChild,
         string displayName,
         DateTime modifiedAt,
+        DateTime? createdAt,
         long size)
     {
         _progress.Update($"Pushing {displayName}...");
@@ -38,7 +40,7 @@ internal sealed partial class CloudSyncEngine
                 return;
             }
             await using var stream = _options.LimitUpload(source);
-            await _remote.UploadAsync(remoteChild, stream, modifiedAt, _cancellationToken);
+            await _remote.UploadAsync(remoteChild, stream, modifiedAt, createdAt, _cancellationToken);
         }) && !vanished;
 
         if (ok)
@@ -56,11 +58,16 @@ internal sealed partial class CloudSyncEngine
     /// round-trip) while staying bounded in memory. Returns true only when the
     /// download succeeded.
     /// </summary>
+    /// <param name="createdAt">
+    /// Creation time to stamp, or <c>null</c> to keep the local one (an overwrite whose
+    /// provider reports no creation time, or a later one).
+    /// </param>
     private async Task<bool> PullFileAsync(
         string localChild,
         string remoteChild,
         string displayName,
         DateTime modifiedAt,
+        DateTime? createdAt,
         long size)
     {
         _progress.Update($"Pulling {displayName}...");
@@ -91,7 +98,8 @@ internal sealed partial class CloudSyncEngine
             // Stamp the source modification time so pull change-detection keeps
             // working on the next run (mirrors the former SetModifiedAtAsync call).
             // atime = mtime: providers expose no access time, and the copy was not opened since.
-            await session.SetTimesAsync(new FileTimes(null, modifiedAt, modifiedAt), _cancellationToken);
+            // Without a creation time the file would show the time of the sync run as created.
+            await session.SetTimesAsync(new FileTimes(createdAt, modifiedAt, modifiedAt), _cancellationToken);
         }) && !vanished;
 
         if (ok)
@@ -181,7 +189,8 @@ internal sealed partial class CloudSyncEngine
     private async Task UploadDirectoryRecursiveAsync(
         string localDir,
         string remoteDir,
-        DateTime localModifiedAt)
+        DateTime localModifiedAt,
+        DateTime? localCreatedAt)
     {
         _cancellationToken.ThrowIfCancellationRequested();
 
@@ -226,23 +235,26 @@ internal sealed partial class CloudSyncEngine
             if (item.IsDirectory)
             {
                 _newManifest.Paths.Add(localChild);
-                await UploadDirectoryRecursiveAsync(localChild, remoteChild, item.ModifiedAt);
+                await UploadDirectoryRecursiveAsync(localChild, remoteChild, item.ModifiedAt, KnownCreatedAt(item));
             }
             else
             {
                 if (_options.ShouldSkip(item.Name, item.Size))
                     continue;
 
-                if (await PushFileAsync(localChild, remoteChild, item.Name, item.ModifiedAt, item.Size))
+                if (await PushFileAsync(localChild, remoteChild, item.Name, item.ModifiedAt,
+                        KnownCreatedAt(item) ?? item.ModifiedAt, item.Size))
                     _newManifest.Paths.Add(localChild);
             }
         }
 
-        // This pass wrote the whole folder remotely: give it the local folder's time.
+        // This pass wrote the whole folder remotely: give it the local folder's times
+        // (the modification time stands in for an unknown creation time).
         try
         {
             if (localModifiedAt > DateTime.MinValue)
-                await _remote.TrySetDirectoryModifiedTimeAsync(remoteDir, localModifiedAt, _cancellationToken);
+                await _remote.TrySetDirectoryTimesAsync(
+                    remoteDir, localModifiedAt, localCreatedAt ?? localModifiedAt, _cancellationToken);
         }
         catch (Exception) when (!_cancellationToken.IsCancellationRequested)
         {

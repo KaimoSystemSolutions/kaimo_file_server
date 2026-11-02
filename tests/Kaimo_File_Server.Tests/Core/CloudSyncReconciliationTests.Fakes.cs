@@ -17,8 +17,14 @@ public sealed partial class CloudSyncReconciliationTests
         private readonly HashSet<string> _dirs = new();
         private readonly Dictionary<string, DateTime> _dirTimes = new();
 
+        /// <summary>Creation times the remote reports, by normalized path; absent = not reported.</summary>
+        private readonly Dictionary<string, DateTime> _createdTimes = new();
+
         /// <summary>Folder times the sync engine stamped, by normalized path.</summary>
         public Dictionary<string, DateTime> DirStamps { get; } = new();
+
+        /// <summary>Creation times the sync engine sent with uploads and folder stamps.</summary>
+        public Dictionary<string, DateTime?> SentCreated { get; } = new();
 
         public string ServiceName => "in-memory";
         public Task Dispose() => Task.CompletedTask;
@@ -39,6 +45,9 @@ public sealed partial class CloudSyncReconciliationTests
                 _dirTimes[Normalize(path)] = time;
         }
 
+        /// <summary>Makes the listing report a creation time for an existing file or folder.</summary>
+        public void SetCreated(string path, DateTime created) => _createdTimes[Normalize(path)] = created;
+
         public void RemoveFile(string path) => _files.Remove(Normalize(path));
 
         public bool HasFile(string path) => _files.ContainsKey(Normalize(path));
@@ -50,6 +59,20 @@ public sealed partial class CloudSyncReconciliationTests
         {
             DirStamps[Normalize(path)] = modifiedUtc;
             return Task.CompletedTask;
+        }
+
+        public Task TrySetDirectoryTimesAsync(
+            string path, DateTime modifiedUtc, DateTime? createdUtc, CancellationToken ct = default)
+        {
+            SentCreated[Normalize(path)] = createdUtc;
+            return TrySetDirectoryModifiedTimeAsync(path, modifiedUtc, ct);
+        }
+
+        public Task UploadAsync(
+            string path, Stream data, DateTime modifiedTime, DateTime? createdTime, CancellationToken ct = default)
+        {
+            SentCreated[Normalize(path)] = createdTime;
+            return UploadAsync(path, data, modifiedTime, ct);
         }
 
         public Task UploadAsync(string path, Stream data, DateTime modifiedTime, CancellationToken ct = default)
@@ -112,12 +135,15 @@ public sealed partial class CloudSyncReconciliationTests
             ListCalls[key] = ListCalls.TryGetValue(key, out int n) ? n + 1 : 1;
             var items = new List<CloudItemMeta>();
             foreach (var (file, value) in _files.Where(f => Parent(f.Key) == key))
-                items.Add(new CloudItemMeta(false, NameOf(file), "/" + file, value.Data.Length, value.Modified));
+                items.Add(new CloudItemMeta(false, NameOf(file), "/" + file, value.Data.Length, value.Modified,
+                    CreatedOf(file)));
             foreach (var dir in _dirs.Where(d => Parent(d) == key))
                 items.Add(new CloudItemMeta(true, NameOf(dir), "/" + dir, 0,
-                    _dirTimes.TryGetValue(dir, out var time) ? time : DateTime.UnixEpoch));
+                    _dirTimes.TryGetValue(dir, out var time) ? time : DateTime.UnixEpoch, CreatedOf(dir)));
             return Task.FromResult<IReadOnlyList<CloudItemMeta>>(items);
         }
+
+        private DateTime? CreatedOf(string path) => _createdTimes.TryGetValue(path, out var created) ? created : null;
     }
 
     /// <summary>Minimal in-memory <see cref="IFileService"/> covering only the members the sync engine calls.</summary>
@@ -134,6 +160,9 @@ public sealed partial class CloudSyncReconciliationTests
 
         /// <summary>Last-access times set on pulled files.</summary>
         public Dictionary<string, DateTime> Accessed { get; } = new();
+
+        /// <summary>Creation times set on pulled files and folders, and reported by listings.</summary>
+        public Dictionary<string, DateTime> Created { get; } = new();
 
         /// <summary>Paths read with <c>preserveAccessTime</c>.</summary>
         public List<string> PreservedReads { get; } = [];
@@ -190,13 +219,15 @@ public sealed partial class CloudSyncReconciliationTests
                 items.Add(new FileMetadata
                 {
                     Name = NameOf(file), Path = file, IsDirectory = false,
-                    Size = value.Data.Length, ModifiedAt = value.Modified
+                    Size = value.Data.Length, ModifiedAt = value.Modified,
+                    CreatedAt = Created.TryGetValue(file, out var created) ? created : DateTime.MinValue
                 });
             foreach (var dir in _dirs.Where(d => Parent(d) == key))
                 items.Add(new FileMetadata
                 {
                     Name = NameOf(dir), Path = dir, IsDirectory = true,
-                    ModifiedAt = _dirTimes.TryGetValue(dir, out var time) ? time : DateTime.UnixEpoch
+                    ModifiedAt = _dirTimes.TryGetValue(dir, out var time) ? time : DateTime.UnixEpoch,
+                    CreatedAt = Created.TryGetValue(dir, out var created) ? created : DateTime.MinValue
                 });
             AfterList?.Invoke(key);
             return Task.FromResult(items);
@@ -247,6 +278,14 @@ public sealed partial class CloudSyncReconciliationTests
                 Log.Add("stamp:" + key);
             }
             return Task.CompletedTask;
+        }
+
+        public async Task SetModifiedAtAsync(string path, UserContext user, DateTime? modifiedAtUtc, DateTime? createdAtUtc)
+        {
+            if (createdAtUtc is { } created)
+                Created[Normalize(path)] = created;
+            if (modifiedAtUtc is { } modified)
+                await SetModifiedAtAsync(path, user, modified);
         }
 
         public Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled)
@@ -327,6 +366,8 @@ public sealed partial class CloudSyncReconciliationTests
                     _modified = written;
                 if (times.LastAccessed is { } accessed)
                     owner.Accessed[key] = accessed;
+                if (times.Created is { } created)
+                    owner.Created[key] = created;
                 return ValueTask.CompletedTask;
             }
 

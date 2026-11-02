@@ -311,6 +311,32 @@ public sealed class WebDavTests
         Assert.NotNull(notFound.Element(Dav + "prop")!.Element(unknown));
     }
 
+    [Fact]
+    public void PropFind_named_Win32CreationTime_reports_the_creation_time()
+    {
+        // Kaimo's WebDAV sync reads it in preference to creationdate, which some servers fill
+        // with the inode change time.
+        var win32Created = XName.Get("Win32CreationTime", "urn:schemas-microsoft-com:");
+        var xml = WebDavPropFind.WriteMultiStatus(
+            [File("/dav/Projekte/file.txt")],
+            new WebDavPropFind.PropRequest(WebDavPropFind.PropMode.Named, [win32Created]));
+
+        var prop = FindProp(XDocument.Parse(xml), "/dav/Projekte/file.txt", win32Created);
+        Assert.Equal("Tue, 01 Sep 2026 08:00:00 GMT", prop!.Value);
+        Assert.Contains(win32Created, OkProps(XDocument.Parse(xml), "/dav/Projekte/file.txt"));
+    }
+
+    [Fact]
+    public void PropFind_allprop_does_not_add_Win32CreationTime()
+    {
+        var xml = WebDavPropFind.WriteMultiStatus(
+            [File("/dav/Projekte/file.txt")],
+            new WebDavPropFind.PropRequest(WebDavPropFind.PropMode.AllProp, []));
+
+        Assert.DoesNotContain(XName.Get("Win32CreationTime", "urn:schemas-microsoft-com:"),
+            OkProps(XDocument.Parse(xml), "/dav/Projekte/file.txt"));
+    }
+
     // ── helpers ──
 
     private static XElement? FindProp(XDocument doc, string href, XName prop)

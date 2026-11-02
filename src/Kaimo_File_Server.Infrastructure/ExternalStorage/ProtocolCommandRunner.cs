@@ -8,9 +8,17 @@ public sealed class ProtocolCommandRunner : IProtocolCommandRunner
 {
     private const int MaximumOutputCharacters = 4 * 1024 * 1024;
 
+    public Task<ProtocolCommandResult> RunAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        CancellationToken cancellationToken,
+        bool throwOnFailure = true)
+        => RunAsync(executable, arguments, new Dictionary<string, string>(), cancellationToken, throwOnFailure);
+
     public async Task<ProtocolCommandResult> RunAsync(
         string executable,
         IReadOnlyList<string> arguments,
+        IReadOnlyDictionary<string, string> environment,
         CancellationToken cancellationToken,
         bool throwOnFailure = true)
     {
@@ -25,6 +33,8 @@ public sealed class ProtocolCommandRunner : IProtocolCommandRunner
         };
         foreach (string argument in arguments)
             startInfo.ArgumentList.Add(argument);
+        foreach ((string name, string value) in environment)
+            startInfo.Environment[name] = value;
         using var process = new Process { StartInfo = startInfo };
         try
         {

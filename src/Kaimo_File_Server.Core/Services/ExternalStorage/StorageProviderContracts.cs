@@ -54,7 +54,8 @@ public sealed record RemoteStorageItem(
     bool IsDirectory,
     long? Size,
     DateTime? ModifiedAtUtc,
-    string? StableId = null);
+    string? StableId = null,
+    DateTime? CreatedAtUtc = null);
 
 /// <summary>A validated remote directory that can be persisted by a virtual share or sync.</summary>
 public sealed record StorageDirectoryTarget(string Path, string? StableId = null);
@@ -114,6 +115,19 @@ public interface IRemoteFileStore
     /// </summary>
     Task TrySetDirectoryModifiedTimeAsync(string path, DateTime modifiedUtc, CancellationToken cancellationToken = default)
         => TrySetModifiedTimeAsync(path, modifiedUtc, cancellationToken);
+
+    /// <summary>
+    /// Best-effort: stamps the modification time and, when <paramref name="createdUtc"/> is set,
+    /// the creation time. Providers without settable creation times keep this default.
+    /// </summary>
+    Task TrySetTimesAsync(
+        string path, DateTime modifiedUtc, DateTime? createdUtc, CancellationToken cancellationToken = default)
+        => TrySetModifiedTimeAsync(path, modifiedUtc, cancellationToken);
+
+    /// <summary>Directory variant of <see cref="TrySetTimesAsync"/>.</summary>
+    Task TrySetDirectoryTimesAsync(
+        string path, DateTime modifiedUtc, DateTime? createdUtc, CancellationToken cancellationToken = default)
+        => TrySetDirectoryModifiedTimeAsync(path, modifiedUtc, cancellationToken);
 }
 
 public enum OptimizedSyncDirection

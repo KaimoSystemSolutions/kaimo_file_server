@@ -85,7 +85,12 @@ public partial class WebDavController
         return names;
     }
 
-    private static DateTime? TryReadWin32ModifiedTime(string? body)
+    /// <summary>The precision of the times PROPFIND reports (<c>creationdate</c>, <c>Win32CreationTime</c>).</summary>
+    private static DateTime TruncateToSeconds(DateTime value)
+        => new(value.Ticks - value.Ticks % TimeSpan.TicksPerSecond, value.Kind);
+
+    /// <summary>Reads a Win32 time property (e.g. <c>Win32LastModifiedTime</c>) from a PROPPATCH body.</summary>
+    private static DateTime? TryReadWin32Time(string? body, string localName)
     {
         if (string.IsNullOrWhiteSpace(body)) return null;
 
@@ -94,7 +99,7 @@ public partial class WebDavController
         catch (System.Xml.XmlException) { return null; }
 
         var value = doc.Descendants()
-            .FirstOrDefault(e => e.Name.LocalName == "Win32LastModifiedTime")?.Value;
+            .FirstOrDefault(e => e.Name.LocalName == localName)?.Value;
         if (string.IsNullOrWhiteSpace(value)) return null;
 
         return DateTime.TryParse(value, CultureInfo.InvariantCulture,
