@@ -61,6 +61,61 @@ public partial class UserListViewModelDatabaseTests
         Assert.True(_passwords.VerifyPassword("N3wSecret!2026", row!.PasswordHash));
     }
 
+    // ─────────────── Mandatory password change via the admin edit form ───────────────
+
+    private async Task SetMustChangePasswordAsync(Guid userId)
+    {
+        await using var db = NewContext();
+        var row = await db.Users.FindAsync(userId);
+        row!.MustChangePassword = true;
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Regression: the bootstrap administrator holds full profile authority over their own
+    /// record, so their own password change runs through the admin save path. It must still
+    /// count as chosen by the account holder and clear the mandatory-change requirement.
+    /// </summary>
+    [Fact]
+    public async Task SaveUserAsync_AdminChangesOwnPassword_ClearsMustChange()
+    {
+        var actor = SeedUser("admin");
+        await SetMustChangePasswordAsync(actor.Id);
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectUserAsync(sut.Users.Single(u => u.Id == actor.Id));
+        await sut.StartEditUserAsync();
+
+        sut.NewPassword = "N3wSecret!2026";
+        sut.ConfirmPassword = "N3wSecret!2026";
+        await sut.SaveUserAsync();
+
+        Assert.Null(sut.ErrorMessage);
+        await using var db = NewContext();
+        var row = (await db.Users.FindAsync(actor.Id))!;
+        Assert.True(_passwords.VerifyPassword("N3wSecret!2026", row.PasswordHash));
+        Assert.False(row.MustChangePassword);
+    }
+
+    [Fact]
+    public async Task SaveUserAsync_AdminResetsOtherUsersPassword_KeepsMustChange()
+    {
+        var actor = SeedUser("admin");
+        var target = SeedUser("bob");
+        await SetMustChangePasswordAsync(target.Id);
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectUserAsync(sut.Users.Single(u => u.Id == target.Id));
+        await sut.StartEditUserAsync();
+
+        sut.NewPassword = "N3wSecret!2026";
+        sut.ConfirmPassword = "N3wSecret!2026";
+        await sut.SaveUserAsync();
+
+        await using var db = NewContext();
+        Assert.True((await db.Users.FindAsync(target.Id))!.MustChangePassword);
+    }
+
     // ─────────────── Self-service password change ───────────────
 
     private UserListViewModel BuildSelfServiceSut(User self, ILoginService login)

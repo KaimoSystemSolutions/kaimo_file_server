@@ -301,12 +301,16 @@ public partial class UserListViewModel
         if (pwError is not null) { ErrorMessage = pwError; return false; }
         if (NewPassword != ConfirmPassword) { ErrorMessage = Resources.Web_User_PasswordsDoNotMatch; return false; }
 
+        // An admin setting their OWN password chose it themselves (e.g. the bootstrap admin
+        // replacing the initial password), which satisfies a pending mandatory change.
+        var isOwnAccount = user.Id == _actorContext!.User.Id;
         await _userRepo.UpdatePasswordAsync(user.Id,
             _passwordService.HashPassword(NewPassword),
-            _ntHashProtector.Protect(_passwordService.ComputeNtHash(NewPassword)));
-        await PublishAsync(NotificationEvents.PasswordReset(user.Id, user.Name, user.Username, _actorContext!.User.Id));
+            _ntHashProtector.Protect(_passwordService.ComputeNtHash(NewPassword)),
+            changedByUser: isOwnAccount);
+        await PublishAsync(NotificationEvents.PasswordReset(user.Id, user.Name, user.Username, _actorContext.User.Id));
         // An admin resetting their own password keeps this session (others end).
-        if (user.Id == _actorContext.User.Id)
+        if (isOwnAccount)
             await RenewOwnSessionAsync(user.Id);
         return true;
     }

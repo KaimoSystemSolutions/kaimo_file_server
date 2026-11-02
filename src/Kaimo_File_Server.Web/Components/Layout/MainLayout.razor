@@ -5,6 +5,9 @@
 @using Kaimo_File_Server.Web.Components.Search
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inherits AppLayoutComponentBase
+@* Required: without it Blazor never calls Dispose, and the circuit-wide event handlers below
+   outlive the layout (after a logout they caused an endless /login ↔ /users redirect loop). *@
+@implements IDisposable
 @inject ThemeService Theme
 @inject DateFormatService DateFmt
 @inject NavigationManager Nav
@@ -58,7 +61,7 @@
                     @Assets.SVG("compass.svg", new SvgOptions())
                     <span class="nav-label">@Resources.Web_Nav_BrowseFiles</span>
                 </NavLink>
-                @if (canManageSyncs() || _canManageCloudAccess)
+                @if (CanManageSyncs() || _canManageCloudAccess)
                 {
                     <NavLink class="nav-item" href="/external-storage" Match="NavLinkMatch.Prefix">
                         @Assets.SVG("cloud-download.svg", new SvgOptions())
@@ -353,10 +356,22 @@
         => _ = InvokeAsync(() => EnforcePasswordChangeAsync(e.Location));
 
     private void EnforcePasswordChangeOnSessionRenewal(Task<AuthenticationState> state)
-        => _ = InvokeAsync(() => EnforcePasswordChangeAsync(Nav.Uri));
+        => _ = InvokeAsync(async () =>
+        {
+            // A logout (or an interrupted session) ends the enforcement instead of redirecting
+            // the now anonymous circuit back to the profile page.
+            if ((await state).User.Identity?.IsAuthenticated != true)
+            {
+                StopPasswordChangeEnforcement();
+                return;
+            }
+            await EnforcePasswordChangeAsync(Nav.Uri);
+        });
 
     private void StopPasswordChangeEnforcement()
     {
+        // Also turns callbacks that were already queued into no-ops.
+        _mustChangePassword = false;
         Nav.LocationChanged -= EnforcePasswordChangeOnNavigation;
         AuthStateProvider.AuthenticationStateChanged -= EnforcePasswordChangeOnSessionRenewal;
     }
@@ -456,7 +471,7 @@
                                           _currentUser, ManagementPermission.ManageBackupJobs);
         }
 
-        if (_currentUser?.User.MustChangePassword == true)
+        if (_currentUser?.User?.MustChangePassword == true)
             await StartPasswordChangeEnforcementAsync();
 
         // Load the global date-display format once for the whole circuit (uses the
@@ -534,7 +549,7 @@
         return name[..Math.Min(2, name.Length)].ToUpperInvariant();
     }
 
-    private bool canManageSyncs()
+    private bool CanManageSyncs()
         => _canManageSyncs;
 
     private static string Text(string key, string fallback)
