@@ -6,14 +6,23 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 
 public partial class FileBrowserViewModel
 {
-    public async Task CreateFolderAtAsync(string path)
+    public Task CreateFolderAtAsync(string path)
+        => CreateFolderAtAsync(path, CaptureOperationTarget());
+
+    public async Task CreateFolderAtAsync(string path, FileOperationTarget? target)
     {
-        var (service, user) = await RequireServiceAndUserAsync();
+        var pin = target as LocalFileOperationTarget;
+        var (service, user) = await RequireServiceAndUserAsync(pin);
         // An existing folder is merged into (paste); only a new one is undone as a whole.
-        var existed = ExistsOnDisk(service, path);
-        await service.CreateDirectoryAsync(path, user);
+        // Off the circuit dispatcher like DeleteAsync: the storage creates synchronously.
+        var existed = await Task.Run(async () =>
+        {
+            var existedBefore = ExistsOnDisk(service, path);
+            await service.CreateDirectoryAsync(path, user);
+            return existedBefore;
+        });
         if (!existed)
-            RecordCreated(path);
+            RecordCreated(path, target: pin);
     }
 
     /// <summary>Create a new sub-folder inside the current directory.</summary>
@@ -68,9 +77,15 @@ public partial class FileBrowserViewModel
     }
 
     /// <summary>Delete a file or directory (recursively).</summary>
-    public async Task<OperationResult> DeleteAsync(FileMetadata item)
+    public Task<OperationResult> DeleteAsync(FileMetadata item)
+        => DeleteAsync(item, CaptureOperationTarget());
+
+    public FileOperationTarget? CaptureOperationTarget() => _shownTarget;
+
+    /// <summary>Delete a file or directory (recursively) in the pinned share.</summary>
+    public async Task<OperationResult> DeleteAsync(FileMetadata item, FileOperationTarget? target)
     {
-        if (_fileService is null || CurrentShare is null)
+        if (target is not LocalFileOperationTarget pin)
             return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
 
         try
@@ -81,12 +96,14 @@ public partial class FileBrowserViewModel
 
             // Build relative path within the share
             var relativePath = item.Path;
-            if (relativePath.StartsWith(CurrentShare.Path))
-                relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+            if (relativePath.StartsWith(pin.Share.Path))
+                relativePath = relativePath[pin.Share.Path.Length..].TrimStart('/');
 
-            var recyclePath = await _fileService.DeleteFileReturningRecyclePathAsync(
-                relativePath, userContext, CurrentShare.IsRecycleEnabled);
-            RecordRecycled(relativePath, recyclePath);
+            // Off the circuit dispatcher: the storage deletes synchronously (a large folder
+            // for seconds), and browsing in this tab must not queue up behind it.
+            var recyclePath = await Task.Run(() => pin.Service.DeleteFileReturningRecyclePathAsync(
+                relativePath, userContext, pin.Share.IsRecycleEnabled));
+            RecordRecycled(relativePath, recyclePath, pin);
 
             _logger.LogInformation("{Type} deleted: '{Path}' by {User}",
                 item.IsDirectory ? "Directory" : "File",
@@ -131,7 +148,7 @@ public partial class FileBrowserViewModel
         var parentDir = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(relativePath);
         var newRelativePath = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(parentDir, newName);
 
-        return await MoveInternalAsync(item, relativePath, newRelativePath, "renamed");
+        return await MoveInternalAsync(item, relativePath, newRelativePath, "renamed", _shownTarget);
     }
 
     /// <summary>
@@ -139,14 +156,18 @@ public partial class FileBrowserViewModel
     /// </summary>
     /// <param name="item">The item to move.</param>
     /// <param name="destRelativePath">Share-relative path of the destination directory ("" = share root).</param>
-    public async Task<OperationResult> MoveAsync(FileMetadata item, string destRelativePath)
+    public Task<OperationResult> MoveAsync(FileMetadata item, string destRelativePath)
+        => MoveAsync(item, destRelativePath, CaptureOperationTarget());
+
+    /// <summary>Moves an item within the pinned share (a drag of several items).</summary>
+    public async Task<OperationResult> MoveAsync(FileMetadata item, string destRelativePath, FileOperationTarget? target)
     {
-        if (CurrentShare is null)
+        if (target is not LocalFileOperationTarget pin)
             return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
 
         var relativePath = item.Path;
-        if (relativePath.StartsWith(CurrentShare.Path))
-            relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+        if (relativePath.StartsWith(pin.Share.Path))
+            relativePath = relativePath[pin.Share.Path.Length..].TrimStart('/');
 
         var newRelativePath = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(destRelativePath, item.Name);
 
@@ -155,22 +176,35 @@ public partial class FileBrowserViewModel
         if (string.Equals(currentParent, destRelativePath.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
             return OperationResult.Ok();
 
-        return await MoveInternalAsync(item, relativePath, newRelativePath, "moved");
+        return await MoveInternalAsync(item, relativePath, newRelativePath, "moved", pin);
     }
 
-    public async Task<List<FileMetadata>> ListDirectoryAsync(string dirPath)
+    public Task<List<FileMetadata>> ListDirectoryAsync(string dirPath)
+        => ListDirectoryAsync(dirPath, CaptureOperationTarget());
+
+    public async Task<List<FileMetadata>> ListDirectoryAsync(string dirPath, FileOperationTarget? target)
     {
-        var (service, user) = await RequireServiceAndUserAsync();
+        var (service, user) = await RequireServiceAndUserAsync(target as LocalFileOperationTarget);
         return await service.ListAsync(dirPath, user);
     }
 
-    public async Task CopyAsync(FileMetadata item, string targetPath, CancellationToken cancellationToken)
+    public Task CopyAsync(FileMetadata item, string targetPath, CancellationToken cancellationToken)
+        => CopyAsync(item, targetPath, cancellationToken, CaptureOperationTarget());
+
+    public async Task CopyAsync(
+        FileMetadata item, string targetPath, CancellationToken cancellationToken, FileOperationTarget? target)
     {
-        var (service, user) = await RequireServiceAndUserAsync();
-        var existed = ExistsOnDisk(service, targetPath);
-        Stream fileToCopy = await service.ReadFileAsync(item.Path, user);
-        await service.WriteFileAsync(targetPath, fileToCopy, user, cancellationToken);
-        RecordCreated(targetPath, overwroteExisting: existed);
+        var pin = target as LocalFileOperationTarget;
+        var (service, user) = await RequireServiceAndUserAsync(pin);
+        // Off the circuit dispatcher like DeleteAsync: the storage writes synchronously.
+        var existed = await Task.Run(async () =>
+        {
+            var existedBefore = ExistsOnDisk(service, targetPath);
+            await using var fileToCopy = await service.ReadFileAsync(item.Path, user);
+            await service.WriteFileAsync(targetPath, fileToCopy, user, cancellationToken);
+            return existedBefore;
+        }, cancellationToken);
+        RecordCreated(targetPath, overwroteExisting: existed, target: pin);
     }
 
     private string GetCurrentPath(string fileName)
@@ -189,9 +223,9 @@ public partial class FileBrowserViewModel
     /// one share-relative path to another" as far as the file service is concerned.
     /// </summary>
     private async Task<OperationResult> MoveInternalAsync(
-        FileMetadata item, string relativePath, string newRelativePath, string logVerb)
+        FileMetadata item, string relativePath, string newRelativePath, string logVerb, LocalFileOperationTarget? target)
     {
-        if (_fileService is null)
+        if (target is null)
             return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
 
         try
@@ -200,8 +234,9 @@ public partial class FileBrowserViewModel
             if (userContext is null)
                 return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
 
-            await _fileService.RenameAsync(relativePath, newRelativePath, userContext);
-            RecordRenamed(relativePath, newRelativePath);
+            // Off the circuit dispatcher like DeleteAsync: the storage renames synchronously.
+            await Task.Run(() => target.Service.RenameAsync(relativePath, newRelativePath, userContext));
+            RecordRenamed(relativePath, newRelativePath, target);
 
             _logger.LogInformation("{Type} {Verb}: '{OldPath}' -> '{NewPath}' by {User}",
                 item.IsDirectory ? "Directory" : "File",

@@ -76,6 +76,21 @@ public abstract class RemoteFileBrowserViewModelBase : IFileBrowserViewModel
         FileMetadata item,
         string targetPath,
         CancellationToken cancellationToken);
+
+    // Batches pinned to the share they started in (see IFileBrowserViewModel.CaptureOperationTarget).
+    // Backends without pinning keep these defaults and act on the open share.
+    public virtual FileOperationTarget? CaptureOperationTarget() => null;
+    public virtual Task CreateFolderAtAsync(string path, FileOperationTarget? target)
+        => CreateFolderAtAsync(path);
+    public virtual Task<OperationResult> DeleteAsync(FileMetadata item, FileOperationTarget? target)
+        => DeleteAsync(item);
+    public virtual Task<OperationResult> MoveAsync(FileMetadata item, string destinationPath, FileOperationTarget? target)
+        => MoveAsync(item, destinationPath);
+    public virtual Task<List<FileMetadata>> ListDirectoryAsync(string directoryPath, FileOperationTarget? target)
+        => ListDirectoryAsync(directoryPath);
+    public virtual Task CopyAsync(
+        FileMetadata item, string targetPath, CancellationToken cancellationToken, FileOperationTarget? target)
+        => CopyAsync(item, targetPath, cancellationToken);
     public abstract Task<(byte[] Data, string ContentType, PreviewKind Kind)?>
         ReadFileForPreviewAsync(FileMetadata file);
     public abstract Task<OperationResult> UploadFileAsync(

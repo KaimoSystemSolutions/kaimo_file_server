@@ -20,7 +20,7 @@ namespace Kaimo_File_Server.Tests;
 /// a new circuit (new scoped view model) and must not be served the cached listing of the
 /// page it reloads; the context-menu refresh must clear the share's cache.
 /// </summary>
-public sealed class RemoteCloudAccessCacheReloadTests : IDisposable
+public sealed partial class RemoteCloudAccessCacheReloadTests : IDisposable
 {
     private readonly MemoryCache _memory = new(new MemoryCacheOptions());
     private readonly CloudAccessDirectoryCache _cache;
@@ -103,11 +103,13 @@ public sealed class RemoteCloudAccessCacheReloadTests : IDisposable
         Assert.Equal(2, _listCalls["Other"]);
     }
 
-    private RemoteCloudAccessFileBrowserViewModel NewViewModel()
+    private RemoteCloudAccessFileBrowserViewModel NewViewModel(params CloudAccessShare[] otherShares)
     {
         var actor = new UserContext(new User(Guid.NewGuid(), "Alice", "alice", "hash", "nt"), [], [], []);
         var repository = new Mock<ICloudAccessRepository>();
         repository.Setup(x => x.GetShareAsync(_share.Id, It.IsAny<CancellationToken>())).ReturnsAsync(_share);
+        foreach (var other in otherShares)
+            repository.Setup(x => x.GetShareAsync(other.Id, It.IsAny<CancellationToken>())).ReturnsAsync(other);
         var connections = new Mock<IStorageConnectionRepository>();
         connections.Setup(x => x.GetAsync(_connection.Id, It.IsAny<CancellationToken>())).ReturnsAsync(_connection);
         var management = new Mock<IManagementAuthService>();

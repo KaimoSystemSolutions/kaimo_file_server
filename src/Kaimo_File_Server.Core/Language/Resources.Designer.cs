@@ -8942,7 +8942,16 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Delete_BatchSuccess", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} of {1} items deleted. The remaining items were skipped. ähnelt.
+        /// </summary>
+        public static string Web_Delete_BatchStopped {
+            get {
+                return ResourceManager.GetString("Web_Delete_BatchStopped", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die {0} of {1} deleted ähnelt.
         /// </summary>
@@ -21765,6 +21774,24 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Transfer_CutSuccess {
             get {
                 return ResourceManager.GetString("Web_Transfer_CutSuccess", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die All items were copied, but {0} original item(s) could not be removed. ähnelt.
+        /// </summary>
+        public static string Web_Transfer_CutOriginalsKept {
+            get {
+                return ResourceManager.GetString("Web_Transfer_CutOriginalsKept", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die These cut items are already being pasted. ähnelt.
+        /// </summary>
+        public static string Web_Transfer_CutPasteRunning {
+            get {
+                return ResourceManager.GetString("Web_Transfer_CutPasteRunning", resourceCulture);
             }
         }
         

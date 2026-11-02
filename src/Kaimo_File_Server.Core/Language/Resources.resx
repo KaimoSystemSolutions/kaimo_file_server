@@ -2589,6 +2589,9 @@
   <data name="Web_Delete_Progress" xml:space="preserve">
     <value>{0} of {1} deleted</value>
   </data>
+  <data name="Web_Delete_BatchStopped" xml:space="preserve">
+    <value>{0} of {1} items deleted. The remaining items were skipped.</value>
+  </data>
   <data name="Web_Upload_ProgressWithSpeed" xml:space="preserve">
     <value>Uploading {0} ({1})</value>
   </data>
@@ -3452,6 +3455,12 @@
   </data>
   <data name="Web_Transfer_CutSuccess" xml:space="preserve">
     <value>Items moved successfully.</value>
+  </data>
+  <data name="Web_Transfer_CutOriginalsKept" xml:space="preserve">
+    <value>All items were copied, but {0} original item(s) could not be removed.</value>
+  </data>
+  <data name="Web_Transfer_CutPasteRunning" xml:space="preserve">
+    <value>These cut items are already being pasted.</value>
   </data>
   <data name="Web_Transfer_Copy" xml:space="preserve">
     <value>Copy</value>

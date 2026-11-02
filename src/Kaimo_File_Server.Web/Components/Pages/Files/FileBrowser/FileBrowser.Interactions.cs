@@ -52,13 +52,6 @@ public partial class FileBrowser
     
     private SyncDialog? _syncDialogComponent;
     
-    // ========== Copy & Cut ==========
-    private HashSet<FileMetadata> _clipboard = new();
-    private bool _deleteOnPaste = false;
-    private string? _clipboardToastID = null;
-    private string? _clipboardStartPath = null;
-    private BrowserShareInfo? _clipboardSourceShare;
-    
     // ========== Drag & Drop ==========
     private HashSet<FileMetadata> _draggedItems = new();
     private string? _dragOverPath; // Path of the currently hovered drop target, ".." for the parent row
@@ -313,285 +306,6 @@ public partial class FileBrowser
         catch (JSException) { /* element not focusable yet — leave focus where it is */ }
     }
 
-    internal async Task PutIntoClipboard(bool deleteOnPaste)
-    {
-        if (!VM.Capabilities.CanCopy || (deleteOnPaste && !VM.Capabilities.CanCut) || _selectedItems.Count < 1)
-            return;
-
-        RemoveClipboardToast();
-        
-        await ClearClipboard();
-        _clipboardStartPath = VM.CurrentPath;
-        _clipboardSourceShare = VM.CurrentBrowserShare;
-        _deleteOnPaste = deleteOnPaste;
-        
-        foreach (var item in _selectedItems)
-            _clipboard.Add(item);
-        if (_clipboardSourceShare is not null)
-            BrowserClipboard.Set(_clipboardSourceShare, _clipboard, deleteOnPaste, _clipboardStartPath);
-        
-        var msg = _clipboard.Count == 1
-            ? string.Format(T(deleteOnPaste ? "Web_Transfer_CuttingOne" : "Web_Transfer_CopyingOne"), _clipboard.First().Name)
-            : string.Format(T(deleteOnPaste ? "Web_Transfer_CuttingMany" : "Web_Transfer_CopyingMany"), _clipboard.Count);
-        var tooltip = _clipboard.Count > 1
-            ? string.Join(Environment.NewLine, _clipboard.Select(item => item.Name).OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
-            : null;
-
-        _clipboardToastID = Toast.Show(msg, ToastType.State, ClearClipboard, tooltip);
-        BrowserClipboard.SetToastId(_clipboardToastID);
-    }
-
-    private async Task PasteClipboard()
-    {
-        if (_clipboard.Count == 0 && BrowserClipboard.Source is not null)
-        {
-            _clipboard = BrowserClipboard.Items.ToHashSet();
-            _clipboardSourceShare = BrowserClipboard.Source;
-            _deleteOnPaste = BrowserClipboard.DeleteOnPaste;
-            _clipboardStartPath = BrowserClipboard.StartPath;
-            _clipboardToastID = BrowserClipboard.ToastId;
-        }
-        if (!VM.Capabilities.CanCopy || _clipboard.Count < 1 || _clipboardSourceShare is null || VM.CurrentBrowserShare is null)
-            return;
-
-        // Crossing a share boundary is handled by the transfer service. It owns
-        // authorization for both backends and never cuts a virtual source.
-        if (_clipboardSourceShare.Id != VM.CurrentBrowserShare.Id || _clipboardSourceShare.Kind != VM.CurrentBrowserShare.Kind)
-        {
-            await PasteAcrossSharesAsync();
-            return;
-        }
-
-        await PasteWithinShareAsync();
-    }
-
-    /// <summary>
-    /// Paste across a share boundary via the transfer service. Wrapped so an
-    /// unexpected throw never escapes to the circuit or strands the progress toast.
-    /// </summary>
-    private async Task PasteAcrossSharesAsync()
-    {
-        // The transfer service writes here without recording undo steps.
-        VM.ClearUndo();
-        using var job = StartTransferJob();
-        RemoveClipboardToast();
-        var toastId = Toast.Show(T("Web_Transfer_Progress"), ToastType.Progress,
-            onDismiss: () => { job.Cancel(); return Task.CompletedTask; });
-        try
-        {
-            var result = await CrossShareTransfer.TransferAsync(
-                _clipboardSourceShare!, _clipboard.ToList(), VM.CurrentBrowserShare!,
-                VM.CurrentPath, _deleteOnPaste, job.CancellationToken,
-                (name, progress) =>
-                {
-                    var detail = string.Format(T("Web_Transfer_ProgressItem"), name);
-                    job.Update(detail, progress);
-                    Toast.Update(toastId, detail, progress, ToastType.Progress);
-                });
-            if (result.Success)
-            {
-                Toast.Show(_deleteOnPaste ? T("Web_Transfer_CutSuccess") : T("Web_Transfer_CopySuccess"), ToastType.Success);
-                await VM.RefreshCurrentDirectoryAsync();
-                await ClearClipboard();
-            }
-            else
-            {
-                Toast.Show(result.Error ?? T("Web_Transfer_Error_Failed"), ToastType.Error);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            Toast.Show(T("Web_Transfer_Error_Cancelled"), ToastType.Info);
-        }
-        catch (Exception)
-        {
-            Toast.Show(T("Web_Transfer_Error_Failed"), ToastType.Error);
-        }
-        finally
-        {
-            Toast.Remove(toastId);
-        }
-    }
-
-    /// <summary>
-    /// Paste inside the same share: copy the collected tree item by item, then (for a
-    /// cut) delete the originals. Each item is isolated so one failure never aborts the
-    /// batch, the progress toast is always removed, and originals are only deleted when
-    /// every copy succeeded — a partially failed cut must never lose data.
-    /// </summary>
-    private async Task PasteWithinShareAsync()
-    {
-        // The source directory is required to map each item into the target. It can be
-        // absent after a circuit was recreated without a full clipboard restore.
-        if (_clipboardStartPath is null)
-        {
-            Toast.Show(T("Web_Transfer_Error_Failed"), ToastType.Error);
-            return;
-        }
-
-        using var localJob = StartTransferJob();
-        var cancellationToken = localJob.CancellationToken;
-        // Copies and (for a cut) the source deletes revert as one entry.
-        using var undoGroup = VM.BeginUndoGroup();
-
-        RemoveClipboardToast();
-        _clipboardToastID = Toast.Show(T("Web_Transfer_Progress"), ToastType.Progress,
-            onDismiss: () => { localJob.Cancel(); return Task.CompletedTask; });
-
-        var itemsToCopy = new List<FileMetadata>();
-        int copied = 0;
-        var failed = new List<string>();
-        bool cancelled = false;
-
-        try
-        {
-            foreach (FileMetadata file in _clipboard)
-                await listItemsRecursivley(itemsToCopy, file);
-
-            foreach (FileMetadata file in itemsToCopy)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var newPath = ResolvePastePath(file);
-                // null: item is not under the recorded source root. Equal path: pasting
-                // into the source folder would overwrite the item with itself.
-                if (newPath is null || string.Equals(newPath, file.Path, StringComparison.Ordinal))
-                {
-                    failed.Add(file.Name);
-                    continue;
-                }
-
-                try
-                {
-                    if (file.IsDirectory)
-                        await VM.CreateFolderAtAsync(newPath);
-                    else
-                        await VM.CopyAsync(file, newPath, cancellationToken);
-                    copied++;
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception)
-                {
-                    failed.Add(file.Name);
-                }
-
-                var progress = (int)(copied * 100f / Math.Max(1, itemsToCopy.Count));
-                var detail = string.Format(T("Web_Transfer_ProgressItem"), file.Name);
-                localJob.Update(detail, progress);
-                Toast.Update(_clipboardToastID, detail, progress, ToastType.Progress);
-                StateHasChanged();
-            }
-
-            // Delete originals only for a cut where every copy succeeded. Reverse order
-            // so the innermost items go first and each folder is empty when removed.
-            if (_deleteOnPaste && failed.Count == 0)
-            {
-                for (int i = itemsToCopy.Count - 1; i >= 0; i--)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await VM.DeleteAsync(itemsToCopy[i]);
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            cancelled = true;
-        }
-        catch (Exception)
-        {
-            Toast.Show(T("Web_Transfer_Error_Failed"), ToastType.Error);
-        }
-        finally
-        {
-            RemoveClipboardToast();
-            await VM.LoadShareAsync(ShareName, SubPath ?? "");
-            StateHasChanged();
-        }
-
-        if (cancelled)
-        {
-            Toast.Show(T("Web_Transfer_Error_Cancelled"), ToastType.Info);
-        }
-        else if (failed.Count == 0)
-        {
-            Toast.Show(_deleteOnPaste ? T("Web_Transfer_CutSuccess") : T("Web_Transfer_CopySuccess"), ToastType.Success);
-            await ClearClipboard();
-        }
-        else if (copied > 0)
-        {
-            Toast.Show(string.Format(T("Web_Transfer_PartialFailure"), copied, itemsToCopy.Count),
-                ToastType.Error, tooltip: string.Join(Environment.NewLine, failed));
-        }
-        else
-        {
-            Toast.Show(T("Web_Transfer_Error_Failed"), ToastType.Error);
-        }
-    }
-
-    /// <summary>
-    /// Maps a clipboard item's share-relative path into the current directory, preserving
-    /// its position beneath the folder it was cut/copied from. Returns null when the item
-    /// does not sit under that recorded source folder (a stale or malformed clipboard).
-    /// </summary>
-    private string? ResolvePastePath(FileMetadata file)
-    {
-        var root = _clipboardStartPath!.Trim('/');
-        string relative;
-        if (root.Length == 0)
-            relative = file.Path.TrimStart('/');
-        else if (file.Path.StartsWith(root + "/", StringComparison.Ordinal))
-            relative = file.Path.Substring(root.Length + 1);
-        else
-            return null;
-
-        var target = VM.CurrentPath.Trim('/');
-        return target.Length == 0 ? relative : target + "/" + relative;
-    }
-
-    private async Task listItemsRecursivley(List<FileMetadata> itemList, FileMetadata item)
-    {
-        itemList.Add(item);
-
-        if (!item.IsDirectory)
-            return;
-        
-        List<FileMetadata> folderItems = await VM.ListDirectoryAsync(item.Path);
-
-        foreach (var innerItem in folderItems)
-            await listItemsRecursivley(itemList, innerItem);
-        
-    }
-
-    internal Task ClearClipboard()
-    {
-        _clipboard.Clear();
-        _clipboardSourceShare = null;
-        BrowserClipboard.Clear();
-        return Task.CompletedTask;
-    }
-
-    /// <summary>Removes the retained state toast even when its source page was already disposed.</summary>
-    private void RemoveClipboardToast()
-    {
-        var toastId = _clipboardToastID ?? BrowserClipboard.ToastId;
-        if (toastId is not null)
-            Toast.Remove(toastId);
-        _clipboardToastID = null;
-        BrowserClipboard.ClearToastId();
-    }
-
-    /// <summary>Registers a navigation-independent, user-cancellable transfer in the global job menu.</summary>
-    private JobHandle StartTransferJob()
-    {
-        var itemLabel = _clipboard.Count == 1 ? _clipboard.First().Name : string.Format(T("Web_Transfer_Items"), _clipboard.Count);
-        var action = T(_deleteOnPaste ? "Web_Transfer_JobCut" : "Web_Transfer_JobCopy");
-        return Jobs.Start(string.Format(T("Web_Jobs_FileTransfer_Title"), action, itemLabel),
-            T("Web_Transfer_Progress"), "file-transfer");
-    }
-
     internal async Task DeleteSelected()
     {
         if (_selectedItems.Count == 0) return;
@@ -627,12 +341,17 @@ public partial class FileBrowser
 
     /// <summary>
     /// Permanently deletes every top-level entry inside the recycle bin. Items already
-    /// live under <c>.RECYCLE_BIN</c>, so <see cref="FileBrowserViewModel.DeleteAsync"/>
+    /// live under <c>.RECYCLE_BIN</c>, so
+    /// <see cref="FileBrowserViewModel.DeleteAsync(FileMetadata, FileOperationTarget?)"/>
     /// removes them for good rather than recycling them again. One failure never aborts
     /// the batch; the folder itself is kept.
     /// </summary>
     private async Task ConfirmEmptyRecycle()
     {
+        // Pinned before the first await: listing and deleting stay in this share's bin even
+        // when the user opens another share meanwhile.
+        var operationTarget = VM.CaptureOperationTarget();
+        var (batchShare, batchPath) = (ShareName, SubPath);
         var recycleRoot = _emptyRecycleTarget;
         _showEmptyRecycleConfirm = false;
         _emptyRecycleTarget = null;
@@ -641,7 +360,7 @@ public partial class FileBrowser
 
         if (recycleRoot is null) return;
 
-        var children = await VM.ListDirectoryAsync(recycleRoot.Path);
+        var children = await VM.ListDirectoryAsync(recycleRoot.Path, operationTarget);
         if (children.Count == 0)
         {
             Toast.Show(Resources.Web_EmptyRecycle_AlreadyEmpty, ToastType.Info);
@@ -657,17 +376,20 @@ public partial class FileBrowser
         Toast.Update(toastId, onDismiss: () => { job.Cancel(); return Task.CompletedTask; });
 
         var failed = new List<string>();
+        var progressThrottle = new ProgressThrottle();
         var done = 0;
         foreach (var child in children)
         {
             if (job.CancellationToken.IsCancellationRequested)
                 break;
 
-            var result = await VM.DeleteAsync(child);
+            var result = await VM.DeleteAsync(child, operationTarget);
             if (!result.Success)
                 failed.Add(child.Name);
 
             done++;
+            if (!progressThrottle.ShouldReport(isFinal: done == children.Count))
+                continue;
             job.Update(
                 string.Format(T("Web_Jobs_ItemCounter"), done, children.Count),
                 children.Count == 0 ? 100 : done * 100 / children.Count);
@@ -686,7 +408,7 @@ public partial class FileBrowser
                 type: ToastType.Error);
         }
 
-        await VM.LoadShareAsync(ShareName, SubPath ?? "");
+        await RefreshAfterBatchAsync(batchShare, batchPath);
         StateHasChanged();
     }
 
@@ -801,12 +523,16 @@ public partial class FileBrowser
                 : string.Format(Resources.Web_Move_BatchProgress, items.Count),
             ToastType.Progress);
 
+        // Pinned like ConfirmDelete: the remaining moves stay in this share even when the user
+        // opens another one meanwhile.
+        var operationTarget = VM.CaptureOperationTarget();
+        var (batchShare, batchPath) = (ShareName, SubPath);
         var failed = new List<string>();
         using (VM.BeginUndoGroup())
         {
             foreach (var item in items)
             {
-                var result = await VM.MoveAsync(item, destRelativePath);
+                var result = await VM.MoveAsync(item, destRelativePath, operationTarget);
                 if (!result.Success)
                     failed.Add(item.Name);
             }
@@ -828,7 +554,7 @@ public partial class FileBrowser
         }
 
         _selectedItems.Clear();
-        await VM.LoadShareAsync(ShareName, SubPath ?? "");
+        await RefreshAfterBatchAsync(batchShare, batchPath);
         StateHasChanged();
     }
     

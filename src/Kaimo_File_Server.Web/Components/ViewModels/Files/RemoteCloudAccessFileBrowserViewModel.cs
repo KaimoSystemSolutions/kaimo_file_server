@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
-public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserViewModelBase, IAsyncDisposable
+public sealed partial class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserViewModelBase, IAsyncDisposable
 {
     private static readonly BrowserCapabilities WritableCapabilities = new()
     {
@@ -110,7 +110,9 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
             _shareWritable = permission == CloudAccessPermission.Write;
             _canManage = await _authorization.CanManageAsync(actor, share);
             Capabilities = BuildCapabilities(_session!.Capabilities, readOnly: !_shareWritable);
-            var items = await ListCoreAsync(relativePath);
+            var shown = new RemoteTarget(_remoteFiles!, share, _shareWritable);
+            var items = await ListCoreAsync(shown, relativePath);
+            _shownTarget = shown;
             CompleteLoad(
                 new BrowserShareInfo(share.Id, share.Name, BrowserShareKind.Remote, connectionRecord.ProviderId),
                 relativePath,
@@ -145,43 +147,28 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
     }
 
     public override async Task<OperationResult> CreateFolderAsync(string folderName)
-        => await RunWriteAsync(files =>
-            files.CreateDirectoryAsync(RemotePath(ShareRelativePath.Combine(CurrentPath, folderName))),
+        => await RunWriteAsync(target =>
+            target.Files.CreateDirectoryAsync(RemotePath(target.Share, ShareRelativePath.Combine(CurrentPath, folderName))),
             R("Web_CloudAccess_Error_CreateFolder"));
 
-    public override async Task CreateFolderAtAsync(string path)
-    {
-        var result = await RunWriteAsync(files => files.CreateDirectoryAsync(RemotePath(path)),
-            R("Web_CloudAccess_Error_CreateFolder"));
-        if (!result.Success) throw new IOException(result.Error);
-    }
+    public override Task CreateFolderAtAsync(string path) => CreateFolderAtAsync(path, CaptureOperationTarget());
 
-    public override Task<OperationResult> DeleteAsync(FileMetadata item)
-        => RunWriteAsync(files => files.DeleteAsync(RemotePath(ShareRelativeOf(item)), item.IsDirectory),
-            R("Web_CloudAccess_Error_Delete"));
+    public override Task<OperationResult> DeleteAsync(FileMetadata item) => DeleteAsync(item, CaptureOperationTarget());
 
     public override Task<OperationResult> RenameAsync(FileMetadata item, string newName)
-        => RunWriteAsync(files => files.MoveAsync(
-                RemotePath(ShareRelativeOf(item)),
-                RemotePath(ShareRelativePath.Combine(ShareRelativePath.GetParent(ShareRelativeOf(item)), newName))),
+        => RunWriteAsync(CaptureOperationTarget(), target => target.Files.MoveAsync(
+                RemotePath(target.Share, ShareRelativeOf(item)),
+                RemotePath(target.Share, ShareRelativePath.Combine(ShareRelativePath.GetParent(ShareRelativeOf(item)), newName))),
             R("Web_CloudAccess_Error_Rename"));
 
     public override Task<OperationResult> MoveAsync(FileMetadata item, string destinationPath)
-        => RunWriteAsync(files => files.MoveAsync(
-                RemotePath(ShareRelativeOf(item)),
-                RemotePath(ShareRelativePath.Combine(destinationPath, item.Name))),
-            R("Web_CloudAccess_Error_Move"));
+        => MoveAsync(item, destinationPath, CaptureOperationTarget());
 
     public override Task<List<FileMetadata>> ListDirectoryAsync(string directoryPath)
-        => ListCoreAsync(ShareRelativeOf(new FileMetadata { Path = directoryPath }));
+        => ListDirectoryAsync(directoryPath, CaptureOperationTarget());
 
-    public override async Task CopyAsync(FileMetadata item, string targetPath, CancellationToken cancellationToken)
-    {
-        var result = await RunWriteAsync(files => CopyRemoteItemAsync(files,
-            RemotePath(ShareRelativeOf(item)), RemotePath(targetPath), item.IsDirectory, cancellationToken),
-            R("Web_CloudAccess_Error_RemoteCopy"));
-        if (!result.Success) throw new IOException(result.Error);
-    }
+    public override Task CopyAsync(FileMetadata item, string targetPath, CancellationToken cancellationToken)
+        => CopyAsync(item, targetPath, cancellationToken, CaptureOperationTarget());
 
     public override async Task<(byte[] Data, string ContentType, PreviewKind Kind)?> ReadFileForPreviewAsync(FileMetadata file)
     {
@@ -221,8 +208,8 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
     public override async Task<OperationResult> UploadFileAsync(
         string fileName, Stream fileStream, CancellationToken cancellationToken = default,
         string? relativeDir = null)
-        => await RunWriteAsync(files => files.WriteAsync(
-                RemotePath(ShareRelativePath.Combine(
+        => await RunWriteAsync(target => target.Files.WriteAsync(
+                RemotePath(target.Share, ShareRelativePath.Combine(
                     ShareRelativePath.Combine(CurrentPath, relativeDir), fileName)),
                 fileStream,
                 overwrite: true,
@@ -232,17 +219,17 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
     // Providers differ on whether creating an existing folder fails, so look before creating.
     public override async Task<OperationResult> EnsureFolderAsync(
         string relativeDir, CancellationToken cancellationToken = default)
-        => await RunWriteAsync(async files =>
+        => await RunWriteAsync(async target =>
             {
                 foreach (var prefix in UploadFolderPath.Prefixes(ShareRelativePath.Normalize(relativeDir)))
                 {
                     var parent = ShareRelativePath.Combine(CurrentPath, ShareRelativePath.GetParent(prefix));
                     var name = ShareRelativePath.GetFileName(prefix);
-                    var siblings = await files.ListAsync(RemotePath(parent), cancellationToken);
+                    var siblings = await target.Files.ListAsync(RemotePath(target.Share, parent), cancellationToken);
                     if (siblings.Any(s => s.IsDirectory && string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)))
                         continue;
-                    await files.CreateDirectoryAsync(
-                        RemotePath(ShareRelativePath.Combine(CurrentPath, prefix)), cancellationToken);
+                    await target.Files.CreateDirectoryAsync(
+                        RemotePath(target.Share, ShareRelativePath.Combine(CurrentPath, prefix)), cancellationToken);
                 }
             },
             R("Web_CloudAccess_Error_CreateFolder"));
@@ -259,18 +246,18 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
         return "/api/cloud-access/download?ticket=" + Uri.EscapeDataString(ticket);
     }
 
-    private async Task<List<FileMetadata>> ListCoreAsync(string relativePath)
+    private async Task<List<FileMetadata>> ListCoreAsync(FileOperationTarget? target, string relativePath)
     {
-        var files = _remoteFiles ?? throw new InvalidOperationException("The storage connection is not initialized.");
-        var shareId = _share?.Id ?? throw new InvalidOperationException("No virtual share is loaded.");
+        var pin = target as RemoteTarget ?? throw new InvalidOperationException("No virtual share is loaded.");
+        var shareId = pin.Share.Id;
         return await _directoryCache.GetOrCreateAsync(shareId, relativePath, async () =>
         {
-            var remoteItems = await files.ListAsync(RemotePath(relativePath));
+            var remoteItems = await pin.Files.ListAsync(RemotePath(pin.Share, relativePath));
             return remoteItems.Select(item => new FileMetadata
             {
                 Id = StableGuid(item.StableId ?? item.Path),
                 ShareId = shareId,
-                Path = StripRoot(item.Path),
+                Path = StripRoot(pin.Share, item.Path),
                 Name = item.Name,
                 IsDirectory = item.IsDirectory,
                 Size = item.IsDirectory ? 0 : item.Size ?? 0,
@@ -293,19 +280,26 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
         return total;
     }
 
-    private async Task<OperationResult> RunWriteAsync(Func<IRemoteFileStore, Task> action, string userError)
+    // Writes into the folder the browser holds right now (create folder, upload).
+    private Task<OperationResult> RunWriteAsync(Func<RemoteTarget, Task> action, string userError)
+        => RunWriteAsync(
+            _remoteFiles is null || _share is null ? null : new RemoteTarget(_remoteFiles, _share, _shareWritable),
+            action, userError);
+
+    private async Task<OperationResult> RunWriteAsync(
+        FileOperationTarget? target, Func<RemoteTarget, Task> action, string userError)
     {
-        if (!_shareWritable || _remoteFiles is null || _share is null)
+        if (target is not RemoteTarget { Writable: true } pin)
             return OperationResult.Fail(R("Web_CloudAccess_Error_ReadOnly"));
         try
         {
-            await action(_remoteFiles);
-            _directoryCache.InvalidateShare(_share.Id);
+            await action(pin);
+            _directoryCache.InvalidateShare(pin.Share.Id);
             return OperationResult.Ok();
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Provider write operation failed for virtual share {ShareId}", _share.Id);
+            _logger.LogError(exception, "Provider write operation failed for virtual share {ShareId}", pin.Share.Id);
             return OperationResult.Fail(WriteError(exception, userError));
         }
     }
@@ -316,16 +310,20 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
             : fallback;
 
     private string RemotePath(string relativePath)
+        => RemotePath(_share ?? throw new InvalidOperationException("No virtual share is loaded."), relativePath);
+
+    private static string RemotePath(CloudAccessShare share, string relativePath)
     {
-        if (_share is null) throw new InvalidOperationException("No virtual share is loaded.");
         if (!ShareRelativePath.TryNormalizeStrict(relativePath ?? string.Empty, out var normalized))
             throw new UnauthorizedAccessException("The remote path is invalid.");
-        return ShareRelativePath.Combine(_share.RemoteRootPath, normalized);
+        return ShareRelativePath.Combine(share.RemoteRootPath, normalized);
     }
 
-    private string StripRoot(string remotePath)
+    private string StripRoot(string remotePath) => StripRoot(_share, remotePath);
+
+    private static string StripRoot(CloudAccessShare? share, string remotePath)
     {
-        var root = ShareRelativePath.Normalize(_share?.RemoteRootPath);
+        var root = ShareRelativePath.Normalize(share?.RemoteRootPath);
         var path = ShareRelativePath.Normalize(remotePath);
         if (root.Length == 0) return path;
         if (path.Equals(root, StringComparison.OrdinalIgnoreCase)) return string.Empty;

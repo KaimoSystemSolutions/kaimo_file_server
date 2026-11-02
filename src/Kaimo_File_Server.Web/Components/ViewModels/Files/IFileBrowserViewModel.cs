@@ -164,6 +164,35 @@ public interface IFileBrowserViewModel
     Task<OperationResult> CreateFolderAsync(string folderName);
     Task CreateFolderAtAsync(string path);
     Task<OperationResult> DeleteAsync(FileMetadata item);
+
+    /// <summary>
+    /// Pins the shown share for a batch (delete, paste, move, empty recycle bin); null when
+    /// nothing is loaded or the backend does not support pinning. The batch passes the result
+    /// to every pinned overload below.
+    /// </summary>
+    FileOperationTarget? CaptureOperationTarget() => null;
+
+    /// <summary>
+    /// Deletes an item in the pinned share, wherever the browser navigated meanwhile.
+    /// Backends without pinning act on the open share.
+    /// </summary>
+    Task<OperationResult> DeleteAsync(FileMetadata item, FileOperationTarget? target) => DeleteAsync(item);
+
+    /// <summary>Pinned counterparts used by a paste batch; see <see cref="DeleteAsync(FileMetadata, FileOperationTarget?)"/>.</summary>
+    Task CreateFolderAtAsync(string path, FileOperationTarget? target) => CreateFolderAtAsync(path);
+
+    /// <inheritdoc cref="CreateFolderAtAsync(string, FileOperationTarget?)"/>
+    Task<List<FileMetadata>> ListDirectoryAsync(string directoryPath, FileOperationTarget? target)
+        => ListDirectoryAsync(directoryPath);
+
+    /// <inheritdoc cref="CreateFolderAtAsync(string, FileOperationTarget?)"/>
+    Task CopyAsync(FileMetadata item, string targetPath, CancellationToken cancellationToken, FileOperationTarget? target)
+        => CopyAsync(item, targetPath, cancellationToken);
+
+    /// <summary>Pinned counterpart used by a drag of several items; see <see cref="DeleteAsync(FileMetadata, FileOperationTarget?)"/>.</summary>
+    Task<OperationResult> MoveAsync(FileMetadata item, string destinationPath, FileOperationTarget? target)
+        => MoveAsync(item, destinationPath);
+
     Task<OperationResult> RenameAsync(FileMetadata item, string newName);
     Task<OperationResult> MoveAsync(FileMetadata item, string destinationPath);
     Task<List<FileMetadata>> ListDirectoryAsync(string directoryPath);
@@ -280,8 +309,9 @@ public interface IFileBrowserViewModel
     void InvalidateListingCache() { }
 
     /// <summary>
-    /// Groups all operations until disposal into one undo entry; null when the backend
-    /// has no undo or a group is already open (<c>using</c> accepts null).
+    /// Groups all operations until the last open group is disposed into one undo entry; null
+    /// when the backend has no undo (<c>using</c> accepts null). Nested and overlapping groups
+    /// join the open one.
     /// </summary>
     IDisposable? BeginUndoGroup() => null;
 }

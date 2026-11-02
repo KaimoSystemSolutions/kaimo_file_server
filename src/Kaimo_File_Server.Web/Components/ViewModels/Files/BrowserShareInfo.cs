@@ -14,5 +14,10 @@ public sealed record BrowserShareInfo(
     Guid Id,
     string Name,
     BrowserShareKind Kind,
-    string? ProviderId = null);
+    string? ProviderId = null)
+{
+    /// <summary>Same share when id and backend kind match; display fields are ignored.</summary>
+    public bool IsSameShareAs(BrowserShareInfo? other)
+        => other is not null && Id == other.Id && Kind == other.Kind;
+}
 

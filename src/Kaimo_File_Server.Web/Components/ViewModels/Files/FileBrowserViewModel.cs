@@ -38,6 +38,11 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     // file service to a fixed target instead of resolving it from a share name.
     protected IFileService? _fileService;
 
+    // The share whose listing is on screen, set when a load completes. Kept while the next load
+    // runs (it clears _fileService and CurrentShare first and lists last), so a batch confirmed
+    // meanwhile acts on the items the user sees (see CaptureOperationTarget).
+    private LocalFileOperationTarget? _shownTarget;
+
     // Exposed to derived view models so they can reuse the base file-operation methods.
     protected IUserContextFactory UserContextFactory => _userContextFactory;
 
@@ -391,6 +396,9 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         finally
         {
             IsLoading = false;
+            _shownTarget = _fileService is null || CurrentShare is null
+                ? null
+                : new LocalFileOperationTarget(_fileService, CurrentShare, _undoVisit);
         }
     }
 
@@ -446,15 +454,19 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     /// require a loaded share and a signed-in user. Throws when either precondition is
     /// not met, so callers can rely on non-null results.
     /// </summary>
-    private async Task<(IFileService Service, UserContext User)> RequireServiceAndUserAsync()
+    private Task<(IFileService Service, UserContext User)> RequireServiceAndUserAsync()
+        => RequireServiceAndUserAsync(_shownTarget);
+
+    // Same for a batch pinned to the share it started in (see CaptureOperationTarget).
+    private async Task<(IFileService Service, UserContext User)> RequireServiceAndUserAsync(LocalFileOperationTarget? target)
     {
-        if (_fileService is null)
+        if (target is null)
             throw new InvalidOperationException("No share is currently loaded.");
 
         var userContext = await GetCurrentUserContextAsync()
             ?? throw new InvalidOperationException("No authenticated user context is available.");
 
-        return (_fileService, userContext);
+        return (target.Service, userContext);
     }
 
     /// <summary>

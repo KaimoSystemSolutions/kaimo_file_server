@@ -16,9 +16,15 @@ public sealed class FileBrowserClipboardService
     public string? StartPath { get; private set; }
     /// <summary>State-toast identity retained across browser route changes.</summary>
     public string? ToastId { get; private set; }
+    /// <summary>
+    /// Changes whenever the clipboard is set or cleared, so a finished paste clears only the
+    /// clipboard it pasted, never one set meanwhile in this or another browser page.
+    /// </summary>
+    public int Generation { get; private set; }
 
     public void Set(BrowserShareInfo source, IEnumerable<FileMetadata> items, bool deleteOnPaste, string? startPath)
     {
+        Generation++;
         Source = source;
         Items = items.ToList();
         DeleteOnPaste = deleteOnPaste;
@@ -27,6 +33,7 @@ public sealed class FileBrowserClipboardService
 
     public void Clear()
     {
+        Generation++;
         Source = null;
         Items = [];
         DeleteOnPaste = false;
@@ -37,4 +44,17 @@ public sealed class FileBrowserClipboardService
     public void SetToastId(string toastId) => ToastId = toastId;
 
     public void ClearToastId() => ToastId = null;
+
+    // Generations of the cuts being pasted right now.
+    private readonly HashSet<int> _cutPastesRunning = [];
+
+    /// <summary>
+    /// Claims the cut of <paramref name="generation"/> for one paste. False while it is already
+    /// being pasted: batches no longer block the circuit, and a second paste of the same cut
+    /// would copy the items again (into the same files, or a second place) and then also try to
+    /// delete the originals. Release it with <see cref="EndCutPaste"/>.
+    /// </summary>
+    public bool TryBeginCutPaste(int generation) => _cutPastesRunning.Add(generation);
+
+    public void EndCutPaste(int generation) => _cutPastesRunning.Remove(generation);
 }

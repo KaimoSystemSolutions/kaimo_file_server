@@ -119,5 +119,21 @@ public partial class FileBrowser
             Toast.Update(toastId, result.Error ?? Resources.Web_Unzip_Error, type: ToastType.Error);
         }
     }
+
+    // ========== Batches ==========
+
+    /// <summary>
+    /// Reloads the listing after a batch, but only while the folder it ran in is still on screen.
+    /// Batches finish in the background: a full reload of another folder the user opened
+    /// meanwhile would reset it and could overlap that folder's own load.
+    /// </summary>
+    private Task RefreshAfterBatchAsync(string batchShare, string? batchPath)
+        => IsSameLocation(batchShare, batchPath, ShareName, SubPath)
+            ? VM.LoadShareAsync(ShareName, SubPath ?? "")
+            : Task.CompletedTask;
+
+    internal static bool IsSameLocation(string shareA, string? pathA, string shareB, string? pathB)
+        => string.Equals(shareA, shareB, StringComparison.Ordinal)
+           && string.Equals((pathA ?? "").Trim('/'), (pathB ?? "").Trim('/'), StringComparison.Ordinal);
 }
 
