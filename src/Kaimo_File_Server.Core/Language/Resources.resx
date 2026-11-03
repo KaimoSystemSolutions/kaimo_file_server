@@ -7826,6 +7826,18 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_ExternalStorage_ErrorCode_ssh_password_missing" xml:space="preserve">
     <value>The SSH password is missing. Edit the connection and enter it again.</value>
   </data>
+  <data name="Web_ExternalStorage_ErrorCode_ssh_connection_failed" xml:space="preserve">
+    <value>The SSH server could not be reached or closed the connection. Check the host, port and firewall.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_ssh_authentication_failed" xml:space="preserve">
+    <value>The SSH server rejected the sign-in. Check the username and the password or key.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_sftp_unavailable" xml:space="preserve">
+    <value>The sign-in succeeded, but the server does not provide SFTP for this account. Enable SFTP on the server (on a Synology NAS: File Services → FTP → SFTP).</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_host_key_mismatch" xml:space="preserve">
+    <value>The server identity no longer matches the confirmed host key. Verify the server before trusting a new key.</value>
+  </data>
   <data name="Web_Backup_Error_ssh_password_missing" xml:space="preserve">
     <value>The SSH connection has no password.</value>
   </data>

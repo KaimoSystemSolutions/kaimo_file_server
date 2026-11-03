@@ -554,6 +554,64 @@ public sealed class ProtocolStorageProviderTests : IDisposable
     }
 
     [Fact]
+    public void SftpConnectFailure_AfterSuccessfulSignIn_IsSftpUnavailable()
+    {
+        // Synology and similar servers accept the login but refuse the sftp subsystem.
+        var refused = new Renci.SshNet.Common.SshException("Subsystem 'sftp' could not be executed.");
+
+        Assert.Equal("sftp_unavailable", SftpStorageConnectionProvider.ConnectFailureCode(
+            refused, hostKeyReceived: true, hostKeyMatched: true, authenticated: true));
+        Assert.Null(SftpStorageConnectionProvider.ConnectFailureCode(
+            refused, hostKeyReceived: true, hostKeyMatched: true, authenticated: false));
+        Assert.Null(SftpStorageConnectionProvider.ConnectFailureCode(
+            new Renci.SshNet.Common.SshAuthenticationException("Permission denied (password)."),
+            hostKeyReceived: true, hostKeyMatched: true, authenticated: false));
+    }
+
+    [Fact]
+    public void SftpConnectFailure_ReportsHostKeyMismatchOnlyWhenAKeyWasReceived()
+    {
+        Assert.Equal("host_key_mismatch", SftpStorageConnectionProvider.ConnectFailureCode(
+            new Renci.SshNet.Common.SshConnectionException("Key exchange negotiation failed."),
+            hostKeyReceived: true, hostKeyMatched: false, authenticated: false));
+        // An unreachable host fails before any host key arrives: that is not an identity change.
+        Assert.Null(SftpStorageConnectionProvider.ConnectFailureCode(
+            new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionRefused),
+            hostKeyReceived: false, hostKeyMatched: false, authenticated: false));
+    }
+
+    [Fact]
+    public void SftpTestFailure_MapsRemoteRootErrorsToExistingCodes()
+    {
+        Assert.Equal("remote_path_missing", SftpStorageConnectionProvider.TestFailureCode(
+            new Renci.SshNet.Common.SftpPathNotFoundException("No such file")));
+        Assert.Equal("remote_access_denied", SftpStorageConnectionProvider.TestFailureCode(
+            new Renci.SshNet.Common.SftpPermissionDeniedException("Permission denied")));
+        Assert.Equal("ssh_authentication_failed", SftpStorageConnectionProvider.TestFailureCode(
+            new Renci.SshNet.Common.SshAuthenticationException("Permission denied (password).")));
+        Assert.Equal("ssh_connection_failed", SftpStorageConnectionProvider.TestFailureCode(
+            new Renci.SshNet.Common.SshOperationTimeoutException("timeout")));
+        Assert.Equal("ssh_connection_failed", SftpStorageConnectionProvider.TestFailureCode(new IOException()));
+        Assert.Equal("ssh_connection_failed", SftpStorageConnectionProvider.TestFailureCode(
+            new System.Net.Sockets.SocketException()));
+        Assert.Null(SftpStorageConnectionProvider.TestFailureCode(new InvalidOperationException()));
+    }
+
+    [Theory]
+    [InlineData("ssh_connection_failed")]
+    [InlineData("ssh_authentication_failed")]
+    [InlineData("sftp_unavailable")]
+    [InlineData("host_key_mismatch")]
+    public void SftpErrorCodes_HaveTextInBothLanguages(string code)
+    {
+        // tryParents: false, so a missing German entry does not silently fall back to English.
+        var manager = Kaimo_File_Server.Core.Language.Resources.ResourceManager;
+        foreach (var culture in new[] { System.Globalization.CultureInfo.InvariantCulture, new System.Globalization.CultureInfo("de") })
+            Assert.False(string.IsNullOrWhiteSpace(manager.GetResourceSet(culture, createIfNotExists: true, tryParents: false)
+                ?.GetString($"Web_ExternalStorage_ErrorCode_{code}")));
+    }
+
+    [Fact]
     public void DeleteUnreferencedKnownHosts_RemovesOnlyOldOrphans()
     {
         var service = new RsyncSshSetupService(_temporaryRoot);

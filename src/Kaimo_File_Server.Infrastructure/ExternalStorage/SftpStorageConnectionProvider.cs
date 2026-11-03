@@ -3,6 +3,7 @@ using System.Text;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
+using Microsoft.Extensions.Logging;
 using Renci.SshNet;
 using Renci.SshNet.Common;
 using Renci.SshNet.Sftp;
@@ -20,7 +21,8 @@ namespace Kaimo_File_Server.Infrastructure.ExternalStorage;
 /// </summary>
 public sealed class SftpStorageConnectionProvider(
     ICredentialVault credentialVault,
-    IRsyncSshSetupService? setupService = null) : IStorageConnectionProvider
+    IRsyncSshSetupService? setupService = null,
+    ILogger<SftpStorageConnectionProvider>? logger = null) : IStorageConnectionProvider
 {
     public string Id => "sftp";
     public string DisplayName => "SFTP";
@@ -62,22 +64,37 @@ public sealed class SftpStorageConnectionProvider(
         {
             throw;
         }
-        catch (SshAuthenticationException)
+        catch (Exception exception) when (TestFailureCode(exception) is { } code)
         {
-            return SmbStorageConnectionProvider.Unavailable("ssh_authentication_failed");
+            // The UI only shows the code; the log keeps the server's reason for diagnosis.
+            logger?.LogWarning(exception, "SFTP connection test for {ConnectionId} failed ({Code})", connection.Id, code);
+            return SmbStorageConnectionProvider.Unavailable(code);
         }
-        catch (SshException)
-        {
-            return SmbStorageConnectionProvider.Unavailable("ssh_connection_failed");
-        }
-        catch (IOException)
-        {
-            return SmbStorageConnectionProvider.Unavailable("ssh_connection_failed");
-        }
-        catch (System.Net.Sockets.SocketException)
-        {
-            return SmbStorageConnectionProvider.Unavailable("ssh_connection_failed");
-        }
+    }
+
+    /// <summary>Maps a failed connection test to a stable, localizable error code, or null to rethrow.</summary>
+    internal static string? TestFailureCode(Exception exception) => exception switch
+    {
+        SftpPathNotFoundException => "remote_path_missing",
+        SftpPermissionDeniedException => "remote_access_denied",
+        SshAuthenticationException => "ssh_authentication_failed",
+        SshException or IOException or System.Net.Sockets.SocketException => "ssh_connection_failed",
+        _ => null
+    };
+
+    /// <summary>
+    /// Classifies a failed connect as a configuration problem, or returns null to rethrow it.
+    /// A received but unmatched host key is an identity failure; a failure after a successful
+    /// sign-in means the server refused the sftp subsystem (for example SFTP disabled on a NAS).
+    /// </summary>
+    internal static string? ConnectFailureCode(
+        Exception exception, bool hostKeyReceived, bool hostKeyMatched, bool authenticated)
+    {
+        if (hostKeyReceived && !hostKeyMatched)
+            return "host_key_mismatch";
+        if (authenticated && exception is SshException and not SshAuthenticationException)
+            return "sftp_unavailable";
+        return null;
     }
 
     public Task RevokeAsync(StorageConnection connection, CancellationToken cancellationToken = default)
@@ -121,13 +138,14 @@ public sealed class SftpStorageConnectionProvider(
             // In-process host-key pinning. The server key is trusted only when
             // its SHA-256 fingerprint matches the value the administrator
             // verified through an independent channel during setup.
-            bool hostKeyMatched = false;
+            bool hostKeyReceived = false, hostKeyMatched = false;
             client.HostKeyReceived += (_, hostKey) =>
             {
                 string fingerprint = PinnedSshSettings.ComputeFingerprint(hostKey.HostKey);
                 hostKey.CanTrust = CryptographicOperations.FixedTimeEquals(
                     Encoding.ASCII.GetBytes(fingerprint),
                     Encoding.ASCII.GetBytes(settings.ExpectedHostKeySha256));
+                hostKeyReceived = true;
                 hostKeyMatched = hostKey.CanTrust;
             };
 
@@ -135,15 +153,15 @@ public sealed class SftpStorageConnectionProvider(
             {
                 await client.ConnectAsync(cancellationToken);
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception exception) when (exception is not OperationCanceledException
+                && ConnectFailureCode(exception, hostKeyReceived, hostKeyMatched, connectionInfo.IsAuthenticated) is { } code)
             {
                 // A rejected host key surfaces as a connection exception; classify
                 // it as an identity failure rather than a transient outage so the
                 // UI never silently re-pins a changed server.
-                if (!hostKeyMatched)
-                    throw new ProtocolConfigurationException(
-                        "host_key_mismatch", "The pinned SSH host identity does not match the server.", exception);
-                throw;
+                throw new ProtocolConfigurationException(code, code == "host_key_mismatch"
+                    ? "The pinned SSH host identity does not match the server."
+                    : "The SSH server accepted the sign-in but refused the SFTP subsystem.", exception);
             }
 
             var session = new SftpStorageSession(
