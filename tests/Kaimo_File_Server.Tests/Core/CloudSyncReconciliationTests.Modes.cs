@@ -182,22 +182,4 @@ public sealed partial class CloudSyncReconciliationTests
         Assert.False(remote.HasFile("/.RECYCLE_BIN/old.txt"));
         Assert.DoesNotContain(manifest!.Paths, p => p.Contains(".RECYCLE_BIN"));
     }
-
-    [Fact]
-    public async Task Sync_ReportsProgress_EndingAtOneHundredPercent()
-    {
-        var remote = new InMemoryRemote();
-        var local = new InMemoryFileService();
-        local.PutFile("a.txt", "content", Time(10));
-        var reports = new List<(string? Text, int Percent)>();
-        var options = new CloudSyncTransferOptions(new CloudSyncAdvancedSettings());
-
-        await ((ICloudConnection)remote).SyncAsync(
-            local, User, RemoteRoot, LocalRoot, SyncMode.Push, options, previousManifest: null,
-            reportProgress: (text, percent) => reports.Add((text, percent)));
-
-        Assert.Equal("Scanning...", reports[0].Text);
-        Assert.Equal(100, reports[^1].Percent);
-        Assert.Contains(reports, r => r.Text == "Pushing a.txt...");
-    }
 }

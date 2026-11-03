@@ -1,5 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
+using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Core.Services.Notifications;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Clouds;
 
@@ -22,7 +24,8 @@ internal sealed partial class CloudSyncEngine
         DateTime? createdAt,
         long size)
     {
-        _progress.Update($"Pushing {displayName}...");
+        string action = string.Format(SyncProgress.Text("Web_Jobs_CloudSync_Uploading", "Uploading {0}"), displayName);
+        _progress.Update(action);
         bool vanished = false;
         bool ok = await TryTransferAsync(localChild, SyncFailureOperation.Upload, async () =>
         {
@@ -43,11 +46,8 @@ internal sealed partial class CloudSyncEngine
             await _remote.UploadAsync(remoteChild, stream, modifiedAt, createdAt, _cancellationToken);
         }) && !vanished;
 
-        if (ok)
-        {
-            _progress.TransferredBytes += size;
-            _progress.Update($"Pushing {displayName}...");
-        }
+        _progress.FileDone(size);
+        _progress.Update(action);
         return ok;
     }
 
@@ -70,7 +70,8 @@ internal sealed partial class CloudSyncEngine
         DateTime? createdAt,
         long size)
     {
-        _progress.Update($"Pulling {displayName}...");
+        string action = string.Format(SyncProgress.Text("Web_Jobs_CloudSync_Downloading", "Downloading {0}"), displayName);
+        _progress.Update(action);
         bool vanished = false;
         bool ok = await TryTransferAsync(localChild, SyncFailureOperation.Download, async () =>
         {
@@ -102,11 +103,8 @@ internal sealed partial class CloudSyncEngine
             await session.SetTimesAsync(new FileTimes(createdAt, modifiedAt, modifiedAt), _cancellationToken);
         }) && !vanished;
 
-        if (ok)
-        {
-            _progress.TransferredBytes += size;
-            _progress.Update($"Pulling {displayName}...");
-        }
+        _progress.FileDone(size);
+        _progress.Update(action);
         return ok;
     }
 
@@ -240,7 +238,10 @@ internal sealed partial class CloudSyncEngine
             else
             {
                 if (_options.ShouldSkip(item.Name, item.Size))
+                {
+                    _progress.FileDone(item.Size);
                     continue;
+                }
 
                 if (await PushFileAsync(localChild, remoteChild, item.Name, item.ModifiedAt,
                         KnownCreatedAt(item) ?? item.ModifiedAt, item.Size))
@@ -262,23 +263,61 @@ internal sealed partial class CloudSyncEngine
         }
     }
 
+    /// <summary>
+    /// Progress of one run. The percentage counts every file the run has dealt with
+    /// (transferred, unchanged, skipped or failed) against the pre-scanned total, so a
+    /// mostly converged tree advances while it is compared instead of sitting at 0%.
+    /// Messages are localized with the culture of the thread that runs the sync.
+    /// </summary>
     private sealed class SyncProgress
     {
         public long TotalBytes { get; set; }
-        public long TransferredBytes { get; set; }
+        public long ProcessedBytes { get; private set; }
+        public int CheckedFiles { get; private set; }
+        public int ScannedFiles { get; private set; }
+        public long ScannedBytes { get; private set; }
 
         public Action<string, int>? Report { get; init; }
 
-        public void Update(string text)
+        public static string Text(string key, string fallback)
+            => Resources.ResourceManager.GetString(key) ?? fallback;
+
+        /// <summary>Counts one file as dealt with, whatever its outcome.</summary>
+        public void FileDone(long size)
+        {
+            CheckedFiles++;
+            ProcessedBytes += size;
+        }
+
+        /// <summary>Adds one remote listing to the pre-scan counters and reports them.</summary>
+        public void Scanned(IEnumerable<CloudItemMeta> items)
+        {
+            foreach (var item in items.Where(i => !i.IsDirectory))
+            {
+                ScannedFiles++;
+                ScannedBytes += item.Size;
+            }
+            Report?.Invoke(string.Format(
+                Text("Web_Jobs_CloudSync_RemoteScan", "Scanning remote folder… Files found: {0} ({1})"),
+                ScannedFiles, NotificationEvents.FormatSize(ScannedBytes)), 0);
+        }
+
+        /// <summary>Reports a pre-scan step; the total is not known yet, so it stays at 0%.</summary>
+        public void ReportPhase(string text) => Report?.Invoke(text, 0);
+
+        public void Update(string action)
         {
             if (Report == null)
                 return;
 
             int percent = TotalBytes == 0
                 ? 100
-                : (int)Math.Clamp(TransferredBytes * 100 / TotalBytes, 0, 100);
+                : (int)Math.Clamp(ProcessedBytes * 100 / TotalBytes, 0, 100);
 
-            Report(text, percent);
+            Report(string.Format(
+                Text("Web_Jobs_CloudSync_Summary", "{0} · Files checked: {1} · {2} of {3}"),
+                action, CheckedFiles,
+                NotificationEvents.FormatSize(ProcessedBytes), NotificationEvents.FormatSize(TotalBytes)), percent);
         }
     }
 }

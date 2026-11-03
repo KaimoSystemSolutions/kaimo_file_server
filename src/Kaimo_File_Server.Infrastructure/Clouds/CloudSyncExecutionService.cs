@@ -1,6 +1,7 @@
 using System.Net;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.DataServices;
@@ -330,7 +331,10 @@ public sealed class CloudSyncExecutionService(
             IOptimizedStorageSync optimizedSync = session.OptimizedSync
                 ?? throw new NotSupportedException(
                     "The storage provider did not expose its advertised optimized synchronization contract.");
-            reportProgress?.Invoke(null, 0);
+            // rsync reports only success or failure, so say why the bar stays at 0%.
+            reportProgress?.Invoke(
+                Resources.ResourceManager.GetString("Web_Jobs_CloudSync_Native")
+                ?? "Transferring with rsync – progress is shown when finished…", 0);
             receivedFiles = await optimizedSync.SynchronizeAsync(request, transferToken) ?? [];
             reportProgress?.Invoke(null, 100);
         }

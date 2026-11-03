@@ -82,13 +82,11 @@ internal sealed partial class CloudSyncEngine
 
         _progress.TotalBytes = _mode switch
         {
-            SyncMode.Push => await Guard(SyncEndpoint.Local,
-                () => _local.GetDirectorySizeAsync(localPath, _user)),
+            SyncMode.Push => await LocalSizeAsync(localPath),
             SyncMode.Pull => await Guard(SyncEndpoint.Remote,
                 () => ListRemoteTreeAsync(remotePath)),
             SyncMode.TwoWay => Math.Max(
-                await Guard(SyncEndpoint.Local,
-                    () => _local.GetDirectorySizeAsync(localPath, _user)),
+                await LocalSizeAsync(localPath),
                 await Guard(SyncEndpoint.Remote,
                     () => ListRemoteTreeAsync(remotePath))),
             _ => 0
@@ -96,11 +94,18 @@ internal sealed partial class CloudSyncEngine
 
         _cancellationToken.ThrowIfCancellationRequested();
 
-        _progress.Update("Scanning...");
+        _progress.Update(SyncProgress.Text("Web_Jobs_CloudSync_Comparing", "Comparing files…"));
 
         await SyncDirectoryAsync(remotePath.TrimEnd('/'), localPath.TrimEnd('/'), isRoot: true);
 
         return _newManifest;
+    }
+
+    // The local size walk reports no intermediate counts, so announce it at least.
+    private Task<long> LocalSizeAsync(string localPath)
+    {
+        _progress.ReportPhase(SyncProgress.Text("Web_Jobs_CloudSync_LocalSize", "Calculating local size…"));
+        return Guard(SyncEndpoint.Local, () => _local.GetDirectorySizeAsync(localPath, _user));
     }
 
     /// <summary>
@@ -118,6 +123,7 @@ internal sealed partial class CloudSyncEngine
         string dir = remoteDir.TrimEnd('/');
         var items = await _remote.ListAsync(dir, _cancellationToken);
         _remoteListings[dir] = items;
+        _progress.Scanned(items);
 
         long total = 0;
         foreach (var item in items)
@@ -292,7 +298,10 @@ internal sealed partial class CloudSyncEngine
 
             if ((local is { IsDirectory: false } && _options.ShouldSkip(local.Name, local.Size))
                 || (remote is { IsDirectory: false } && _options.ShouldSkip(remote.Name, remote.Size)))
+            {
+                _progress.FileDone(Math.Max(local?.Size ?? 0, remote?.Size ?? 0));
                 continue;
+            }
 
             // name is the local name; a renamed remote item keeps its original name remotely.
             string remoteChild = $"{remoteDir}/{remote?.Name ?? name}";
@@ -337,7 +346,7 @@ internal sealed partial class CloudSyncEngine
             if (!_options.SyncDeletions)
                 return (false, false);
 
-            _progress.Update($"Removing {local.Name}...");
+            _progress.Update(string.Format(SyncProgress.Text("Web_Jobs_CloudSync_Removing", "Removing {0}"), local.Name));
             return (await DeleteLocalAsync(localChild), false);
         }
 
@@ -346,7 +355,7 @@ internal sealed partial class CloudSyncEngine
         // re-uploading it. The local delete honors the share recycle bin.
         if (_previousManifest?.Contains(localChild) == true)
         {
-            _progress.Update($"Removing {local.Name}...");
+            _progress.Update(string.Format(SyncProgress.Text("Web_Jobs_CloudSync_Removing", "Removing {0}"), local.Name));
             return (await DeleteLocalAsync(localChild), false);
         }
 
@@ -389,7 +398,7 @@ internal sealed partial class CloudSyncEngine
         // re-downloading it.
         if (_previousManifest?.Contains(localChild) == true)
         {
-            _progress.Update($"Removing {remote.Name}...");
+            _progress.Update(string.Format(SyncProgress.Text("Web_Jobs_CloudSync_Removing", "Removing {0}"), remote.Name));
             bool deleted = await TryTransferAsync(remoteChild, SyncFailureOperation.Delete,
                 () => _remote.DeleteAsync(remoteChild, remote.IsDirectory, _cancellationToken));
             return (false, deleted);
@@ -466,6 +475,9 @@ internal sealed partial class CloudSyncEngine
             return (await PullFileAsync(localChild, remoteChild,
                 remote.Name, remote.ModifiedAt, EarlierCreatedAt(remote.CreatedAt, KnownCreatedAt(local)), remote.Size), false);
 
+        // Unchanged (or not allowed in this direction): still progress for the user.
+        _progress.FileDone(Math.Max(local.Size, remote.Size));
+        _progress.Update(SyncProgress.Text("Web_Jobs_CloudSync_Comparing", "Comparing files…"));
         return (false, false);
     }
 

@@ -3084,6 +3084,31 @@
   <data name="Web_Jobs_CloudSync_Title" xml:space="preserve">
     <value>Synchronisierung: {0}</value>
   </data>
+  <data name="Web_Jobs_CloudSync_LocalSize" xml:space="preserve">
+    <value>Lokale Größe wird ermittelt…</value>
+  </data>
+  <data name="Web_Jobs_CloudSync_RemoteScan" xml:space="preserve">
+    <value>Entfernter Ordner wird durchsucht… Gefundene Dateien: {0} ({1})</value>
+  </data>
+  <data name="Web_Jobs_CloudSync_Comparing" xml:space="preserve">
+    <value>Dateien werden verglichen…</value>
+  </data>
+  <data name="Web_Jobs_CloudSync_Uploading" xml:space="preserve">
+    <value>Hochladen: {0}</value>
+  </data>
+  <data name="Web_Jobs_CloudSync_Downloading" xml:space="preserve">
+    <value>Herunterladen: {0}</value>
+  </data>
+  <data name="Web_Jobs_CloudSync_Removing" xml:space="preserve">
+    <value>Entfernen: {0}</value>
+  </data>
+  <data name="Web_Jobs_CloudSync_Summary" xml:space="preserve">
+    <value>{0} · Geprüfte Dateien: {1} · {2} von {3}</value>
+    <comment>{0} = current action, {1} = file count, {2} = processed size, {3} = total size</comment>
+  </data>
+  <data name="Web_Jobs_CloudSync_Native" xml:space="preserve">
+    <value>Übertragung per rsync – der Fortschritt wird am Ende angezeigt…</value>
+  </data>
   <data name="Web_Jobs_Upload_Title" xml:space="preserve">
     <value>Upload: {0}</value>
   </data>

@@ -3084,6 +3084,31 @@
   <data name="Web_Jobs_CloudSync_Title" xml:space="preserve">
     <value>Sync: {0}</value>
   </data>
+  <data name="Web_Jobs_CloudSync_LocalSize" xml:space="preserve">
+    <value>Calculating local size…</value>
+  </data>
+  <data name="Web_Jobs_CloudSync_RemoteScan" xml:space="preserve">
+    <value>Scanning remote folder… Files found: {0} ({1})</value>
+  </data>
+  <data name="Web_Jobs_CloudSync_Comparing" xml:space="preserve">
+    <value>Comparing files…</value>
+  </data>
+  <data name="Web_Jobs_CloudSync_Uploading" xml:space="preserve">
+    <value>Uploading {0}</value>
+  </data>
+  <data name="Web_Jobs_CloudSync_Downloading" xml:space="preserve">
+    <value>Downloading {0}</value>
+  </data>
+  <data name="Web_Jobs_CloudSync_Removing" xml:space="preserve">
+    <value>Removing {0}</value>
+  </data>
+  <data name="Web_Jobs_CloudSync_Summary" xml:space="preserve">
+    <value>{0} · Files checked: {1} · {2} of {3}</value>
+    <comment>{0} = current action, {1} = file count, {2} = processed size, {3} = total size</comment>
+  </data>
+  <data name="Web_Jobs_CloudSync_Native" xml:space="preserve">
+    <value>Transferring with rsync – progress is shown when finished…</value>
+  </data>
   <data name="Web_Jobs_Upload_Title" xml:space="preserve">
     <value>Upload: {0}</value>
   </data>
