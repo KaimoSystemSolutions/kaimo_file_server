@@ -17,11 +17,12 @@ public sealed partial class RemoteCloudAccessFileBrowserViewModel : RemoteFileBr
     private static readonly BrowserCapabilities WritableCapabilities = new()
     {
         CanOpen = true, CanUpload = true, CanCreateDirectory = true, CanRename = true,
-        CanDelete = true, CanMove = true, CanCopy = true, CanCopyToLocal = true, HasProperties = true
+        CanDelete = true, CanMove = true, CanCopy = true, CanCopyToLocal = true, HasProperties = true,
+        HasSearchIntegration = true
     };
     private static readonly BrowserCapabilities ReadOnlyCapabilities = new()
     {
-        CanOpen = true, CanCopyToLocal = true, HasProperties = true
+        CanOpen = true, CanCopyToLocal = true, HasProperties = true, HasSearchIntegration = true
     };
 
     private readonly ICloudAccessRepository _repository;
@@ -359,7 +360,8 @@ public sealed partial class RemoteCloudAccessFileBrowserViewModel : RemoteFileBr
             CanCopy = capabilities.HasFlag(StorageProviderCapabilities.Read)
                       && capabilities.HasFlag(StorageProviderCapabilities.Write),
             CanCopyToLocal = capabilities.HasFlag(StorageProviderCapabilities.Read),
-            HasProperties = true
+            HasProperties = true,
+            HasSearchIntegration = true
         };
     }
 

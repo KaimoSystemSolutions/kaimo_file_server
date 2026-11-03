@@ -22,7 +22,8 @@ namespace Kaimo_File_Server.Web.Components.Search;
 /// scope chosen from a single dropdown next to the input.
 ///
 /// <para>Inside the file browser the options are: this folder (default), the whole
-/// share, all shares, or settings/tabs. Outside the browser: settings/tabs (default),
+/// share, all shares, or settings/tabs — in a virtual share the first two match names only,
+/// without the index. Outside the browser: settings/tabs (default),
 /// all shares, or "selected shares" — the last reveals the shared
 /// <see cref="PrincipalPickerField"/> (the same multi-select share dialog used in the
 /// department editor).</para>
@@ -128,14 +129,15 @@ public partial class GlobalSearch : IDisposable
 
     /// <summary>
     /// Detects the file-browser context from the URL and resets the scope to the
-    /// context's sensible default. The GUID cloud-access route (/files/access/...) is
-    /// treated as "in browser but no name-scopable share" → global.
+    /// context's sensible default. A virtual share (/files/access/{id}/...) defaults to its
+    /// folder (name walk, see GlobalSearch.VirtualShare.cs); /files itself to global.
     /// </summary>
     private void DetectContext()
     {
         var rel = Nav.ToBaseRelativePath(Nav.Uri);
         var path = rel.Split('?', '#')[0].Trim('/');
         var segs = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        _virtualShareId = null;
 
         if (segs.Length == 0 || !segs[0].Equals("files", StringComparison.OrdinalIgnoreCase))
         {
@@ -151,7 +153,7 @@ public partial class GlobalSearch : IDisposable
         {
             _contextShare = null;
             _contextSubPath = "";
-            _scope = _lastScope = ScopeGlobal;
+            _scope = _lastScope = TryDetectVirtualShare(segs) ? ScopeFolder : ScopeGlobal;
             return;
         }
 
@@ -197,7 +199,7 @@ public partial class GlobalSearch : IDisposable
     /// <summary>Scope options for the current context, as (value, label) pairs.</summary>
     private IEnumerable<(string Value, string Label)> ScopeOptions()
     {
-        if (_inBrowser && _contextShare != null)
+        if (_inBrowser && (_contextShare != null || _virtualShareId != null))
         {
             yield return (ScopeFolder, Text("Web_Search_Scope_Folder", "This folder"));
             yield return (ScopeShare, Text("Web_Search_Scope_Share", "Entire share"));
@@ -422,6 +424,9 @@ public partial class GlobalSearch : IDisposable
         var perTarget = await Task.WhenAll(plan.Targets.Select(t =>
             SearchService.SearchAsync(_searchQuery, _user, t.Share, t.Sub, token, includeRecycleBin: true)));
         var files = perTarget.SelectMany(hits => hits).Select(ToWebHit).OfType<FileDocument>().ToList();
+        var virtualShareId = IsVirtualShareScope ? _virtualShareId : null;
+        if (virtualShareId is { } shareId)
+            files = await SearchVirtualShareAsync(shareId, token);
 
         var dests = plan.Dest
             ? await SearchDestinations.MatchAsync(_searchQuery, ManagementAuth, _user, token)
@@ -437,6 +442,7 @@ public partial class GlobalSearch : IDisposable
             .GroupBy(f => f.Id)
             .Select(g => g.First())
             .ToList();
+        _hitsVirtualShareId = virtualShareId;
         ApplyRecycleBinFilter();
         _destResults = dests.Take(plan.DestLimit).ToList();
         _isSearching = false;
@@ -452,7 +458,7 @@ public partial class GlobalSearch : IDisposable
         bool showBin = _includeRecycleBin || IsRecycleBinScope;
         _fileResults = _allFileHits
             .Where(f => showBin || !IsInRecycleBin(f))
-            .Take(8)
+            .Take(MaxShownFileHits)
             .GroupBy(f => f.ShareName)
             .SelectMany(g => g)
             .ToList();
@@ -464,8 +470,14 @@ public partial class GlobalSearch : IDisposable
         _scope == ScopeFolder
         && _contextSubPath.Split('/').Any(s => s.Equals(ShareEntryPolicy.RecycleBinName, StringComparison.OrdinalIgnoreCase));
 
+    private const int MaxShownFileHits = 8;
+
     private (bool Dest, int DestLimit, List<(string? Share, string Sub)> Targets) ResolvePlan()
     {
+        // No index targets: the virtual share is walked by name instead.
+        if (IsVirtualShareScope)
+            return (true, 3, new List<(string?, string)>());
+
         if (_scope == ScopeDest)
             return (true, 8, new List<(string?, string)>());
 
@@ -491,24 +503,29 @@ public partial class GlobalSearch : IDisposable
     {
         HideAndClear();
 
+        // A virtual share's hits open in its GUID route, whose browser is keyed by the share id.
+        var routeBase = _hitsVirtualShareId is { } virtualId ? $"/files/access/{virtualId}" : $"/files/{result.ShareName}";
+
         string url;
         if (result.IsDirectory)
         {
             var dirPath = (result.SharePath ?? string.Empty).Replace('\\', '/').Trim('/');
             url = string.IsNullOrEmpty(dirPath) || dirPath == "."
-                ? $"/files/{result.ShareName}"
-                : $"/files/{result.ShareName}/{dirPath}";
+                ? routeBase
+                : $"{routeBase}/{dirPath}";
         }
         else
         {
             var folderPath = (Path.GetDirectoryName(result.SharePath) ?? string.Empty)
                 .Replace('\\', '/').Trim('/');
             url = string.IsNullOrEmpty(folderPath)
-                ? $"/files/{result.ShareName}"
-                : $"/files/{result.ShareName}/{folderPath}";
+                ? routeBase
+                : $"{routeBase}/{folderPath}";
 
-            // The home browser addresses its share by the real name, not by the "user" route.
-            var browserShare = result.ShareName == HomeRoute ? HomeDirectoryService.ShareName : result.ShareName;
+            // The home browser addresses its share by the real name, not by the "user" route;
+            // a virtual share's browser by its id.
+            var browserShare = _hitsVirtualShareId?.ToString()
+                ?? (result.ShareName == HomeRoute ? HomeDirectoryService.ShareName : result.ShareName);
             if (FileSelectionCoordinator.RequestSelection(browserShare, folderPath, result.FileName))
                 return;
         }
@@ -600,12 +617,12 @@ public partial class GlobalSearch : IDisposable
         var sub = "";
         if (_scope == ScopeFolder)
         {
-            share = _contextShare ?? "";
+            share = ContextShareLabel;
             sub = _contextSubPath;
         }
         else if (_scope == ScopeShare)
         {
-            share = _contextShare ?? "";
+            share = ContextShareLabel;
         }
         else
         {
