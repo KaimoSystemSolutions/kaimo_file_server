@@ -259,9 +259,12 @@ internal sealed class SmbCommandRemoteFileStore(
         // Upstream smbclient applies --grepable to server/share discovery but
         // normally keeps the classic fixed-column directory representation.
         // Parse from the attribute/size boundary so names may contain spaces.
+        // The date is anchored to smbclient's fixed "Sun Mar  7 16:14:00 2021"
+        // form at the line end and the name is greedy, so the last boundary wins:
+        // a name such as "AP 1 HT 2018 x.png" must not be cut at "HT 2018".
         Match match = Regex.Match(
             line,
-            @"^\s*(?<name>.+?)\s+(?<attributes>[ADHNRSTV]+)\s+(?<size>\d+)\s+(?<date>.+)$",
+            @"^\s*(?<name>.+)\s+(?<attributes>[ADHNRSTV]+)\s+(?<size>\d+)\s+(?<date>[a-z]{3}\s+[a-z]{3}\s+\d{1,2}\s+\d{1,2}:\d{2}:\d{2}\s+\d{4})\s*$",
             RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
         if (!match.Success || !TrySize(match.Groups["size"].Value, out size))
             return false;

@@ -209,6 +209,29 @@ public sealed class ProtocolStorageProviderTests : IDisposable
     }
 
     [Theory]
+    [InlineData("AP 1 HT 2018 zweiter fall.PNG", 21938)]
+    [InlineData("Ap 1 HT 2018 zweiter fall lösung.PNG", 35952)]
+    [InlineData("AP 1 HT 2019 Lösung dritter fall.PNG", 29168)]
+    [InlineData("Report A 2024 final", 12)]
+    [InlineData("Notes DS 7 draft.txt", 0)]
+    public async Task SmbProvider_ClassicListingKeepsNamesThatContainAttributeAndSizeLikeTokens(
+        string name, long size)
+    {
+        var runner = RunnerReturning($"  {name,-30}      A {size,8}  Sun Mar  7 16:14:00 2021\n");
+        await using var session = await SmbProvider(runner.Object).OpenSessionAsync(SmbConnection());
+
+        var items = await session.RemoteFiles!.ListAsync("/Team");
+
+        Assert.Collection(items, item =>
+        {
+            Assert.Equal(name, item.Name);
+            Assert.Equal(size, item.Size);
+            Assert.False(item.IsDirectory);
+            Assert.Equal(new DateTime(2021, 3, 7), item.ModifiedAtUtc?.ToLocalTime().Date);
+        });
+    }
+
+    [Theory]
     [InlineData("D|0|Wed Aug 19 10:00:00 2026|Documents")]
     [InlineData("Documents|D|0|Wed Aug 19 10:00:00 2026")]
     public async Task SmbProvider_AcceptsKnownPipeDirectoryFormats(string output)
