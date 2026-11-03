@@ -3082,7 +3082,7 @@
     <value>Cancelling…</value>
   </data>
   <data name="Web_Jobs_CloudSync_Title" xml:space="preserve">
-    <value>Cloud sync: {0}</value>
+    <value>Sync: {0}</value>
   </data>
   <data name="Web_Jobs_Upload_Title" xml:space="preserve">
     <value>Upload: {0}</value>

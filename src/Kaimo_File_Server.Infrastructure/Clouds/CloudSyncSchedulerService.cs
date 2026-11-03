@@ -151,14 +151,14 @@ public sealed class CloudSyncSchedulerService(
                 // up in the Running Jobs menu. The runner dedupes an already
                 // queued/running sync for this share+path.
                 string title = string.Format(
-                    Resources.ResourceManager.GetString("Web_Jobs_CloudSync_Title") ?? "Cloud sync: {0}",
+                    Resources.ResourceManager.GetString("Web_Jobs_CloudSync_Title") ?? "Sync: {0}",
                     string.IsNullOrWhiteSpace(definition.DisplayName) ? localPath : definition.DisplayName);
                 jobRunner.Enqueue(
                     definition.LocalShareId,
                     localPath,
                     runAsUserId.Value,
                     title,
-                    $"{localPath} ↔ {definition.RemotePath}");
+                    definition.DescribePaths());
         }
 
         foreach (ScheduleKey staleKey in _lastEvaluations.Keys

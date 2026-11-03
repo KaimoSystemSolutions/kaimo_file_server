@@ -3082,7 +3082,7 @@
     <value>Wird abgebrochen…</value>
   </data>
   <data name="Web_Jobs_CloudSync_Title" xml:space="preserve">
-    <value>Cloud-Synchronisierung: {0}</value>
+    <value>Synchronisierung: {0}</value>
   </data>
   <data name="Web_Jobs_Upload_Title" xml:space="preserve">
     <value>Upload: {0}</value>

@@ -40,6 +40,18 @@ public sealed class SyncDefinition
     /// <summary>SHA-256 checksum of the imported legacy configuration.</summary>
     public string? MigrationSourceChecksum { get; set; }
 
+    /// <summary>Short "local → remote" summary whose arrow reflects <see cref="Mode"/>.</summary>
+    public string DescribePaths()
+    {
+        string arrow = Mode switch
+        {
+            SyncMode.Pull => "←",
+            SyncMode.Push => "→",
+            _ => "↔"
+        };
+        return $"{LocalPath} {arrow} {RemotePath}";
+    }
+
     public static string SerializeSchedule(CloudSyncSchedule value)
         => JsonSerializer.Serialize(value ?? new CloudSyncSchedule());
 

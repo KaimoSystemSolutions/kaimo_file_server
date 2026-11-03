@@ -13345,7 +13345,7 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud sync: {0} ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Sync: {0} ähnelt.
         /// </summary>
         public static string Web_Jobs_CloudSync_Title {
             get {

@@ -240,7 +240,7 @@ public sealed class ExternalStorageSyncViewModel(
         await GetAuthorizedShareAsync(definition.LocalShareId, ManagementPermission.SyncManually);
 
         string title = string.Format(
-            Text("Web_Jobs_CloudSync_Title", "Cloud sync: {0}"),
+            Text("Web_Jobs_CloudSync_Title", "Sync: {0}"),
             string.IsNullOrWhiteSpace(definition.DisplayName)
                 ? definition.LocalPath
                 : definition.DisplayName);
@@ -249,7 +249,7 @@ public sealed class ExternalStorageSyncViewModel(
             definition.LocalPath,
             _actor!.User.Id,
             title,
-            $"{definition.LocalPath} ↔ {definition.RemotePath}");
+            definition.DescribePaths());
     }
 
     /// <summary>
