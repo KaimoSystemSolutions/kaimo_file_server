@@ -178,8 +178,11 @@ window.fileMarquee = (() => {
             if (event.pointerType === 'touch') return;
 
             // File rows own their complete width. Only the surrounding gutters
-            // and the empty area below the list may begin a marquee gesture.
-            if ((event.target as Element).closest('.file-grid-row, .file-grid-header, button, a, input')) return;
+            // and the empty area below the list may begin a marquee gesture. The inline
+            // ACL editor and its dialogs (e.g. the principal picker) are excluded too:
+            // the pointer capture below would retarget their clicks to the host.
+            if ((event.target as Element).closest('.file-grid-row, .file-grid-header, button, a, input, label, ' +
+                '.file-row-acl-expand-wrap, .modal-backdrop')) return;
 
             const headerBottom = host.querySelector('.file-grid-header')
                 ?.getBoundingClientRect().bottom ?? host.getBoundingClientRect().top;
