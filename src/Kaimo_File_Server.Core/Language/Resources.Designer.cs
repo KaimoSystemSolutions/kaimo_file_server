@@ -583,6 +583,42 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Two-factor sign-in changed ähnelt.
+        /// </summary>
+        public static string Notification_Event_security_second_factor_changed {
+            get {
+                return ResourceManager.GetString("Notification_Event_security_second_factor_changed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Security notice when two-factor sign-in is set up, removed or reset, or a recovery code is used. ähnelt.
+        /// </summary>
+        public static string Notification_Event_security_second_factor_changed_Desc {
+            get {
+                return ResourceManager.GetString("Notification_Event_security_second_factor_changed_Desc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Wrong two-factor code ähnelt.
+        /// </summary>
+        public static string Notification_Event_security_second_factor_failed {
+            get {
+                return ResourceManager.GetString("Notification_Event_security_second_factor_failed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The password was correct, but the two-factor code was wrong: someone else may know the password. ähnelt.
+        /// </summary>
+        public static string Notification_Event_security_second_factor_failed_Desc {
+            get {
+                return ResourceManager.GetString("Notification_Event_security_second_factor_failed_Desc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Share link downloaded ähnelt.
         /// </summary>
         public static string Notification_Event_sharelink_accessed {
@@ -750,6 +786,33 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Notification_Role_security_account_locked_affected {
             get {
                 return ResourceManager.GetString("Notification_Role_security_account_locked_affected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Who made the change ähnelt.
+        /// </summary>
+        public static string Notification_Role_security_second_factor_changed_actor {
+            get {
+                return ResourceManager.GetString("Notification_Role_security_second_factor_changed_actor", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The user themselves ähnelt.
+        /// </summary>
+        public static string Notification_Role_security_second_factor_changed_affected {
+            get {
+                return ResourceManager.GetString("Notification_Role_security_second_factor_changed_affected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Owner of the account ähnelt.
+        /// </summary>
+        public static string Notification_Role_security_second_factor_failed_affected {
+            get {
+                return ResourceManager.GetString("Notification_Role_security_second_factor_failed_affected", resourceCulture);
             }
         }
         
@@ -1024,6 +1087,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die At most {0} SMB networks are allowed. ähnelt.
+        /// </summary>
+        public static string Web_AccessRestrictions_Error_TooManySmbNetworks {
+            get {
+                return ResourceManager.GetString("Web_AccessRestrictions_Error_TooManySmbNetworks", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Groups ähnelt.
         /// </summary>
         public static string Web_AccessRestrictions_Groups {
@@ -1110,6 +1182,60 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_AccessRestrictions_Rules {
             get {
                 return ResourceManager.GetString("Web_AccessRestrictions_Rules", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Networks Samba accepts connections from, for every user. The rules above do not apply to SMB. A change disconnects all active SMB sessions; clients reconnect automatically. ähnelt.
+        /// </summary>
+        public static string Web_AccessRestrictions_Smb_Hint {
+            get {
+                return ResourceManager.GetString("Web_AccessRestrictions_Smb_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Allowed client networks ähnelt.
+        /// </summary>
+        public static string Web_AccessRestrictions_Smb_Networks {
+            get {
+                return ResourceManager.GetString("Web_AccessRestrictions_Smb_Networks", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die One per line: CIDR range (192.168.1.0/24) or single address (IPv4 or IPv6). Leave empty to allow every network. ähnelt.
+        /// </summary>
+        public static string Web_AccessRestrictions_Smb_NetworksHint {
+            get {
+                return ResourceManager.GetString("Web_AccessRestrictions_Smb_NetworksHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Samba sees the address a connection comes from. Through Docker&apos;s userland proxy (IPv6 or hairpin connections) that is the Docker gateway, not the client, so a narrow list can block everybody. Publish port 445 so Samba sees real client addresses, or include the gateway network. Loopback is always allowed for the container health checks. ähnelt.
+        /// </summary>
+        public static string Web_AccessRestrictions_Smb_ProxyHint {
+            get {
+                return ResourceManager.GetString("Web_AccessRestrictions_Smb_ProxyHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Locked out? Start the smb-bridge container with KAIMO_ACCESS_RESTRICTIONS_DISABLED=true; Samba then accepts every network again. ähnelt.
+        /// </summary>
+        public static string Web_AccessRestrictions_Smb_RecoveryHint {
+            get {
+                return ResourceManager.GetString("Web_AccessRestrictions_Smb_RecoveryHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die SMB ähnelt.
+        /// </summary>
+        public static string Web_AccessRestrictions_Smb_Title {
+            get {
+                return ResourceManager.GetString("Web_AccessRestrictions_Smb_Title", resourceCulture);
             }
         }
         
@@ -3553,6 +3679,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die A new folder cannot be created at the top level of the home folders. Open a home folder first or restore in place. ähnelt.
+        /// </summary>
+        public static string Web_Backup_Error_homes_root_new_folder {
+            get {
+                return ResourceManager.GetString("Web_Backup_Error_homes_root_new_folder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die The SSH host key does not match the pinned key. ähnelt.
         /// </summary>
         public static string Web_Backup_Error_host_key_mismatch {
@@ -4876,38 +5011,155 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die {0} jobs ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Everything is fine: all backups and repositories are running as planned. ähnelt.
         /// </summary>
-        public static string Web_Backup_Overview_JobCount {
+        public static string Web_Backup_Overview_AllGood {
             get {
-                return ResourceManager.GetString("Web_Backup_Overview_JobCount", resourceCulture);
+                return ResourceManager.GetString("Web_Backup_Overview_AllGood", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die The repository &quot;{0}&quot; waits for its recovery kit to be downloaded and confirmed. No backups run into it until then. ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Needs attention ähnelt.
         /// </summary>
-        public static string Web_Backup_Overview_KitPending {
+        public static string Web_Backup_Overview_Attention {
             get {
-                return ResourceManager.GetString("Web_Backup_Overview_KitPending", resourceCulture);
+                return ResourceManager.GetString("Web_Backup_Overview_Attention", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Open repository ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Open items: {0}. Details in the list below. ähnelt.
         /// </summary>
-        public static string Web_Backup_Overview_OpenRepository {
+        public static string Web_Backup_Overview_AttentionCount {
             get {
-                return ResourceManager.GetString("Web_Backup_Overview_OpenRepository", resourceCulture);
+                return ResourceManager.GetString("Web_Backup_Overview_AttentionCount", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die {0} repositories ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die The last run on {0} failed. ähnelt.
         /// </summary>
-        public static string Web_Backup_Overview_RepositoryCount {
+        public static string Web_Backup_Overview_JobFailed {
             get {
-                return ResourceManager.GetString("Web_Backup_Overview_RepositoryCount", resourceCulture);
+                return ResourceManager.GetString("Web_Backup_Overview_JobFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No successful backup for {0} days (last on {1}). ähnelt.
+        /// </summary>
+        public static string Web_Backup_Overview_JobOverdue {
+            get {
+                return ResourceManager.GetString("Web_Backup_Overview_JobOverdue", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No successful backup yet, although the job is scheduled. ähnelt.
+        /// </summary>
+        public static string Web_Backup_Overview_JobOverdueNever {
+            get {
+                return ResourceManager.GetString("Web_Backup_Overview_JobOverdueNever", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The last run on {0} finished with warnings; some files may be missing from the backup. ähnelt.
+        /// </summary>
+        public static string Web_Backup_Overview_JobWarnings {
+            get {
+                return ResourceManager.GetString("Web_Backup_Overview_JobWarnings", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Last successful backup ähnelt.
+        /// </summary>
+        public static string Web_Backup_Overview_LastSuccess {
+            get {
+                return ResourceManager.GetString("Web_Backup_Overview_LastSuccess", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Next backup ähnelt.
+        /// </summary>
+        public static string Web_Backup_Overview_NextRun {
+            get {
+                return ResourceManager.GetString("Web_Backup_Overview_NextRun", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No backup job yet ähnelt.
+        /// </summary>
+        public static string Web_Backup_Overview_NoJobs {
+            get {
+                return ResourceManager.GetString("Web_Backup_Overview_NoJobs", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Nothing is backed up yet. Create a job for your shares. ähnelt.
+        /// </summary>
+        public static string Web_Backup_Overview_NoJobsHelp {
+            get {
+                return ResourceManager.GetString("Web_Backup_Overview_NoJobsHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No repository yet ähnelt.
+        /// </summary>
+        public static string Web_Backup_Overview_NoRepositories {
+            get {
+                return ResourceManager.GetString("Web_Backup_Overview_NoRepositories", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Backups need a storage target. Create a repository first. ähnelt.
+        /// </summary>
+        public static string Web_Backup_Overview_NoRepositoriesHelp {
+            get {
+                return ResourceManager.GetString("Web_Backup_Overview_NoRepositoriesHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No backup has been set up yet. ähnelt.
+        /// </summary>
+        public static string Web_Backup_Overview_NotSetUp {
+            get {
+                return ResourceManager.GetString("Web_Backup_Overview_NotSetUp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The integrity check on {0} found errors. ähnelt.
+        /// </summary>
+        public static string Web_Backup_Overview_RepositoryCheckFailed {
+            get {
+                return ResourceManager.GetString("Web_Backup_Overview_RepositoryCheckFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Download and confirm the recovery kit; no backups run into this repository until then. ähnelt.
+        /// </summary>
+        public static string Web_Backup_Overview_RepositoryKitPending {
+            get {
+                return ResourceManager.GetString("Web_Backup_Overview_RepositoryKitPending", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Running now ähnelt.
+        /// </summary>
+        public static string Web_Backup_Overview_Running {
+            get {
+                return ResourceManager.GetString("Web_Backup_Overview_Running", resourceCulture);
             }
         }
         
@@ -5916,15 +6168,6 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Backup_Restore_PermissionsAuto {
             get {
                 return ResourceManager.GetString("Web_Backup_Restore_PermissionsAuto", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die A new folder cannot be created at the top level of the home folders. Open a home folder first or restore in place. ähnelt.
-        /// </summary>
-        public static string Web_Backup_Error_homes_root_new_folder {
-            get {
-                return ResourceManager.GetString("Web_Backup_Error_homes_root_new_folder", resourceCulture);
             }
         }
         
@@ -8935,15 +9178,6 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die {0} items deleted successfully ähnelt.
-        /// </summary>
-        public static string Web_Delete_BatchSuccess {
-            get {
-                return ResourceManager.GetString("Web_Delete_BatchSuccess", resourceCulture);
-            }
-        }
-
-        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die {0} of {1} items deleted. The remaining items were skipped. ähnelt.
         /// </summary>
         public static string Web_Delete_BatchStopped {
@@ -8951,7 +9185,16 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Delete_BatchStopped", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} items deleted successfully ähnelt.
+        /// </summary>
+        public static string Web_Delete_BatchSuccess {
+            get {
+                return ResourceManager.GetString("Web_Delete_BatchSuccess", resourceCulture);
+            }
+        }
+        
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die {0} of {1} deleted ähnelt.
         /// </summary>
@@ -9052,6 +9295,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This department has role assignments with rights you do not hold yourself. Only an administrator holding those rights can delete it. ähnelt.
+        /// </summary>
+        public static string Web_Dept_AssignmentsBeyondOwnRights {
+            get {
+                return ResourceManager.GetString("Web_Dept_AssignmentsBeyondOwnRights", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Roles assigned here also apply in all sub-departments. Assignments of parent departments and of Global apply here too. ähnelt.
         /// </summary>
         public static string Web_Dept_AssignmentsHint {
@@ -9066,6 +9318,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Dept_CannotDeleteGlobal {
             get {
                 return ResourceManager.GetString("Web_Dept_CannotDeleteGlobal", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die You are not allowed to make the following changes: {0} ähnelt.
+        /// </summary>
+        public static string Web_Dept_ChangesNotPermitted {
+            get {
+                return ResourceManager.GetString("Web_Dept_ChangesNotPermitted", resourceCulture);
             }
         }
         
@@ -9273,6 +9534,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Dept_InheritHint {
             get {
                 return ResourceManager.GetString("Web_Dept_InheritHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The selected parent department is not valid. ähnelt.
+        /// </summary>
+        public static string Web_Dept_InvalidParent {
+            get {
+                return ResourceManager.GetString("Web_Dept_InvalidParent", resourceCulture);
             }
         }
         
@@ -10285,6 +10555,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This group grants roles you are not allowed to revoke, so you cannot remove members from it. ähnelt.
+        /// </summary>
+        public static string Web_Error_GroupGrantsUnrevokableRoles {
+            get {
+                return ResourceManager.GetString("Web_Error_GroupGrantsUnrevokableRoles", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Invalid path. ähnelt.
         /// </summary>
         public static string Web_Error_InvalidPath {
@@ -10596,6 +10875,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Error_SystemGroupUndeletable {
             get {
                 return ResourceManager.GetString("Web_Error_SystemGroupUndeletable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die System roles cannot be deleted. ähnelt.
+        /// </summary>
+        public static string Web_Error_SystemRoleUndeletable {
+            get {
+                return ResourceManager.GetString("Web_Error_SystemRoleUndeletable", resourceCulture);
             }
         }
         
@@ -11131,6 +11419,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The server identity no longer matches the confirmed host key. Verify the server before trusting a new key. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ErrorCode_host_key_mismatch {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ErrorCode_host_key_mismatch", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Additional sign-in is required. Reconnect the storage connection. ähnelt.
         /// </summary>
         public static string Web_ExternalStorage_ErrorCode_interaction_required {
@@ -11194,11 +11491,38 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The sign-in succeeded, but the server does not provide SFTP for this account. Enable SFTP on the server (on a Synology NAS: File Services → FTP → SFTP). ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ErrorCode_sftp_unavailable {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ErrorCode_sftp_unavailable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die The provider is rate-limiting requests. Try again later. ähnelt.
         /// </summary>
         public static string Web_ExternalStorage_ErrorCode_slow_down {
             get {
                 return ResourceManager.GetString("Web_ExternalStorage_ErrorCode_slow_down", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The SSH server rejected the sign-in. Check the username and the password or key. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ErrorCode_ssh_authentication_failed {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ErrorCode_ssh_authentication_failed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The SSH server could not be reached or closed the connection. Check the host, port and firewall. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ErrorCode_ssh_connection_failed {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ErrorCode_ssh_connection_failed", resourceCulture);
             }
         }
         
@@ -11878,6 +12202,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Choose key file ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshChooseKeyFile {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshChooseKeyFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die I verified this fingerprint through a trusted channel. ähnelt.
         /// </summary>
         public static string Web_ExternalStorage_SshConfirmFingerprint {
@@ -11910,6 +12243,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_ExternalStorage_SshGenerateKey {
             get {
                 return ResourceManager.GetString("Web_ExternalStorage_SshGenerateKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The server creates a new Ed25519 key pair for this connection. The private key never leaves the server and is stored encrypted in the connection vault; you only install the public key shown below on the remote account. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshGenerateKeyHelp {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshGenerateKeyHelp", resourceCulture);
             }
         }
         
@@ -11977,6 +12319,24 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Generate new key ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshKeySourceGenerate {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshKeySourceGenerate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Upload existing key ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshKeySourceUpload {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshKeySourceUpload", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die The password is stored encrypted and is also used by SFTP backup repositories. Prefer an SSH key where the server allows it. ähnelt.
         /// </summary>
         public static string Web_ExternalStorage_SshPasswordHelp {
@@ -12013,68 +12373,14 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Upload existing key ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Public key to install on the server ähnelt.
         /// </summary>
-        public static string Web_ExternalStorage_SshKeySourceUpload {
+        public static string Web_ExternalStorage_SshPublicKey {
             get {
-                return ResourceManager.GetString("Web_ExternalStorage_SshKeySourceUpload", resourceCulture);
+                return ResourceManager.GetString("Web_ExternalStorage_SshPublicKey", resourceCulture);
             }
         }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Generate new key ähnelt.
-        /// </summary>
-        public static string Web_ExternalStorage_SshKeySourceGenerate {
-            get {
-                return ResourceManager.GetString("Web_ExternalStorage_SshKeySourceGenerate", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Choose an unencrypted OpenSSH private key file, e.g. ~/.ssh/id_ed25519 – not the .pub file. It is stored encrypted in the connection vault. ähnelt.
-        /// </summary>
-        public static string Web_ExternalStorage_SshUploadKeyHelp {
-            get {
-                return ResourceManager.GetString("Web_ExternalStorage_SshUploadKeyHelp", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die The server creates a new Ed25519 key pair for this connection. [...] ähnelt.
-        /// </summary>
-        public static string Web_ExternalStorage_SshGenerateKeyHelp {
-            get {
-                return ResourceManager.GetString("Web_ExternalStorage_SshGenerateKeyHelp", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Choose key file ähnelt.
-        /// </summary>
-        public static string Web_ExternalStorage_SshChooseKeyFile {
-            get {
-                return ResourceManager.GetString("Web_ExternalStorage_SshChooseKeyFile", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Replace with a new key ähnelt.
-        /// </summary>
-        public static string Web_ExternalStorage_SshRegenerateKey {
-            get {
-                return ResourceManager.GetString("Web_ExternalStorage_SshRegenerateKey", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Uploaded key is valid ähnelt.
-        /// </summary>
-        public static string Web_ExternalStorage_SshUploadedKeyReady {
-            get {
-                return ResourceManager.GetString("Web_ExternalStorage_SshUploadedKeyReady", resourceCulture);
-            }
-        }
-
+        
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Add this line to ~/.ssh/authorized_keys of the remote account. ähnelt.
         /// </summary>
@@ -12083,22 +12389,13 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_ExternalStorage_SshPublicKeyInstallHint", resourceCulture);
             }
         }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die This is a public key (.pub). Upload the matching private key file instead. ähnelt.
-        /// </summary>
-        public static string Web_ExternalStorage_SshSetupError_private_key_is_public {
-            get {
-                return ResourceManager.GetString("Web_ExternalStorage_SshSetupError_private_key_is_public", resourceCulture);
-            }
-        }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Public key to install on the server ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Replace with a new key ähnelt.
         /// </summary>
-        public static string Web_ExternalStorage_SshPublicKey {
+        public static string Web_ExternalStorage_SshRegenerateKey {
             get {
-                return ResourceManager.GetString("Web_ExternalStorage_SshPublicKey", resourceCulture);
+                return ResourceManager.GetString("Web_ExternalStorage_SshRegenerateKey", resourceCulture);
             }
         }
         
@@ -12166,11 +12463,38 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This is a public key (.pub). Upload the matching private key file instead. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshSetupError_private_key_is_public {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshSetupError_private_key_is_public", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Complete the SSH key and host-verification steps first. ähnelt.
         /// </summary>
         public static string Web_ExternalStorage_SshSetupIncomplete {
             get {
                 return ResourceManager.GetString("Web_ExternalStorage_SshSetupIncomplete", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Uploaded key is valid ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshUploadedKeyReady {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshUploadedKeyReady", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Choose an unencrypted OpenSSH private key file, e.g. ~/.ssh/id_ed25519 – not the .pub file. It is stored encrypted in the connection vault. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshUploadKeyHelp {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshUploadKeyHelp", resourceCulture);
             }
         }
         
@@ -12832,6 +13156,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die You are not allowed to add the following users to the department of this group: {0} ähnelt.
+        /// </summary>
+        public static string Web_Group_MembersNotPermitted {
+            get {
+                return ResourceManager.GetString("Web_Group_MembersNotPermitted", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Group name is required. ähnelt.
         /// </summary>
         public static string Web_Group_NameRequired {
@@ -13273,7 +13606,7 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Home folders are disabled for all users (Settings tab). Files are kept. ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Home folders are disabled for all users (Settings → Home folders). Files are kept. ähnelt.
         /// </summary>
         public static string Web_Homes_GloballyDisabled {
             get {
@@ -13318,7 +13651,7 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Home folders are not set up yet. Choose a storage pool on the Settings tab. ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Home folders are not set up yet. Choose a storage pool under Settings → Home folders. ähnelt.
         /// </summary>
         public static string Web_Homes_NotConfigured {
             get {
@@ -13408,11 +13741,83 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Comparing files… ähnelt.
+        /// </summary>
+        public static string Web_Jobs_CloudSync_Comparing {
+            get {
+                return ResourceManager.GetString("Web_Jobs_CloudSync_Comparing", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Downloading {0} ähnelt.
+        /// </summary>
+        public static string Web_Jobs_CloudSync_Downloading {
+            get {
+                return ResourceManager.GetString("Web_Jobs_CloudSync_Downloading", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Calculating local size… ähnelt.
+        /// </summary>
+        public static string Web_Jobs_CloudSync_LocalSize {
+            get {
+                return ResourceManager.GetString("Web_Jobs_CloudSync_LocalSize", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Transferring with rsync – progress is shown when finished… ähnelt.
+        /// </summary>
+        public static string Web_Jobs_CloudSync_Native {
+            get {
+                return ResourceManager.GetString("Web_Jobs_CloudSync_Native", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Scanning remote folder… Files found: {0} ({1}) ähnelt.
+        /// </summary>
+        public static string Web_Jobs_CloudSync_RemoteScan {
+            get {
+                return ResourceManager.GetString("Web_Jobs_CloudSync_RemoteScan", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Removing {0} ähnelt.
+        /// </summary>
+        public static string Web_Jobs_CloudSync_Removing {
+            get {
+                return ResourceManager.GetString("Web_Jobs_CloudSync_Removing", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} · Files checked: {1} · {2} of {3} ähnelt.
+        /// </summary>
+        public static string Web_Jobs_CloudSync_Summary {
+            get {
+                return ResourceManager.GetString("Web_Jobs_CloudSync_Summary", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Sync: {0} ähnelt.
         /// </summary>
         public static string Web_Jobs_CloudSync_Title {
             get {
                 return ResourceManager.GetString("Web_Jobs_CloudSync_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Uploading {0} ähnelt.
+        /// </summary>
+        public static string Web_Jobs_CloudSync_Uploading {
+            get {
+                return ResourceManager.GetString("Web_Jobs_CloudSync_Uploading", resourceCulture);
             }
         }
         
@@ -13579,6 +13984,78 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Back to sign-in ähnelt.
+        /// </summary>
+        public static string Web_Login_SecondFactor_Back {
+            get {
+                return ResourceManager.GetString("Web_Login_SecondFactor_Back", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The sign-in took too long. Please sign in again. ähnelt.
+        /// </summary>
+        public static string Web_Login_SecondFactor_Expired {
+            get {
+                return ResourceManager.GetString("Web_Login_SecondFactor_Expired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter the 6-digit code from your authenticator app or one of your recovery codes. ähnelt.
+        /// </summary>
+        public static string Web_Login_SecondFactor_Hint {
+            get {
+                return ResourceManager.GetString("Web_Login_SecondFactor_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The code is not valid. ähnelt.
+        /// </summary>
+        public static string Web_Login_SecondFactor_Invalid {
+            get {
+                return ResourceManager.GetString("Web_Login_SecondFactor_Invalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Too many wrong codes. Try again in {0} minutes. ähnelt.
+        /// </summary>
+        public static string Web_Login_SecondFactor_LockedOut {
+            get {
+                return ResourceManager.GetString("Web_Login_SecondFactor_LockedOut", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Verify ähnelt.
+        /// </summary>
+        public static string Web_Login_SecondFactor_Submit {
+            get {
+                return ResourceManager.GetString("Web_Login_SecondFactor_Submit", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Two-factor verification ähnelt.
+        /// </summary>
+        public static string Web_Login_SecondFactor_Title {
+            get {
+                return ResourceManager.GetString("Web_Login_SecondFactor_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The second factor cannot be checked. Please contact your administrator. ähnelt.
+        /// </summary>
+        public static string Web_Login_SecondFactor_Unavailable {
+            get {
+                return ResourceManager.GetString("Web_Login_SecondFactor_Unavailable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Sign in ähnelt.
         /// </summary>
         public static string Web_Login_Submit {
@@ -13602,6 +14079,294 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Login_TooManyAttempts {
             get {
                 return ResourceManager.GetString("Web_Login_TooManyAttempts", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Account-wide factor ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_AccountWideFactor {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_AccountWideFactor", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The account is locked for all addresses after {0} failed attempts (attempts per user and address × factor). ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_AccountWideFactor_Hint {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_AccountWideFactor_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The account is locked for all addresses after (attempts per user and address × factor) failed attempts. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_AccountWideFactor_HintUnknown {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_AccountWideFactor_HintUnknown", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Please correct the marked fields. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_Error_Invalid {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_Error_Invalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Allowed: {0}–{1} ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_Error_Range {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_Error_Range", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Limits how often a wrong password may be tried before further attempts are refused for a while. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_Intro {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_Intro", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Address lockout duration (minutes) ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_IpLockoutMinutes {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_IpLockoutMinutes", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die While locked, no account can sign in from this address. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_IpLockoutMinutes_Hint {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_IpLockoutMinutes_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Failed attempts per address ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_IpMaxAttempts {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_IpMaxAttempts", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Counts every user name tried from one address; after that, the address is locked. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_IpMaxAttempts_Hint {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_IpMaxAttempts_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Lockout duration (minutes) ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_LockoutMinutes {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_LockoutMinutes", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Applies to the lock per user and address and to the account-wide limit. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_LockoutMinutes_Hint {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_LockoutMinutes_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Low values also lock out legitimate users: a mistyped password, an old password saved in a sync client or many users behind one shared address (office NAT, untrusted reverse proxy) quickly use up the budget. A lock ends by itself after the set duration; a successful login resets the counters of that user and address. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_LockoutRiskHint {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_LockoutRiskHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Applies to the web sign-in, the client apps and WebDAV alike. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_Login_Desc {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_Login_Desc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Web, client API and WebDAV ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_Login_Title {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_Login_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Failed attempts per user and address ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_MaxAttempts {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_MaxAttempts", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die After that, this user is locked from this address. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_MaxAttempts_Hint {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_MaxAttempts_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Behind a reverse proxy, every client appears with the proxy&apos;s address unless the proxy is trusted (ForwardedHeaders:KnownProxies) – a single attacker could then lock out everyone. See the reverse proxy section in example/DETAILS.md. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_ProxyHint {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_ProxyHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Limits password guessing on password-protected download and upload links. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_ShareLink_Desc {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_ShareLink_Desc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Share link passwords ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_ShareLink_Title {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_ShareLink_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die How long a locked link or address stays locked. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_ShareLinkLockoutMinutes_Hint {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_ShareLinkLockoutMinutes_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Wrong passwords per link and address ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_ShareLinkPerAddress {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_ShareLinkPerAddress", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die After that, this address cannot try the link any more. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_ShareLinkPerAddress_Hint {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_ShareLinkPerAddress_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Wrong passwords per link ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_ShareLinkPerLink {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_ShareLinkPerLink", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Counted across all addresses; after that, the link is locked for everyone. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_ShareLinkPerLink_Hint {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_ShareLinkPerLink_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Samba counts failed SMB logins per account, regardless of the client address. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_Smb_Desc {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_Smb_Desc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Lock accounts after failed SMB logins ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_Smb_Enabled {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_Smb_Enabled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die An SMB lock applies to the account globally, from every address. Anyone who knows a user name can deliberately lock that user out of SMB. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_Smb_GlobalWarning {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_Smb_GlobalWarning", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die SMB (Windows file sharing) ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_Smb_Title {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_Smb_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Failed SMB logins ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_SmbAttempts {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_SmbAttempts", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die After that, the account is locked for SMB. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_SmbAttempts_Hint {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_SmbAttempts_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die After that, the account is unlocked automatically. ähnelt.
+        /// </summary>
+        public static string Web_LoginProtection_SmbLockoutMinutes_Hint {
+            get {
+                return ResourceManager.GetString("Web_LoginProtection_SmbLockoutMinutes_Hint", resourceCulture);
             }
         }
         
@@ -15289,6 +16054,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Configure syncs ähnelt.
+        /// </summary>
+        public static string Web_Perm_ConfigureSyncs {
+            get {
+                return ResourceManager.GetString("Web_Perm_ConfigureSyncs", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Create groups ähnelt.
         /// </summary>
         public static string Web_Perm_CreateGroups {
@@ -15303,6 +16077,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Perm_CreateShares {
             get {
                 return ResourceManager.GetString("Web_Perm_CreateShares", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Create syncs ähnelt.
+        /// </summary>
+        public static string Web_Perm_CreateSyncs {
+            get {
+                return ResourceManager.GetString("Web_Perm_CreateSyncs", resourceCulture);
             }
         }
         
@@ -15330,6 +16113,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Perm_DeleteShares {
             get {
                 return ResourceManager.GetString("Web_Perm_DeleteShares", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Delete syncs ähnelt.
+        /// </summary>
+        public static string Web_Perm_DeleteSyncs {
+            get {
+                return ResourceManager.GetString("Web_Perm_DeleteSyncs", resourceCulture);
             }
         }
         
@@ -15375,6 +16167,24 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Perm_EnableDisable {
             get {
                 return ResourceManager.GetString("Web_Perm_EnableDisable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Global only ähnelt.
+        /// </summary>
+        public static string Web_Perm_GlobalOnly {
+            get {
+                return ResourceManager.GetString("Web_Perm_GlobalOnly", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Only takes effect when the role is assigned system-wide. ähnelt.
+        /// </summary>
+        public static string Web_Perm_GlobalOnly_Hint {
+            get {
+                return ResourceManager.GetString("Web_Perm_GlobalOnly_Hint", resourceCulture);
             }
         }
         
@@ -15429,6 +16239,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Perm_ManageCertificates {
             get {
                 return ResourceManager.GetString("Web_Perm_ManageCertificates", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Manage client devices ähnelt.
+        /// </summary>
+        public static string Web_Perm_ManageClientDevices {
+            get {
+                return ResourceManager.GetString("Web_Perm_ManageClientDevices", resourceCulture);
             }
         }
         
@@ -15532,6 +16351,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Reset two-factor sign-in ähnelt.
+        /// </summary>
+        public static string Web_Perm_ResetSecondFactor {
+            get {
+                return ResourceManager.GetString("Web_Perm_ResetSecondFactor", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Restore in place (overwrite, other share; resets owners and permissions of overwritten items to the backup state) ähnelt.
         /// </summary>
         public static string Web_Perm_RestoreBackupInPlace {
@@ -15546,6 +16374,24 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Perm_RestoreFromBackup {
             get {
                 return ResourceManager.GetString("Web_Perm_RestoreFromBackup", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die All permissions: {0} ähnelt.
+        /// </summary>
+        public static string Web_Perm_SelectAllInGroup {
+            get {
+                return ResourceManager.GetString("Web_Perm_SelectAllInGroup", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Start syncs manually ähnelt.
+        /// </summary>
+        public static string Web_Perm_SyncManually {
+            get {
+                return ResourceManager.GetString("Web_Perm_SyncManually", resourceCulture);
             }
         }
         
@@ -15708,6 +16554,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Picker_Placeholder {
             get {
                 return ResourceManager.GetString("Web_Picker_Placeholder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Pools ähnelt.
+        /// </summary>
+        public static string Web_Picker_Pools {
+            get {
+                return ResourceManager.GetString("Web_Picker_Pools", resourceCulture);
             }
         }
         
@@ -16504,6 +17359,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} of {1} permissions ähnelt.
+        /// </summary>
+        public static string Web_Role_PermissionCount {
+            get {
+                return ResourceManager.GetString("Web_Role_PermissionCount", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Role saved. ähnelt.
         /// </summary>
         public static string Web_Role_Saved {
@@ -16729,6 +17593,438 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Continue ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Continue {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Continue", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Remove two-factor sign-in ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Disable {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Disable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter a code from your authenticator app to remove two-factor sign-in. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_DisableHint {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_DisableHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Activate ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Enroll_Confirm {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Enroll_Confirm", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Your account requires two-factor sign-in. Set it up now. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Enroll_RequiredHint {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Enroll_RequiredHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Install an authenticator app on your phone. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Enroll_Step1 {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Enroll_Step1", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Scan the QR code with the app. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Enroll_Step2 {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Enroll_Step2", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter the 6-digit code the app shows. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Enroll_Step3 {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Enroll_Step3", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Verification code ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Label_Code {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Label_Code", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Unused recovery codes ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Label_RecoveryCodesLeft {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Label_RecoveryCodesLeft", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Status ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Label_Status {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Label_Status", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cannot scan? Enter this key in the app: ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_ManualKey {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_ManualKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Off ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Mode_Off {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Mode_Off", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Nobody is asked for a second factor. Factors already set up are kept. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Mode_Off_Hint {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Mode_Off_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Optional ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Mode_Optional {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Mode_Optional", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Users can set up a second factor in their profile; whoever has one is asked for it. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Mode_Optional_Hint {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Mode_Optional_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Required ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Mode_Required {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Mode_Required", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Like optional, and the users chosen below must set one up at their next web login. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Mode_Required_Hint {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Mode_Required_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Confirm with your current password to set up two-factor sign-in. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_PasswordHint {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_PasswordHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die QR code for the authenticator app ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_QrAlt {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_QrAlt", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die I have stored the codes ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_RecoveryCodes_Continue {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_RecoveryCodes_Continue", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Copy codes ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_RecoveryCodes_Copy {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_RecoveryCodes_Copy", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Store these recovery codes in a safe place. Each one works once instead of a code from the app. They are shown only now. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_RecoveryCodes_Hint {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_RecoveryCodes_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Recovery codes ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_RecoveryCodes_Title {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_RecoveryCodes_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die New recovery codes ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Regenerate {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Regenerate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter a code from your authenticator app. The previous recovery codes stop working. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_RegenerateHint {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_RegenerateHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Reset two-factor sign-in ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Reset {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Reset", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Reset the two-factor sign-in of {0}? The authenticator app and all recovery codes stop working. If the policy requires two-factor sign-in, it has to be set up again at the next web login. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_ResetConfirm {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_ResetConfirm", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die There was nothing to reset: the two-factor sign-in of this user is no longer set up. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_ResetNothingToReset {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_ResetNothingToReset", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Applies to the web login only: after the password, a code from an authenticator app is required. The client app, WebDAV and SMB keep using the password alone. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Section_Info {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Section_Info", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Two-factor sign-in ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Section_Title {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Section_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Required for all users ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Settings_AppliesToAll {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Settings_AppliesToAll", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} users have set up a second factor. The saved policy requires it from {1} users; {2} of them have not set it up yet. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Settings_Counts {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Settings_Counts", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die KAIMO_MFA_DISABLED is set on this server: no second factor is asked at the moment, whatever is configured here. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Settings_DisabledByEnvironment {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Settings_DisabledByEnvironment", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die A second factor protects the web login with a code from an authenticator app (TOTP) in addition to the password. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Settings_Intro {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Settings_Intro", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Name in the authenticator app ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Settings_Issuer {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Settings_Issuer", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Shown next to the user name in the app. Changing it affects new set-ups only. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Settings_IssuerHint {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Settings_IssuerHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Always required for users with management permissions ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Settings_ManagementRoles {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Settings_ManagementRoles", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Mode ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Settings_Mode {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Settings_Mode", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Users who lose their phone sign in with a recovery code; an administrator with the &quot;Reset passwords&quot; permission can reset their second factor in the user details. If the last administrator is locked out, start the web container with KAIMO_MFA_DISABLED=true. The codes depend on the server clock (keep NTP running), and the secrets are encrypted with the Data Protection key ring, which a restore must bring back. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Settings_RecoveryHint {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Settings_RecoveryHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Roles ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Settings_Roles {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Settings_Roles", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Counts in every scope: system wide, department or share. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Settings_RolesHint {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Settings_RolesHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This policy would require a second factor from your own account, which has none. Set up two-factor sign-in in your profile first. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Settings_SelfNotEnrolled {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Settings_SelfNotEnrolled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Applies to the web login only. The client app, WebDAV and SMB keep signing in with the password alone; switch these services off for accounts that do not need them. ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Settings_WebOnly {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Settings_WebOnly", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Set up two-factor sign-in ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_SetUp {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_SetUp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Active since {0} ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Status_ActiveSince {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Status_ActiveSince", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Not set up ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Status_NotSetUp {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Status_NotSetUp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Required, not set up ähnelt.
+        /// </summary>
+        public static string Web_SecondFactor_Status_RequiredMissing {
+            get {
+                return ResourceManager.GetString("Web_SecondFactor_Status_RequiredMissing", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Account ähnelt.
         /// </summary>
         public static string Web_Security_Col_Account {
@@ -16891,6 +18187,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Address locked ähnelt.
+        /// </summary>
+        public static string Web_Security_Outcome_AddressLocked {
+            get {
+                return ResourceManager.GetString("Web_Security_Outcome_AddressLocked", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Address not allowed ähnelt.
         /// </summary>
         public static string Web_Security_Outcome_AddressNotAllowed {
@@ -16918,20 +18223,38 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Address locked ähnelt.
-        /// </summary>
-        public static string Web_Security_Outcome_AddressLocked {
-            get {
-                return ResourceManager.GetString("Web_Security_Outcome_AddressLocked", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Locked out ähnelt.
         /// </summary>
         public static string Web_Security_Outcome_Locked {
             get {
                 return ResourceManager.GetString("Web_Security_Outcome_Locked", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Password correct, second factor pending ähnelt.
+        /// </summary>
+        public static string Web_Security_Outcome_PasswordAccepted {
+            get {
+                return ResourceManager.GetString("Web_Security_Outcome_PasswordAccepted", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Wrong second factor ähnelt.
+        /// </summary>
+        public static string Web_Security_Outcome_SecondFactorFailed {
+            get {
+                return ResourceManager.GetString("Web_Security_Outcome_SecondFactorFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Second factor locked ähnelt.
+        /// </summary>
+        public static string Web_Security_Outcome_SecondFactorLocked {
+            get {
+                return ResourceManager.GetString("Web_Security_Outcome_SecondFactorLocked", resourceCulture);
             }
         }
         
@@ -17008,11 +18331,29 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} failed logins in this hour ähnelt.
+        /// </summary>
+        public static string Web_Security_RepeatCount_FailureHint {
+            get {
+                return ResourceManager.GetString("Web_Security_RepeatCount_FailureHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die {0} attempts during this lockout ähnelt.
         /// </summary>
         public static string Web_Security_RepeatCount_Hint {
             get {
                 return ResourceManager.GetString("Web_Security_RepeatCount_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} successful logins in this hour ähnelt.
+        /// </summary>
+        public static string Web_Security_RepeatCount_SuccessHint {
+            get {
+                return ResourceManager.GetString("Web_Security_RepeatCount_SuccessHint", resourceCulture);
             }
         }
         
@@ -20257,6 +21598,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Login protection ähnelt.
+        /// </summary>
+        public static string Web_Settings_Tab_LoginProtection {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_LoginProtection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Mail server ähnelt.
         /// </summary>
         public static string Web_Settings_Tab_MailServer {
@@ -20302,6 +21652,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Two-factor sign-in ähnelt.
+        /// </summary>
+        public static string Web_Settings_Tab_SecondFactor {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_SecondFactor", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Share Links ähnelt.
         /// </summary>
         public static string Web_Settings_Tab_ShareLinks {
@@ -20325,6 +21684,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Settings_Tab_SystemStatus {
             get {
                 return ResourceManager.GetString("Web_Settings_Tab_SystemStatus", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Versioning ähnelt.
+        /// </summary>
+        public static string Web_Settings_Tab_Versioning {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_Versioning", resourceCulture);
             }
         }
         
@@ -20586,6 +21954,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_ShareLink_MaxAccess {
             get {
                 return ResourceManager.GetString("Web_ShareLink_MaxAccess", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Each preview and each download counts as one access. ähnelt.
+        /// </summary>
+        public static string Web_ShareLink_MaxAccess_Hint {
+            get {
+                return ResourceManager.GetString("Web_ShareLink_MaxAccess_Hint", resourceCulture);
             }
         }
         
@@ -20941,6 +22318,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die You are not permitted to change this link. ähnelt.
+        /// </summary>
+        public static string Web_ShareLinks_NotPermitted {
+            get {
+                return ResourceManager.GetString("Web_ShareLinks_NotPermitted", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Open in file browser ähnelt.
         /// </summary>
         public static string Web_ShareLinks_OpenInBrowser {
@@ -20968,29 +22354,20 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Select a link to see its details. ähnelt.
-        /// </summary>
-        public static string Web_ShareLinks_SelectHint {
-            get {
-                return ResourceManager.GetString("Web_ShareLinks_SelectHint", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die You are not permitted to change this link. ähnelt.
-        /// </summary>
-        public static string Web_ShareLinks_NotPermitted {
-            get {
-                return ResourceManager.GetString("Web_ShareLinks_NotPermitted", resourceCulture);
-            }
-        }
-
-        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Created by a user with more rights — you can only disable or delete this link. ähnelt.
         /// </summary>
         public static string Web_ShareLinks_RestrictedHint {
             get {
                 return ResourceManager.GetString("Web_ShareLinks_RestrictedHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a link to see its details. ähnelt.
+        /// </summary>
+        public static string Web_ShareLinks_SelectHint {
+            get {
+                return ResourceManager.GetString("Web_ShareLinks_SelectHint", resourceCulture);
             }
         }
         
@@ -21832,15 +23209,6 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Items moved successfully. ähnelt.
-        /// </summary>
-        public static string Web_Transfer_CutSuccess {
-            get {
-                return ResourceManager.GetString("Web_Transfer_CutSuccess", resourceCulture);
-            }
-        }
-
-        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die All items were copied, but {0} original item(s) could not be removed. ähnelt.
         /// </summary>
         public static string Web_Transfer_CutOriginalsKept {
@@ -21855,6 +23223,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Transfer_CutPasteRunning {
             get {
                 return ResourceManager.GetString("Web_Transfer_CutPasteRunning", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Items moved successfully. ähnelt.
+        /// </summary>
+        public static string Web_Transfer_CutSuccess {
+            get {
+                return ResourceManager.GetString("Web_Transfer_CutSuccess", resourceCulture);
             }
         }
         
@@ -22507,6 +23884,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Changing the file services requires the &quot;Enable/Disable&quot; permission for this user. ähnelt.
+        /// </summary>
+        public static string Web_User_FileServices_NoPermission {
+            get {
+                return ResourceManager.GetString("Web_User_FileServices_NoPermission", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die You cannot change the file services of your own account. ähnelt.
         /// </summary>
         public static string Web_User_FileServices_SelfLocked {
@@ -22584,6 +23970,60 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_User_PasswordsDoNotMatch {
             get {
                 return ResourceManager.GetString("Web_User_PasswordsDoNotMatch", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Lifts a lockout after failed SMB logins. Samba applies it with its next user sync, within a minute. ähnelt.
+        /// </summary>
+        public static string Web_User_SmbLock_Hint {
+            get {
+                return ResourceManager.GetString("Web_User_SmbLock_Hint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die SMB lockout ähnelt.
+        /// </summary>
+        public static string Web_User_SmbLock_Label {
+            get {
+                return ResourceManager.GetString("Web_User_SmbLock_Label", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Not locked ähnelt.
+        /// </summary>
+        public static string Web_User_SmbLock_NotLocked {
+            get {
+                return ResourceManager.GetString("Web_User_SmbLock_NotLocked", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Unlock pending ähnelt.
+        /// </summary>
+        public static string Web_User_SmbLock_Pending {
+            get {
+                return ResourceManager.GetString("Web_User_SmbLock_Pending", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Unlock requested. Samba applies it within a minute. ähnelt.
+        /// </summary>
+        public static string Web_User_SmbLock_Requested {
+            get {
+                return ResourceManager.GetString("Web_User_SmbLock_Requested", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Unlock SMB ähnelt.
+        /// </summary>
+        public static string Web_User_SmbLock_Unlock {
+            get {
+                return ResourceManager.GetString("Web_User_SmbLock_Unlock", resourceCulture);
             }
         }
         
@@ -22741,11 +24181,92 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Shows only files with stored versions. Renaming or deleting a file also changes its earlier states. ähnelt.
+        /// </summary>
+        public static string Web_Version_FolderSnapshotScope {
+            get {
+                return ResourceManager.GetString("Web_Version_FolderSnapshotScope", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Loading versions… ähnelt.
         /// </summary>
         public static string Web_Version_Loading {
             get {
                 return ResourceManager.GetString("Web_Version_Loading", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Restore anyway ähnelt.
+        /// </summary>
+        public static string Web_Version_NoBackup_Confirm {
+            get {
+                return ResourceManager.GetString("Web_Version_NoBackup_Confirm", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Versioning is switched off, so the current content cannot be kept as a version. ähnelt.
+        /// </summary>
+        public static string Web_Version_NoBackup_Disabled {
+            get {
+                return ResourceManager.GetString("Web_Version_NoBackup_Disabled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This file is excluded from versioning, so its current content cannot be kept as a version. ähnelt.
+        /// </summary>
+        public static string Web_Version_NoBackup_Excluded {
+            get {
+                return ResourceManager.GetString("Web_Version_NoBackup_Excluded", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The storage pool is low on free space, so the current content cannot be kept as a version. ähnelt.
+        /// </summary>
+        public static string Web_Version_NoBackup_LowSpace {
+            get {
+                return ResourceManager.GetString("Web_Version_NoBackup_LowSpace", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The current content cannot be kept as a version. ähnelt.
+        /// </summary>
+        public static string Web_Version_NoBackup_Other {
+            get {
+                return ResourceManager.GetString("Web_Version_NoBackup_Other", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Restoring replaces the current content of the file permanently. It cannot be restored afterwards. ähnelt.
+        /// </summary>
+        public static string Web_Version_NoBackup_Text {
+            get {
+                return ResourceManager.GetString("Web_Version_NoBackup_Text", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Restore without keeping the current content? ähnelt.
+        /// </summary>
+        public static string Web_Version_NoBackup_Title {
+            get {
+                return ResourceManager.GetString("Web_Version_NoBackup_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The current file is larger than the versioning size limit, so its content cannot be kept as a version. ähnelt.
+        /// </summary>
+        public static string Web_Version_NoBackup_TooLarge {
+            get {
+                return ResourceManager.GetString("Web_Version_NoBackup_TooLarge", resourceCulture);
             }
         }
         
@@ -22827,6 +24348,258 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Version_TitleFolder {
             get {
                 return ResourceManager.GetString("Web_Version_TitleFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Changes apply to new writes right away and to existing versions within six hours. The Storage tab shows the current usage. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_ApplyHint {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_ApplyHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Max. share of a pool (%) ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_Budget {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_Budget", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Versions are stored in the storage pool of their share. If older versions take up more than this share of a pool, the oldest are removed first. The newest version of each file mirrors its current content and does not count. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_BudgetDescription {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_BudgetDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Up to 90 %. 0 = no budget; then only the free-space reserve of the pool limits new versions. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_BudgetHint {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_BudgetHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Storage budget ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_BudgetTitle {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_BudgetTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Then one per day for (days) ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_Daily {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_Daily", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Counted from the time of the version. Older versions keep one per week until the maximum age. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_DailyHint {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_DailyHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Restore default patterns ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_DefaultPatterns {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_DefaultPatterns", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Versioning enabled ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_Enabled {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_Enabled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die When off, no new versions are created. Existing versions stay available and are still cleaned up by the rules below. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_EnabledHint {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_EnabledHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Then one per hour for (days) ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_Hourly {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_Hourly", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Keep all versions for (hours) ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_KeepAll {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_KeepAll", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Older versions are thinned out step by step. The newest version of a file is always kept, whatever the limits say. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_KeepDescription {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_KeepDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die How long versions are kept ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_KeepTitle {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_KeepTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Max. age (days) ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_MaxAge {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_MaxAge", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Older versions are removed, also for files that are no longer changed. 0 = no limit. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_MaxAgeHint {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_MaxAgeHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Max. file size (MB) ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_MaxSize {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_MaxSize", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Larger files are not versioned: every version is a full copy, so large videos, images or archives would quickly fill the pool. 0 = no limit. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_MaxSizeHint {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_MaxSizeHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Max. versions per file ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_MaxVersions {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_MaxVersions", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The oldest versions are removed first. 0 = no limit. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_MaxVersionsHint {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_MaxVersionsHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Excluded files ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_Patterns {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_Patterns", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die One pattern per line. * matches any characters, ? one character, ** also across folders. Without / the pattern matches the file name, with / the path inside the share. Case is ignored. Do not exclude temporary files such as *.tmp: Office and many other programs save into a temporary file and then rename it, so the document would get no version. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_PatternsHint {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_PatternsHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Versioning settings saved. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_Saved {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_Saved", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The versioning settings could not be saved. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_SaveFailed {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_SaveFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Thin out older versions ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_Thinning {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_Thinning", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Keeps every version of the most recent hours, then one per hour, then one per day and finally one per week. Without thinning only the count and age limits apply. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_ThinningHint {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_ThinningHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Every write stores the new content as a version, so earlier states can be restored. These rules apply to all shares. ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_WhatDescription {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_WhatDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die What is versioned ähnelt.
+        /// </summary>
+        public static string Web_VersioningSettings_WhatTitle {
+            get {
+                return ResourceManager.GetString("Web_VersioningSettings_WhatTitle", resourceCulture);
             }
         }
     }

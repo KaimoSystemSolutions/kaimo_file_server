@@ -31,6 +31,11 @@ public sealed record BackupAttention(BackupAttentionReason Reason, StatusTone To
 /// </summary>
 public static class BackupOverviewStatus
 {
+    /// <summary>True when no job exists and the only messages are setup hints: the overview then says "not set up yet" instead of counting problems.</summary>
+    public static bool NothingSetUp(IReadOnlyList<BackupJobView> jobs, IReadOnlyList<BackupAttention> attention)
+        => jobs.Count == 0 && attention.Count > 0
+           && attention.All(i => i.Reason is BackupAttentionReason.NoRepositories or BackupAttentionReason.NoJobs);
+
     /// <param name="repositories">Null when the actor does not manage repositories (they are not checked then).</param>
     public static IReadOnlyList<BackupAttention> Attention(
         IReadOnlyList<BackupJobView> jobs, IReadOnlyList<BackupRepositoryView>? repositories, bool canManageJobs, DateTime nowUtc)

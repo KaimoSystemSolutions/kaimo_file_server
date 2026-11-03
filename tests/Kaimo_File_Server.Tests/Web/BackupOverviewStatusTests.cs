@@ -101,6 +101,21 @@ public class BackupOverviewStatusTests
     }
 
     [Fact]
+    public void NothingSetUp_IsDetectedFromSetupHintsOnly()
+    {
+        Assert.True(BackupOverviewStatus.NothingSetUp([], BackupOverviewStatus.Attention([], [], true, Now)));
+        Assert.True(BackupOverviewStatus.NothingSetUp([], BackupOverviewStatus.Attention([], [Repo("NAS")], true, Now)));
+    }
+
+    [Fact]
+    public void NothingSetUp_IsFalseOnceAJobExistsOrNothingIsReported()
+    {
+        IReadOnlyList<BackupJobView> jobs = [Job("Daily", BackupRunStatus.Failed)];
+        Assert.False(BackupOverviewStatus.NothingSetUp(jobs, BackupOverviewStatus.Attention(jobs, [Repo("NAS")], true, Now)));
+        Assert.False(BackupOverviewStatus.NothingSetUp([], []));
+    }
+
+    [Fact]
     public void NoJobs_IsOnlyHintedToJobManagers()
         => Assert.Empty(BackupOverviewStatus.Attention([], null, canManageJobs: false, Now));
 

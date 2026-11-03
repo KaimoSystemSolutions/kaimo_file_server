@@ -7986,7 +7986,10 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>Everything is fine: all backups and repositories are running as planned.</value>
   </data>
   <data name="Web_Backup_Overview_AttentionCount" xml:space="preserve">
-    <value>Needs attention: {0}</value>
+    <value>Open items: {0}. Details in the list below.</value>
+  </data>
+  <data name="Web_Backup_Overview_NotSetUp" xml:space="preserve">
+    <value>No backup has been set up yet.</value>
   </data>
   <data name="Web_Backup_Overview_Running" xml:space="preserve">
     <value>Running now</value>

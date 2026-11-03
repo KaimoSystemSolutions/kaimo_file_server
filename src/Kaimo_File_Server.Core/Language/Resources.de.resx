@@ -7986,7 +7986,10 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Alles in Ordnung: Alle Sicherungen und Repositorys laufen planmäßig.</value>
   </data>
   <data name="Web_Backup_Overview_AttentionCount" xml:space="preserve">
-    <value>Braucht Aufmerksamkeit: {0}</value>
+    <value>Offene Punkte: {0}. Details in der Liste darunter.</value>
+  </data>
+  <data name="Web_Backup_Overview_NotSetUp" xml:space="preserve">
+    <value>Bisher ist keine Sicherung eingerichtet.</value>
   </data>
   <data name="Web_Backup_Overview_Running" xml:space="preserve">
     <value>Läuft gerade</value>

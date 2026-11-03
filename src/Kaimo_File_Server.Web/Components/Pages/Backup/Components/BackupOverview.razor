@@ -27,7 +27,8 @@
     else
     {
         <div class="@(attention.Any(i => i.Tone == StatusTone.Negative) ? "error-banner" : "warning-banner")" role="status">
-            @string.Format(R("Web_Backup_Overview_AttentionCount"), attention.Count)
+            @(BackupOverviewStatus.NothingSetUp(VM.Jobs, attention) ? R("Web_Backup_Overview_NotSetUp")
+                : string.Format(R("Web_Backup_Overview_AttentionCount"), attention.Count))
         </div>
         <ul class="backup-overview-list">
             @foreach (var item in attention)
