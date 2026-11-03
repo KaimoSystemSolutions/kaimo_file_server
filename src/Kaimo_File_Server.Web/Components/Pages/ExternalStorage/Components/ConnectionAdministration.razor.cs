@@ -41,6 +41,7 @@ public partial class ConnectionAdministration
     private string _knownHostsSecretReference = string.Empty;
     private bool _advancedSshSetup;
     private bool _sshUsePassword;
+    private bool _sshGenerateKey;
     private bool _sshSetupBusy;
     private byte[]? _sshPrivateKey;
     private string? _sshPrivateKeyName;

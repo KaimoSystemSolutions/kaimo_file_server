@@ -3625,7 +3625,7 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die The SSH connection has no pinned host key file. Run the guided SSH setup for the connection first. ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die The SSH connection has no pinned host key file. Verify the host key in the connection&apos;s Security tab first. ähnelt.
         /// </summary>
         public static string Web_Backup_Error_known_hosts_missing {
             get {
@@ -5164,7 +5164,7 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die An existing SFTP or rsync/SSH connection with a pinned host key (guided SSH setup). ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die An existing SFTP or rsync/SSH connection with a pinned host key. ähnelt.
         /// </summary>
         public static string Web_Backup_Repos_ConnectionHelp {
             get {
@@ -11968,15 +11968,6 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Guided SSH setup ähnelt.
-        /// </summary>
-        public static string Web_ExternalStorage_SshKeySetup {
-            get {
-                return ResourceManager.GetString("Web_ExternalStorage_SshKeySetup", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Upload or generate a key, install the public key on the remote account, and explicitly verify the server identity. ähnelt.
         /// </summary>
         public static string Web_ExternalStorage_SshKeySetupHelp {
@@ -12022,11 +12013,83 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Upload an unencrypted OpenSSH private key or generate a new Ed25519 key. The private key is encrypted in the connection vault. ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Upload existing key ähnelt.
         /// </summary>
-        public static string Web_ExternalStorage_SshPrivateKeyHelp {
+        public static string Web_ExternalStorage_SshKeySourceUpload {
             get {
-                return ResourceManager.GetString("Web_ExternalStorage_SshPrivateKeyHelp", resourceCulture);
+                return ResourceManager.GetString("Web_ExternalStorage_SshKeySourceUpload", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Generate new key ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshKeySourceGenerate {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshKeySourceGenerate", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Choose an unencrypted OpenSSH private key file, e.g. ~/.ssh/id_ed25519 – not the .pub file. It is stored encrypted in the connection vault. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshUploadKeyHelp {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshUploadKeyHelp", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The server creates a new Ed25519 key pair for this connection. [...] ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshGenerateKeyHelp {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshGenerateKeyHelp", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Choose key file ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshChooseKeyFile {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshChooseKeyFile", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Replace with a new key ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshRegenerateKey {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshRegenerateKey", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Uploaded key is valid ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshUploadedKeyReady {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshUploadedKeyReady", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Add this line to ~/.ssh/authorized_keys of the remote account. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshPublicKeyInstallHint {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshPublicKeyInstallHint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This is a public key (.pub). Upload the matching private key file instead. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshSetupError_private_key_is_public {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshSetupError_private_key_is_public", resourceCulture);
             }
         }
         

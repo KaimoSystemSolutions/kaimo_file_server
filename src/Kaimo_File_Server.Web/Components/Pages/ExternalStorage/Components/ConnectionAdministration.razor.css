@@ -125,7 +125,7 @@
 
 .ssh-setup-heading {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
     padding: 13px 14px;
@@ -139,7 +139,6 @@
     gap: 5px;
 }
 
-.ssh-setup-heading strong,
 .ssh-step-content > strong {
     color: var(--text-primary);
     font-size: 12.5px;
@@ -167,21 +166,41 @@
     font-weight: 750;
 }
 
-.ssh-actions {
-    display: flex;
-    align-items: center;
+/* Upload vs. generate: segmented like the key/password choice, sized to its labels. */
+.ssh-key-source {
+    width: fit-content;
+    max-width: 100%;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 5px;
+    margin-top: 3px;
 }
 
-.ssh-actions input[type="file"] {
-    max-width: min(100%, 330px);
+.ssh-key-source .toggle-btn { white-space: nowrap; }
+
+/* Shared .file-picker (detail.css); `.connection-form label` would turn it into a grid. */
+.connection-form .file-picker {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
     color: var(--text-secondary);
-    font-size: 11.5px;
 }
 
-.ssh-actions button,
+.connection-form .file-picker-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+}
+
+.connection-form .file-picker:focus-within .file-picker-btn {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.connection-form .file-picker--disabled {
+    cursor: not-allowed;
+    opacity: .6;
+}
+
 .ssh-step-content > button,
 .ssh-copy {
     width: fit-content;

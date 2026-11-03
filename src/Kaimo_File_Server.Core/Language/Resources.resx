@@ -4054,9 +4054,6 @@
   <data name="Web_ExternalStorage_SecretFileReferences" xml:space="preserve">
     <value>External secret files</value>
   </data>
-  <data name="Web_ExternalStorage_SshKeySetup" xml:space="preserve">
-    <value>Guided SSH setup</value>
-  </data>
   <data name="Web_ExternalStorage_SshKeySetupHelp" xml:space="preserve">
     <value>Upload or generate a key, install the public key on the remote account, and explicitly verify the server identity.</value>
   </data>
@@ -4066,8 +4063,29 @@
   <data name="Web_ExternalStorage_SshPrivateKey" xml:space="preserve">
     <value>Prepare the client key</value>
   </data>
-  <data name="Web_ExternalStorage_SshPrivateKeyHelp" xml:space="preserve">
-    <value>Upload an unencrypted OpenSSH private key or generate a new Ed25519 key. The private key is encrypted in the connection vault.</value>
+  <data name="Web_ExternalStorage_SshKeySourceUpload" xml:space="preserve">
+    <value>Upload existing key</value>
+  </data>
+  <data name="Web_ExternalStorage_SshKeySourceGenerate" xml:space="preserve">
+    <value>Generate new key</value>
+  </data>
+  <data name="Web_ExternalStorage_SshUploadKeyHelp" xml:space="preserve">
+    <value>Choose an unencrypted OpenSSH private key file, e.g. ~/.ssh/id_ed25519 – not the .pub file. It is stored encrypted in the connection vault.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshGenerateKeyHelp" xml:space="preserve">
+    <value>The server creates a new Ed25519 key pair for this connection. The private key never leaves the server and is stored encrypted in the connection vault; you only install the public key shown below on the remote account.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshChooseKeyFile" xml:space="preserve">
+    <value>Choose key file</value>
+  </data>
+  <data name="Web_ExternalStorage_SshRegenerateKey" xml:space="preserve">
+    <value>Replace with a new key</value>
+  </data>
+  <data name="Web_ExternalStorage_SshUploadedKeyReady" xml:space="preserve">
+    <value>Uploaded key is valid</value>
+  </data>
+  <data name="Web_ExternalStorage_SshPublicKeyInstallHint" xml:space="preserve">
+    <value>Add this line to ~/.ssh/authorized_keys of the remote account.</value>
   </data>
   <data name="Web_ExternalStorage_SshGenerateKey" xml:space="preserve">
     <value>Generate Ed25519 key</value>
@@ -4110,6 +4128,9 @@
   </data>
   <data name="Web_ExternalStorage_SshSetupError_private_key_invalid" xml:space="preserve">
     <value>The private key is invalid, unsupported, or protected by a passphrase. Use an unencrypted OpenSSH key.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshSetupError_private_key_is_public" xml:space="preserve">
+    <value>This is a public key (.pub). Upload the matching private key file instead.</value>
   </data>
   <data name="Web_ExternalStorage_SshSetupError_key_generation_failed" xml:space="preserve">
     <value>The server could not generate an SSH key.</value>
@@ -6153,7 +6174,7 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>SSH connection</value>
   </data>
   <data name="Web_Backup_Repos_ConnectionHelp" xml:space="preserve">
-    <value>An existing SFTP or rsync/SSH connection with a pinned host key (guided SSH setup).</value>
+    <value>An existing SFTP or rsync/SSH connection with a pinned host key.</value>
   </data>
   <data name="Web_Backup_Repos_RemotePath" xml:space="preserve">
     <value>Folder below the connection's root</value>
@@ -6453,7 +6474,7 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>The SSH connection has no private key.</value>
   </data>
   <data name="Web_Backup_Error_known_hosts_missing" xml:space="preserve">
-    <value>The SSH connection has no pinned host key file. Run the guided SSH setup for the connection first.</value>
+    <value>The SSH connection has no pinned host key file. Verify the host key in the connection's Security tab first.</value>
   </data>
   <data name="Web_Backup_Error_host_key_mismatch" xml:space="preserve">
     <value>The SSH host key does not match the pinned key.</value>

@@ -73,11 +73,18 @@ public sealed class RsyncSshSetupService : IRsyncSshSetupService
             throw new ProtocolConfigurationException(
                 "private_key_invalid", "The uploaded SSH private key is invalid or too large.");
 
+        byte[] normalized = NormalizePrivateKey(privateKey.Span);
         string temporary = ProtocolTemporaryFile.CreatePath();
         try
         {
+            if (normalized.Length <= 1)
+                throw new ProtocolConfigurationException(
+                    "private_key_invalid", "The uploaded SSH private key is empty.");
+            if (IsPublicKeyFile(normalized))
+                throw new ProtocolConfigurationException(
+                    "private_key_is_public", "The uploaded file is an SSH public key, not the private key.");
             await ProtocolTemporaryFile.WriteRestrictedBytesAsync(
-                temporary, privateKey, cancellationToken);
+                temporary, normalized, cancellationToken);
             ProcessResult result = await RunAsync(
                 "ssh-keygen", ["-y", "-f", temporary], cancellationToken);
             string publicKey = result.StandardOutput.Trim();
@@ -85,13 +92,49 @@ public sealed class RsyncSshSetupService : IRsyncSshSetupService
                 throw new ProtocolConfigurationException(
                     "private_key_invalid",
                     "The SSH private key is unsupported, invalid, or requires a passphrase.");
-            return new RsyncSshKeyMaterial(privateKey.ToArray(), publicKey);
+            return new RsyncSshKeyMaterial(normalized, publicKey);
+        }
+        catch
+        {
+            CryptographicOperations.ZeroMemory(normalized);
+            throw;
         }
         finally
         {
             File.Delete(temporary);
         }
     }
+
+    /// <summary>
+    /// Returns the key in the form OpenSSH requires: no UTF-8 BOM, LF line endings and
+    /// exactly one trailing newline. ssh-keygen 9.x rejects CRLF, a BOM or a missing final
+    /// newline ("error in libcrypto"), which a key easily picks up in an editor or clipboard.
+    /// </summary>
+    internal static byte[] NormalizePrivateKey(ReadOnlySpan<byte> key)
+    {
+        if (key.StartsWith("﻿"u8))
+            key = key[3..];
+        key = key.Trim(" \t\r\n"u8);
+        byte[] buffer = new byte[key.Length + 1];
+        int length = 0;
+        for (int index = 0; index < key.Length; index++)
+        {
+            if (key[index] != (byte)'\r')
+                buffer[length++] = key[index];
+            else if (index + 1 >= key.Length || key[index + 1] != (byte)'\n')
+                buffer[length++] = (byte)'\n';
+        }
+        buffer[length++] = (byte)'\n';
+        if (length == buffer.Length)
+            return buffer;
+        byte[] result = buffer[..length];
+        CryptographicOperations.ZeroMemory(buffer);
+        return result;
+    }
+
+    // A *.pub file picked by mistake: "<algorithm> <base64> [comment]" instead of a PEM block.
+    private static bool IsPublicKeyFile(ReadOnlySpan<byte> key)
+        => key.StartsWith("ssh-"u8) || key.StartsWith("ecdsa-"u8) || key.StartsWith("sk-"u8);
 
     public async Task<RsyncSshKeyMaterial> GeneratePrivateKeyAsync(
         CancellationToken cancellationToken = default)

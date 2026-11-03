@@ -40,18 +40,37 @@ public partial class ConnectionAdministration
     private async Task GenerateSshPrivateKeyAsync()
     {
         _sshSetupBusy = true; _error = null;
-        try { SetSshKey(await RsyncSshSetup.GeneratePrivateKeyAsync(), R("Web_ExternalStorage_SshGeneratedKeyReady")); }
+        try { SetSshKey(await RsyncSshSetup.GeneratePrivateKeyAsync(), null); }
         catch (Exception exception) { _error = SetupError(exception); }
         finally { _sshSetupBusy = false; }
     }
 
-    private void SetSshKey(RsyncSshKeyMaterial material, string name)
+    private void SetSshKey(RsyncSshKeyMaterial material, string? uploadedFileName)
+    {
+        ClearSshKey();
+        _sshPrivateKey = material.PrivateKey;
+        _sshPublicKey = material.PublicKey;
+        _sshPrivateKeyName = uploadedFileName;
+    }
+
+    private void ClearSshKey()
     {
         if (_sshPrivateKey is not null)
             CryptographicOperations.ZeroMemory(_sshPrivateKey);
-        _sshPrivateKey = material.PrivateKey;
-        _sshPublicKey = material.PublicKey;
-        _sshPrivateKeyName = name;
+        _sshPrivateKey = null;
+        _sshPrivateKeyName = null;
+        _sshPublicKey = string.Empty;
+    }
+
+    // Upload and generation are exclusive: switching discards the key of the other source,
+    // so an uploaded file never lingers next to a freshly generated key.
+    private void SelectSshKeySource(bool generate)
+    {
+        if (_sshGenerateKey == generate)
+            return;
+        _sshGenerateKey = generate;
+        _error = null;
+        ClearSshKey();
     }
 
     private async Task CopyPublicKeyAsync()
@@ -93,11 +112,7 @@ public partial class ConnectionAdministration
         _error = null;
         if (_advancedSshSetup)
         {
-            if (_sshPrivateKey is not null)
-                CryptographicOperations.ZeroMemory(_sshPrivateKey);
-            _sshPrivateKey = null;
-            _sshPrivateKeyName = null;
-            _sshPublicKey = string.Empty;
+            ClearSshKey();
             await SshEndpointChangedAsync();
         }
         else
@@ -116,11 +131,7 @@ public partial class ConnectionAdministration
         _sshUsePassword = password;
         _error = null;
         _password = string.Empty;
-        if (_sshPrivateKey is not null)
-            CryptographicOperations.ZeroMemory(_sshPrivateKey);
-        _sshPrivateKey = null;
-        _sshPrivateKeyName = null;
-        _sshPublicKey = string.Empty;
+        ClearSshKey();
         _privateKeySecretReference = string.Empty;
     }
 
@@ -138,11 +149,8 @@ public partial class ConnectionAdministration
 
     private async Task ResetGuidedSshStateAsync()
     {
-        if (_sshPrivateKey is not null)
-            CryptographicOperations.ZeroMemory(_sshPrivateKey);
-        _sshPrivateKey = null;
-        _sshPrivateKeyName = null;
-        _sshPublicKey = string.Empty;
+        ClearSshKey();
+        _sshGenerateKey = false;
         _hostKeyCandidates = [];
         _selectedHostFingerprint = string.Empty;
         _hostKeyConfirmed = false;

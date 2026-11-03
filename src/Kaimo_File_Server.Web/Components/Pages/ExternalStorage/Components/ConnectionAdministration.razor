@@ -251,6 +251,12 @@ else
         class="toggle-btn @(_sshUsePassword == password ? "toggle-btn--active" : null)"
         disabled="@_sshSetupBusy" @onclick="() => SelectSshAuthMethod(password)">@label</button>;
 
+    // Segmented upload/generate choice of the client key; switching discards the other key.
+    private RenderFragment SshKeySourceChoice(bool generate, string label) => @<button type="button" role="radio"
+        aria-checked="@(_sshGenerateKey == generate ? "true" : "false")"
+        class="toggle-btn @(_sshGenerateKey == generate ? "toggle-btn--active" : null)"
+        disabled="@_sshSetupBusy" @onclick="() => SelectSshKeySource(generate)">@label</button>;
+
     // Fields of the active tab. In edit mode the provider and department are
     // fixed (shown read-only) and the password may be left blank to keep the
     // stored credential.
@@ -342,7 +348,7 @@ else
                 else
                 {
                     <section class="storage-wide ssh-setup-card">
-                        <div class="ssh-setup-heading"><div><strong>@R("Web_ExternalStorage_SshKeySetup")</strong><small>@R(UsesSshPassword ? "Web_ExternalStorage_SshPasswordSetupHelp" : "Web_ExternalStorage_SshKeySetupHelp")</small></div><label class="storage-check"><span class="toggle-switch"><input type="checkbox" @bind="_advancedSshSetup" @bind:after="SshModeChangedAsync" /><span class="toggle-slider"></span></span> <span>@R("Web_ExternalStorage_SshAdvancedMode")</span></label></div>
+                        <div class="ssh-setup-heading"><div><small>@R(UsesSshPassword ? "Web_ExternalStorage_SshPasswordSetupHelp" : "Web_ExternalStorage_SshKeySetupHelp")</small></div><label class="storage-check"><span class="toggle-switch"><input type="checkbox" @bind="_advancedSshSetup" @bind:after="SshModeChangedAsync" /><span class="toggle-slider"></span></span> <span>@R("Web_ExternalStorage_SshAdvancedMode")</span></label></div>
                         @if (!_advancedSshSetup)
                         {
                             @if (UsesSshPassword)
@@ -356,12 +362,30 @@ else
                             else
                             {
                                 <div class="ssh-setup-section">
-                                    <span class="ssh-step">1</span><div class="ssh-step-content"><strong>@R("Web_ExternalStorage_SshPrivateKey")</strong><small>@R("Web_ExternalStorage_SshPrivateKeyHelp")</small>
-                                        <div class="ssh-actions"><InputFile OnChange="UploadSshPrivateKeyAsync" accept=".key,.pem,.openssh" /><button class="btn-secondary" type="button" disabled="@_sshSetupBusy" @onclick="GenerateSshPrivateKeyAsync">@R("Web_ExternalStorage_SshGenerateKey")</button></div>
+                                    <span class="ssh-step">1</span><div class="ssh-step-content"><strong>@R("Web_ExternalStorage_SshPrivateKey")</strong>
+                                        <div class="toggle-button-group ssh-key-source" role="radiogroup" aria-label="@R("Web_ExternalStorage_SshPrivateKey")">
+                                            @SshKeySourceChoice(false, R("Web_ExternalStorage_SshKeySourceUpload"))
+                                            @SshKeySourceChoice(true, R("Web_ExternalStorage_SshKeySourceGenerate"))
+                                        </div>
+                                        @if (_sshGenerateKey)
+                                        {
+                                            <small>@R("Web_ExternalStorage_SshGenerateKeyHelp")</small>
+                                            <button class="btn-secondary" type="button" disabled="@_sshSetupBusy" @onclick="GenerateSshPrivateKeyAsync">@R(_sshPrivateKey is null ? "Web_ExternalStorage_SshGenerateKey" : "Web_ExternalStorage_SshRegenerateKey")</button>
+                                        }
+                                        else
+                                        {
+                                            <small>@R("Web_ExternalStorage_SshUploadKeyHelp")</small>
+                                            @* No accept filter: OpenSSH keys (id_ed25519, id_rsa) have no extension and would be hidden. *@
+                                            <label class="file-picker @(_sshSetupBusy ? "file-picker--disabled" : null)">
+                                                <span class="btn-secondary file-picker-btn">@Assets.SVG("upload.svg", new SvgOptions(Width: 14, Height: 14)) @R("Web_ExternalStorage_SshChooseKeyFile")</span>
+                                                <InputFile OnChange="UploadSshPrivateKeyAsync" disabled="@_sshSetupBusy" />
+                                                <span class="file-picker-name @(_sshPrivateKeyName is null ? "is-muted" : null)">@(_sshPrivateKeyName ?? R("Web_Settings_Cert_NoFile"))</span>
+                                            </label>
+                                        }
                                         @if (_sshPrivateKey is not null)
                                         {
-                                            <div class="ssh-ready-line"><span class="connection-health"></span>@(_sshPrivateKeyName ?? R("Web_ExternalStorage_SshGeneratedKeyReady"))</div>
-                                            <label><span>@R("Web_ExternalStorage_SshPublicKey")</span><textarea class="edit-input ssh-public-key" readonly rows="3">@_sshPublicKey</textarea></label>
+                                            <div class="ssh-ready-line"><span class="connection-health"></span>@R(_sshGenerateKey ? "Web_ExternalStorage_SshGeneratedKeyReady" : "Web_ExternalStorage_SshUploadedKeyReady")</div>
+                                            <label><span>@R("Web_ExternalStorage_SshPublicKey")</span><textarea class="edit-input ssh-public-key" readonly rows="3">@_sshPublicKey</textarea><small>@R("Web_ExternalStorage_SshPublicKeyInstallHint")</small></label>
                                             <button class="btn-secondary ssh-copy" type="button" @onclick="CopyPublicKeyAsync">@R("Web_ExternalStorage_CopyPublicKey")</button>
                                         }
                                     </div>

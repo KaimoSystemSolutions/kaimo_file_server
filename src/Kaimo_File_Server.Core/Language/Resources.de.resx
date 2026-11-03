@@ -4054,9 +4054,6 @@
   <data name="Web_ExternalStorage_SecretFileReferences" xml:space="preserve">
     <value>Externe Secret-Dateien</value>
   </data>
-  <data name="Web_ExternalStorage_SshKeySetup" xml:space="preserve">
-    <value>Geführte SSH-Einrichtung</value>
-  </data>
   <data name="Web_ExternalStorage_SshKeySetupHelp" xml:space="preserve">
     <value>Laden oder erzeugen Sie einen Schlüssel, hinterlegen Sie den öffentlichen Schlüssel beim entfernten Konto und prüfen Sie ausdrücklich die Serveridentität.</value>
   </data>
@@ -4066,8 +4063,29 @@
   <data name="Web_ExternalStorage_SshPrivateKey" xml:space="preserve">
     <value>Client-Schlüssel vorbereiten</value>
   </data>
-  <data name="Web_ExternalStorage_SshPrivateKeyHelp" xml:space="preserve">
-    <value>Laden Sie einen unverschlüsselten privaten OpenSSH-Schlüssel hoch oder erzeugen Sie einen neuen Ed25519-Schlüssel. Der private Schlüssel wird verschlüsselt im Verbindungs-Tresor gespeichert.</value>
+  <data name="Web_ExternalStorage_SshKeySourceUpload" xml:space="preserve">
+    <value>Vorhandenen Schlüssel hochladen</value>
+  </data>
+  <data name="Web_ExternalStorage_SshKeySourceGenerate" xml:space="preserve">
+    <value>Neuen Schlüssel erzeugen</value>
+  </data>
+  <data name="Web_ExternalStorage_SshUploadKeyHelp" xml:space="preserve">
+    <value>Wählen Sie eine unverschlüsselte private OpenSSH-Schlüsseldatei, z. B. ~/.ssh/id_ed25519 – nicht die .pub-Datei. Sie wird verschlüsselt im Verbindungs-Tresor gespeichert.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshGenerateKeyHelp" xml:space="preserve">
+    <value>Der Server erzeugt ein neues Ed25519-Schlüsselpaar für diese Verbindung. Der private Schlüssel verlässt den Server nie und wird verschlüsselt im Verbindungs-Tresor gespeichert; Sie hinterlegen nur den unten angezeigten öffentlichen Schlüssel beim entfernten Konto.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshChooseKeyFile" xml:space="preserve">
+    <value>Schlüsseldatei wählen</value>
+  </data>
+  <data name="Web_ExternalStorage_SshRegenerateKey" xml:space="preserve">
+    <value>Durch neuen Schlüssel ersetzen</value>
+  </data>
+  <data name="Web_ExternalStorage_SshUploadedKeyReady" xml:space="preserve">
+    <value>Hochgeladener Schlüssel ist gültig</value>
+  </data>
+  <data name="Web_ExternalStorage_SshPublicKeyInstallHint" xml:space="preserve">
+    <value>Fügen Sie diese Zeile in ~/.ssh/authorized_keys des entfernten Kontos ein.</value>
   </data>
   <data name="Web_ExternalStorage_SshGenerateKey" xml:space="preserve">
     <value>Ed25519-Schlüssel erzeugen</value>
@@ -4110,6 +4128,9 @@
   </data>
   <data name="Web_ExternalStorage_SshSetupError_private_key_invalid" xml:space="preserve">
     <value>Der private Schlüssel ist ungültig, nicht unterstützt oder mit einer Passphrase geschützt. Verwenden Sie einen unverschlüsselten OpenSSH-Schlüssel.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshSetupError_private_key_is_public" xml:space="preserve">
+    <value>Das ist ein öffentlicher Schlüssel (.pub). Laden Sie stattdessen die zugehörige private Schlüsseldatei hoch.</value>
   </data>
   <data name="Web_ExternalStorage_SshSetupError_key_generation_failed" xml:space="preserve">
     <value>Der Server konnte keinen SSH-Schlüssel erzeugen.</value>
@@ -6153,7 +6174,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>SSH-Verbindung</value>
   </data>
   <data name="Web_Backup_Repos_ConnectionHelp" xml:space="preserve">
-    <value>Eine vorhandene SFTP- oder rsync/SSH-Verbindung mit hinterlegtem Host-Schlüssel (geführte SSH-Einrichtung).</value>
+    <value>Eine vorhandene SFTP- oder rsync/SSH-Verbindung mit hinterlegtem Host-Schlüssel.</value>
   </data>
   <data name="Web_Backup_Repos_RemotePath" xml:space="preserve">
     <value>Ordner unterhalb des Verbindungs-Stammordners</value>
@@ -6453,7 +6474,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Die SSH-Verbindung hat keinen privaten Schlüssel.</value>
   </data>
   <data name="Web_Backup_Error_known_hosts_missing" xml:space="preserve">
-    <value>Die SSH-Verbindung hat keine hinterlegte Host-Schlüssel-Datei. Führe zuerst die geführte SSH-Einrichtung der Verbindung aus.</value>
+    <value>Die SSH-Verbindung hat keine hinterlegte Host-Schlüssel-Datei. Prüfe zuerst den Host-Schlüssel im Reiter „Sicherheit“ der Verbindung.</value>
   </data>
   <data name="Web_Backup_Error_host_key_mismatch" xml:space="preserve">
     <value>Der SSH-Host-Schlüssel passt nicht zum hinterlegten Schlüssel.</value>
