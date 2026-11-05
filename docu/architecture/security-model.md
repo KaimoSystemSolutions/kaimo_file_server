@@ -232,7 +232,13 @@ with the password alone (a deliberate decision, documented as residual risk in t
 
 `AclService` (`src/Kaimo_File_Server.Core/Security/AclService.cs`) evaluates access in this order:
 
-1. An explicit **Deny** entry on the item or an inherited ancestor entry denies.
+0. **Depth precedence (NTFS-like):** only the entries from the deepest folder level that has an
+   entry for any of the user's principals (user, groups, roles) covering the requested permission
+   count. An entry on a subfolder therefore overrides inherited ancestor entries, also across
+   principals (e.g. user Deny on `docs`, group Allow on `docs/open` → access below `docs/open`).
+   Entries for other permissions do not override: Deny Write on `docs` plus Allow Read on
+   `docs/open` still denies writing below `docs/open`.
+1. Within that level an explicit **Deny** wins over an Allow.
 2. An explicit **Allow** entry grants.
 3. The share's **department default** grants baseline access to members of the share's department
    (walking the department hierarchy). Defaults are evaluated at runtime and never materialized as

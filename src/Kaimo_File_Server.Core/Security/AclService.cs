@@ -11,7 +11,9 @@ namespace Kaimo_File_Server.Core.Security;
 /// Unified ACL evaluation service with integrated department default permissions.
 ///
 /// Access evaluation priority (highest to lowest):
-///   1. Explicit Deny ACL entries  → immediately denies access
+///   0. Depth precedence           → the deepest folder level with a matching entry
+///                                   decides; ancestor entries are overridden (NTFS-like)
+///   1. Explicit Deny ACL entries  → denies access (wins within that level)
 ///   2. Explicit Allow ACL entries → immediately grants access
 ///   3. Department Default         → grants baseline access if user is in the share's department
 ///   4. Home access (homes share)  → AccessHomeContents grant for homes in the actor's scope
@@ -21,7 +23,7 @@ namespace Kaimo_File_Server.Core.Security;
 /// No AccessEntry records are created — this means:
 ///   - Adding a user to a department instantly grants default access (no ACL rebuild)
 ///   - Changing a department's default instantly affects all members (no ACL rebuild)
-///   - Explicit Deny entries always override department defaults
+///   - Applicable explicit Deny entries always override department defaults
 ///   - The department hierarchy is walked to resolve inherited defaults
 ///
 /// The department default is resolved ONCE per share (not per file),
@@ -324,36 +326,47 @@ public partial class AclService : IAclService
     /// <summary>
     /// Unified access evaluation with three priority layers:
     ///
-    ///   1. Explicit Deny  → immediately false (deny always wins)
-    ///   2. Explicit Allow  → immediately true
+    ///   0. Depth precedence → only the entries from the DEEPEST folder level that has
+    ///      an entry for any of the user's principals covering the requested permission
+    ///      count (NTFS-like: nearer entries override inherited ancestor entries, also
+    ///      across principals, e.g. a group Allow on a subfolder lifts a user Deny above).
+    ///   1. Explicit Deny  → false (within that level deny wins over allow)
+    ///   2. Explicit Allow  → true
     ///   3. Department Default → true if the default grants the requested permission
     ///   4. No match        → false
     ///
     /// Department defaults act as a "virtual allow" — they grant baseline access
-    /// without requiring any AccessEntry records. An explicit Deny on any ancestor
-    /// folder will still block access even if the department default would allow it.
+    /// without requiring any AccessEntry records. An applicable explicit Deny
+    /// still blocks access even if the department default would allow it.
     /// </summary>
     private static bool EvaluateAccess(
-        List<AccessEntry> effectiveAcl,
+        List<(AccessEntry Entry, int Level)> effectiveAcl,
         HashSet<Guid> userPrincipalIds,
         FilePermission permission,
         FilePermission departmentDefault)
     {
-        // -- Layer 1: Explicit Deny (highest priority) --
-        foreach (var entry in effectiveAcl)
+        // -- Layer 0: deepest level with a relevant entry for any of the user's principals --
+        var deepest = -1;
+        foreach (var (entry, level) in effectiveAcl)
         {
-            if (entry.EntryType != AclEntryType.Deny) continue;
-            if (!userPrincipalIds.Contains(entry.PrincipalId)) continue;
-            if ((entry.Permissions & permission) != 0) return false;
+            if (level > deepest && Applies(entry))
+                deepest = level;
         }
 
-        // -- Layer 2: Explicit Allow --
-        foreach (var entry in effectiveAcl)
+        var allowed = false;
+        foreach (var (entry, level) in effectiveAcl)
         {
-            if (entry.EntryType != AclEntryType.Allow) continue;
-            if (!userPrincipalIds.Contains(entry.PrincipalId)) continue;
-            if ((entry.Permissions & permission) != 0) return true;
+            if (level != deepest || !Applies(entry)) continue;
+
+            // -- Layer 1: Explicit Deny --
+            if (entry.EntryType == AclEntryType.Deny) return false;
+            // -- Layer 2: Explicit Allow --
+            if (entry.EntryType == AclEntryType.Allow) allowed = true;
         }
+        if (allowed) return true;
+
+        bool Applies(AccessEntry e)
+            => userPrincipalIds.Contains(e.PrincipalId) && (e.Permissions & permission) != 0;
 
         // -- Layer 3: Department Default (virtual allow) --
         if ((departmentDefault & permission) != 0)
@@ -372,7 +385,9 @@ public partial class AclService : IAclService
         HashSet<Guid> userPrincipalIds,
         FilePermission permission)
     {
-        return EvaluateAccess(effectiveAcl, userPrincipalIds, permission, FilePermission.None);
+        // A single pre-loaded ACL has no hierarchy: every entry sits on the same level.
+        return EvaluateAccess(effectiveAcl.Select(e => (e, 0)).ToList(),
+            userPrincipalIds, permission, FilePermission.None);
     }
 
     // ══════════════════════════════════════════
@@ -400,16 +415,19 @@ public partial class AclService : IAclService
     /// <summary>
     /// Resolves effective ACL for a target path from a pre-loaded ACL cache.
     /// Walks the hierarchy from root to target, applying inheritance rules.
+    /// Each entry carries the hierarchy level it was defined on (0 = share root),
+    /// which <see cref="EvaluateAccess"/> uses for depth precedence.
     /// </summary>
-    private static List<AccessEntry> ResolveEffectiveAclFromCache(
+    private static List<(AccessEntry Entry, int Level)> ResolveEffectiveAclFromCache(
         Dictionary<string, List<AccessEntry>> aclByPath,
         List<string> hierarchy, string targetPath, bool targetIsDirectory)
     {
-        var effective = new List<AccessEntry>();
+        var effective = new List<(AccessEntry, int)>();
         var targetDepth = ShareRelativePath.GetDepth(targetPath);
 
-        foreach (var path in hierarchy)
+        for (var level = 0; level < hierarchy.Count; level++)
         {
+            var path = hierarchy[level];
             if (!aclByPath.TryGetValue(path, out var acl))
                 continue;
 
@@ -420,12 +438,12 @@ public partial class AclService : IAclService
                 if (isDirect)
                 {
                     if ((entry.Inheritance & AclInheritance.ThisFolder) != 0)
-                        effective.Add(entry);
+                        effective.Add((entry, level));
                 }
                 else
                 {
                     if (AppliesToDescendant(entry, targetIsDirectory, path, targetDepth))
-                        effective.Add(entry);
+                        effective.Add((entry, level));
                 }
             }
         }
