@@ -46,6 +46,22 @@ public sealed class RsyncSshKeyUploadTests : IDisposable
     }
 
     [Theory]
+    [InlineData(RsyncSshSetupService.RsyncKeyComment, "kaimo-file-server-rsync")]
+    [InlineData(RsyncSshSetupService.SftpKeyComment, "kaimo-file-server-sftp")]
+    public async Task GeneratePrivateKey_PublicKeyCarriesProtocolComment(string comment, string expected)
+    {
+        // Windows OpenSSH refuses "ssh-keygen -y" on the temporary key file (its ACLs are not
+        // restricted like the Unix 0600 mode); the service only runs in the Linux container.
+        if (OperatingSystem.IsWindows())
+            return;
+        var service = new RsyncSshSetupService(_temporaryRoot);
+
+        RsyncSshKeyMaterial material = await service.GeneratePrivateKeyAsync(comment);
+
+        Assert.EndsWith(" " + expected, material.PublicKey);
+    }
+
+    [Theory]
     [InlineData(" \r\n\t\n")]
     [InlineData("﻿")]
     public async Task ValidatePrivateKey_WhitespaceOnly_IsInvalid(string uploaded)

@@ -40,7 +40,8 @@ public partial class ConnectionAdministration
     private async Task GenerateSshPrivateKeyAsync()
     {
         _sshSetupBusy = true; _error = null;
-        try { SetSshKey(await RsyncSshSetup.GeneratePrivateKeyAsync(), null); }
+        string comment = IsSftpProvider ? RsyncSshSetupService.SftpKeyComment : RsyncSshSetupService.RsyncKeyComment;
+        try { SetSshKey(await RsyncSshSetup.GeneratePrivateKeyAsync(comment), null); }
         catch (Exception exception) { _error = SetupError(exception); }
         finally { _sshSetupBusy = false; }
     }

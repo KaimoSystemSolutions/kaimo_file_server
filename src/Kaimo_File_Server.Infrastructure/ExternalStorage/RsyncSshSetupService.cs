@@ -17,7 +17,9 @@ public interface IRsyncSshSetupService
         ReadOnlyMemory<byte> privateKey,
         CancellationToken cancellationToken = default);
 
+    /// <param name="comment">Public-key comment, e.g. <see cref="RsyncSshSetupService.SftpKeyComment"/>.</param>
     Task<RsyncSshKeyMaterial> GeneratePrivateKeyAsync(
+        string comment,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<RsyncSshHostKeyCandidate>> DiscoverHostKeysAsync(
@@ -47,6 +49,8 @@ public interface IRsyncSshSetupService
 /// </summary>
 public sealed class RsyncSshSetupService : IRsyncSshSetupService
 {
+    public const string RsyncKeyComment = "kaimo-file-server-rsync";
+    public const string SftpKeyComment = "kaimo-file-server-sftp";
     private const int MaximumKeyBytes = 1024 * 1024;
     private const int MaximumProcessOutputCharacters = 64 * 1024;
     private readonly string _managedRoot;
@@ -137,15 +141,17 @@ public sealed class RsyncSshSetupService : IRsyncSshSetupService
         => key.StartsWith("ssh-"u8) || key.StartsWith("ecdsa-"u8) || key.StartsWith("sk-"u8);
 
     public async Task<RsyncSshKeyMaterial> GeneratePrivateKeyAsync(
+        string comment,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(comment);
         string temporary = ProtocolTemporaryFile.CreatePath();
         string publicPath = temporary + ".pub";
         try
         {
             ProcessResult result = await RunAsync(
                 "ssh-keygen",
-                ["-q", "-t", "ed25519", "-N", string.Empty, "-C", "kaimo-rsync", "-f", temporary],
+                ["-q", "-t", "ed25519", "-N", string.Empty, "-C", comment, "-f", temporary],
                 cancellationToken);
             if (result.ExitCode != 0 || !File.Exists(temporary))
                 throw new ProtocolConfigurationException(
