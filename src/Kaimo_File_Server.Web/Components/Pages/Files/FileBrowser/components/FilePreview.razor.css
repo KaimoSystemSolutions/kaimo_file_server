@@ -3,6 +3,11 @@
     right: auto;
 }
 
+/* Fast loads should not flash the spinner: it only fades in once loading takes a moment. */
+.preview-loading.dialog-pane-in {
+    animation-delay: 0.15s;
+}
+
 .preview-frame {
     flex: 1;
     border: none;

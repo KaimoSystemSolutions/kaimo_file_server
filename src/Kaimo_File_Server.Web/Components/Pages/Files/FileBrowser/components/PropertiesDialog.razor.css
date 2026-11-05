@@ -9,19 +9,6 @@
     overflow: hidden;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .properties-pane {
-        animation: properties-pane-in 0.24s cubic-bezier(0.32, 0.72, 0, 1) both;
-    }
-}
-
-@keyframes properties-pane-in {
-    from {
-        opacity: 0;
-        transform: translateY(4px);
-    }
-}
-
 .properties-tabs {
     display: flex;
     gap: 4px;

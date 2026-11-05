@@ -5,12 +5,15 @@
 @inherits AppComponentBase
 @implements IDisposable
 @inject DateFormatService DateFmt
+@inject IJSRuntime JS
 
 @*
     Upload name-collision dialog. Shown while the local file browser has staged uploads
     whose target name already exists (or collides with another in-flight upload). The
     user keeps the existing file, keeps the new one (overwrite), or keeps both (rename).
     Identical-content collisions never reach here — they are dropped silently.
+    Moving on to the next conflict fades its details in (keyed by conflict id) while
+    kaimoSmoothResize animates the dialog's size.
 *@
 @{
     var current = VM.PendingConflicts.FirstOrDefault();
@@ -19,8 +22,9 @@
 {
     var remaining = VM.PendingConflicts.Count - 1;
     <div class="modal-backdrop">
-        <div class="modal-dialog upload-conflict-dialog" @onclick:stopPropagation="true">
+        <div class="modal-dialog upload-conflict-dialog" @ref="_dialogRef" @onclick:stopPropagation="true">
             <h3 class="modal-title">@R("Web_UploadConflict_Title")</h3>
+            <div class="upload-conflict-details dialog-pane-in" @key="current.Id">
             <p class="modal-text">
                 @((MarkupString)string.Format(R("Web_UploadConflict_Message"),
                     $"<strong>{System.Net.WebUtility.HtmlEncode(current.FileName)}</strong>"))
@@ -67,6 +71,7 @@
                     @string.Format(R("Web_UploadConflict_Remaining"), remaining)
                 </p>
             }
+            </div>
 
             <div class="modal-actions">
                 <button class="btn btn-secondary" disabled="@_busy"
@@ -94,6 +99,22 @@
 
     private bool _applyToAll;
     private bool _busy;
+
+    // The dialog element exists while conflicts are pending; each instance is handed to the resize animator once.
+    private ElementReference _dialogRef;
+    private bool _resizeObserved;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (VM.PendingConflicts.Count == 0)
+        {
+            _resizeObserved = false;
+            return;
+        }
+        if (_resizeObserved) return;
+        _resizeObserved = true;
+        await JS.InvokeVoidAsync("kaimoSmoothResize.observe", _dialogRef);
+    }
 
     protected override void OnInitialized()
     {

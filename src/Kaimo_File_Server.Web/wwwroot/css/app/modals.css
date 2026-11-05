@@ -299,6 +299,27 @@
     animation: fadeIn 0.15s ease-out;
 }
 
+/* Content that swaps inside an open dialog (tab, next item, loaded preview) fades in softly.
+   Blazor must create a new element for the animation to replay (@key or an @if branch).
+   Pairs with kaimoSmoothResize (smoothResize.ts), which animates the dialog's size meanwhile. */
+@media (prefers-reduced-motion: no-preference) {
+    .dialog-pane-in {
+        animation: dialogPaneIn 0.24s cubic-bezier(0.32, 0.72, 0, 1) both;
+    }
+}
+
+@keyframes dialogPaneIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+}
+
+/* Set by kaimoSmoothResize while a size animation runs: content must not spill past the box. */
+.smooth-resizing {
+    overflow: hidden;
+}
+
 .modal-dialog {
     background: var(--bg-secondary);
     border: 1px solid var(--border);

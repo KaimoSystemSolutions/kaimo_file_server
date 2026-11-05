@@ -75,7 +75,7 @@
             @* -- Body -- *@
             <div class="properties-body">
                 @* Keyed by tab: a switch re-creates the pane, which replays its fade-in. *@
-                <div class="properties-pane" @key="_activeTab">
+                <div class="properties-pane dialog-pane-in" @key="_activeTab">
                 @if (_activeTab == Tab.General)
                 {
                     var location = Common(LocationOf);
