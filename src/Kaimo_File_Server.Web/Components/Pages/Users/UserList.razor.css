@@ -246,6 +246,12 @@
     background: transparent;
 }
 
+/* Self-service profile hides the tab bar; .admin-tabs' display:flex would otherwise
+   override [hidden] and leave its bottom border stacked on the workspace border. */
+.entity-tabs[hidden] {
+    display: none;
+}
+
 .entity-tab {
     min-height: 40px;
     padding: 8px 13px;
