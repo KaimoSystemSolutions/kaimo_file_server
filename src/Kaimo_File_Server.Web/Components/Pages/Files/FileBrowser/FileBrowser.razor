@@ -616,24 +616,6 @@ else
                 }
             </div>
 
-            @if (_showFolderAcl && _aclFolderPath == aclPath)
-            {
-                <div class="file-row-acl-expand-wrap">
-                    <div class="file-row-acl-expand">
-                        <div class="acl-panel-header" style="padding: 0 0 8px 0;">
-                            <span
-                                class="detail-subtitle">@string.Format(Resources.Web_Acl_PermissionsFor, entry.Name)</span>
-                            <button class="btn-icon btn-icon--small" title="@Resources.Web_Button_Close"
-                                    @onclick="CloseFolderAcl">
-                                @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                            </button>
-                        </div>
-                        <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
-                                   Path="@_aclFolderPath" ShareId="@VM.CurrentShare!.Id"
-                                   IsDirectory="@entry.IsDirectory" OnChanged="LoadAclCounts"/>
-                    </div>
-                </div>
-            }
         </Virtualize>
 
         @if (!VM.Items.Any())
@@ -687,8 +669,7 @@ else
                OnRestored="OnVersionRestored"/>
 
 @* -- Properties dialog (size / metadata / ACL) -- *@
-<PropertiesDialog @ref="_propertiesDialogComponent" VM="VM" Mount="Mount"/>
-<CloudAccessGrantsDialog @ref="_grantsDialogComponent" OnSaved="Refresh"/>
+<PropertiesDialog @ref="_propertiesDialogComponent" VM="VM" Mount="Mount" OnMountSaved="Refresh"/>
 
 @* -- Create-hash dialog (checksum of a single file) -- *@
 <HashDialog @ref="_hashDialogComponent" VM="VM"/>

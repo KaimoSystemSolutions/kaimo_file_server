@@ -1,0 +1,83 @@
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.Pages.CloudAccess
+@inherits AppComponentBase
+@inject CloudAccessViewModel CloudAccess
+
+@* Access list of a virtual share mounted as a folder, shown in the Permissions tab of the
+   properties dialog. Same editor as Shares → Virtual shares → Access; changes are saved
+   explicitly because a grant change may hide the mount from its viewers. *@
+<p class="form-hint mount-grants-hint">@R("Web_CloudAccess_MountGrantsHint")</p>
+
+@if (_error is not null)
+{
+    <div class="error-banner" role="alert">@_error</div>
+}
+@if (_loading)
+{
+    <div class="loading-state"><div class="spinner"></div></div>
+}
+else if (_loaded)
+{
+    <CloudAccessAclEditor Principals="_principals" Grants="_grants" />
+}
+
+<div class="modal-actions">
+    <button class="btn btn-primary" type="button" disabled="@(_busy || !_loaded)" @onclick="SaveAsync">@R("Web_CloudAccess_SaveAccess")</button>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public MountedFolder Mount { get; set; } = default!;
+
+    /// <summary>Raised after the grants were saved (visibility of the mount may have changed).</summary>
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private Dictionary<Guid, CloudAccessPermission> _grants = [];
+    private IReadOnlyList<PrincipalPickerItem> _principals = [];
+    private bool _loading = true;
+    private bool _loaded;
+    private bool _busy;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Loads the principals of the share's department too; throws without manage rights.
+            _grants = await CloudAccess.LoadShareGrantsAsync(Mount.ShareId);
+            _principals = CloudAccess.AvailablePrincipals
+                .Select(p => new PrincipalPickerItem(p.Id, p.Name, p is Group ? PrincipalKind.Group : PrincipalKind.User))
+                .ToList();
+            _loaded = true;
+        }
+        catch (Exception exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await CloudAccess.UpdateShareGrantsAsync(Mount.ShareId, _grants);
+            await OnSaved.InvokeAsync();
+        }
+        catch (Exception exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+}

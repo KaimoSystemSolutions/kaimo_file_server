@@ -33,8 +33,6 @@ public partial class FileBrowser
 
     protected override async Task OnParametersSetAsync()
     {
-        _showFolderAcl = false;
-        _aclFolderPath = "";
         _selectedItems.Clear();
         _sortColumn = null;
         _sortDirection = 0;
@@ -200,7 +198,6 @@ public partial class FileBrowser
     private void ToggleAclPanel()
     {
         _showAclPanel = !_showAclPanel;
-        _showFolderAcl = false;
     }
 
     // ========== Create folder ==========
@@ -387,8 +384,13 @@ public partial class FileBrowser
     public async Task OpenPropertiesDialog(IReadOnlyList<FileMetadata> items)
         => await _propertiesDialogComponent.Open(items);
 
+    /// <summary>Opens the properties dialog of a single item on its Permissions (Security) tab.</summary>
+    public Task OpenPermissionsDialog(FileMetadata item)
+        => _propertiesDialogComponent.OpenPermissions(item);
+
     /// <summary>Opens the access list of a virtual share mounted as a folder (mount entry).</summary>
-    public Task OpenMountPermissions(MountedFolder mount) => _grantsDialogComponent.Open(mount);
+    public void OpenMountPermissions(MountedFolder mount, FileMetadata entry)
+        => _propertiesDialogComponent.OpenMountPermissions(mount, entry);
 
     /// <summary>Opens the "create hash" dialog for a single file.</summary>
     public async Task OpenHashDialog(FileMetadata item)
@@ -466,42 +468,6 @@ public partial class FileBrowser
     private string GetFileAclPath(FileMetadata file)
         => VM.ShareRelativeOf(file);
 
-    internal void OpenFolderAcl(FileMetadata dir)
-    {
-        var path = GetDirAclPath(dir);
-        if (_showFolderAcl && _aclFolderPath == path)
-        {
-            _showFolderAcl = false;
-            _aclFolderPath = "";
-        }
-        else
-        {
-            _showFolderAcl = true;
-            _aclFolderPath = path;
-        }
-    }
-
-    internal void OpenFileAcl(FileMetadata file)
-    {
-        var path = GetFileAclPath(file);
-        if (_showFolderAcl && _aclFolderPath == path)
-        {
-            _showFolderAcl = false;
-            _aclFolderPath = "";
-        }
-        else
-        {
-            _showFolderAcl = true;
-            _aclFolderPath = path;
-        }
-    }
-
-    private void CloseFolderAcl()
-    {
-        _showFolderAcl = false;
-        _aclFolderPath = "";
-    }
-
     // ========== Navigation ==========
 
     /// <summary>Double-click / open: navigate into a folder or preview a file.</summary>
@@ -513,14 +479,8 @@ public partial class FileBrowser
             await _filePreviewComponent.OpenFilePreview(entry);
     }
 
-    /// <summary>Open the inline ACL editor for a directory or a file.</summary>
-    private void OpenEntryAcl(FileMetadata entry)
-    {
-        if (entry.IsDirectory)
-            OpenFolderAcl(entry);
-        else
-            OpenFileAcl(entry);
-    }
+    /// <summary>Open the permissions dialog for a directory or a file (ACL emblem click).</summary>
+    private Task OpenEntryAcl(FileMetadata entry) => OpenPermissionsDialog(entry);
 
     /// <summary>Jump to the external-storage sync overview, selecting the sync behind this emblem.</summary>
     private void OpenSyncOverview(SyncFolderMarker marker)
@@ -647,7 +607,6 @@ public partial class FileBrowser
     {
         _showVirtualAclPanel = !_showVirtualAclPanel;
         _showAclPanel = false;
-        _showFolderAcl = false;
         if (_showVirtualAclPanel && VM.CurrentBrowserShare is { } share)
             await LoadVirtualGrantsAsync(share.Id);
     }

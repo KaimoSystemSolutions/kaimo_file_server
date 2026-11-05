@@ -3,6 +3,7 @@
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inherits AppComponentBase
 @inject DateFormatService DateFmt
+@inject IJSRuntime JS
 
 @*
     Compact, Windows-Explorer-style "Properties" dialog for a single file or folder, or for a
@@ -16,6 +17,12 @@
 
     For a multi-selection the size is the combined total, every other value is shown when it
     is the same for all items and "Varies" otherwise, and the Security tab is not offered.
+
+    The context menu's "Permissions" command opens the dialog directly on the Security tab
+    (<see cref="OpenPermissions" />). A mounted virtual share (<see cref="OpenMountPermissions" />)
+    has no metadata of its own, so only the Security tab with its access list is shown.
+    The dialog widens slightly on the Security tab to give the ACL editor room; size changes
+    (tab switch, editor loaded) are animated by kaimoSmoothResize and the new tab fades in.
 *@
 @if (_show && _target is not null)
 {
@@ -26,7 +33,8 @@
     var allDirectories = _targets.All(t => t.IsDirectory);
 
     <div class="modal-backdrop" @onclick="Close">
-        <div class="properties-dialog" @onclick:stopPropagation="true">
+        <div class="properties-dialog @(_activeTab == Tab.Security ? "properties-dialog--wide" : "")" @ref="_dialogRef"
+             @onclick:stopPropagation="true">
 
             @* -- Header: icon + name + close -- *@
             <div class="properties-header">
@@ -48,10 +56,13 @@
 
             @* -- Tabs -- *@
             <div class="properties-tabs">
-                <button class="properties-tab @(_activeTab == Tab.General ? "properties-tab--active" : "")"
-                        @onclick="() => _activeTab = Tab.General">
-                    @Resources.Web_Properties_Tab_General
-                </button>
+                @if (_mount is null)
+                {
+                    <button class="properties-tab @(_activeTab == Tab.General ? "properties-tab--active" : "")"
+                            @onclick="() => _activeTab = Tab.General">
+                        @Resources.Web_Properties_Tab_General
+                    </button>
+                }
                 @if (_showSecurityTab)
                 {
                     <button class="properties-tab @(_activeTab == Tab.Security ? "properties-tab--active" : "")"
@@ -63,6 +74,8 @@
 
             @* -- Body -- *@
             <div class="properties-body">
+                @* Keyed by tab: a switch re-creates the pane, which replays its fade-in. *@
+                <div class="properties-pane" @key="_activeTab">
                 @if (_activeTab == Tab.General)
                 {
                     var location = Common(LocationOf);
@@ -118,6 +131,10 @@
                         }
                     </dl>
                 }
+                else if (_mount is not null)
+                {
+                    <MountGrantsEditor @key="_mount" Mount="_mount" OnSaved="OnMountGrantsSaved" />
+                }
                 else if (_showSecurityTab)
                 {
                     <AclEditor @key="@($"props-acl-{VM.CurrentShare?.Id}-{_relativePath}")"
@@ -125,6 +142,7 @@
                                ShareId="@VM.CurrentShare!.Id"
                                IsDirectory="@_target.IsDirectory" />
                 }
+                </div>
             </div>
         </div>
     </div>
@@ -136,7 +154,24 @@
     /// <summary>Set inside a virtual share mounted as a folder: share and location are the host's.</summary>
     [Parameter] public MountedFolder? Mount { get; set; }
 
+    /// <summary>Raised after a mount's access list was saved (its visibility may have changed).</summary>
+    [Parameter] public EventCallback OnMountSaved { get; set; }
+
     private enum Tab { General, Security }
+
+    // Set while the dialog shows the access list of a mounted virtual share.
+    private MountedFolder? _mount;
+
+    // The dialog element is re-created on every open; each instance is handed to the resize animator once.
+    private ElementReference _dialogRef;
+    private bool _resizeObserved;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_show || _resizeObserved) return;
+        _resizeObserved = true;
+        await JS.InvokeVoidAsync("kaimoSmoothResize.observe", _dialogRef);
+    }
 
     private bool _show;
     public bool IsOpen => _show;
@@ -156,17 +191,33 @@
     /// <summary>Opens the properties dialog for a single file or directory.</summary>
     public Task Open(FileMetadata target) => Open(new[] { target });
 
+    /// <summary>Opens the properties dialog for a single item directly on its Security tab.</summary>
+    public Task OpenPermissions(FileMetadata target) => Open(new[] { target }, permissions: true);
+
+    /// <summary>Opens the access list of a virtual share mounted as a folder (its mount entry).</summary>
+    public void OpenMountPermissions(MountedFolder mount, FileMetadata entry)
+    {
+        _targets = [entry];
+        _target = entry;
+        _mount = mount;
+        _showSecurityTab = true;
+        _activeTab = Tab.Security;
+        _show = true;
+        StateHasChanged();
+    }
+
     /// <summary>Opens the properties dialog for one or more files/directories.</summary>
-    public async Task Open(IReadOnlyList<FileMetadata> targets)
+    public async Task Open(IReadOnlyList<FileMetadata> targets, bool permissions = false)
     {
         if (targets.Count == 0) return;
 
         var list = targets.ToList();
         _targets = list;
         _target = list[0];
-        _activeTab = Tab.General;
+        _mount = null;
         _relativePath = VM.ShareRelativeOf(_target);
         _showSecurityTab = list.Count == 1 && VM.CanManageAcls && VM.CurrentShare is not null;
+        _activeTab = permissions && _showSecurityTab ? Tab.Security : Tab.General;
         _ownerName = null;
         _itemId = null;
         _show = true;
@@ -229,7 +280,15 @@
         _show = false;
         _targets = new();
         _target = null;
+        _mount = null;
+        _resizeObserved = false;
         StateHasChanged();
+    }
+
+    private async Task OnMountGrantsSaved()
+    {
+        Close();
+        await OnMountSaved.InvokeAsync();
     }
 
     private bool IsCurrent(List<FileMetadata> targets) => _show && ReferenceEquals(_targets, targets);

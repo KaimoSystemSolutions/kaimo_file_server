@@ -199,8 +199,8 @@
         "recycle.empty" => async () => { CloseContextMenu(); await FileBrowser.EmptyRecycleBin(target!); },
 
         "permissions" when target is not null && FileBrowser.VM.MountOf(target) is { } mount
-            => async () => { CloseContextMenu(); await FileBrowser.OpenMountPermissions(mount); },
-        "permissions" => () => { ContextAcl(target!); return Task.CompletedTask; },
+            => () => { CloseContextMenu(); FileBrowser.OpenMountPermissions(mount, target); return Task.CompletedTask; },
+        "permissions" => async () => { CloseContextMenu(); await FileBrowser.OpenPermissionsDialog(target!); },
 
         "properties" when scope == ContextMenuScope.MultiSelection
             => async () => { CloseContextMenu(); await FileBrowser.OpenPropertiesDialog(selected.ToList()); },
@@ -287,16 +287,6 @@
     {
         CloseContextMenu();
         await FileBrowser.RenameSelected();
-        FileBrowser.TriggerReRender();
-    }
-
-    private void ContextAcl(FileMetadata item)
-    {
-        CloseContextMenu();
-        if (item.IsDirectory) 
-            FileBrowser.OpenFolderAcl(item); 
-        else 
-            FileBrowser.OpenFileAcl(item);
         FileBrowser.TriggerReRender();
     }
 

@@ -1,3 +1,27 @@
+/* The ACL editor needs a little more room than the metadata grid. The size change itself is
+   animated by kaimoSmoothResize (smoothResize.ts), not by a CSS transition. */
+.properties-dialog--wide {
+    width: 500px;
+}
+
+/* No scrollbar flashes while the dialog grows towards the new content's height. */
+.properties-dialog.smooth-resizing .properties-body {
+    overflow: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .properties-pane {
+        animation: properties-pane-in 0.24s cubic-bezier(0.32, 0.72, 0, 1) both;
+    }
+}
+
+@keyframes properties-pane-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+}
+
 .properties-tabs {
     display: flex;
     gap: 4px;

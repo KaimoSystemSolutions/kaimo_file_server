@@ -258,17 +258,6 @@
     user-select: none;
 }
 
-/* --- ACL Expand --- */
-
-.file-row-acl-expand-wrap {
-    grid-column: 1 / -1;
-    border-bottom: 1px solid var(--border);
-}
-
-.file-row-acl-expand {
-    padding: 12px 16px 16px 44px;
-    background: var(--bg-tertiary);
-}
 
 /* --- Empty State --- */
 

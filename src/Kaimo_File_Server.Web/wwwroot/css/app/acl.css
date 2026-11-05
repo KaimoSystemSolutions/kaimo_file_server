@@ -285,6 +285,12 @@
         color: var(--text-primary);
     }
 
+    /* .detail-label carries a block top margin for stacked forms; inside the toggle it
+       would push the label below the chevron. */
+    .acl-collapse-toggle .detail-label {
+        margin: 0;
+    }
+
 .acl-collapse-chevron {
     transition: transform 0.2s;
     flex-shrink: 0;

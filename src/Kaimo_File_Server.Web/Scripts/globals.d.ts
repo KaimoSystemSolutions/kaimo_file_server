@@ -14,6 +14,9 @@ interface Window {
     contextMenu: {
         reposition(el: HTMLElement | null): Promise<void> | undefined;
     };
+    kaimoSmoothResize: {
+        observe(el: HTMLElement | null): void;
+    };
     infoPopover: {
         MARGIN: number;
         GAP: number;

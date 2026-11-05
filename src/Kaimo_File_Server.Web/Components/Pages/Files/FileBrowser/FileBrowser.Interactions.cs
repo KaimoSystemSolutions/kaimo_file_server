@@ -23,8 +23,6 @@ public partial class FileBrowser
     private Dictionary<string, int> _aclCounts = new();
     private bool _showAclPanel;
     private string _aclPath = "";
-    private bool _showFolderAcl;
-    private string _aclFolderPath = "";
     private bool _showCreateFolder;
     private string _newFolderName = "";
     private bool _showUploadMenu;
@@ -45,7 +43,6 @@ public partial class FileBrowser
     private ContextMenu _contextMenuComponent = default!;
     private VersionDialog _versionDialogComponent = default!;
     private PropertiesDialog _propertiesDialogComponent = default!;
-    private CloudAccessGrantsDialog _grantsDialogComponent = default!;
     private HashDialog _hashDialogComponent = default!;
     private ShareLinkDialog _shareLinkDialogComponent = default!;
 
@@ -266,7 +263,6 @@ public partial class FileBrowser
         _showCreateFolder || _showDeleteConfirm || _showRenameDialog || _showCloudToLocal ||
         _filePreviewComponent?.IsOpen == true || _versionDialogComponent?.IsOpen == true ||
         _propertiesDialogComponent?.IsOpen == true || _hashDialogComponent?.IsOpen == true ||
-        _grantsDialogComponent?.IsOpen == true ||
         _contextMenuComponent?.IsOpen == true;
 
     // ========== Toolbar Actions ==========
@@ -418,12 +414,10 @@ public partial class FileBrowser
         StateHasChanged();
     }
 
-    private void AclSelected()
+    private async Task AclSelected()
     {
         if (_selectedItems.Count != 1) return;
-        var item = _selectedItems.First();
-        if (item.IsDirectory) OpenFolderAcl(item);
-        else OpenFileAcl(item);
+        await OpenPermissionsDialog(_selectedItems.First());
     }
 
 // ---- Drag start/end ----
