@@ -7,6 +7,20 @@ public enum CloudAccessPermission
     Write = 1
 }
 
+/// <summary>How a virtual share is offered to users.</summary>
+public enum CloudAccessProvisioning
+{
+    /// <summary>Standalone entry in the share overview, browsed under /files/access/{id}.</summary>
+    VirtualShare = 0,
+
+    /// <summary>
+    /// Mounted as a folder inside a local share (<see cref="CloudAccessShare.MountShareId"/> +
+    /// <see cref="CloudAccessShare.MountPath"/>). Without a mount point the share is orphaned and
+    /// reachable nowhere; it never falls back to standalone mode.
+    /// </summary>
+    Folder = 1
+}
+
 /// <summary>A provider folder exposed as a web-only, lazily accessed virtual share.</summary>
 public sealed class CloudAccessShare
 {
@@ -18,6 +32,16 @@ public sealed class CloudAccessShare
     public string RemoteRootPath { get; set; } = string.Empty;
     public string? RemoteRootItemId { get; set; }
     public bool IsEnabled { get; set; } = true;
+    public CloudAccessProvisioning Provisioning { get; set; } = CloudAccessProvisioning.VirtualShare;
+
+    /// <summary>Local host share of the mount point (Folder mode only).</summary>
+    public Guid? MountShareId { get; set; }
+
+    /// <summary>Normalized share-relative path of the mount point (Folder mode only).</summary>
+    public string? MountPath { get; set; }
+
+    public bool IsFolderMode => Provisioning == CloudAccessProvisioning.Folder;
+    public bool IsMounted => IsFolderMode && MountShareId is not null && !string.IsNullOrEmpty(MountPath);
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 }

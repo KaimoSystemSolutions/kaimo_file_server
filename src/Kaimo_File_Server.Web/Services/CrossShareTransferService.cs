@@ -48,6 +48,8 @@ public sealed class CrossShareTransferService(
 
         foreach (var share in await cloudRepository.GetSharesAsync())
         {
+            // A share mounted as a folder is reached through its host share's folder tree.
+            if (share.IsFolderMode) continue;
             // Transfer targets require write access; GetEffectivePermissionAsync already
             // returns null for disabled shares and for actors without any grant.
             if (await cloudAuthorization.GetEffectivePermissionAsync(actor, share) == CloudAccessPermission.Write)

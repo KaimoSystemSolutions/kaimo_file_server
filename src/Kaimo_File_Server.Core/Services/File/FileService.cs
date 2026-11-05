@@ -21,6 +21,7 @@ public partial class FileService : IFileService
     private readonly ICloudSyncPathUpdater? _cloudSyncPathUpdater;
     private readonly ICloudSyncOperationCoordinator? _cloudSyncOperations;
     private readonly IFileChangeLog? _changeLog;
+    private readonly ICloudAccessMountGuard? _mountGuard;
     private readonly ILogger<FileService> _logger;
     private readonly Guid _shareId;
     // ShareDefinition.RecycleRootDepth: where reserved namespaces and the recycle bin live.
@@ -38,8 +39,10 @@ public partial class FileService : IFileService
     ICloudSyncPathUpdater? cloudSyncPathUpdater = null,
     ICloudSyncOperationCoordinator? cloudSyncOperations = null,
     IFileChangeLog? changeLog = null,
-    int recycleRootDepth = 0)
+    int recycleRootDepth = 0,
+    ICloudAccessMountGuard? mountGuard = null)
     {
+        _mountGuard = mountGuard;
         _recycleRootDepth = recycleRootDepth;
         _storage = storage;
         _acl = acl;
@@ -297,7 +300,7 @@ public partial class FileService : IFileService
     public async Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format, UserContext user)
     {
         var normalizedTarget = ShareRelativePath.Normalize(targetPath);
-        EnsureUserWriteTargetAllowed(normalizedTarget);
+        await EnsureUserWriteTargetAllowedAsync(normalizedTarget);
 
         // Check read on all sources
         foreach (var source in sourcePaths)
@@ -324,7 +327,7 @@ public partial class FileService : IFileService
     {
         var normalizedZip = ShareRelativePath.Normalize(zipPath);
         var normalizedTarget = ShareRelativePath.Normalize(targetPath);
-        EnsureUserWriteTargetAllowed(normalizedTarget);
+        await EnsureUserWriteTargetAllowedAsync(normalizedTarget);
 
         // Check read permission on the zip
         await EnsureAccessAsync(user, normalizedZip, false, FilePermission.ListReadData);
@@ -344,7 +347,7 @@ public partial class FileService : IFileService
     public async Task CreateFileAsync(string path, UserContext user)
     {
         var normalized = ShareRelativePath.Normalize(path);
-        EnsureUserWriteTargetAllowed(normalized);
+        await EnsureUserWriteTargetAllowedAsync(normalized);
         var parentPath = ShareRelativePath.GetParent(normalized);
 
         await EnsureAccessAsync(user, parentPath, true, FilePermission.CreateWriteData);
@@ -359,7 +362,7 @@ public partial class FileService : IFileService
     public async Task CreateDirectoryAsync(string path, UserContext user)
     {
         var normalized = ShareRelativePath.Normalize(path);
-        EnsureUserWriteTargetAllowed(normalized);
+        await EnsureUserWriteTargetAllowedAsync(normalized);
         var parentPath = ShareRelativePath.GetParent(normalized);
 
         await EnsureAccessAsync(user, parentPath, true, FilePermission.CreateWriteData);
@@ -501,6 +504,8 @@ public partial class FileService : IFileService
             ShareEntryPolicy.IsReservedForUserWrites(normalized, _recycleRootDepth))
             throw new UnauthorizedAccessException(
                 $"Share path '{normalized}' uses a reserved Kaimo namespace.");
+        if ((wantsWrite || !exists && wantsCreate) && await IsMountReservedAsync(normalized, ct))
+            throw new MountPathReservedException(normalized);
 
         // Single permission check at open. No more per-Read/per-Write checks.
         if (!exists)

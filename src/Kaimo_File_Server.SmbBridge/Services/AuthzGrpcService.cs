@@ -6,6 +6,7 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.SmbBridge.Grpc;
 
 namespace Kaimo_File_Server.SmbBridge.Services;
@@ -83,6 +84,7 @@ public sealed partial class AuthzGrpcService : AuthzService.AuthzServiceBase
     private readonly ISmbConfigStore _config;
     private readonly ILogger<AuthzGrpcService> _logger;
     private readonly ICloudSyncOperationCoordinator? _cloudSyncOperations;
+    private readonly ICloudAccessMountGuard? _mountGuard;
 
     public AuthzGrpcService(
         IUserRepository users,
@@ -91,8 +93,10 @@ public sealed partial class AuthzGrpcService : AuthzService.AuthzServiceBase
         IAclService acl,
         ISmbConfigStore config,
         ILogger<AuthzGrpcService> logger,
-        ICloudSyncOperationCoordinator? cloudSyncOperations = null)
+        ICloudSyncOperationCoordinator? cloudSyncOperations = null,
+        ICloudAccessMountGuard? mountGuard = null)
     {
+        _mountGuard = mountGuard;
         _users = users;
         _shares = shares;
         _auth = auth;
@@ -101,6 +105,14 @@ public sealed partial class AuthzGrpcService : AuthzService.AuthzServiceBase
         _logger = logger;
         _cloudSyncOperations = cloudSyncOperations;
     }
+
+    // Virtual-share mount points live only in the database; deny SMB creates and rename
+    // destinations on them so no real folder can shadow a mount.
+    private Task<bool> IsMountReservedAsync(
+        Guid shareId, string normalizedPath, CancellationToken cancellationToken) =>
+        _mountGuard is null
+            ? Task.FromResult(false)
+            : _mountGuard.IsReservedAsync(shareId, normalizedPath, cancellationToken);
 
     public override async Task<AuthorizeReply> AuthorizeConnect(
         AuthorizeConnectRequest request, ServerCallContext context)

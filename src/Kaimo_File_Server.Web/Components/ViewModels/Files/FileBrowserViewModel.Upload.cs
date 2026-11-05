@@ -94,6 +94,10 @@ public partial class FileBrowserViewModel
                 _fileService, CurrentPath, relativeDir, userContext, cancellationToken);
             return OperationResult.Ok();
         }
+        catch (MountPathReservedException)
+        {
+            return OperationResult.Fail(Resources.ResourceManager.GetString("Web_Error_NameReserved") ?? Resources.Web_Error_AccessDenied);
+        }
         catch (UnauthorizedAccessException)
         {
             return OperationResult.Fail(Resources.Web_Error_AccessDenied);

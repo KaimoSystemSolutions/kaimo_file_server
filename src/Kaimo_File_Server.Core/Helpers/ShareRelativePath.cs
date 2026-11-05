@@ -266,4 +266,21 @@ public static class ShareRelativePath
             return 0;
         return normalized.Split('/').Length;
     }
+
+    /// <summary>
+    /// True when the normalized <paramref name="candidate"/> equals <paramref name="ancestor"/>
+    /// or lies below it (case-insensitive, like SMB clients).
+    /// </summary>
+    public static bool IsSameOrDescendant(string ancestor, string candidate)
+        => string.Equals(ancestor, candidate, StringComparison.OrdinalIgnoreCase)
+           || candidate.StartsWith(ancestor + "/", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Rebases <paramref name="candidate"/> (same as or below <paramref name="oldPath"/>)
+    /// onto <paramref name="newPath"/>.
+    /// </summary>
+    public static string ReplacePrefix(string oldPath, string newPath, string candidate)
+        => candidate.Length == oldPath.Length
+            ? newPath
+            : Combine(newPath, candidate[(oldPath.Length + 1)..]);
 }

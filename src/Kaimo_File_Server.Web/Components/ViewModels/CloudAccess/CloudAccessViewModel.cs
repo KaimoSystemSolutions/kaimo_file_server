@@ -30,6 +30,7 @@ public sealed partial class CloudAccessViewModel
     private readonly ICredentialVault? _credentialVault;
     private readonly IStorageDirectoryTargetResolver? _directoryTargets;
     private readonly CloudAccessAuthorizationService? _cloudAuthorization;
+    private readonly CloudAccessMountService? _mounts;
     private UserContext? _actor;
     private AuthorizedScopeResult? _shareScope;
     private Dictionary<Guid, StorageConnectionState> _connectionStates = [];
@@ -53,7 +54,8 @@ public sealed partial class CloudAccessViewModel
         IStorageConnectionProviderCatalog? providerCatalog = null,
         ICredentialVault? credentialVault = null,
         IStorageDirectoryTargetResolver? directoryTargets = null,
-        CloudAccessAuthorizationService? cloudAuthorization = null)
+        CloudAccessAuthorizationService? cloudAuthorization = null,
+        CloudAccessMountService? mounts = null)
     {
         _repository = repository;
         _connections = connections;
@@ -68,6 +70,7 @@ public sealed partial class CloudAccessViewModel
         _oneDriveConnections = oneDriveConnections;
         _logger = logger;
         _cloudAuthorization = cloudAuthorization;
+        _mounts = mounts;
         _providerCatalog = providerCatalog;
         _credentialVault = credentialVault;
         _directoryTargets = directoryTargets;
@@ -167,7 +170,7 @@ public sealed partial class CloudAccessViewModel
                 .Where(x => shareIds.Contains(x.DepartmentId));
             var accessibleShares = _cloudAuthorization is null
                 ? []
-                : await _cloudAuthorization.GetVisibleSharesAsync(_actor);
+                : await _cloudAuthorization.GetVisibleSharesAsync(_actor, includeFolderMode: true);
             Shares = managedShares.UnionBy(accessibleShares, share => share.Id).ToList();
         }
         catch (Exception exception)

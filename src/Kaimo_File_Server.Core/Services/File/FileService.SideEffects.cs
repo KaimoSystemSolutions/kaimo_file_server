@@ -89,6 +89,12 @@ public partial class FileService
         try { await _acl.DeleteAclAsync(_shareId, relativePath); }
         catch (Exception ex) { failures.Add(ex); }
 
+        if (isDirectory && _mountGuard != null)
+        {
+            try { await _mountGuard.DetachAsync(_shareId, relativePath); }
+            catch (Exception ex) { failures.Add(ex); }
+        }
+
         if (_versionService != null)
         {
             try { await _versionService.DeletePathAsync(_shareId, relativePath); }
@@ -145,6 +151,17 @@ public partial class FileService
             {
                 await _cloudSyncPathUpdater.RenamePathAsync(
                     _shareId, oldRelativePath, newRelativePath);
+            }
+            catch (Exception ex) { failures.Add(ex); }
+        }
+
+        // Unlike cloud-sync paths, mounts must also see recycle moves: those detach them.
+        if (isDirectory && _mountGuard != null)
+        {
+            try
+            {
+                await _mountGuard.RenamePathAsync(
+                    _shareId, oldRelativePath, newRelativePath, _recycleRootDepth);
             }
             catch (Exception ex) { failures.Add(ex); }
         }

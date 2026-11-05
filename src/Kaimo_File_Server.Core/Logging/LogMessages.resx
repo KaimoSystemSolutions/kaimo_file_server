@@ -243,6 +243,12 @@
   <data name="SeedDuplicateGroupsRemoved" xml:space="preserve">
     <value>Removed {Count} duplicate group(s) named '{Name}'.</value>
   </data>
+  <data name="CloudAccessMountDetached" xml:space="preserve">
+    <value>Virtual share mount(s) at {Path} in share {ShareId} detached because the folder was deleted or moved to the recycle bin; re-mount on the virtual share admin page.</value>
+  </data>
+  <data name="CloudAccessMountRebased" xml:space="preserve">
+    <value>Virtual share mount(s) in share {ShareId} moved from {OldPath} to {NewPath}.</value>
+  </data>
   <data name="ReconcilerStarted" xml:space="preserve">
     <value>Data service reconciler started ({Count} services).</value>
   </data>
@@ -275,6 +281,15 @@
   </data>
   <data name="SearchLocalFailed" xml:space="preserve">
     <value>Local index search failed, falling back to filename search.</value>
+  </data>
+  <data name="CloudAccessMountChanged" xml:space="preserve">
+    <value>Virtual share {VirtualShare} mounted at {Share}/{Path} by {User}.</value>
+  </data>
+  <data name="CloudAccessMountRemoved" xml:space="preserve">
+    <value>Virtual share {VirtualShare} switched back to standalone mode by {User}.</value>
+  </data>
+  <data name="CloudAccessMountRaceRolledBack" xml:space="preserve">
+    <value>Mount of virtual share {VirtualShare} at {Path} rolled back: a folder with that name appeared concurrently.</value>
   </data>
   <data name="AclEditorLoadData" xml:space="preserve">
     <value>AclEditor.LoadDataAsync Path='{Path}', ShareId={ShareId}</value>

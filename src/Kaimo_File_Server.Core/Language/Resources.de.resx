@@ -1405,7 +1405,7 @@
     <value>Zuweisung &amp; Delegation</value>
   </data>
   <data name="Web_PermGroup_ShareMgmt" xml:space="preserve">
-    <value>Freigabenverwaltung</value>
+    <value>Share-Verwaltung</value>
   </data>
   <data name="Web_PermGroup_DeptMgmt" xml:space="preserve">
     <value>Abteilungsverwaltung</value>
@@ -1450,10 +1450,10 @@
     <value>Abteilungen zuweisen</value>
   </data>
   <data name="Web_Perm_CreateShares" xml:space="preserve">
-    <value>Freigaben erstellen</value>
+    <value>Shares erstellen</value>
   </data>
   <data name="Web_Perm_DeleteShares" xml:space="preserve">
-    <value>Freigaben löschen</value>
+    <value>Shares löschen</value>
   </data>
   <data name="Web_Perm_EditSettings" xml:space="preserve">
     <value>Einstellungen bearbeiten</value>
@@ -1774,7 +1774,7 @@
     <value>Eigener Name</value>
   </data>
   <data name="Web_Settings_Storage_PoolNameHint" xml:space="preserve">
-    <value>Vergeben Sie einen sprechenden Namen, der beim Erstellen oder Verschieben von Freigaben angezeigt wird; der zugrunde liegende Einhängepfad wird dabei nicht verändert.</value>
+    <value>Vergeben Sie einen sprechenden Namen, der beim Erstellen oder Verschieben von Shares angezeigt wird; der zugrunde liegende Einhängepfad wird dabei nicht verändert.</value>
   </data>
   <data name="Web_Settings_Storage_PoolNamesSaved" xml:space="preserve">
     <value>Speicher-Pool-Namen gespeichert.</value>
@@ -2299,19 +2299,19 @@
     <value>Abteilung</value>
   </data>
   <data name="Web_Admin_Scope_Share" xml:space="preserve">
-    <value>Freigabe</value>
+    <value>Share</value>
   </data>
   <data name="Web_Admin_Label_ShareId" xml:space="preserve">
-    <value>Freigabe-ID</value>
+    <value>Share-ID</value>
   </data>
   <data name="Web_Admin_Placeholder_ShareId" xml:space="preserve">
-    <value>GUID der Freigabe</value>
+    <value>GUID des Shares</value>
   </data>
   <data name="Web_Admin_Label_Share" xml:space="preserve">
-    <value>Freigabe</value>
+    <value>Share</value>
   </data>
   <data name="Web_Admin_ShareScopeHint" xml:space="preserve">
-    <value>Nur in der gewählten Freigabe. Dort wirken nur die freigabebezogenen Rechte der Rolle; System- und Abteilungsrechte bleiben ohne Wirkung.</value>
+    <value>Nur im gewählten Share. Dort wirken nur die sharebezogenen Rechte der Rolle; System- und Abteilungsrechte bleiben ohne Wirkung.</value>
   </data>
   <data name="Web_Common_Select" xml:space="preserve">
     <value>— Auswählen —</value>
@@ -2335,7 +2335,7 @@
     <value>Abteilung</value>
   </data>
   <data name="Web_Admin_ScopeType_Share" xml:space="preserve">
-    <value>Freigabe</value>
+    <value>Share</value>
   </data>
   <data name="Web_Dept_PageTitle" xml:space="preserve">
     <value>Kaimo File Server – Abteilungen</value>
@@ -2401,7 +2401,7 @@
     <value>Standard-Dateiberechtigung</value>
   </data>
   <data name="Web_Dept_DefaultFilePermHint" xml:space="preserve">
-    <value>Wird als virtueller Allow-Layer im ACL-System ausgewertet. Alle Abteilungsmitglieder erhalten diese Rechte auf den zugeordneten Freigaben.</value>
+    <value>Wird als virtueller Allow-Layer im ACL-System ausgewertet. Alle Abteilungsmitglieder erhalten diese Rechte auf den zugeordneten Shares.</value>
   </data>
   <data name="Web_Dept_DefineOwnPerm" xml:space="preserve">
     <value>Eigene Berechtigung definieren</value>
@@ -2422,13 +2422,13 @@
     <value>Jede Gruppe gehört genau einer Abteilung. Abgewählte Gruppen werden auf Global zurückgesetzt.</value>
   </data>
   <data name="Web_Dept_Label_AssignedShares" xml:space="preserve">
-    <value>Zugeordnete Freigaben</value>
+    <value>Zugeordnete Shares</value>
   </data>
   <data name="Web_Dept_SharesHint" xml:space="preserve">
-    <value>Jede Freigabe gehört genau einer Abteilung. Abgewählte Freigaben werden auf Global zurückgesetzt.</value>
+    <value>Jeder Share gehört genau einer Abteilung. Abgewählte Shares werden auf Global zurückgesetzt.</value>
   </data>
   <data name="Web_Dept_NoSharesAvailable" xml:space="preserve">
-    <value>Keine Freigaben vorhanden</value>
+    <value>Keine Shares vorhanden</value>
   </data>
   <data name="Web_Dept_GlobalDepartment" xml:space="preserve">
     <value>Globale Abteilung</value>
@@ -2446,13 +2446,13 @@
     <value>Gruppen ({0})</value>
   </data>
   <data name="Web_Dept_Label_SharesCount" xml:space="preserve">
-    <value>Freigaben ({0})</value>
+    <value>Shares ({0})</value>
   </data>
   <data name="Web_Dept_NoGroupsAssigned" xml:space="preserve">
     <value>Keine Gruppen zugeordnet</value>
   </data>
   <data name="Web_Dept_NoSharesAssigned" xml:space="preserve">
-    <value>Keine Freigaben zugeordnet</value>
+    <value>Keine Shares zugeordnet</value>
   </data>
   <data name="Web_Dept_NoDefaultPerm" xml:space="preserve">
     <value>Keine Default-Berechtigung</value>
@@ -2461,7 +2461,7 @@
     <value>Geerbt von: {0}</value>
   </data>
   <data name="Web_Dept_ConfirmDelete" xml:space="preserve">
-    <value>Abteilung wirklich löschen? Gruppen und Freigaben werden auf Global zurückgesetzt.</value>
+    <value>Abteilung wirklich löschen? Gruppen und Shares werden auf Global zurückgesetzt.</value>
   </data>
   <data name="Web_Dept_DeleteDepartment" xml:space="preserve">
     <value>Abteilung löschen</value>
@@ -2491,7 +2491,7 @@
     <value>Entfernen</value>
   </data>
   <data name="Web_Common_NoSharesAvailable" xml:space="preserve">
-    <value>Keine Freigaben vorhanden</value>
+    <value>Keine Shares vorhanden</value>
   </data>
   <data name="Context_Menu_Properties" xml:space="preserve">
     <value>Eigenschaften</value>
@@ -3259,6 +3259,72 @@
   <data name="Web_CloudAccess_TabAccess" xml:space="preserve">
     <value>Zugriff</value>
   </data>
+  <data name="Web_CloudAccess_TabMount" xml:space="preserve">
+    <value>Bereitstellung</value>
+  </data>
+  <data name="Web_CloudAccess_Mode" xml:space="preserve">
+    <value>Bereitstellungsart</value>
+  </data>
+  <data name="Web_CloudAccess_Mode_VirtualShare" xml:space="preserve">
+    <value>Virtueller Share</value>
+  </data>
+  <data name="Web_CloudAccess_Mode_Folder" xml:space="preserve">
+    <value>Ordner in einem Share</value>
+  </data>
+  <data name="Web_CloudAccess_MountHostShare" xml:space="preserve">
+    <value>Share</value>
+  </data>
+  <data name="Web_CloudAccess_MountParentFolder" xml:space="preserve">
+    <value>Übergeordneter Ordner</value>
+  </data>
+  <data name="Web_CloudAccess_MountFolderName" xml:space="preserve">
+    <value>Ordnername</value>
+  </data>
+  <data name="Web_CloudAccess_MountApply" xml:space="preserve">
+    <value>Übernehmen</value>
+  </data>
+  <data name="Web_CloudAccess_MountSaved" xml:space="preserve">
+    <value>Bereitstellung gespeichert.</value>
+  </data>
+  <data name="Web_CloudAccess_MountStatus_Mounted" xml:space="preserve">
+    <value>Eingehängt unter {0}</value>
+  </data>
+  <data name="Web_CloudAccess_Badge_Detached" xml:space="preserve">
+    <value>Nicht eingehängt</value>
+  </data>
+  <data name="Web_CloudAccess_MountStatus_Detached" xml:space="preserve">
+    <value>Der Ordner mit dem Einhängepunkt wurde gelöscht oder in den Papierkorb verschoben. Hängen Sie den virtuellen Share erneut ein, um ihn verfügbar zu machen.</value>
+  </data>
+  <data name="Web_CloudAccess_MountHelp" xml:space="preserve">
+    <value>Als Ordner in einem Share erscheint der virtuelle Share als Ordner innerhalb eines lokalen Shares und wird nicht mehr eigenständig aufgeführt. Benutzer benötigen Zugriff auf diesen Ordner im Share und auf den virtuellen Share; es gilt das geringere der beiden Rechte. Der Ordner wird nur in der Weboberfläche angezeigt (nicht über SMB, WebDAV oder die API), sein Name bleibt überall reserviert, und sein Remote-Inhalt ist nicht Teil von Kopien, ZIP-Downloads, Sicherungen oder dem Suchindex des Shares.</value>
+  </data>
+  <data name="Web_CloudAccess_Mount_Error_NotAllowed" xml:space="preserve">
+    <value>Sie benötigen Verwaltungsrechte für den virtuellen Share und für den Ziel-Share.</value>
+  </data>
+  <data name="Web_CloudAccess_Mount_Error_HomesShare" xml:space="preserve">
+    <value>Im Share der Benutzerordner können keine virtuellen Shares eingehängt werden.</value>
+  </data>
+  <data name="Web_CloudAccess_Mount_Error_RootNotAllowed" xml:space="preserve">
+    <value>Bitte geben Sie einen Ordnernamen an.</value>
+  </data>
+  <data name="Web_CloudAccess_Mount_Error_InvalidPath" xml:space="preserve">
+    <value>Der Ordnername oder Pfad ist ungültig.</value>
+  </data>
+  <data name="Web_CloudAccess_Mount_Error_ReservedName" xml:space="preserve">
+    <value>Dieser Name ist von Kaimo reserviert.</value>
+  </data>
+  <data name="Web_CloudAccess_Mount_Error_Nested" xml:space="preserve">
+    <value>An, über oder unter diesem Pfad ist bereits ein anderer virtueller Share eingehängt.</value>
+  </data>
+  <data name="Web_CloudAccess_Mount_Error_ParentMissing" xml:space="preserve">
+    <value>Der übergeordnete Ordner existiert nicht.</value>
+  </data>
+  <data name="Web_CloudAccess_Mount_Error_NameInUse" xml:space="preserve">
+    <value>Eine Datei oder ein Ordner mit diesem Namen existiert bereits.</value>
+  </data>
+  <data name="Web_Error_NameReserved" xml:space="preserve">
+    <value>Dieser Name ist reserviert oder bereits vergeben.</value>
+  </data>
   <data name="Web_CloudAccess_DetailHint" xml:space="preserve">
     <value>Virtuellen Share auswählen, um Einstellungen anzuzeigen.</value>
   </data>
@@ -3443,7 +3509,7 @@
     <value>Der entfernte Speicherserver hat den Lesezugriff verweigert. Prüfen Sie die Berechtigungen des für diese Verbindung hinterlegten Kontos.</value>
   </data>
   <data name="Web_ExternalStorage_RemoteWriteDenied" xml:space="preserve">
-    <value>Der entfernte Speicherserver hat den Schreibzugriff verweigert. Prüfen Sie die Freigabe- und Dateisystemrechte des für diese Verbindung hinterlegten Kontos.</value>
+    <value>Der entfernte Speicherserver hat den Schreibzugriff verweigert. Prüfen Sie die Share- und Dateisystemrechte des für diese Verbindung hinterlegten Kontos.</value>
   </data>
   <data name="Web_ExternalStorage_RemoteOperationDenied" xml:space="preserve">
     <value>Der entfernte Speicherserver hat diesen Vorgang verweigert. Prüfen Sie die Berechtigungen des für diese Verbindung hinterlegten Kontos.</value>
@@ -3455,7 +3521,7 @@
     <value>Wähle mindestens ein Element aus.</value>
   </data>
   <data name="Web_Transfer_Error_RemoteCut" xml:space="preserve">
-    <value>Elemente aus einer virtuellen Freigabe können nur kopiert werden.</value>
+    <value>Elemente aus einem virtuellen Share können nur kopiert werden.</value>
   </data>
   <data name="Web_Transfer_Error_InvalidPath" xml:space="preserve">
     <value>Der Zielordner ist ungültig.</value>
@@ -3626,7 +3692,7 @@
     <value>Synchronisierung erstellen</value>
   </data>
   <data name="Web_ExternalStorage_CreateShareFromConnection" xml:space="preserve">
-    <value>Virtuelle Freigabe erstellen</value>
+    <value>Virtuellen Share erstellen</value>
   </data>
   <data name="Web_ExternalStorage_NoSyncs" xml:space="preserve">
     <value>Es sind keine Synchronisierungen konfiguriert.</value>
@@ -3641,7 +3707,7 @@
     <value>Verbindung</value>
   </data>
   <data name="Web_ExternalStorage_LocalShare" xml:space="preserve">
-    <value>Lokale Freigabe</value>
+    <value>Lokaler Share</value>
   </data>
   <data name="Web_ExternalStorage_LocalPath" xml:space="preserve">
     <value>Lokaler Ordner</value>
@@ -3764,7 +3830,7 @@
     <value>Die Synchronisierung ist belegt oder nicht verfügbar.</value>
   </data>
   <data name="Web_ExternalStorage_ShareMissing" xml:space="preserve">
-    <value>Die lokale Freigabe ist nicht mehr vorhanden.</value>
+    <value>Der lokale Share ist nicht mehr vorhanden.</value>
   </data>
   <data name="Web_ExternalStorage_InvalidName" xml:space="preserve">
     <value>Geben Sie einen Namen mit höchstens 200 Zeichen ein.</value>
@@ -3803,7 +3869,7 @@
     <value>Verwendung</value>
   </data>
   <data name="Web_ExternalStorage_UsageFormat" xml:space="preserve">
-    <value>{0} Synchronisierung(en), {1} virtuelle Freigabe(n)</value>
+    <value>{0} Synchronisierung(en), {1} virtuelle(r) Share(s)</value>
   </data>
   <data name="Web_ExternalStorage_ProfileLegacy" xml:space="preserve">
     <value>Legacy / nicht zugewiesen</value>
@@ -3863,10 +3929,10 @@
     <value>Host-Einhängung</value>
   </data>
   <data name="Web_Shares_LocalShares" xml:space="preserve">
-    <value>Lokale Freigaben</value>
+    <value>Lokale Shares</value>
   </data>
   <data name="Web_Shares_VirtualShares" xml:space="preserve">
-    <value>Virtuelle Freigaben</value>
+    <value>Virtuelle Shares</value>
   </data>
   <data name="Web_ExternalStorage_RemoteBrowseFailed" xml:space="preserve">
     <value>Die entfernten Ordner konnten nicht geladen werden.</value>
@@ -3875,7 +3941,7 @@
     <value>Cloud</value>
   </data>
   <data name="Web_ShareList_SelectHint" xml:space="preserve">
-    <value>Wählen Sie eine Freigabe aus, um Details und Einstellungen anzuzeigen.</value>
+    <value>Wählen Sie einen Share aus, um Details und Einstellungen anzuzeigen.</value>
   </data>
   <data name="Web_ShareList_CloudConnected" xml:space="preserve">
     <value>Die Cloud-Verbindung wurde erfolgreich hinzugefügt.</value>
@@ -3899,7 +3965,7 @@
     <value>Rsync-Verbindungen benötigen eine eindeutige Abruf- oder Übertragungsrichtung; bidirektionale Synchronisierung wird nicht unterstützt.</value>
   </data>
   <data name="Web_ExternalStorage_VirtualShareUnsupported" xml:space="preserve">
-    <value>Dieser Anbieter kann nicht für virtuelle Freigaben verwendet werden.</value>
+    <value>Dieser Anbieter kann nicht für virtuelle Shares verwendet werden.</value>
   </data>
   <data name="Web_ExternalStorage_AuthorizeUnsupported" xml:space="preserve">
     <value>Diese Verbindung unterstützt keine interaktive Autorisierung.</value>
@@ -3983,7 +4049,7 @@
     <value>Domäne (optional)</value>
   </data>
   <data name="Web_ExternalStorage_SmbShare" xml:space="preserve">
-    <value>SMB-Freigabe</value>
+    <value>SMB-Share</value>
   </data>
   <data name="Web_ExternalStorage_Username" xml:space="preserve">
     <value>Benutzername</value>
@@ -4010,7 +4076,7 @@
     <value>Geben Sie einen gültigen Benutzernamen und ein Kennwort für diese Verbindung ein.</value>
   </data>
   <data name="Web_ExternalStorage_SmbSharePickerHelp" xml:space="preserve">
-    <value>Verfügbare SMB-Freigaben werden nach dem Verbinden geladen und können beim Einrichten einer Synchronisierung ausgewählt werden.</value>
+    <value>Verfügbare SMB-Shares werden nach dem Verbinden geladen und können beim Einrichten einer Synchronisierung ausgewählt werden.</value>
   </data>
   <data name="Web_ExternalStorage_RuntimeIdentity" xml:space="preserve">
     <value>Netzwerkidentität der Laufzeit</value>
@@ -4181,7 +4247,7 @@
     <value>Noch keine synchronisierten Ordner.</value>
   </data>
   <data name="Web_Devices_Col_Share" xml:space="preserve">
-    <value>Freigabe</value>
+    <value>Share</value>
   </data>
   <data name="Web_Devices_Col_RemoteFolder" xml:space="preserve">
     <value>Remote-Ordner</value>
@@ -4451,7 +4517,7 @@
     <value>Datendienste</value>
   </data>
   <data name="Web_Settings_Data_Description" xml:space="preserve">
-    <value>Aktiviert oder deaktiviert die Freigabe-Protokolle. Änderungen werden vom Dienst innerhalb weniger Sekunden übernommen – ein Neustart ist nicht nötig.</value>
+    <value>Aktiviert oder deaktiviert die Share-Protokolle. Änderungen werden vom Dienst innerhalb weniger Sekunden übernommen – ein Neustart ist nicht nötig.</value>
   </data>
   <data name="Web_Settings_Data_SmbToggle" xml:space="preserve">
     <value>SMB aktivieren/deaktivieren</value>
@@ -4490,7 +4556,7 @@
     <value>Im Netzwerk sichtbar machen (WS-Discovery – erscheint in der Windows-Netzwerkumgebung)</value>
   </data>
   <data name="Web_Settings_Data_AuditLog" xml:space="preserve">
-    <value>Sicherheits-Audit-Protokoll aktivieren (Anmeldungen, Freigabezugriffe, Dateioperationen)</value>
+    <value>Sicherheits-Audit-Protokoll aktivieren (Anmeldungen, Share-Zugriffe, Dateioperationen)</value>
   </data>
   <data name="Web_Settings_Data_StatusRunning" xml:space="preserve">
     <value>Läuft</value>
@@ -4523,13 +4589,13 @@
     <value>Link teilen</value>
   </data>
   <data name="Web_Nav_ShareLinks" xml:space="preserve">
-    <value>Freigabelinks</value>
+    <value>Share-Links</value>
   </data>
   <data name="Web_Perm_ManageShareLinks" xml:space="preserve">
-    <value>Freigabelinks verwalten</value>
+    <value>Share-Links verwalten</value>
   </data>
   <data name="Web_Settings_Tab_ShareLinks" xml:space="preserve">
-    <value>Freigabelinks</value>
+    <value>Share-Links</value>
   </data>
   <data name="Web_Button_Save" xml:space="preserve">
     <value>Speichern</value>
@@ -4589,13 +4655,13 @@
     <value>Sie dürfen für dieses Element keinen Link erstellen.</value>
   </data>
   <data name="Web_ShareLinks_Empty" xml:space="preserve">
-    <value>Noch keine Freigabelinks.</value>
+    <value>Noch keine Share-Links.</value>
   </data>
   <data name="Web_ShareLinks_Col_Item" xml:space="preserve">
     <value>Element</value>
   </data>
   <data name="Web_ShareLinks_Col_Share" xml:space="preserve">
-    <value>Freigabe</value>
+    <value>Share</value>
   </data>
   <data name="Web_ShareLinks_Col_CreatedBy" xml:space="preserve">
     <value>Erstellt von</value>
@@ -5024,7 +5090,7 @@
     <value>Upload fehlgeschlagen</value>
   </data>
   <data name="Web_ShareLink_UploadDisabled" xml:space="preserve">
-    <value>Upload-Links sind deaktiviert. Ein Administrator kann sie unter Einstellungen → Freigabelinks aktivieren.</value>
+    <value>Upload-Links sind deaktiviert. Ein Administrator kann sie unter Einstellungen → Share-Links aktivieren.</value>
   </data>
   <data name="Web_Perm_ManageHomes" xml:space="preserve">
     <value>Home-Ordner verwalten</value>
@@ -5105,7 +5171,7 @@
     <value>Die Home-Ordner sind bereits eingerichtet.</value>
   </data>
   <data name="Web_Settings_Homes_NameTaken" xml:space="preserve">
-    <value>Es gibt bereits eine Freigabe namens "users". Benenne sie um, bevor du die Home-Ordner einrichtest.</value>
+    <value>Es gibt bereits einen Share namens "users". Benenne ihn um, bevor du die Home-Ordner einrichtest.</value>
   </data>
   <data name="Web_Settings_Homes_ConfigureFailed" xml:space="preserve">
     <value>Die Home-Ordner konnten nicht eingerichtet werden.</value>
@@ -5222,7 +5288,7 @@
     <value>Sicherheit</value>
   </data>
   <data name="Notification_Category_sharelinks" xml:space="preserve">
-    <value>Freigabe-Links</value>
+    <value>Share-Links</value>
   </data>
   <data name="Notification_Category_sync" xml:space="preserve">
     <value>Synchronisation</value>
@@ -5273,10 +5339,10 @@
     <value>Ein Besucher hat eine Datei über einen öffentlichen Upload-Link hochgeladen.</value>
   </data>
   <data name="Notification_Event_sharelink_accessed" xml:space="preserve">
-    <value>Freigabe-Link heruntergeladen</value>
+    <value>Share-Link heruntergeladen</value>
   </data>
   <data name="Notification_Event_sharelink_accessed_Desc" xml:space="preserve">
-    <value>Ein Besucher hat Inhalte über einen öffentlichen Freigabe-Link heruntergeladen.</value>
+    <value>Ein Besucher hat Inhalte über einen öffentlichen Share-Link heruntergeladen.</value>
   </data>
   <data name="Notification_Event_sync_failed" xml:space="preserve">
     <value>Synchronisation fehlgeschlagen</value>
@@ -5609,7 +5675,7 @@
     <value>Wer den Upload-Link erstellt hat</value>
   </data>
   <data name="Notification_Role_sharelink_accessed_linkCreator" xml:space="preserve">
-    <value>Wer den Freigabe-Link erstellt hat</value>
+    <value>Wer den Share-Link erstellt hat</value>
   </data>
   <data name="Notification_Role_sync_failed_syncCreator" xml:space="preserve">
     <value>Wer die Synchronisation eingerichtet hat</value>
@@ -5879,10 +5945,10 @@
     <value>Sicherungsaufträge verwalten</value>
   </data>
   <data name="Web_Perm_RestoreFromBackup" xml:space="preserve">
-    <value>Aus Sicherung wiederherstellen (neuer Ordner / Download; schließt Lesezugriff auf die gesicherten Inhalte der Freigabe ein)</value>
+    <value>Aus Sicherung wiederherstellen (neuer Ordner / Download; schließt Lesezugriff auf die gesicherten Inhalte des Shares ein)</value>
   </data>
   <data name="Web_Perm_RestoreBackupInPlace" xml:space="preserve">
-    <value>Am Originalort wiederherstellen (überschreiben, andere Freigabe; setzt Besitzer und Berechtigungen überschriebener Elemente auf den Sicherungsstand zurück)</value>
+    <value>Am Originalort wiederherstellen (überschreiben, anderer Share; setzt Besitzer und Berechtigungen überschriebener Elemente auf den Sicherungsstand zurück)</value>
   </data>
   <data name="Notification_Category_filebackup" xml:space="preserve">
     <value>Dateisicherung</value>
@@ -7359,7 +7425,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>{0} Sync-Ordner</value>
   </data>
   <data name="Web_Home_Tile_ShareLinks" xml:space="preserve">
-    <value>Aktive Freigabelinks</value>
+    <value>Aktive Share-Links</value>
   </data>
   <data name="Web_Home_Tile_Backups" xml:space="preserve">
     <value>Sicherungsaufträge</value>
@@ -7428,7 +7494,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Zugriffsbeschränkungen</value>
   </data>
   <data name="Web_DomainSettings_Hint" xml:space="preserve">
-    <value>Adressen (Basis-URLs), unter denen der Server erreichbar ist. Aus der Standardadresse werden Freigabelink-URLs und die Links in Benachrichtigungs-E-Mails gebildet; Zugriffsbeschränkungen können Anmeldungen pro Adresse erlauben. DNS und TLS für diese Adressen werden außerhalb der App konfiguriert.</value>
+    <value>Adressen (Basis-URLs), unter denen der Server erreichbar ist. Aus der Standardadresse werden Share-Link-URLs und die Links in Benachrichtigungs-E-Mails gebildet; Zugriffsbeschränkungen können Anmeldungen pro Adresse erlauben. DNS und TLS für diese Adressen werden außerhalb der App konfiguriert.</value>
   </data>
   <data name="Web_DomainSettings_Default" xml:space="preserve">
     <value>Standard</value>
@@ -7440,7 +7506,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Adresse hinzufügen</value>
   </data>
   <data name="Web_DomainSettings_Empty" xml:space="preserve">
-    <value>Keine Adresse hinterlegt. Freigabelinks verwenden dann die Adresse, die der Browser gerade nutzt, und E-Mails enthalten keinen Link zum Server.</value>
+    <value>Keine Adresse hinterlegt. Share-Links verwenden dann die Adresse, die der Browser gerade nutzt, und E-Mails enthalten keinen Link zum Server.</value>
   </data>
   <data name="Web_DomainSettings_Invalid" xml:space="preserve">
     <value>Nicht gespeichert – nur absolute http/https-URLs sind erlaubt: {0}</value>
@@ -7632,7 +7698,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Berechnet aus den Dateien im Pool. „Nicht Kaimo“ ist der übrige belegte Platz auf diesem Datenträger, zum Beispiel durch das Betriebssystem oder andere Dienste.</value>
   </data>
   <data name="Web_Settings_Storage_Origin_Files" xml:space="preserve">
-    <value>Dateien in Freigaben</value>
+    <value>Dateien in Shares</value>
   </data>
   <data name="Web_Settings_Storage_Origin_RecycleBins" xml:space="preserve">
     <value>Papierkörbe</value>
@@ -7704,7 +7770,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Mit Download-Links können anonyme Besucher eine Datei oder einen Ordner herunterladen. Solange deaktiviert, können keine Download-Links erstellt werden und bestehende lassen sich nicht öffnen.</value>
   </data>
   <data name="Web_ShareLink_DownloadDisabled" xml:space="preserve">
-    <value>Download-Links sind deaktiviert. Ein Administrator kann sie unter Einstellungen → Freigabelinks aktivieren.</value>
+    <value>Download-Links sind deaktiviert. Ein Administrator kann sie unter Einstellungen → Share-Links aktivieren.</value>
   </data>
   <data name="Web_ShareLinks_DownloadsDisabled" xml:space="preserve">
     <value>Download-Links sind in den Einstellungen deaktiviert; dieser Link lässt sich derzeit nicht öffnen.</value>
@@ -8079,7 +8145,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Hinter einem Reverse Proxy erscheinen alle Clients mit der Adresse des Proxys, solange er nicht vertraut ist (ForwardedHeaders:KnownProxies) – ein einzelner Angreifer könnte dann alle aussperren. Siehe den Abschnitt zum Reverse Proxy in example/DETAILS.md.</value>
   </data>
   <data name="Web_LoginProtection_ShareLink_Title" xml:space="preserve">
-    <value>Passwörter von Freigabe-Links</value>
+    <value>Passwörter von Share-Links</value>
   </data>
   <data name="Web_LoginProtection_ShareLink_Desc" xml:space="preserve">
     <value>Begrenzt das Erraten von Passwörtern bei passwortgeschützten Download- und Upload-Links.</value>
@@ -8301,7 +8367,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Rollen</value>
   </data>
   <data name="Web_SecondFactor_Settings_RolesHint" xml:space="preserve">
-    <value>Zählt in jedem Bereich: systemweit, Abteilung oder Freigabe.</value>
+    <value>Zählt in jedem Bereich: systemweit, Abteilung oder Share.</value>
   </data>
   <data name="Web_SecondFactor_Settings_Issuer" xml:space="preserve">
     <value>Name in der Authenticator-App</value>
@@ -8350,5 +8416,14 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   </data>
   <data name="Notification_Role_security_second_factor_failed_affected" xml:space="preserve">
     <value>Inhaber des Kontos</value>
+  </data>
+  <data name="Web_CloudAccess_ManagementName" xml:space="preserve">
+    <value>Verwaltungsname</value>
+  </data>
+  <data name="Web_CloudAccess_ManagementNameHint" xml:space="preserve">
+    <value>Kennzeichnet den virtuellen Share nur in dieser Liste. Benutzer sehen den Ordnernamen.</value>
+  </data>
+  <data name="Web_CloudAccess_MountGrantsHint" xml:space="preserve">
+    <value>Dies sind die Berechtigungen des virtuellen Shares. Im Ordner benötigen Benutzer zusätzlich Zugriff auf den Ordner im Share; es gilt das geringere der beiden Rechte.</value>
   </data>
 </root>

@@ -115,6 +115,8 @@ internal static class WebServicesSetup
         builder.Services.AddSingleton<ICloudAccessSettingsStore, CloudAccessSettingsStore>();
         builder.Services.AddSingleton<CloudAccessDirectoryCache>();
         builder.Services.AddScoped<CloudAccessAuthorizationService>();
+        builder.Services.AddScoped<CloudAccessMountResolver>();
+        builder.Services.AddScoped<CloudAccessMountService>();
         builder.Services.AddScoped<CloudToLocalTransferService>();
         builder.Services.AddScoped<CrossShareTransferService>();
         builder.Services.AddScoped<FileBrowserClipboardService>();

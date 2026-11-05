@@ -67,6 +67,8 @@ public partial class FileBrowserViewModel
     /// </summary>
     public virtual async Task<string?> GetSelectionDownloadUrlAsync(IReadOnlyList<FileMetadata> items)
     {
+        // Remote content of a mounted folder is never part of a host-share download.
+        items = WithoutMountEntries(items);
         if (_fileService is null || CurrentShare is null || items.Count == 0) return null;
 
         // A single plain file needs no archive.

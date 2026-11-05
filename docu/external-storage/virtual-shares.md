@@ -72,3 +72,37 @@ local shares:
   through `IFileService` with ACL checks, versioning and change log).
 - **Cut** is accepted only for a local source: the source is deleted only after every destination
   write has completed successfully; on failure the source is retained.
+
+## Provisioning as a folder in a local share
+
+A virtual share is provisioned either standalone (`CloudAccessProvisioning.VirtualShare`, the
+default: listed in the share overview, browsed under `/files/access/{id}`) or as a folder inside a
+local share (`CloudAccessProvisioning.Folder`). The mode and the mount point (`MountShareId`,
+`MountPath`, at most one per virtual share) live on `cloud_access_shares`; nothing is created on
+disk. Admins set them on the **Provisioning** tab of the virtual share
+(`CloudAccessMountTab` → `CloudAccessMountService`), which requires `ManageCloudAccess` for the
+virtual share and `EditShareSettings` on the host share.
+
+| Rule | Implementation |
+|---|---|
+| Mount only on a free name, never at the share root, below another mount, in the home-folder share or on a reserved name (`.kaimo-*`, `.RECYCLE_BIN`) | `CloudAccessMountService.MountAsync`: validation, insert, disk re-check, rollback on a concurrent create |
+| Name reserved against every user write afterwards (create, upload, rename/move target, unzip/archive target) on Web, REST, WebDAV and SMB | `ICloudAccessMountGuard` (`CloudAccessMountGuard`) checked in `FileService` (throws `MountPathReservedException`, a 403 like an ACL deny) and in the SMB bridge (`AuthzGrpcService` create and rename-destination checks) |
+| Rename/move of a parent folder moves the mount point | `FileService` rename side effects → `CloudAccessMountGuard.RenamePathAsync` (also for SMB lifecycle events) |
+| Deleting a parent (recycle bin, permanent delete, cross-share cut) detaches the mount | Mount columns cleared, mode stays `Folder` (orphaned, reachable nowhere), warning log `CloudAccessMountDetached` (2401); a restore does not bring the mount back |
+| Host share deleted | Foreign key `ON DELETE SET NULL` orphans the mount |
+| Effective rights inside the folder | Intersection: `ListReadData` of the host-share ACL at the mount path **and** the virtual-share grant; `Write` additionally needs host `CreateWriteData` and `Delete`. Applies to cloud-access managers too (`CloudAccessAuthorizationService.ClampToHostAsync`) |
+| Users without access | The folder is not shown at all; its name is still reserved |
+| Concurrent editors | `UpsertShareAsync` never writes the mount columns; only `SetMountAsync` and the guard do |
+
+In the web file browser the mounted folder keeps the host route
+(`/files/{hostShare}/{mountPath}/{sub}`): `CloudAccessMountResolver` (per circuit) resolves the
+visible mounts of a share once on entry and after every local listing, `LocalFileBrowserPage`
+renders the remote browser below a mount with the host breadcrumbs (`FileBrowser.ParentCrumbs`),
+and `/files/access/{id}` redirects there for users who can see the mount. In the host listing the
+mount is a synthetic, open-only folder entry (`IFileBrowserViewModel.IsMountEntry`). Global search
+keeps its rules: the host share is searched through the index (which never contains remote content),
+and inside the mounted folder the name walk of virtual shares is used.
+
+Out of scope in this phase: the mount is invisible over REST, WebDAV and SMB, and every recursive
+host-side operation (copy or ZIP of a parent folder, folder sizes, backup, indexing, sync delta,
+share pool move) skips it, because the remote content is not part of the host share.

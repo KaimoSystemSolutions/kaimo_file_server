@@ -6,7 +6,16 @@ public interface ICloudAccessRepository
 {
     Task<List<CloudAccessShare>> GetSharesAsync(CancellationToken cancellationToken = default);
     Task<CloudAccessShare?> GetShareAsync(Guid id, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Creates or updates a share. On update the provisioning mode and mount point are kept:
+    /// they are owned by <see cref="SetMountAsync"/> and the mount guard, so a stale copy held
+    /// by an editor never undoes a mount rebase or detach.
+    /// </summary>
     Task UpsertShareAsync(CloudAccessShare share, CancellationToken cancellationToken = default);
+
+    /// <summary>Sets the provisioning mode and mount point of a share.</summary>
+    Task SetMountAsync(Guid shareId, CloudAccessProvisioning provisioning, Guid? mountShareId, string? mountPath,
+        CancellationToken cancellationToken = default);
     Task DeleteShareAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<List<CloudAccessGrant>> GetGrantsAsync(Guid shareId, CancellationToken cancellationToken = default);

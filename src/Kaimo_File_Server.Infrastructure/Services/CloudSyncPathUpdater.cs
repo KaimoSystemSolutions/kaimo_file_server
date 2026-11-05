@@ -44,11 +44,11 @@ public sealed class CloudSyncPathUpdater(
             return false;
 
         var affected = folders.Keys
-            .Where(path => IsSameOrDescendant(oldPath, path))
+            .Where(path => ShareRelativePath.IsSameOrDescendant(oldPath, path))
             .Select(path => new
             {
                 OldPath = path,
-                NewPath = ReplacePrefix(oldPath, newPath, path),
+                NewPath = ShareRelativePath.ReplacePrefix(oldPath, newPath, path),
                 Folder = folders[path]
             })
             .ToList();
@@ -96,12 +96,12 @@ public sealed class CloudSyncPathUpdater(
             .ToListAsync();
 
         var affected = definitions
-            .Where(definition => IsSameOrDescendant(
+            .Where(definition => ShareRelativePath.IsSameOrDescendant(
                 oldPath, ShareRelativePath.Normalize(definition.LocalPath)))
             .Select(definition => new
             {
                 Definition = definition,
-                NewPath = ReplacePrefix(
+                NewPath = ShareRelativePath.ReplacePrefix(
                     oldPath, newPath, ShareRelativePath.Normalize(definition.LocalPath))
             })
             .ToList();
@@ -135,23 +135,5 @@ public sealed class CloudSyncPathUpdater(
         }
 
         return true;
-    }
-
-    private static bool IsSameOrDescendant(string ancestor, string candidate)
-        => string.Equals(ancestor, candidate, StringComparison.OrdinalIgnoreCase)
-           || candidate.StartsWith(ancestor + "/",
-               StringComparison.OrdinalIgnoreCase);
-
-    private static string ReplacePrefix(
-        string oldPath,
-        string newPath,
-        string candidate)
-    {
-        if (candidate.Length == oldPath.Length)
-            return newPath;
-
-        return ShareRelativePath.Combine(
-            newPath,
-            candidate[(oldPath.Length + 1)..]);
     }
 }

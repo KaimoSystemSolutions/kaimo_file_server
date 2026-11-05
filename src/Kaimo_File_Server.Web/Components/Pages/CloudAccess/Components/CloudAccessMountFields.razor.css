@@ -1,0 +1,24 @@
+/* Field wrappers only; sizing of the controls is left to the hosting form. */
+.vs-mount-field {
+    display: grid;
+    align-content: start;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.vs-mount-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.vs-mount-row .edit-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.vs-mount-row .btn-secondary {
+    flex: 0 0 auto;
+    width: auto;
+    margin-top: 0;
+}

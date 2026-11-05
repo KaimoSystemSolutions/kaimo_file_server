@@ -48,6 +48,22 @@ public partial class FileBrowser
     /// </summary>
     [Parameter] public string? ShareDisplayName { get; set; }
 
+    /// <summary>
+    /// The virtual share mounted as a folder that this browser shows. Set only by the mount
+    /// route: its host-share breadcrumbs (host share, then parent folders) precede the folder,
+    /// the ".." row at the mount root leads back into the host folder, and
+    /// <see cref="ShareDisplayName"/> (the folder name) replaces the virtual share's own name.
+    /// </summary>
+    [Parameter] public MountedFolder? Mount { get; set; }
+
+    private IReadOnlyList<(string Name, string Href)>? ParentCrumbs => Mount?.ParentCrumbs;
+
+    private bool IsMountedFolder => Mount is not null;
+
+    // The mount root has no parent inside the virtual share, but ".." still leads back
+    // into the host folder.
+    private bool ShowParentRow => VM.HasParent || IsMountedFolder;
+
     private string CurrentShareRoute => string.IsNullOrWhiteSpace(ShareRoute)
         ? $"{OverviewRoute.TrimEnd('/')}/{Uri.EscapeDataString(ShareName)}"
         : ShareRoute.TrimEnd('/');
@@ -66,7 +82,8 @@ public partial class FileBrowser
     private string RowKey(FileMetadata entry) => VM.RouteSubPathOf(VM.ShareRelativeOf(entry));
 
     private string CurrentShareDisplayName =>
-        VM.CurrentBrowserShare?.Name
+        (IsMountedFolder ? ShareDisplayName : null)
+        ?? VM.CurrentBrowserShare?.Name
         ?? ShareDisplayName
         ?? (VM.IsLoading ? "…" : ShareName);
 

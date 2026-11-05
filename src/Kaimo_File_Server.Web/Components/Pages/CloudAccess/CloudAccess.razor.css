@@ -383,8 +383,27 @@
     gap: .4rem;
 }
 
-.cloud-access-folder-field {
+.cloud-access-folder-field,
+.cloud-access-mode-field {
     grid-column: 1 / -1;
+}
+
+.cloud-access-mode-field {
+    display: grid;
+    justify-items: start;
+    gap: .4rem;
+}
+
+.cloud-access-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+/* The 30px info trigger must not make this label taller than its neighbours,
+   otherwise the inputs in the same form row no longer line up. */
+.cloud-access-form ::deep .cloud-access-label-info {
+    margin-block: -8px;
 }
 
 .cloud-access-path {

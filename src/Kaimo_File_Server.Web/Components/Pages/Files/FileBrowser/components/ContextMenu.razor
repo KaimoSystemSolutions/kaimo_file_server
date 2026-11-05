@@ -80,6 +80,8 @@
             var command = ContextCommandCatalog.ById(id);
             if (command is null || !command.IsValidFor(scope)) continue;
             if (!PassesRuntimeGuard(id, scope, selectedItems)) continue;
+            // A mounted virtual-share entry offers only commands that leave the host folder alone.
+            if (selectedItems.Any(FileBrowser.VM.IsMountEntry) && !ContextCommandCatalog.AllowedOnMountEntry(id)) continue;
 
             // The "general" commands (new folder / refresh) render as a trailing
             // group, separated and headed like the previous hard-coded menu.
@@ -117,7 +119,9 @@
             "versions" => FileBrowser.VM.Capabilities.HasVersions,
             "properties" => FileBrowser.VM.Capabilities.HasProperties,
             "newfolder" => FileBrowser.VM.Capabilities.CanCreateDirectory,
-            // Permissions stay manager-only regardless of configuration.
+            // Permissions stay manager-only regardless of configuration. On a mount entry they
+            // are the virtual share's own grants, editable by its cloud-access managers.
+            "permissions" when MountTarget(selected) is { } mount => mount.CanManage,
             "permissions" => FileBrowser.CanManageAcls(),
             // Sharing a public link requires the scoped ManageShareLinks permission.
             "sharelink" => FileBrowser.CanManageShareLinks(),
@@ -194,6 +198,8 @@
 
         "recycle.empty" => async () => { CloseContextMenu(); await FileBrowser.EmptyRecycleBin(target!); },
 
+        "permissions" when target is not null && FileBrowser.VM.MountOf(target) is { } mount
+            => async () => { CloseContextMenu(); await FileBrowser.OpenMountPermissions(mount); },
         "permissions" => () => { ContextAcl(target!); return Task.CompletedTask; },
 
         "properties" when scope == ContextMenuScope.MultiSelection
@@ -209,6 +215,9 @@
         
         _ => () => Task.CompletedTask,
     };
+
+    private MountedFolder? MountTarget(HashSet<FileMetadata> selected)
+        => selected.Count == 1 ? FileBrowser.VM.MountOf(selected.First()) : null;
 
     private static IEnumerable<FileMetadata> CompressTargets(ContextMenuScope scope,
         FileMetadata? target, HashSet<FileMetadata> selected)

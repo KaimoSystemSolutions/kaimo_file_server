@@ -18,7 +18,7 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
@@ -631,10 +631,20 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("MountPath")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid?>("MountShareId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Provisioning")
+                        .HasColumnType("integer");
 
                     b.Property<string>("RemoteRootItemId")
                         .HasMaxLength(500)
@@ -655,6 +665,9 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.HasIndex("DepartmentId");
 
                     b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("MountShareId", "MountPath")
                         .IsUnique();
 
                     b.ToTable("cloud_access_shares", (string)null);
@@ -2245,6 +2258,11 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .HasForeignKey("ConnectionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("Kaimo_File_Server.Core.Domain.ShareDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("MountShareId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.Identity.UserRecoveryCode", b =>

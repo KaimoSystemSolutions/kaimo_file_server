@@ -1,4 +1,5 @@
-﻿using Kaimo_File_Server.Core.Domain;
+﻿using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Language;
 
@@ -57,6 +58,10 @@ public partial class FileBrowserViewModel
 
             return OperationResult.Ok();
         }
+        catch (MountPathReservedException)
+        {
+            return OperationResult.Fail(Resources.ResourceManager.GetString("Web_Error_NameReserved") ?? Resources.Web_Error_AccessDenied);
+        }
         catch (UnauthorizedAccessException)
         {
             return OperationResult.Fail(Resources.Web_Error_AccessDenied);
@@ -110,6 +115,10 @@ public partial class FileBrowserViewModel
                 relativePath, userContext.User.Username);
 
             return OperationResult.Ok();
+        }
+        catch (MountPathReservedException)
+        {
+            return OperationResult.Fail(Resources.ResourceManager.GetString("Web_Error_NameReserved") ?? Resources.Web_Error_AccessDenied);
         }
         catch (UnauthorizedAccessException)
         {
@@ -244,6 +253,10 @@ public partial class FileBrowserViewModel
 
             return OperationResult.Ok();
         }
+        catch (MountPathReservedException)
+        {
+            return OperationResult.Fail(Resources.ResourceManager.GetString("Web_Error_NameReserved") ?? Resources.Web_Error_AccessDenied);
+        }
         catch (UnauthorizedAccessException)
         {
             return OperationResult.Fail(Resources.Web_Error_AccessDenied);
@@ -294,6 +307,10 @@ public partial class FileBrowserViewModel
 
             return OperationResult.Ok();
         }
+        catch (MountPathReservedException)
+        {
+            return OperationResult.Fail(Resources.ResourceManager.GetString("Web_Error_NameReserved") ?? Resources.Web_Error_AccessDenied);
+        }
         catch (UnauthorizedAccessException)
         {
             return OperationResult.Fail(Resources.Web_Error_AccessDenied);
@@ -336,6 +353,10 @@ public partial class FileBrowserViewModel
                 relativePath, targetDir, userContext.User.Username);
 
             return OperationResult.Ok();
+        }
+        catch (MountPathReservedException)
+        {
+            return OperationResult.Fail(Resources.ResourceManager.GetString("Web_Error_NameReserved") ?? Resources.Web_Error_AccessDenied);
         }
         catch (UnauthorizedAccessException)
         {

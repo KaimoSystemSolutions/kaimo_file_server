@@ -18,7 +18,8 @@ public partial class FileService
         var normalized = ShareRelativePath.Normalize(path);
         if (IsInternalBelowRecycleRoot(normalized) ||
             IsUserWritePermission(permission) &&
-            ShareEntryPolicy.IsReservedForUserWrites(normalized, _recycleRootDepth))
+            ShareEntryPolicy.IsReservedForUserWrites(normalized, _recycleRootDepth) ||
+            IsUserWritePermission(permission) && await IsMountReservedAsync(normalized))
             return false;
         var isDir = await _storage.IsDirectoryAsync(normalized);
         return await _acl.HasAccessAsync(user, _shareId, normalized, isDir, permission);
@@ -33,7 +34,7 @@ public partial class FileService
         UserContext user, string normalizedPath, bool isDirectory, FilePermission permission)
     {
         if (IsUserWritePermission(permission))
-            EnsureUserWriteTargetAllowed(normalizedPath);
+            await EnsureUserWriteTargetAllowedAsync(normalizedPath);
 
         if (IsInternalBelowRecycleRoot(normalizedPath) ||
             !await _acl.HasAccessAsync(user, _shareId, normalizedPath, isDirectory, permission))
@@ -52,12 +53,22 @@ public partial class FileService
             (FilePermission.CreateWriteData |
              FilePermission.CreateAppendData)) != 0;
 
-    private void EnsureUserWriteTargetAllowed(string normalizedPath)
+    private async Task EnsureUserWriteTargetAllowedAsync(
+        string normalizedPath, CancellationToken ct = default)
     {
         if (ShareEntryPolicy.IsReservedForUserWrites(normalizedPath, _recycleRootDepth))
             throw new UnauthorizedAccessException(
                 $"Share path '{normalizedPath}' uses a reserved Kaimo namespace.");
+        if (await IsMountReservedAsync(normalizedPath, ct))
+            throw new MountPathReservedException(normalizedPath);
     }
+
+    // A virtual-share mount point exists only in the database; its name (and anything
+    // below it) is reserved against every user write so no real folder can shadow it.
+    private Task<bool> IsMountReservedAsync(string normalizedPath, CancellationToken ct = default) =>
+        _mountGuard is null
+            ? Task.FromResult(false)
+            : _mountGuard.IsReservedAsync(_shareId, normalizedPath, ct);
 
     // ------------------ Batch Permission Check ------------------
 
@@ -96,7 +107,8 @@ public partial class FileService
     public async Task<bool> CanCreateAsync(string path, UserContext user)
     {
         var normalized = ShareRelativePath.Normalize(path);
-        if (ShareEntryPolicy.IsReservedForUserWrites(normalized, _recycleRootDepth))
+        if (ShareEntryPolicy.IsReservedForUserWrites(normalized, _recycleRootDepth) ||
+            await IsMountReservedAsync(normalized))
             return false;
         var parentPath = ShareRelativePath.GetParent(path);
         return await _acl.HasAccessAsync(user, _shareId, parentPath, true, FilePermission.CreateWriteData);

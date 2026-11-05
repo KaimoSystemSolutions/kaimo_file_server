@@ -100,6 +100,8 @@ public partial class AuthzGrpcService
         if (ShareEntryPolicy.IsReservedForUserWrites(destination, share.RecycleRootDepth))
             return Deny(
                 $"rename denied: destination '{destination}' is a reserved Kaimo namespace");
+        if (await IsMountReservedAsync(share.Id, destination, cancellationToken))
+            return Deny($"rename denied: destination '{destination}' is reserved");
 
         // Cross-check the native request against the shared storage view. This
         // is not the final TOCTOU guard (the VFS performs that immediately

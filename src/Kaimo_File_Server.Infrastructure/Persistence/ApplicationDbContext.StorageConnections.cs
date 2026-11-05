@@ -79,6 +79,14 @@ public partial class ApplicationDbContext
             entity.HasIndex(x => x.ConnectionId);
             entity.HasOne<StorageConnection>().WithMany().HasForeignKey(x => x.ConnectionId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.Provisioning).HasConversion<int>();
+            entity.Property(x => x.MountPath).HasMaxLength(2000);
+            entity.Ignore(x => x.IsFolderMode);
+            entity.Ignore(x => x.IsMounted);
+            entity.HasIndex(x => new { x.MountShareId, x.MountPath }).IsUnique();
+            // Deleting the host share orphans the mount; the virtual share stays in Folder mode.
+            entity.HasOne<ShareDefinition>().WithMany().HasForeignKey(x => x.MountShareId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<CloudAccessGrant>(entity =>

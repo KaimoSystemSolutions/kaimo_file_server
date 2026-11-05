@@ -4,6 +4,7 @@
 @using Kaimo_File_Server.Core.Services.ExternalStorage
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.CloudSync.Components
+@using Kaimo_File_Server.Web.Components.Pages.CloudAccess.Components
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject CloudAccessViewModel VM
@@ -81,6 +82,20 @@ else
                     <span class="detail-subtitle">@R("Web_CloudAccess_CreateShareHelp")</span>
                 </div>
                 <div class="cloud-access-form">
+                    <div class="cloud-access-mode-field">
+                        <span class="detail-label cloud-access-label" id="vs-create-mode">
+                            @R("Web_CloudAccess_Mode")
+                            <InfoButton Text="@R("Web_CloudAccess_MountHelp")" IconSize="16" />
+                        </span>
+                        <div class="toggle-button-group" role="radiogroup" aria-labelledby="vs-create-mode">
+                            @foreach (var mode in new[] { CloudAccessProvisioning.VirtualShare, CloudAccessProvisioning.Folder })
+                            {
+                                <button type="button" role="radio" aria-checked="@(_shareProvisioning == mode ? "true" : "false")"
+                                        class="toggle-btn @(_shareProvisioning == mode ? "toggle-btn--active" : null)" disabled="@_busy"
+                                        @onclick="() => SetProvisioningAsync(mode)">@R("Web_CloudAccess_Mode_" + mode)</button>
+                            }
+                        </div>
+                    </div>
                     <label>
                         <span class="detail-label">@R("Web_CloudAccess_Connection")</span>
                         <select class="edit-input" value="@_shareConnectionId" @onchange="ConnectionChangedAsync">
@@ -92,8 +107,19 @@ else
                             }
                         </select>
                     </label>
+                    @* As a folder, users see the folder name; this name only labels the share for admins. *@
                     <label>
-                        <span class="detail-label">@R("Web_CloudAccess_ShareName")</span>
+                        <span class="detail-label cloud-access-label">
+                            @if (_shareProvisioning == CloudAccessProvisioning.Folder)
+                            {
+                                @R("Web_CloudAccess_ManagementName")
+                                <InfoButton Class="cloud-access-label-info" Text="@R("Web_CloudAccess_ManagementNameHint")" IconSize="16" />
+                            }
+                            else
+                            {
+                                @R("Web_CloudAccess_ShareName")
+                            }
+                        </span>
                         <input class="edit-input" @bind="_shareName" @bind:event="oninput" maxlength="200" />
                     </label>
                     <label>
@@ -113,6 +139,12 @@ else
                             <button class="btn-secondary" type="button" disabled="@(_shareConnectionId == Guid.Empty)" @onclick="OpenPickerAsync">@R("Web_CloudAccess_Browse")</button>
                         </div>
                     </label>
+                    @if (_shareProvisioning == CloudAccessProvisioning.Folder)
+                    {
+                        <CloudAccessMountFields Hosts="_mountHosts" @bind-HostId="_mountHostId" @bind-ParentPath="_mountParentPath"
+                                                @bind-FolderName="_mountFolderName" FolderNamePlaceholder="@_shareName.Trim()"
+                                                Disabled="_busy" />
+                    }
                 </div>
 
                 @if (_shareConnectionId != Guid.Empty)
@@ -235,6 +267,8 @@ else
                          OnClick="() => SwitchTabAsync(CloudAccessTab.Extra)" />
                     <Tab Active="@(_activeTab == CloudAccessTab.Access)" Icon="users.svg" Label="@R("Web_CloudAccess_TabAccess")"
                          OnClick="() => SwitchTabAsync(CloudAccessTab.Access)" />
+                    <Tab Active="@(_activeTab == CloudAccessTab.Mount)" Icon="folder.svg" Label="@R("Web_CloudAccess_TabMount")"
+                         OnClick="() => SwitchTabAsync(CloudAccessTab.Mount)" />
                 </Tabs>
 
                 @if (_activeTab == CloudAccessTab.General)
@@ -333,6 +367,10 @@ else
                     {
                         <div class="detail-empty"><p>@R("Web_CloudAccess_DetailHint")</p></div>
                     }
+                }
+                else if (_activeTab == CloudAccessTab.Mount)
+                {
+                    <CloudAccessMountTab Share="_selectedShare" OnChanged="StateHasChanged" />
                 }
                 else
                 {

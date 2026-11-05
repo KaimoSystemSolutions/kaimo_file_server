@@ -5,11 +5,27 @@
 @using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser.components
 @using Kaimo_File_Server.Infrastructure.Services
 @inject FileBrowserViewModel LocalViewModel
+@inject RemoteCloudAccessFileBrowserViewModel RemoteViewModel
+@inject CloudAccessMountResolver Mounts
 @inject NavigationManager Nav
 
 @if (string.IsNullOrWhiteSpace(ShareName))
 {
     <FileBrowserShareOverview />
+}
+else if (!Mounts.HasLoaded(ShareName))
+{
+    @* First visit of this share: its mount points are resolved once, then routing stays synchronous. *@
+}
+else if (_mount is { } mount)
+{
+    @* A virtual share mounted as a folder: the remote browser under the host-share route. *@
+    <FileBrowser VM="RemoteViewModel"
+                 ShareName="@mount.Mount.ShareId.ToString()"
+                 SubPath="@mount.RemoteSubPath"
+                 ShareRoute="@mount.Mount.RouteBase"
+                 ShareDisplayName="@mount.Mount.Name"
+                 Mount="@mount.Mount" />
 }
 else if (!IsHomesShare || _homesAllowed)
 {
@@ -21,6 +37,7 @@ else if (!IsHomesShare || _homesAllowed)
     [Parameter] public string? SubPath { get; set; }
 
     private bool _homesAllowed;
+    private MountMatch? _mount;
 
     private bool IsHomesShare
         => string.Equals(ShareName, HomeDirectoryService.ShareName, StringComparison.OrdinalIgnoreCase);
@@ -30,6 +47,20 @@ else if (!IsHomesShare || _homesAllowed)
     // (/files/user); /files/users itself leads to the metadata-only overview on /home-folders.
     protected override async Task OnParametersSetAsync()
     {
+        _mount = null;
+        if (string.IsNullOrWhiteSpace(ShareName))
+            return;
+
+        // Mount points are loaded on entering a share and refreshed by every local listing,
+        // so navigating inside the share (and into a mount) completes synchronously and the
+        // browser is neither re-mounted nor loaded twice. The remote view model re-checks
+        // access to the mounted share on every load.
+        if (!Mounts.HasLoaded(ShareName))
+            await Mounts.RefreshAsync(ShareName);
+        _mount = Mounts.Match(ShareName, SubPath);
+        if (_mount is not null)
+            return;
+
         // Checked once on entering the share: navigating inside /files/users then completes
         // synchronously, so the browser is neither re-mounted nor loaded twice. The view model
         // re-checks the permission on every load.

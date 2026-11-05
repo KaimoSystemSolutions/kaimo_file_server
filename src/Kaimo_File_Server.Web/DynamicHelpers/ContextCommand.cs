@@ -133,6 +133,13 @@ public static class ContextCommandCatalog
     /// <summary>The "general" commands rendered as a trailing group (auto-separator).</summary>
     public static readonly HashSet<string> GeneralIds = new() { "newfolder", "refresh" };
 
+    /// <summary>
+    /// Commands offered on the synthetic entry of a virtual share mounted as a folder: open,
+    /// the virtual share's own permissions, and the "general" commands that act on the current
+    /// folder. Everything else would touch the host folder, which does not exist on disk.
+    /// </summary>
+    public static bool AllowedOnMountEntry(string id) => id is "open" or "permissions" || GeneralIds.Contains(id);
+
     public static ContextCommand? ById(string id) => All.FirstOrDefault(c => c.Id == id);
 
     /// <summary>All commands that may be placed in the given scope.</summary>

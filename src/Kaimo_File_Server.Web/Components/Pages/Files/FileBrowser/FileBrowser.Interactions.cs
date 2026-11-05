@@ -3,6 +3,7 @@ using System.Collections;
 using System.Diagnostics;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Web.Components.Pages.CloudAccess.Components;
 using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser.components;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.DynamicHelpers;
@@ -44,6 +45,7 @@ public partial class FileBrowser
     private ContextMenu _contextMenuComponent = default!;
     private VersionDialog _versionDialogComponent = default!;
     private PropertiesDialog _propertiesDialogComponent = default!;
+    private CloudAccessGrantsDialog _grantsDialogComponent = default!;
     private HashDialog _hashDialogComponent = default!;
     private ShareLinkDialog _shareLinkDialogComponent = default!;
 
@@ -59,11 +61,14 @@ public partial class FileBrowser
     // ========== Toolbar Computed ==========
     
     private bool CanOpenSelection => VM.Capabilities.CanOpen && _selectedItems.Count == 1;
-    private bool CanRenameSelection => VM.Capabilities.CanRename && _selectedItems.Count == 1;
-    private bool CanDeleteSelection => VM.Capabilities.CanDelete && _selectedItems.Count > 0;
+    private bool CanRenameSelection => VM.Capabilities.CanRename && _selectedItems.Count == 1 && !SelectionTouchesMount;
+    private bool CanDeleteSelection => VM.Capabilities.CanDelete && _selectedItems.Count > 0 && !SelectionTouchesMount;
+
+    /// <summary>The selection contains a mounted virtual-share entry, which can only be opened.</summary>
+    internal bool SelectionTouchesMount => _selectedItems.Any(VM.IsMountEntry);
     private bool CanEmptyRecycleSelection =>
         VM.Capabilities.CanDelete && _selectedItems.Count == 1 && IsRecycleBinRoot(_selectedItems.First());
-    private bool CanAclSelection => CanManageAcls() && _selectedItems.Count == 1;
+    private bool CanAclSelection => CanManageAcls() && _selectedItems.Count == 1 && !SelectionTouchesMount;
     private bool CanPasteClipboard => _clipboard.Count > 0 || BrowserClipboard.Source is not null;
     
     // ========== Syncing ==========
@@ -169,7 +174,7 @@ public partial class FileBrowser
 
         if (key == "Backspace")
         {
-            if (VM.HasParent)
+            if (ShowParentRow)
                 await InvokeAsync(NavigateUp);
             return null;
         }
@@ -261,6 +266,7 @@ public partial class FileBrowser
         _showCreateFolder || _showDeleteConfirm || _showRenameDialog || _showCloudToLocal ||
         _filePreviewComponent?.IsOpen == true || _versionDialogComponent?.IsOpen == true ||
         _propertiesDialogComponent?.IsOpen == true || _hashDialogComponent?.IsOpen == true ||
+        _grantsDialogComponent?.IsOpen == true ||
         _contextMenuComponent?.IsOpen == true;
 
     // ========== Toolbar Actions ==========
@@ -424,7 +430,7 @@ public partial class FileBrowser
 
     private void OnDragStart(FileMetadata entry)
     {
-        if (!VM.Capabilities.CanMove)
+        if (!VM.Capabilities.CanMove || VM.IsMountEntry(entry))
             return;
 
         // If the dragged item is part of the current selection, the entire
@@ -450,7 +456,7 @@ public partial class FileBrowser
     {
         if (!VM.Capabilities.CanMove) return false;
         if (_draggedItems.Count == 0) return false;
-        if (!target.IsDirectory) return false;
+        if (!target.IsDirectory || VM.IsMountEntry(target)) return false;
         if (_draggedItems.Contains(target)) return false;
 
         // Prevents a folder from being moved into itself / its own subfolders

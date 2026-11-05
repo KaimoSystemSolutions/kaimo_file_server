@@ -32,7 +32,8 @@ public sealed class BackupRestoreExecutor(
     ShareLockManager locks,
     IConfiguration configuration,
     TimeProvider time,
-    ILogger<BackupRestoreExecutor> logger)
+    ILogger<BackupRestoreExecutor> logger,
+    ICloudAccessMountGuard? mounts = null)
 {
     public const string StagingFolderName = ShareEntryPolicy.InternalNamespacePrefix + "restore";
     private const double RequiredSpaceFactor = 1.1;
@@ -90,7 +91,8 @@ public sealed class BackupRestoreExecutor(
                 _ => ShareRelativePath.Combine(NormalizeOrThrow(request.TargetFolder, depth),
                     UniqueRestoredFolderName(destinationRoot, NormalizeOrThrow(request.TargetFolder, depth), now, request.GetUiCulture())),
             };
-            if (destinationBase.Length > 0 && ShareEntryPolicy.IsReservedForUserWrites(destinationBase, depth))
+            if (destinationBase.Length > 0 && (ShareEntryPolicy.IsReservedForUserWrites(destinationBase, depth)
+                    || await IsMountAsync(destination.Id, destinationBase, ct)))
                 throw new ResticException("path_invalid", "The restore target lies in a folder reserved by Kaimo.");
             outcome.SourceShareName = await db.ShareDefinitions.AsNoTracking()
                 .Where(s => s.Id == request.ShareId).Select(s => s.Name).FirstOrDefaultAsync(ct);
@@ -138,7 +140,10 @@ public sealed class BackupRestoreExecutor(
                 {
                     ct.ThrowIfCancellationRequested();
                     var relative = ShareRelativePath.Combine(destinationBase, Path.GetFileName(entry));
-                    if (ShareEntryPolicy.IsReservedForUserWrites(relative, depth))
+                    // ponytail: only top-level entries are checked against virtual-share mounts;
+                    // a deeper collision is admin-made and the web listing shows the mount anyway.
+                    if (ShareEntryPolicy.IsReservedForUserWrites(relative, depth)
+                        || await IsMountAsync(destination.Id, relative, ct))
                     {
                         outcome.SkippedItems.Add(relative);
                         continue;
@@ -418,6 +423,10 @@ public sealed class BackupRestoreExecutor(
             candidate = $"{name} ({n})";
         return candidate;
     }
+
+    // A virtual-share mount point exists only in the database; restored data must not claim its name.
+    private Task<bool> IsMountAsync(Guid shareId, string relativePath, CancellationToken ct)
+        => mounts is null ? Task.FromResult(false) : mounts.IsReservedAsync(shareId, relativePath, ct);
 
     private static string RenameSuffix(DateTime nowUtc, CultureInfo culture)
     {

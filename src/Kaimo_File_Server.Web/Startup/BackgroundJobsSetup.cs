@@ -45,7 +45,8 @@ internal static class BackgroundJobsSetup
             sp.GetRequiredService<ShareLockManager>(),
             sp.GetRequiredService<IConfiguration>(),
             sp.GetRequiredService<TimeProvider>(),
-            sp.GetRequiredService<ILogger<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRestoreExecutor>>()));
+            sp.GetRequiredService<ILogger<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRestoreExecutor>>(),
+            sp.GetService<Kaimo_File_Server.Core.Services.File.ICloudAccessMountGuard>()));
         builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupMaintenanceExecutor>();
         builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupRunner>();
         builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Backup.Restic.IBackupRunner>(

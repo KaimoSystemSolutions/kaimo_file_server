@@ -3,6 +3,7 @@ using System.Collections;
 using System.Diagnostics;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser.components;
 using Kaimo_File_Server.Web.Components.Shared;
@@ -253,6 +254,10 @@ public partial class FileBrowser
     
     private async Task OnKeyDownItemList(KeyboardEventArgs e)
     {
+        // A mounted virtual-share entry can only be opened (see IsMountEntry).
+        if (SelectionTouchesMount && e.Key is "Delete" or "F2" or "c" or "x")
+            return;
+
         if (e.Key == "Delete" && VM.Capabilities.CanDelete && _selectedItems.Count > 0)
             await DeleteSelected();
 
@@ -381,6 +386,9 @@ public partial class FileBrowser
     /// <summary>Opens the properties dialog for a multi-selection (combined values, no ACL tab).</summary>
     public async Task OpenPropertiesDialog(IReadOnlyList<FileMetadata> items)
         => await _propertiesDialogComponent.Open(items);
+
+    /// <summary>Opens the access list of a virtual share mounted as a folder (mount entry).</summary>
+    public Task OpenMountPermissions(MountedFolder mount) => _grantsDialogComponent.Open(mount);
 
     /// <summary>Opens the "create hash" dialog for a single file.</summary>
     public async Task OpenHashDialog(FileMetadata item)
@@ -538,7 +546,17 @@ public partial class FileBrowser
         => NavigateToRoutePath(VM.RouteSubPathOf(VM.ShareRelativeOf(dir)));
 
     private void NavigateUp()
-        => NavigateToRoutePath(VM.RouteSubPathOf(VM.ParentPath ?? ""));
+    {
+        if (!VM.HasParent && Mount is { } mount)
+        {
+            // The host folder is a fresh browser; ask it to select the mount we came from.
+            FileSelectionCoordinator.RequestSelection(
+                mount.HostShareName, ShareRelativePath.GetParent(mount.MountPath), mount.Name);
+            Nav.NavigateTo(ParentCrumbs![^1].Href);
+            return;
+        }
+        NavigateToRoutePath(VM.RouteSubPathOf(VM.ParentPath ?? ""));
+    }
 
     // Navigate to a route-relative sub-path either by routing (default) or, when
     // InPlaceNavigation is set, by reloading the listing without changing the URL — so a

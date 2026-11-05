@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.ViewModels;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components;
 
 namespace Kaimo_File_Server.Web.Components.Search;
@@ -24,6 +25,18 @@ public partial class GlobalSearch
     private Guid? _virtualShareId;
     private Guid? _hitsVirtualShareId;
 
+    // Route of that virtual share: /files/access/{id}, or the host-share route of a share
+    // mounted as a folder (/files/{host}/{mountPath}).
+    private string? _virtualRouteBase;
+    private string? _hitsVirtualRouteBase;
+
+    // The mounted folder of the current route, if any: its label is the host location,
+    // never the virtual share's management name.
+    private MountedFolder? _mountedFolder;
+
+    // Resolved on use only, like the virtual-share browser above.
+    private CloudAccessMountResolver? Mounts => Services.GetService<CloudAccessMountResolver>();
+
     private bool IsVirtualShareScope => _virtualShareId != null && _scope is ScopeFolder or ScopeShare;
 
     /// <summary>Picks up /files/access/{id}/{sub...}; false for anything else under /files/access.</summary>
@@ -32,13 +45,31 @@ public partial class GlobalSearch
         if (segs.Length < 3 || !Guid.TryParse(segs[2], out var id))
             return false;
         _virtualShareId = id;
+        _virtualRouteBase = $"/files/access/{id}";
         _contextSubPath = string.Join('/', segs.Skip(3).Select(Uri.UnescapeDataString));
+        return true;
+    }
+
+    /// <summary>
+    /// Picks up a virtual share mounted as a folder of the context share. The page resolves
+    /// the share's mounts on entry, so this may only match once that finished (see OnFocusIn).
+    /// </summary>
+    private bool TryDetectMountedFolder()
+    {
+        if (_contextShare is null || Mounts?.Match(_contextShare, _contextSubPath) is not { } match)
+            return false;
+        _virtualShareId = match.Mount.ShareId;
+        _virtualRouteBase = match.Mount.RouteBase;
+        _mountedFolder = match.Mount;
+        _contextShare = null;
+        _contextSubPath = match.RemoteSubPath;
         return true;
     }
 
     // Display name of the context share; a virtual share's name is known once its browser has loaded it.
     private string ContextShareLabel => _virtualShareId is { } id
-        ? VirtualShareBrowser.CurrentBrowserShare is { } shown && shown.Id == id ? shown.Name : ""
+        ? _mountedFolder?.ShareId == id ? _mountedFolder.HostLocationOf("")
+        : VirtualShareBrowser.CurrentBrowserShare is { } shown && shown.Id == id ? shown.Name : ""
         : _contextShare ?? "";
 
     private async Task<List<FileDocument>> SearchVirtualShareAsync(Guid shareId, CancellationToken token)

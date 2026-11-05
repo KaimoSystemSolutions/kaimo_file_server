@@ -61,7 +61,7 @@ public partial class FileService
             if (string.Equals(oldRel, newRel, StringComparison.Ordinal))
                 return;
 
-            _owner.EnsureUserWriteTargetAllowed(newRel);
+            await _owner.EnsureUserWriteTargetAllowedAsync(newRel, ct);
             await using var operationLease =
                 await _owner.BeginPathMutationOrThrowAsync(oldRel, newRel, ct);
 

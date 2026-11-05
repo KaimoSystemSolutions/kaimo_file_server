@@ -54,6 +54,8 @@ public static class LogEvents
     public static readonly EventId DatabaseNotReadyRetry = new(2202, nameof(DatabaseNotReadyRetry));
     public static readonly EventId LogLevelApplied = new(2301, nameof(LogLevelApplied));
     public static readonly EventId LogLevelReloadFailed = new(2302, nameof(LogLevelReloadFailed));
+    public static readonly EventId CloudAccessMountDetached = new(2401, nameof(CloudAccessMountDetached));
+    public static readonly EventId CloudAccessMountRebased = new(2402, nameof(CloudAccessMountRebased));
 
     #endregion
 
@@ -116,6 +118,9 @@ public static class LogEvents
     public static readonly EventId AclEditorLoaded = new(5605, nameof(AclEditorLoaded));
     public static readonly EventId AclEditorLoadFailed = new(5606, nameof(AclEditorLoadFailed));
     public static readonly EventId AclEditorException = new(5607, nameof(AclEditorException));
+    public static readonly EventId CloudAccessMountChanged = new(5701, nameof(CloudAccessMountChanged));
+    public static readonly EventId CloudAccessMountRemoved = new(5702, nameof(CloudAccessMountRemoved));
+    public static readonly EventId CloudAccessMountRaceRolledBack = new(5703, nameof(CloudAccessMountRaceRolledBack));
 
     #endregion
 

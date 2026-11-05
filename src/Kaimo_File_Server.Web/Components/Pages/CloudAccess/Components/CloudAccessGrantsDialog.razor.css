@@ -1,0 +1,12 @@
+/* The access list needs more room than a confirmation dialog. */
+.grants-dialog {
+    width: min(640px, calc(100vw - 2 * var(--space-4)));
+    max-width: none;
+    min-width: 0;
+    max-height: calc(100vh - 2 * var(--space-6));
+    overflow-y: auto;
+}
+
+.grants-dialog .form-hint {
+    margin: 0 0 var(--space-3);
+}

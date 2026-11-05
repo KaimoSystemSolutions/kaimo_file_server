@@ -70,6 +70,10 @@ public partial class AuthzGrpcService
         if (traversalDeny is not null)
             return Deny(traversalDeny);
 
+        if (!exists && request.WantsCreate &&
+            await IsMountReservedAsync(share.Id, normalized, cancellationToken))
+            return Deny($"create denied: '{normalized}' is reserved");
+
         if (!exists && request.WantsCreate)
         {
             string parent = ShareRelativePath.GetParent(normalized);

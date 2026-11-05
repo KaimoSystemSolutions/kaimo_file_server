@@ -100,6 +100,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IManagementAuthService, ManagementAuthService>();
             services.AddScoped<HomeDirectoryService>();
             services.AddSingleton<ICloudSyncPathUpdater, CloudSyncPathUpdater>();
+            services.AddSingleton<ICloudAccessMountGuard, CloudAccessMountGuard>();
             services.AddSingleton<ICloudSyncOperationCoordinator, DatabaseCloudSyncOperationCoordinator>();
             services.AddSingleton<IStorageConnectionCredentialLeaseManager, DatabaseStorageConnectionCredentialLeaseManager>();
 

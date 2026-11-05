@@ -99,11 +99,15 @@
 
                         <div class="properties-divider"></div>
 
-                        <dt>@Resources.Web_Properties_Owner</dt>
-                        <dd>@(_ownerName ?? "–")</dd>
+                        @* Owners are tracked for local shares only; remote items never have one. *@
+                        @if (VM.CurrentShare is not null)
+                        {
+                            <dt>@Resources.Web_Properties_Owner</dt>
+                            <dd>@(_ownerName ?? "–")</dd>
+                        }
 
                         <dt>@Resources.Web_Properties_Share</dt>
-                        <dd>@(VM.CurrentBrowserShare?.Name ?? "–")</dd>
+                        <dd>@(Mount?.HostShareName ?? VM.CurrentBrowserShare?.Name ?? "–")</dd>
 
                         @* Only persisted items carry a stable id; hide the row otherwise
                            instead of showing a meaningless all-zero GUID. *@
@@ -128,6 +132,9 @@
 
 @code {
     [Parameter, EditorRequired] public IFileBrowserViewModel VM { get; set; } = default!;
+
+    /// <summary>Set inside a virtual share mounted as a folder: share and location are the host's.</summary>
+    [Parameter] public MountedFolder? Mount { get; set; }
 
     private enum Tab { General, Security }
 
@@ -238,6 +245,7 @@
     private string LocationOf(FileMetadata item)
     {
         var parent = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(VM.ShareRelativeOf(item));
+        if (Mount is not null) return Mount.HostLocationOf(parent);
         var shareName = VM.CurrentBrowserShare?.Name ?? "";
         return string.IsNullOrEmpty(parent) ? shareName : $"{shareName}/{parent}";
     }

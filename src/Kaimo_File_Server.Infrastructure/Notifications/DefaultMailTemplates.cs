@@ -89,8 +89,8 @@ public static class DefaultMailTemplates
         [(C.UploadReceived, "en")] = new("New file via \"{{ link.name }}\"",
             "<p>Hello {{ recipient.name }},</p><p>the file <strong>{{ file.name }}</strong> ({{ file.size }}) was uploaded through your upload link <strong>{{ link.name }}</strong>.</p>" + LoginLink),
 
-        [(C.LinkAccessed, "de")] = new("Freigabe-Link „{{ link.name }}“ wurde abgerufen",
-            "<p>Hallo {{ recipient.name }},</p><p>über deinen Freigabe-Link <strong>{{ link.name }}</strong> wurde <strong>{{ file.name }}</strong> heruntergeladen ({{ event.time }}).</p>"),
+        [(C.LinkAccessed, "de")] = new("Share-Link „{{ link.name }}“ wurde abgerufen",
+            "<p>Hallo {{ recipient.name }},</p><p>über deinen Share-Link <strong>{{ link.name }}</strong> wurde <strong>{{ file.name }}</strong> heruntergeladen ({{ event.time }}).</p>"),
         [(C.LinkAccessed, "en")] = new("Share link \"{{ link.name }}\" was accessed",
             "<p>Hello {{ recipient.name }},</p><p><strong>{{ file.name }}</strong> was downloaded through your share link <strong>{{ link.name }}</strong> ({{ event.time }}).</p>"),
 

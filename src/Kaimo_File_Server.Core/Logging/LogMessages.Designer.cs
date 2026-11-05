@@ -594,6 +594,24 @@ namespace Kaimo_File_Server.Core.Logging {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Virtual share mount(s) at {Path} in share {ShareId} detached because the folder was deleted or moved to the recycle bin; re-mount on the virtual share admin page..
+        /// </summary>
+        public static string CloudAccessMountDetached {
+            get {
+                return ResourceManager.GetString("CloudAccessMountDetached", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Virtual share mount(s) in share {ShareId} moved from {OldPath} to {NewPath}..
+        /// </summary>
+        public static string CloudAccessMountRebased {
+            get {
+                return ResourceManager.GetString("CloudAccessMountRebased", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Data service reconciler started ({Count} services)..
         /// </summary>
         public static string ReconcilerStarted {
@@ -689,6 +707,33 @@ namespace Kaimo_File_Server.Core.Logging {
         public static string SearchLocalFailed {
             get {
                 return ResourceManager.GetString("SearchLocalFailed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Virtual share {VirtualShare} mounted at {Share}/{Path} by {User}..
+        /// </summary>
+        public static string CloudAccessMountChanged {
+            get {
+                return ResourceManager.GetString("CloudAccessMountChanged", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Virtual share {VirtualShare} switched back to standalone mode by {User}..
+        /// </summary>
+        public static string CloudAccessMountRemoved {
+            get {
+                return ResourceManager.GetString("CloudAccessMountRemoved", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Mount of virtual share {VirtualShare} at {Path} rolled back: a folder with that name appeared concurrently..
+        /// </summary>
+        public static string CloudAccessMountRaceRolledBack {
+            get {
+                return ResourceManager.GetString("CloudAccessMountRaceRolledBack", resourceCulture);
             }
         }
 

@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Web.Components.Shared;
 using Kaimo_File_Server.Web.Components.ViewModels;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components;
 
 namespace Kaimo_File_Server.Web.Components.Pages.CloudAccess;
@@ -39,11 +40,18 @@ public partial class CloudAccess
     private bool _showShareDepartmentConfirm;
     private bool _showShareDeleteConfirm;
     private bool _showVirtualShareDetails;
+    private CloudAccessProvisioning _shareProvisioning = CloudAccessProvisioning.VirtualShare;
+    private List<ShareDefinition> _mountHosts = [];
+    private Guid _mountHostId;
+    private string _mountParentPath = "";
+    private string _mountFolderName = "";
 
     private bool CanCreateShare => _shareConnectionId != Guid.Empty
                                    && !string.IsNullOrWhiteSpace(_shareName)
                                    && _shareDepartmentId != Guid.Empty
-                                   && !string.IsNullOrWhiteSpace(_remoteRoot);
+                                   && !string.IsNullOrWhiteSpace(_remoteRoot)
+                                   && (_shareProvisioning == CloudAccessProvisioning.VirtualShare
+                                       || _mountHostId != Guid.Empty);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -91,13 +99,26 @@ public partial class CloudAccess
         return Task.CompletedTask;
     }
 
+    // Host shares are only needed for "Folder in a share", so they load on first switch.
+    private async Task SetProvisioningAsync(CloudAccessProvisioning mode)
+    {
+        _shareProvisioning = mode;
+        if (mode == CloudAccessProvisioning.Folder && _mountHosts.Count == 0)
+            await RunAsync(async () => _mountHosts = await VM.GetMountHostSharesAsync());
+    }
+
     private async Task CreateShareAsync() => await RunAsync(async () =>
     {
-        await VM.CreateShareAsync(_shareConnectionId, _shareName, _remoteRoot, _shareDepartmentId, _principalLevels);
+        var mount = _shareProvisioning == CloudAccessProvisioning.Folder
+            ? new CloudAccessMountRequest(_mountHostId, _mountParentPath, _mountFolderName)
+            : null;
+        await VM.CreateShareAsync(_shareConnectionId, _shareName, _remoteRoot, _shareDepartmentId, _principalLevels, mount);
         _shareName = "";
         _remoteRoot = "";
         _shareDepartmentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
         _principalLevels.Clear();
+        _shareProvisioning = CloudAccessProvisioning.VirtualShare;
+        (_mountHostId, _mountParentPath, _mountFolderName) = (Guid.Empty, "", "");
         _showShareForm = false;
     });
 
@@ -283,5 +304,5 @@ public partial class CloudAccess
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 
-    private enum CloudAccessTab { General, Extra, Access }
+    private enum CloudAccessTab { General, Extra, Access, Mount }
 }

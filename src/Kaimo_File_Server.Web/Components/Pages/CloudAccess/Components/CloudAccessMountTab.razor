@@ -1,0 +1,51 @@
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.Shared
+@inherits AppComponentBase
+
+<div class="detail-section">
+    <span class="detail-label" id="vs-provisioning-mode">
+        @R("Web_CloudAccess_Mode")
+        <InfoButton Text="@R("Web_CloudAccess_MountHelp")" IconSize="16" />
+    </span>
+    <div class="toggle-button-group" role="radiogroup" aria-labelledby="vs-provisioning-mode">
+        @foreach (var mode in new[] { CloudAccessProvisioning.VirtualShare, CloudAccessProvisioning.Folder })
+        {
+            <button type="button" role="radio" aria-checked="@(_mode == mode ? "true" : "false")"
+                    class="toggle-btn @(_mode == mode ? "toggle-btn--active" : null)" disabled="@_busy"
+                    @onclick="() => _mode = mode">@R("Web_CloudAccess_Mode_" + mode)</button>
+        }
+    </div>
+</div>
+
+@if (Share.IsFolderMode)
+{
+    <div class="detail-section">
+        @if (MountedLabel is { } mounted)
+        {
+            <StatusBadge Tone="StatusTone.Positive" Label="@string.Format(R("Web_CloudAccess_MountStatus_Mounted"), mounted)" />
+        }
+        else
+        {
+            <StatusBadge Tone="StatusTone.Warning" Label="@R("Web_CloudAccess_Badge_Detached")" />
+            <p class="form-hint">@R("Web_CloudAccess_MountStatus_Detached")</p>
+        }
+    </div>
+}
+
+@if (_mode == CloudAccessProvisioning.Folder)
+{
+    <div class="vs-mount-fields">
+        <CloudAccessMountFields Hosts="_hosts" @bind-HostId="_hostId" @bind-ParentPath="_parentPath"
+                                @bind-FolderName="_folderName" Disabled="_busy" FieldClass="detail-section" />
+    </div>
+}
+
+@if (_error is not null)
+{
+    <div class="error-banner" role="alert">@_error</div>
+}
+
+<div class="detail-actions mount-actions">
+    <button class="btn-primary" type="button" disabled="@(!CanApply)" @onclick="ApplyAsync">@R("Web_CloudAccess_MountApply")</button>
+</div>

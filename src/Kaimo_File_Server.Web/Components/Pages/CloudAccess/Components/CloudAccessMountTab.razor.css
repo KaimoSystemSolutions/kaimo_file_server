@@ -1,0 +1,29 @@
+/* Provisioning tab: same compact field rhythm as the remote-folder row on the General tab. */
+.detail-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.vs-mount-fields ::deep .edit-input {
+    min-width: 0;
+    min-height: 28px;
+    padding: 5px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.vs-mount-fields ::deep .vs-mount-row .btn-secondary,
+.mount-actions > .btn-primary {
+    flex: 0 0 auto;
+    width: auto;
+    margin-top: 0;
+    padding: 5px 12px;
+    font-size: 12px;
+    min-height: 28px;
+}
+
+.mount-actions {
+    flex-direction: row;
+    justify-content: flex-start;
+}

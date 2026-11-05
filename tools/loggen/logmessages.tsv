@@ -76,6 +76,9 @@ SeedConfigEntries	2112	Config entries seeded.
 SeedTestUserSummary	2113	Test users created: admin, marco.hanisch, anna.weber, lisa.mueller (password '1234', admin 'admin1234').
 SeedDuplicateRolesRemoved	2114	Removed {Count} duplicate role(s) named '{Name}'.
 SeedDuplicateGroupsRemoved	2115	Removed {Count} duplicate group(s) named '{Name}'.
+# -- virtual-share mounts 2400-2499 --
+CloudAccessMountDetached	2401	Virtual share mount(s) at {Path} in share {ShareId} detached because the folder was deleted or moved to the recycle bin; re-mount on the virtual share admin page.
+CloudAccessMountRebased	2402	Virtual share mount(s) in share {ShareId} moved from {OldPath} to {NewPath}.
 # ============================ Host (6000-6999) ============================
 # -- data service reconciler 6100-6199 --
 ReconcilerStarted	6101	Data service reconciler started ({Count} services).
@@ -92,6 +95,10 @@ SearchElasticDisabled	3204	Elasticsearch disabled, search running in filename mo
 SearchReindexFailed	3205	Reindex failed.
 SearchLocalFailed	3206	Local index search failed, falling back to filename search.
 # ============================ Web (5000-5999) ============================
+# -- virtual-share mounts 5700-5799 --
+CloudAccessMountChanged	5701	Virtual share {VirtualShare} mounted at {Share}/{Path} by {User}.
+CloudAccessMountRemoved	5702	Virtual share {VirtualShare} switched back to standalone mode by {User}.
+CloudAccessMountRaceRolledBack	5703	Mount of virtual share {VirtualShare} at {Path} rolled back: a folder with that name appeared concurrently.
 # -- AclEditor 5600-5699 --
 AclEditorLoadData	5601	AclEditor.LoadDataAsync Path='{Path}', ShareId={ShareId}
 AclEditorNoPath	5602	AclEditor: path is null, aborting.

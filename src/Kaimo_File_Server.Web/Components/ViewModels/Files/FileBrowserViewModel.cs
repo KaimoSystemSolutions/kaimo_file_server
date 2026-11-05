@@ -61,8 +61,10 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         DemoModeOptions demo,
         ISyncDefinitionRepository syncRepo,
         IShareLinkRepository shareLinkRepo,
-        ICloudSyncJobRunner? syncJobs = null)
+        ICloudSyncJobRunner? syncJobs = null,
+        CloudAccessMountResolver? mountResolver = null)
     {
+        _mountResolver = mountResolver;
         _fileServiceFactory = fileServiceFactory;
         _shareRepo = shareRepo;
         _dbFactory = dbFactory;
@@ -358,6 +360,7 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
                 CurrentPath, shareName, userContext.User.Username);
 
             Items = await _fileService.ListAsync(CurrentPath, userContext);
+            await InjectMountEntriesAsync(userContext);
             await LoadHomeOwnerNamesAsync();
 
             _logger.LogDebug("Found {Total} items ({Dirs} dirs, {Files} files)",
@@ -423,6 +426,7 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         {
             ErrorMessage = null;
             Items = await _fileService.ListAsync(CurrentPath, userContext);
+            await InjectMountEntriesAsync(userContext);
             _ = LoadDirectorySizesInBackgroundAsync();
         }
         catch (Exception ex)

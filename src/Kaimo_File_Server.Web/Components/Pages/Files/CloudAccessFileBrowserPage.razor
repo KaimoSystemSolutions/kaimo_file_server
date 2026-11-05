@@ -1,15 +1,62 @@
 @page "/files/access/{ShareId:guid}"
 @page "/files/access/{ShareId:guid}/{*SubPath}"
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Repositories
 @using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser
 @inject RemoteCloudAccessFileBrowserViewModel RemoteViewModel
+@inject ICloudAccessRepository CloudShares
+@inject IShareRepository LocalShares
+@inject CloudAccessMountResolver Mounts
+@inject NavigationManager Nav
 
-<FileBrowser VM="RemoteViewModel"
-             ShareName="@ShareId.ToString()"
-             SubPath="@SubPath"
-             OverviewRoute="/files"
-             ShareRoute="@($"/files/access/{ShareId}")" />
+@if (_checkedShareId != ShareId)
+{
+    @* Provisioning mode not known yet. *@
+}
+else if (_folderMode)
+{
+    @* Mounted as a folder: reachable only through its host share (see OnParametersSetAsync). *@
+    <div class="empty-state"><p>@Resources.Web_Error_ShareNotFound</p></div>
+}
+else
+{
+    <FileBrowser VM="RemoteViewModel"
+                 ShareName="@ShareId.ToString()"
+                 SubPath="@SubPath"
+                 OverviewRoute="/files"
+                 ShareRoute="@($"/files/access/{ShareId}")" />
+}
 
 @code {
     [Parameter] public Guid ShareId { get; set; }
     [Parameter] public string? SubPath { get; set; }
+
+    // Checked once per share id, so navigating inside the share stays synchronous and the
+    // browser is not loaded twice.
+    private Guid? _checkedShareId;
+    private bool _folderMode;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_checkedShareId == ShareId)
+            return;
+
+        var share = await CloudShares.GetShareAsync(ShareId);
+        _folderMode = share is { IsFolderMode: true };
+        _checkedShareId = ShareId;
+        if (!_folderMode || !share!.IsMounted)
+            return;
+
+        // Old links lead to the mounted folder, but only for users who can see that mount;
+        // everyone else gets "not found", so the host share and path never leak.
+        var host = await LocalShares.GetByIdAsync(share.MountShareId!.Value);
+        if (host is null)
+            return;
+        await Mounts.RefreshAsync(host.Name);
+        var match = Mounts.Match(host.Name, share.MountPath);
+        if (match?.Mount.ShareId == share.Id)
+            Nav.NavigateTo(
+                string.IsNullOrEmpty(SubPath) ? match.Mount.RouteBase : $"{match.Mount.RouteBase}/{SubPath}",
+                replace: true);
+    }
 }

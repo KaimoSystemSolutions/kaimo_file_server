@@ -3,6 +3,7 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.Acl
 @using Kaimo_File_Server.Web.Components.Pages.CloudAccess
+@using Kaimo_File_Server.Web.Components.Pages.CloudAccess.Components
 @using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser.components
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Kaimo_File_Server.Web.Helpers
@@ -27,6 +28,14 @@
     <div class="breadcrumb-bar">
         <a class="breadcrumb-link" href="@OverviewRoute">@Resources.Web_Breadcrumb_Shares</a>
         <span class="breadcrumb-sep">/</span>
+        @if (ParentCrumbs is not null)
+        {
+            @foreach (var (crumbName, crumbHref) in ParentCrumbs)
+            {
+                <a class="breadcrumb-link" href="@crumbHref">@crumbName</a>
+                <span class="breadcrumb-sep">/</span>
+            }
+        }
         @if (InPlaceNavigation)
         {
             <button type="button" class="breadcrumb-link breadcrumb-button" @onclick="() => NavigateToRoutePath(string.Empty)">@CurrentShareDisplayName</button>
@@ -135,14 +144,14 @@
             <span>@Resources.Web_Action_Open</span>
         </button>
         <button class="toolbar-btn" title="@T("Web_Action_Download")"
-                disabled="@(_selectedItems.Count == 0)" @onclick="DownloadSelectionAsync">
+                disabled="@(_selectedItems.Count == 0 || SelectionTouchesMount)" @onclick="DownloadSelectionAsync">
             @Assets.SVG("download.svg", new SvgOptions(Width: 16, Height: 16))
             <span>@T("Web_Action_Download")</span>
         </button>
         @if (VM.Capabilities.CanCopy)
         {
             <button class="toolbar-btn" title="@T("Web_Transfer_Copy")"
-                    disabled="@(_selectedItems.Count == 0)" @onclick="() => PutIntoClipboard(false)">
+                    disabled="@(_selectedItems.Count == 0 || SelectionTouchesMount)" @onclick="() => PutIntoClipboard(false)">
                 @Assets.SVG("copy.svg", new SvgOptions(Width: 16, Height: 16))
                 <span>@T("Web_Transfer_Copy")</span>
             </button>
@@ -150,7 +159,7 @@
         @if (VM.Capabilities.CanCut)
         {
             <button class="toolbar-btn" title="@T("Web_Transfer_Cut")"
-                    disabled="@(_selectedItems.Count == 0)" @onclick="() => PutIntoClipboard(true)">
+                    disabled="@(_selectedItems.Count == 0 || SelectionTouchesMount)" @onclick="() => PutIntoClipboard(true)">
                 @Assets.SVG("scissors.svg", new SvgOptions(Width: 16, Height: 16))
                 <span>@T("Web_Transfer_Cut")</span>
             </button>
@@ -473,8 +482,8 @@ else
             </div>
         </div>
 
-        @* -- ".." Parent directory -- *@
-        @if (VM.HasParent)
+        @* -- ".." Parent directory (at a mount root: back into the host folder) -- *@
+        @if (ShowParentRow)
         {
             <div class="file-grid-row file-row-dir @(_dragOverPath == ".." ? "file-row--drop-target" : "")"
                  @ondblclick="NavigateUp"
@@ -515,12 +524,19 @@ else
                 @oncontextmenu:stopPropagation="true">
 
                 <div class="col-name"
-                     draggable="@VM.Capabilities.CanMove"
+                     draggable="@(VM.Capabilities.CanMove && !VM.IsMountEntry(entry))"
                      data-path="@RowKey(entry)"
                      @ondragstart="() => OnDragStart(entry)"
                      @ondragend="OnDragEnd">
-                    @{ var icon = FileHelper.GetEntryIcon(entry.Name, entry.IsDirectory, IsRecycleBinEntry(entry)); }
-                    @Assets.SVG(icon.File, new SvgOptions(Width: 20, Height: 20, Color: icon.Color, Fill: icon.Fill, CssClass: "file-icon"))
+                    @if (VM.IsMountEntry(entry))
+                    {
+                        @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--folder-stroke)", CssClass: "file-icon"))
+                    }
+                    else
+                    {
+                        var icon = FileHelper.GetEntryIcon(entry.Name, entry.IsDirectory, IsRecycleBinEntry(entry));
+                        @Assets.SVG(icon.File, new SvgOptions(Width: 20, Height: 20, Color: icon.Color, Fill: icon.Fill, CssClass: "file-icon"))
+                    }
                     <span>@entry.Name</span>
                     @if (VM is FileBrowserViewModel local && local.GetHomeOwnerName(entry) is { } owner)
                     {
@@ -585,10 +601,19 @@ else
                     }
                 </div>
 
-                <div class="col-created">@DateFmt.FormatDateTime(entry.CreatedAt)</div>
-                <div class="col-modified">@DateFmt.FormatDateTime(entry.ModifiedAt)</div>
-                <div
-                    class="col-lastaccess">@DateFmt.FormatDateTime(entry.LastAccessedAt)</div>
+                @* A mount entry exists only in the database: it has no timestamps of its own. *@
+                @if (VM.IsMountEntry(entry))
+                {
+                    <div class="col-created"></div>
+                    <div class="col-modified"></div>
+                    <div class="col-lastaccess"></div>
+                }
+                else
+                {
+                    <div class="col-created">@DateFmt.FormatDateTime(entry.CreatedAt)</div>
+                    <div class="col-modified">@DateFmt.FormatDateTime(entry.ModifiedAt)</div>
+                    <div class="col-lastaccess">@DateFmt.FormatDateTime(entry.LastAccessedAt)</div>
+                }
             </div>
 
             @if (_showFolderAcl && _aclFolderPath == aclPath)
@@ -662,7 +687,8 @@ else
                OnRestored="OnVersionRestored"/>
 
 @* -- Properties dialog (size / metadata / ACL) -- *@
-<PropertiesDialog @ref="_propertiesDialogComponent" VM="VM"/>
+<PropertiesDialog @ref="_propertiesDialogComponent" VM="VM" Mount="Mount"/>
+<CloudAccessGrantsDialog @ref="_grantsDialogComponent" OnSaved="Refresh"/>
 
 @* -- Create-hash dialog (checksum of a single file) -- *@
 <HashDialog @ref="_hashDialogComponent" VM="VM"/>

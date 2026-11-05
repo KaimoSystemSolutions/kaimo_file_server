@@ -45,7 +45,8 @@ namespace Kaimo_File_Server.Infrastructure.Services
                 _serviceProvider.GetRequiredService<ICloudSyncPathUpdater>(),
                 _serviceProvider.GetRequiredService<ICloudSyncOperationCoordinator>(),
                 changeLog,
-                share.RecycleRootDepth);
+                share.RecycleRootDepth,
+                _serviceProvider.GetService<ICloudAccessMountGuard>());
         }
     }
 }

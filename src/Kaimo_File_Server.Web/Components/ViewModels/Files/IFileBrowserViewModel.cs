@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Web.Helpers;
+using Kaimo_File_Server.Web.Services;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -222,6 +223,15 @@ public interface IFileBrowserViewModel
     /// overrides this to hide the shared root, so the real folder name never appears in the URL.
     /// </summary>
     string RouteSubPathOf(string shareRelativePath) => shareRelativePath;
+
+    /// <summary>
+    /// True for the synthetic folder entry of a virtual share mounted into this listing. It
+    /// can only be opened; every other action (rename, delete, copy, download …) is withheld.
+    /// </summary>
+    bool IsMountEntry(FileMetadata entry) => false;
+
+    /// <summary>The mounted virtual share behind a mount entry, or <c>null</c> for any other entry.</summary>
+    MountedFolder? MountOf(FileMetadata entry) => null;
 
     Task<string?> GetDownloadUrlAsync(FileMetadata file)
         => Task.FromResult<string?>(null);

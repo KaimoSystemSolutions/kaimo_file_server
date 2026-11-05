@@ -1,0 +1,113 @@
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Helpers
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.Pages.CloudSync.Components
+@using Kaimo_File_Server.Web.Services
+@inherits AppComponentBase
+@inject CloudAccessMountService Mounts
+
+@* Host share / parent folder / folder name of a folder-mode virtual share. Shared by the
+   create form and the Provisioning tab; the parent container decides the layout. *@
+<div class="vs-mount-field @FieldClass">
+    <span class="detail-label">@R("Web_CloudAccess_MountHostShare")</span>
+    <PrincipalPickerField Mode="SelectionMode.Single"
+                          Items="HostItems"
+                          SelectedIds="HostId.AsSelection()"
+                          SelectedIdsChanged="OnHostChangedAsync"
+                          AllowClear="false"
+                          Disabled="Disabled"
+                          Title="@R("Web_CloudAccess_MountHostShare")"
+                          Placeholder="@R("Web_CloudAccess_Select")" />
+</div>
+
+<div class="vs-mount-field @FieldClass">
+    <span class="detail-label">@R("Web_CloudAccess_MountParentFolder")</span>
+    <div class="vs-mount-row">
+        <input class="edit-input" value="@("/" + ParentPath)" readonly aria-label="@R("Web_CloudAccess_MountParentFolder")" />
+        <button class="btn-secondary" type="button" disabled="@(Disabled || SelectedHost is null)"
+                @onclick="OpenPicker">@R("Web_CloudAccess_Browse")</button>
+    </div>
+</div>
+
+<div class="vs-mount-field @FieldClass">
+    <label class="detail-label" for="@($"{_id}-name")">@R("Web_CloudAccess_MountFolderName")</label>
+    <input id="@($"{_id}-name")" class="edit-input" type="text" maxlength="255" disabled="@Disabled"
+           placeholder="@FolderNamePlaceholder" value="@FolderName" @oninput="OnFolderNameInputAsync" />
+</div>
+
+<DirectoryPickerDialog IsOpen="@_pickerOpen"
+                       IsRemote="false"
+                       IsLoading="false"
+                       Title="@R("Web_CloudAccess_MountParentFolder")"
+                       CurrentPath="@_pickerPath"
+                       Items="@_pickerItems"
+                       OnNavigate="NavigatePicker"
+                       OnSelected="SelectPickerAsync"
+                       OnClosed="() => _pickerOpen = false" />
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ShareDefinition> Hosts { get; set; } = [];
+    [Parameter] public Guid HostId { get; set; }
+    [Parameter] public EventCallback<Guid> HostIdChanged { get; set; }
+    [Parameter] public string ParentPath { get; set; } = "";
+    [Parameter] public EventCallback<string> ParentPathChanged { get; set; }
+    [Parameter] public string FolderName { get; set; } = "";
+    [Parameter] public EventCallback<string> FolderNameChanged { get; set; }
+    [Parameter] public string? FolderNamePlaceholder { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+
+    /// <summary>Extra class per field wrapper, e.g. <c>detail-section</c> in the detail pane.</summary>
+    [Parameter] public string? FieldClass { get; set; }
+
+    // Unique per instance: the create form and the Provisioning tab can be on screen together.
+    private readonly string _id = "vs-mount-" + Guid.NewGuid().ToString("N")[..8];
+    private bool _pickerOpen;
+    private string _pickerPath = "";
+    private IReadOnlyList<CloudDirectoryItem> _pickerItems = [];
+
+    private ShareDefinition? SelectedHost => Hosts.FirstOrDefault(host => host.Id == HostId);
+
+    private IReadOnlyList<PrincipalPickerItem> HostItems
+        => Hosts.Select(host => new PrincipalPickerItem(host.Id, host.Name, PrincipalKind.Share)).ToList();
+
+    private async Task OnHostChangedAsync(IReadOnlyList<Guid> ids)
+    {
+        var id = ids.FirstOrNull() ?? Guid.Empty;
+        if (id == HostId) return;
+        await HostIdChanged.InvokeAsync(id);
+        await ParentPathChanged.InvokeAsync(string.Empty);
+    }
+
+    private Task OnFolderNameInputAsync(ChangeEventArgs e) => FolderNameChanged.InvokeAsync(e.Value?.ToString() ?? "");
+
+    private void OpenPicker()
+    {
+        NavigatePicker(ParentPath);
+        _pickerOpen = true;
+    }
+
+    private void NavigatePicker(string path)
+    {
+        if (SelectedHost is not { } host) return;
+        _pickerPath = ShareRelativePath.Normalize(path);
+        try
+        {
+            _pickerItems = Mounts.ListHostFolders(host, _pickerPath)
+                .Select(folder => new CloudDirectoryItem(folder.Name, folder.Path))
+                .ToList();
+        }
+        catch (Exception) when (_pickerPath.Length > 0)
+        {
+            // A typed path that does not exist (or escapes the share) falls back to the root.
+            NavigatePicker("");
+        }
+    }
+
+    private async Task SelectPickerAsync(string path)
+    {
+        _pickerOpen = false;
+        await ParentPathChanged.InvokeAsync(ShareRelativePath.Normalize(path));
+    }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+}

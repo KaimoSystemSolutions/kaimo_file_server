@@ -25,9 +25,27 @@ public sealed class CloudAccessRepository(IDbContextFactory<ApplicationDbContext
         share.UpdatedAtUtc = DateTime.UtcNow;
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         if (await db.CloudAccessShares.AnyAsync(x => x.Id == share.Id, cancellationToken))
-            db.CloudAccessShares.Update(share);
+        {
+            var entry = db.CloudAccessShares.Update(share);
+            entry.Property(x => x.Provisioning).IsModified = false;
+            entry.Property(x => x.MountShareId).IsModified = false;
+            entry.Property(x => x.MountPath).IsModified = false;
+        }
         else
             db.CloudAccessShares.Add(share);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SetMountAsync(Guid shareId, CloudAccessProvisioning provisioning, Guid? mountShareId,
+        string? mountPath, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var share = await db.CloudAccessShares.FindAsync([shareId], cancellationToken)
+            ?? throw new KeyNotFoundException($"Virtual share {shareId} does not exist.");
+        share.Provisioning = provisioning;
+        share.MountShareId = mountShareId;
+        share.MountPath = mountPath;
+        share.UpdatedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
     }
 

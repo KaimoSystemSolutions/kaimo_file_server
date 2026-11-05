@@ -138,6 +138,8 @@ public partial class GlobalSearch : IDisposable
         var path = rel.Split('?', '#')[0].Trim('/');
         var segs = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         _virtualShareId = null;
+        _virtualRouteBase = null;
+        _mountedFolder = null;
 
         if (segs.Length == 0 || !segs[0].Equals("files", StringComparison.OrdinalIgnoreCase))
         {
@@ -167,6 +169,10 @@ public partial class GlobalSearch : IDisposable
         {
             _contextShare = HomeDirectoryService.ShareName;
             _contextSubPath = $"{HomeDirectoryService.HomePathOf(_user.User.Id)}/{_contextSubPath}".TrimEnd('/');
+        }
+        else
+        {
+            TryDetectMountedFolder();
         }
 
         _scope = _lastScope = ScopeFolder;
@@ -443,6 +449,7 @@ public partial class GlobalSearch : IDisposable
             .Select(g => g.First())
             .ToList();
         _hitsVirtualShareId = virtualShareId;
+        _hitsVirtualRouteBase = virtualShareId is null ? null : _virtualRouteBase;
         ApplyRecycleBinFilter();
         _destResults = dests.Take(plan.DestLimit).ToList();
         _isSearching = false;
@@ -504,7 +511,9 @@ public partial class GlobalSearch : IDisposable
         HideAndClear();
 
         // A virtual share's hits open in its GUID route, whose browser is keyed by the share id.
-        var routeBase = _hitsVirtualShareId is { } virtualId ? $"/files/access/{virtualId}" : $"/files/{result.ShareName}";
+        var routeBase = _hitsVirtualShareId is { } virtualId
+            ? _hitsVirtualRouteBase ?? $"/files/access/{virtualId}"
+            : $"/files/{result.ShareName}";
 
         string url;
         if (result.IsDirectory)
@@ -579,6 +588,10 @@ public partial class GlobalSearch : IDisposable
 
     private void OnFocusIn()
     {
+        // On first entry the page may resolve the share's mounts after the location change:
+        // pick up a mounted folder now (the scope then defaults to this folder again).
+        if (!_focusWithin && _inBrowser && _virtualShareId is null && TryDetectMountedFolder())
+            _scope = _lastScope = ScopeFolder;
         _focusWithin = true;
         if (HasResults || _isSearching)
             _dropdownVisible = true;

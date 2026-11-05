@@ -2,6 +2,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
+using Kaimo_File_Server.Web.Services;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -34,9 +35,12 @@ public partial class CloudAccessViewModel
         string name,
         string remoteRootPath,
         Guid departmentId,
-        IReadOnlyDictionary<Guid, CloudAccessPermission> grants)
+        IReadOnlyDictionary<Guid, CloudAccessPermission> grants,
+        CloudAccessMountRequest? mount = null)
     {
         await EnsureCanManageDepartmentAsync(departmentId);
+        if (mount is not null && _mounts is null)
+            throw new InvalidOperationException(R("Web_CloudAccess_Mount_Error_NotAllowed"));
         var connectionRecord = await GetUsableConnectionAsync(connectionId);
         if (_providerCatalog is not null
             && !_providerCatalog.GetRequired(connectionRecord.ProviderId).Capabilities
@@ -71,7 +75,10 @@ public partial class CloudAccessViewModel
             Name = normalizedName,
             RemoteRootPath = folder.Path,
             RemoteRootItemId = folder.StableId,
-            IsEnabled = true
+            IsEnabled = true,
+            // A share created as a folder starts in folder mode, so it is never reachable
+            // standalone at /files/access/{id} — not even between insert and mount.
+            Provisioning = mount is null ? CloudAccessProvisioning.VirtualShare : CloudAccessProvisioning.Folder
         };
         await _repository.UpsertShareAsync(share);
 
@@ -89,7 +96,26 @@ public partial class CloudAccessViewModel
         }
         await _repository.ReplaceGrantsAsync(
             share.Id, BuildGrants(share.Id, connectionRecord, effectiveGrants, alwaysAllowed));
+
+        if (mount is not null)
+        {
+            var folderName = string.IsNullOrWhiteSpace(mount.FolderName) ? normalizedName : mount.FolderName;
+            var errorKey = await _mounts!.MountAsync(_actor, share, mount.HostShareId, mount.ParentPath, folderName);
+            if (errorKey is not null)
+            {
+                // Create-as-folder is all or nothing: a share whose mount was rejected is removed again.
+                await _repository.DeleteShareAsync(share.Id);
+                throw new InvalidOperationException(R(errorKey));
+            }
+        }
         await LoadAsync();
+    }
+
+    /// <summary>Local shares the actor may mount a new virtual share in (create-as-folder).</summary>
+    public async Task<List<ShareDefinition>> GetMountHostSharesAsync()
+    {
+        _actor ??= await GetActorAsync();
+        return _mounts is null || _actor is null ? [] : await _mounts.GetHostSharesAsync(_actor);
     }
 
     /// <summary>Name of the seeded system group that always receives access to new virtual shares.</summary>

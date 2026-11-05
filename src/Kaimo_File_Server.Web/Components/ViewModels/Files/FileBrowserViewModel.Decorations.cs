@@ -82,7 +82,7 @@ public partial class FileBrowserViewModel
         var userContext = await GetCurrentUserContextAsync();
         if (userContext is null) return;
 
-        var dirs = Items.Where(f => f.IsDirectory).ToList();
+        var dirs = WithoutMountEntries(Items.Where(f => f.IsDirectory));
         if (dirs.Count == 0) return;
 
         // Throttle timestamp shared across worker threads; guarded with Interlocked
