@@ -20,7 +20,8 @@ public sealed partial class RoleAssignmentService(
     IRoleRepository roleRepo,
     IUserRepository userRepo,
     IGroupRepository groupRepo,
-    IManagementAuthService mgmtAuth)
+    IManagementAuthService mgmtAuth,
+    IDepartmentRepository departmentRepo)
 {
     /// <summary>A role that carries the complete <see cref="ManagementPermission.FullAdmin"/> mask.</summary>
     public static bool IsAdminRole(Role role)
@@ -35,9 +36,9 @@ public sealed partial class RoleAssignmentService(
 
     /// <summary>
     /// Creates the assignment after the no-privilege-elevation gate. The recipient must be within
-    /// the actor's own <see cref="ManagementPermission.AssignRoles"/> reach (it may lie outside the
-    /// target scope). Granting the admin role system-wide to a user also adds them to the Admins
-    /// group (full mirror).
+    /// the actor's own <see cref="ManagementPermission.AssignRoles"/> reach, and at department
+    /// scope belong to that department (<see cref="BelongsToDepartmentAsync"/>). Granting the
+    /// admin role system-wide to a user also adds them to the Admins group (full mirror).
     /// </summary>
     /// <returns>A localized error message, or <c>null</c> on success.</returns>
     public async Task<string?> CreateAsync(
@@ -50,6 +51,9 @@ public sealed partial class RoleAssignmentService(
 
         if (!await mgmtAuth.CanAssignRoleAsync(actor, role.ManagementPermissions, scopeType, scopeId))
             return Resources.Web_Error_NoPermission;
+
+        if (scopeType == ScopeType.Department && !await BelongsToDepartmentAsync(principalId, scopeId))
+            return Resources.Web_Error_AssignmentRequiresMembership;
 
         await assignmentRepo.CreateAsync(new ScopedRoleAssignment(principalId, role.Id, scopeType, scopeId));
 
@@ -126,20 +130,6 @@ public sealed partial class RoleAssignmentService(
     /// </summary>
     public Task<bool> CanRemoveGroupMembersAsync(UserContext actor, Guid groupId)
         => CanDelegateGroupGrantsAsync(actor, groupId);
-
-    /// <summary>
-    /// Whether the actor may take the user out of every group of the department, which is what
-    /// leaving the department does. Bounded per group like <see cref="CanRemoveGroupMembersAsync"/>.
-    /// </summary>
-    public async Task<bool> CanLeaveDepartmentGroupsAsync(UserContext actor, Guid userId, Guid departmentId)
-    {
-        foreach (var group in await userRepo.GetGroupsForUserAsync(userId))
-        {
-            if (group.DepartmentId == departmentId && !await CanRemoveGroupMembersAsync(actor, group.Id))
-                return false;
-        }
-        return true;
-    }
 
     /// <summary>
     /// Whether every assignment at the scope stays within the actor's own effective permissions

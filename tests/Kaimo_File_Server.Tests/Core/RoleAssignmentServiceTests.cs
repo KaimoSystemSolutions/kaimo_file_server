@@ -30,7 +30,7 @@ public partial class RoleAssignmentServiceTests : DatabaseTestBase
     }
 
     private RoleAssignmentService BuildSut()
-        => new(ScopedRoleRepo(), RoleRepo(), UserRepo(), GroupRepo(), _mgmtAuth.Object);
+        => new(ScopedRoleRepo(), RoleRepo(), UserRepo(), GroupRepo(), _mgmtAuth.Object, DepartmentRepo());
 
     private Role SeedRole(string name, ManagementPermission perms = ManagementPermission.None, Guid? id = null)
     {
@@ -90,6 +90,7 @@ public partial class RoleAssignmentServiceTests : DatabaseTestBase
         var principal = SeedUser("bob");
         var role = SeedRole("Reviewer");
         var dept = SeedDepartment("Sales");
+        await DepartmentRepo().AddUserAsync(dept.Id, principal.Id);
 
         await BuildSut().CreateAsync(ContextFor(actor), principal.Id, role, ScopeType.Department, dept.Id);
 

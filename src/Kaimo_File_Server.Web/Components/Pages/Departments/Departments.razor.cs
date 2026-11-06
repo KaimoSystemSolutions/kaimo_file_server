@@ -10,6 +10,7 @@ public partial class Departments
     private async Task Select(Department dept) { _activeTab = DepartmentDetailTab.General; await VM.SelectAsync(dept); StateHasChanged(); }
     private async Task Edit() { await VM.StartEditAsync(); StateHasChanged(); }
     private async Task Save() { await VM.SaveAsync(); StateHasChanged(); }
+    private async Task ConfirmDepartmentLeave() { await VM.ConfirmDepartmentLeaveAsync(); StateHasChanged(); }
     private async Task Create() { await VM.CreateAsync(); StateHasChanged(); }
     private async Task ConfirmDelete() { await VM.ConfirmDeleteAsync(); StateHasChanged(); }
     private void CancelEdit() { VM.CancelEdit(); StateHasChanged(); }

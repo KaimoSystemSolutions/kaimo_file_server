@@ -319,6 +319,7 @@ public class DepartmentViewModelDatabaseTests : DatabaseTestBase
         var dept = SeedDepartment("Engineering");
         var role = SeedRole("DeptAdmin");
         var principal = SeedUser("bob");
+        await DepartmentRepo().AddUserAsync(dept.Id, principal.Id);
         var sut = BuildGlobalAdminSut(actor);
         await sut.LoadAsync();
         await sut.SelectAsync(sut.Departments.Single(d => d.Id == dept.Id));

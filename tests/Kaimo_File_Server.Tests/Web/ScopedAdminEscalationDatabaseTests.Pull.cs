@@ -50,11 +50,29 @@ public partial class ScopedAdminEscalationDatabaseTests
     }
 
     [Fact]
-    public async Task DeptAdmin_AddingMemberOfChildDepartmentToGroup_AddsThemToTheDepartment()
+    public async Task DeptAdmin_AddingMemberOfChildDepartmentToGroup_IsRefused()
     {
+        // A department group only takes members of exactly its department.
         var group = SeedGroup("Team", _own.Id);
         var bob = SeedUser("bob");
         AddToDepartment(_ownChild, bob);
+        var sut = await EditGroupAsync(_deptAdmin, group);
+
+        Assert.DoesNotContain(sut.EditGroupMembers, m => m.Item.Id == bob.Id);
+        sut.EditGroupMembers.Add(new CheckboxItem<User>(bob, true));
+        await sut.SaveGroupAsync();
+
+        Assert.NotNull(sut.ErrorMessage);
+        Assert.False(await IsGroupMemberAsync(group, bob));
+        Assert.False(await IsMemberAsync(_own, bob));
+    }
+
+    [Fact]
+    public async Task DeptAdmin_AddingDepartmentMemberToGroup_Works()
+    {
+        var group = SeedGroup("Team", _own.Id);
+        var bob = SeedUser("bob");
+        AddToDepartment(_own, bob);
         var sut = await EditGroupAsync(_deptAdmin, group);
 
         sut.EditGroupMembers.Single(m => m.Item.Id == bob.Id).IsChecked = true;
@@ -62,7 +80,6 @@ public partial class ScopedAdminEscalationDatabaseTests
 
         Assert.Null(sut.ErrorMessage);
         Assert.True(await IsGroupMemberAsync(group, bob));
-        Assert.True(await IsMemberAsync(_own, bob));
     }
 
     // ═══════════════════ C3: shares ═══════════════════

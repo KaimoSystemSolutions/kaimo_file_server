@@ -428,7 +428,7 @@
                     <ScopedRoleAssignmentForm Roles="VM.AllRoles.ToRoleItems()"
                                               @bind-RoleId="VM.NewAssignmentRoleId"
                                               RolePermissionsById="VM.AllRoles.ToDictionary(r => r.Id, r => r.ManagementPermissions)"
-                                              Departments="VM.AllDepartments.ToDepartmentItems()"
+                                              Departments="VM.AssignmentDepartments.ToDepartmentItems()"
                                               Shares="ShareItems()"
                                               @bind-ScopeType="VM.NewAssignmentScopeType"
                                               @bind-ScopeId="VM.NewAssignmentScopeId"
@@ -506,6 +506,9 @@
     }
 }
 
+<DepartmentLeaveDialog Items="VM.PendingDepartmentLeaves" IsSaving="VM.IsSaving"
+                       OnConfirm="ConfirmDepartmentLeave" OnCancel="VM.CancelDepartmentLeave" />
+
 @if (_cropOpen)
 {
     <div class="avatar-crop-overlay" @onclick="CloseCrop">
@@ -549,6 +552,7 @@
 
     private async Task EditUser() { await VM.StartEditUserAsync(); _editTab = EditTab.General; StateHasChanged(); }
     private async Task SaveUser() { await VM.SaveUserAsync(); await OnChanged.InvokeAsync(); }
+    private async Task ConfirmDepartmentLeave() { await VM.ConfirmDepartmentLeaveAsync(); await OnChanged.InvokeAsync(); }
 
     // Crop-dialog state.
     private bool _cropOpen;

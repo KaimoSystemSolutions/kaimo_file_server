@@ -36,11 +36,11 @@ public partial class DepartmentViewModel
     private Task<bool> CanMoveShareAsync(ShareDefinition share) => CanMoveFromAsync(share.DepartmentId);
 
     /// <summary>Leaving the department also drops the user's memberships in its groups (revoking the
-    /// roles they grant), so the actor must outrank the user and be allowed to remove members from
-    /// each of those groups.</summary>
+    /// roles they grant) and the user's roles at the department, so the actor must outrank the user
+    /// and be allowed to revoke each of those.</summary>
     private async Task<bool> CanRemoveMemberAsync(Guid userId, Guid departmentId)
         => await _mgmtAuth.CanManageUserAsync(_actorContext!, userId, ManagementPermission.AssignDepartments)
-           && await _roleAssignments.CanLeaveDepartmentGroupsAsync(_actorContext!, userId, departmentId);
+           && await _roleAssignments.CanLeaveDepartmentAsync(_actorContext!, userId, departmentId);
 
     /// <summary>Current members plus every user the actor may add to the department.</summary>
     private async Task<List<CheckboxItem<User>>> BuildMemberPickerAsync(Guid departmentId, IEnumerable<User> allUsers)

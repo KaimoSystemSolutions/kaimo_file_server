@@ -129,6 +129,14 @@ public partial class DepartmentViewModel
                 return;
             }
 
+            // Removed members lose the department's groups and roles: warn before writing anything.
+            var leaveWarnings = await CollectLeaveWarningsAsync(Selected.Id, removedUserIds);
+            if (leaveWarnings.Count > 0)
+            {
+                PendingDepartmentLeaves = leaveWarnings;
+                return;
+            }
+
             // -- Update department entity --
             if (!string.IsNullOrWhiteSpace(EditName))
                 Selected.Name = EditName.Trim();
@@ -148,21 +156,13 @@ public partial class DepartmentViewModel
             foreach (var user in addedUsers)
                 await _departmentRepo.AddUserAsync(Selected.Id, user.Id);
             var removedGroupMemberships = 0;
+            var removedRoleAssignments = 0;
             foreach (var userId in removedUserIds)
             {
                 await _departmentRepo.RemoveUserAsync(Selected.Id, userId);
-
-                var userGroups = await _userRepo.GetGroupsForUserAsync(userId);
-                var remainingGroupIds = userGroups
-                    .Where(group => group.DepartmentId != Selected.Id)
-                    .Select(group => group.Id)
-                    .ToList();
-
-                if (remainingGroupIds.Count != userGroups.Count)
-                {
-                    await _userRepo.SetGroupsForUserAsync(userId, remainingGroupIds);
-                    removedGroupMemberships += userGroups.Count - remainingGroupIds.Count;
-                }
+                var revoked = await _roleAssignments.RevokeDepartmentTiesAsync(userId, Selected.Id);
+                removedGroupMemberships += revoked.Groups.Count;
+                removedRoleAssignments += revoked.Roles.Count;
             }
 
             // -- Groups diff (direct FK: Group.DepartmentId); released ones go back to Global --
@@ -187,9 +187,11 @@ public partial class DepartmentViewModel
             await LoadDepartmentsAsync();
 
             IsEditing = false;
-            SuccessMessage = removedGroupMemberships == 0
-                ? Resources.Web_Dept_Saved
-                : $"{Resources.Web_Dept_Saved} {string.Format(Resources.Web_Dept_GroupMembershipsRemoved, removedGroupMemberships)}";
+            SuccessMessage = Resources.Web_Dept_Saved;
+            if (removedGroupMemberships > 0)
+                SuccessMessage += " " + string.Format(Resources.Web_Dept_GroupMembershipsRemoved, removedGroupMemberships);
+            if (removedRoleAssignments > 0)
+                SuccessMessage += " " + string.Format(Resources.Web_Dept_RoleAssignmentsRemoved, removedRoleAssignments);
         }
         catch (Exception ex)
         {

@@ -82,7 +82,7 @@ public partial class UserListViewModel
         _logger = logger;
         _shareRepo = shareRepo;
         _config = config;
-        _roleAssignments = new RoleAssignmentService(assignmentRepo, roleRepo, userRepo, groupRepo, mgmtAuth);
+        _roleAssignments = new RoleAssignmentService(assignmentRepo, roleRepo, userRepo, groupRepo, mgmtAuth, departmentRepo);
     }
 
     // ══════════════════════════════════════════

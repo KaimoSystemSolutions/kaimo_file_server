@@ -68,6 +68,7 @@ public partial class UserListViewModelDatabaseTests
         var role = SeedRole("Delegate");
         var target = SeedUser("bob");
         var dept = SeedDepartment("Engineering");
+        await DepartmentRepo().AddUserAsync(dept.Id, target.Id);
         var sut = BuildGlobalAdminSut(actor);
         await sut.LoadAsync();
         await sut.SelectUserAsync(sut.Users.Single(u => u.Id == target.Id));

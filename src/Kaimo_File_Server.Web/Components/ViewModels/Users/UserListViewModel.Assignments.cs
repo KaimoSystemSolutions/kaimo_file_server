@@ -1,5 +1,7 @@
 ﻿using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Language;
@@ -12,7 +14,35 @@ public partial class UserListViewModel
     public bool IsAddingAssignment { get; set; }
     public ScopeType NewAssignmentScopeType { get; set; } = ScopeType.Department;
     public Guid? NewAssignmentScopeId { get; set; }
-    public Guid? NewAssignmentPrincipalId { get; set; }
+
+    /// <summary>The user or group to assign. Changing it drops a chosen department the new
+    /// principal does not belong to.</summary>
+    public Guid? NewAssignmentPrincipalId
+    {
+        get => _newAssignmentPrincipalId;
+        set
+        {
+            _newAssignmentPrincipalId = value;
+            if (NewAssignmentScopeType == ScopeType.Department && NewAssignmentScopeId is { } scopeId
+                && AssignmentDepartments.All(d => d.Id != scopeId))
+                NewAssignmentScopeId = null;
+        }
+    }
+    private Guid? _newAssignmentPrincipalId;
+
+    // Members per department, loaded with the form data (department roles go to members only).
+    private Dictionary<Guid, HashSet<Guid>> _departmentMemberIds = [];
+
+    /// <summary>The departments offered as scope: the Global department (system wide) plus those
+    /// the chosen user is a member of, or the chosen group belongs to. All while none is chosen;
+    /// the create call enforces membership in any case.</summary>
+    public List<Department> AssignmentDepartments => NewAssignmentPrincipalId is not { } principalId
+        ? AllDepartments
+        : AllDepartments.Where(d => d.Id == WellKnownGUIDs.DEPARTMENT_GLOBAL
+            || (AllGroups.FirstOrDefault(g => g.Id == principalId) is { } group
+                ? group.DepartmentId == d.Id
+                : _departmentMemberIds.TryGetValue(d.Id, out var members) && members.Contains(principalId)))
+            .ToList();
     public bool NewAssignmentPrincipalIsGroup { get; set; }
 
     /// <summary>The role to assign. Preset to the selected role on the role detail; chosen
@@ -58,6 +88,11 @@ public partial class UserListViewModel
         AllUsers = users.OrderBy(u => u.Name).ToList();
         AllGroups = groups.OrderBy(g => g.Name).ToList();
         AllShares = (await _shareRepo.GetAllAsync()).OrderBy(s => s.Name).ToList();
+
+        _departmentMemberIds = [];
+        foreach (var department in AllDepartments)
+            _departmentMemberIds[department.Id] =
+                (await _departmentRepo.GetUsersAsync(department.Id)).Select(u => u.Id).ToHashSet();
     }
 
     public async Task CreateAssignmentAsync()

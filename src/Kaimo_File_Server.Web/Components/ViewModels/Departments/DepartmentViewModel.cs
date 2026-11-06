@@ -46,7 +46,7 @@ public partial class DepartmentViewModel
         _userContextFactory = userContextFactory;
         _authState = authState;
         _logger = logger;
-        _roleAssignments = new RoleAssignmentService(assignmentRepo, roleRepo, userRepo, groupRepo, mgmtAuth);
+        _roleAssignments = new RoleAssignmentService(assignmentRepo, roleRepo, userRepo, groupRepo, mgmtAuth, departmentRepo);
     }
 
     // ══════════════════════════════════════════

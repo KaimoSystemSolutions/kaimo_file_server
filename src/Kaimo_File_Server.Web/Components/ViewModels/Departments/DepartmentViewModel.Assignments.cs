@@ -81,6 +81,14 @@ public partial class DepartmentViewModel
         var (users, groups) = _actorContext is null
             ? (new List<User>(), new List<Group>())
             : await _roleAssignments.GetAssignableRecipientsAsync(_actorContext);
+        // Department roles go to its members only (enforced again on create); the Global
+        // department is the system-wide scope and open to everyone.
+        if (Selected is not null && Selected.Id != WellKnownGUIDs.DEPARTMENT_GLOBAL)
+        {
+            var memberIds = (await _departmentRepo.GetUsersAsync(Selected.Id)).Select(u => u.Id).ToHashSet();
+            users = users.Where(u => memberIds.Contains(u.Id)).ToList();
+            groups = groups.Where(g => g.DepartmentId == Selected.Id).ToList();
+        }
         AllUsers = users.OrderBy(u => u.Name).ToList();
         AllGroups = groups.OrderBy(g => g.Name).ToList();
     }

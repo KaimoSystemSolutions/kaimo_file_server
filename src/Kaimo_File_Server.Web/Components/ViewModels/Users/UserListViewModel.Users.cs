@@ -195,6 +195,10 @@ public partial class UserListViewModel
         if (await WouldRemoveLastAdminAsync(SelectedUser.Id, isEnabled, leavesAdminsGroup))
         { ErrorMessage = Resources.Web_Error_LastAdmin; return; }
 
+        // Leaving a department drops its groups and roles: warn before writing anything.
+        var leaveWarnings = await CollectLeaveWarningsAsync(SelectedUser.Id);
+        if (leaveWarnings.Count > 0) { PendingDepartmentLeaves = leaveWarnings; return; }
+
         try
         {
             IsSaving = true;

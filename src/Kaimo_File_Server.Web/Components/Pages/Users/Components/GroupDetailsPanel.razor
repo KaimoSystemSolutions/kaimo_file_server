@@ -26,10 +26,6 @@
                                              Title="@Resources.Web_Admin_Label_Users"
                                              Placeholder="@Resources.Web_Common_NoMembers" />
                             </div>
-                            @if (VM.EditGroupDeptWarning is not null)
-                            {
-                                <div class="warning-banner">@VM.EditGroupDeptWarning</div>
-                            }
                             @if (VM.ErrorMessage is not null)
                             {
                                 <div class="error-banner" style="margin-bottom: 12px;">@VM.ErrorMessage</div>

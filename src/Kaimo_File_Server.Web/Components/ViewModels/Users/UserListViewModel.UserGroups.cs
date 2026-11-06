@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
@@ -89,21 +90,25 @@ public partial class UserListViewModel
     }
 
     /// <summary>
-    /// Leaving a department drops the user's memberships in its groups, so every department the
-    /// form unchecks is bounded like leaving those groups directly. Returns a localized error or
+    /// Leaving a department drops the user's memberships in its groups and the user's roles there,
+    /// so every department the form unchecks is bounded like revoking those directly. Returns a localized error or
     /// <c>null</c> when every pending leave is permitted.
     /// </summary>
     private async Task<string?> AuthorizeDepartmentLeavesAsync(Guid userId)
     {
-        var shownIds = EditUserDepartments.Select(d => d.Item.Id).ToHashSet();
-        var desiredIds = EditUserDepartments.Where(d => d.IsChecked).Select(d => d.Item.Id).ToHashSet();
-        var leftIds = UserDepartments.Select(d => d.Id).Where(id => shownIds.Contains(id) && !desiredIds.Contains(id));
-
-        foreach (var departmentId in leftIds)
-            if (!await _roleAssignments.CanLeaveDepartmentGroupsAsync(_actorContext!, userId, departmentId))
+        foreach (var department in PendingDepartmentLeaveDepartments())
+            if (!await _roleAssignments.CanLeaveDepartmentAsync(_actorContext!, userId, department.Id))
                 return GroupGrantsUnrevokableRolesMessage;
 
         return null;
+    }
+
+    /// <summary>The user's departments the form unchecks.</summary>
+    private IEnumerable<Department> PendingDepartmentLeaveDepartments()
+    {
+        var shownIds = EditUserDepartments.Select(d => d.Item.Id).ToHashSet();
+        var desiredIds = EditUserDepartments.Where(d => d.IsChecked).Select(d => d.Item.Id).ToHashSet();
+        return UserDepartments.Where(d => shownIds.Contains(d.Id) && !desiredIds.Contains(d.Id));
     }
 
     /// <summary>
@@ -131,11 +136,8 @@ public partial class UserListViewModel
             if (await _mgmtAuth.CanManageDepartmentAsync(_actorContext!, departmentId, ManagementPermission.AssignDepartments))
             {
                 await _departmentRepo.RemoveUserAsync(departmentId, userId);
-                // Mirror DepartmentViewModel: leaving a department drops group memberships tied to it.
-                var groups = await _userRepo.GetGroupsForUserAsync(userId);
-                var remaining = groups.Where(g => g.DepartmentId != departmentId).Select(g => g.Id).ToList();
-                if (remaining.Count != groups.Count)
-                    await _userRepo.SetGroupsForUserAsync(userId, remaining);
+                // Like DepartmentViewModel: leaving drops the department's groups and roles.
+                await _roleAssignments.RevokeDepartmentTiesAsync(userId, departmentId);
             }
 
         return (await _departmentRepo.GetDepartmentsForUserAsync(userId)).Select(d => d.Id).ToHashSet();

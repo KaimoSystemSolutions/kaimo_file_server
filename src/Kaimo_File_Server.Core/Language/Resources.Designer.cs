@@ -9491,6 +9491,69 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Dept_GroupMembershipsRemoved", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die A role can only be assigned in a department to its members: the user must belong to this department, or the group must be one of its groups. ähnelt.
+        /// </summary>
+        public static string Web_Error_AssignmentRequiresMembership {
+            get {
+                return ResourceManager.GetString("Web_Error_AssignmentRequiresMembership", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} role assignment(s) at this department were removed. ähnelt.
+        /// </summary>
+        public static string Web_Dept_RoleAssignmentsRemoved {
+            get {
+                return ResourceManager.GetString("Web_Dept_RoleAssignmentsRemoved", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Remove from department? ähnelt.
+        /// </summary>
+        public static string Web_Dept_LeaveWarning_Title {
+            get {
+                return ResourceManager.GetString("Web_Dept_LeaveWarning_Title", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Removing a user from a department also removes their memberships in that department&apos;s groups and the roles assigned to them in that department: ähnelt.
+        /// </summary>
+        public static string Web_Dept_LeaveWarning_Text {
+            get {
+                return ResourceManager.GetString("Web_Dept_LeaveWarning_Text", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Groups ähnelt.
+        /// </summary>
+        public static string Web_Dept_LeaveWarning_Groups {
+            get {
+                return ResourceManager.GetString("Web_Dept_LeaveWarning_Groups", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Roles ähnelt.
+        /// </summary>
+        public static string Web_Dept_LeaveWarning_Roles {
+            get {
+                return ResourceManager.GetString("Web_Dept_LeaveWarning_Roles", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Remove anyway ähnelt.
+        /// </summary>
+        public static string Web_Dept_LeaveWarning_Confirm {
+            get {
+                return ResourceManager.GetString("Web_Dept_LeaveWarning_Confirm", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Each group belongs to exactly one department. Unchecked groups are reset to Global. ähnelt.
@@ -13138,29 +13201,11 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Note: the following selected users are not yet members of department &quot;{0}&quot; and will be added to it when you save: {1} ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Only members of department &quot;{0}&quot; can join this group. Not members: {1} ähnelt.
         /// </summary>
-        public static string Web_Group_DeptWarning {
+        public static string Web_Group_MembersNotInDepartment {
             get {
-                return ResourceManager.GetString("Web_Group_DeptWarning", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Note: the following members were also added to department &quot;{0}&quot;, because the group belongs to it: {1} ähnelt.
-        /// </summary>
-        public static string Web_Group_MembersAddedToDept {
-            get {
-                return ResourceManager.GetString("Web_Group_MembersAddedToDept", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die You are not allowed to add the following users to the department of this group: {0} ähnelt.
-        /// </summary>
-        public static string Web_Group_MembersNotPermitted {
-            get {
-                return ResourceManager.GetString("Web_Group_MembersNotPermitted", resourceCulture);
+                return ResourceManager.GetString("Web_Group_MembersNotInDepartment", resourceCulture);
             }
         }
         

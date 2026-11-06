@@ -87,52 +87,71 @@ public partial class UserListViewModelDatabaseTests
         Assert.Equal(Resources.Web_Error_EveryoneNotEditable, sut.ErrorMessage);
     }
 
-    [Fact]
-    public async Task SaveGroupAsync_AddMemberToDeptGroup_AlsoAddsUserToDepartment()
-    {
-        // Bug regression: adding a user to a department-scoped group via the Groups tab must
-        // also grant them that group's department, so the membership is not orphaned.
-        var actor = SeedUser("admin");
-        var dept = SeedDepartment("Sales");
-        var group = SeedGroupInDept("Sales-Team", dept.Id);
-        var alice = SeedUser("alice");
+    // A department group only takes members of exactly its department; joining never adds the
+    // user to the department (that is done on the department or the user form).
 
-        var sut = BuildGlobalAdminSut(actor);
+    private async Task<UserListViewModel> EditGroupAsGlobalAdminAsync(Group group)
+    {
+        var sut = BuildGlobalAdminSut(SeedUser("admin"));
         await sut.LoadAsync();
         await sut.SwitchTabAsync(AdminTab.Groups);
         await sut.SelectGroupAsync(sut.Groups.Single(g => g.Id == group.Id));
         await sut.StartEditGroupAsync();
-
-        foreach (var m in sut.EditGroupMembers)
-            m.IsChecked = m.Item.Id == alice.Id;
-        await sut.SaveGroupAsync();
-
-        await using var db = NewContext();
-        Assert.True(await db.UserGroups.AnyAsync(ug => ug.GroupId == group.Id && ug.UserId == alice.Id));
-        Assert.True(await db.DepartmentUsers.AnyAsync(du => du.DepartmentId == dept.Id && du.UserId == alice.Id));
+        return sut;
     }
 
     [Fact]
-    public async Task EditGroupDeptWarning_SurfacesSelectedUsersMissingDepartment()
+    public async Task StartEditGroup_DeptGroup_OffersOnlyDepartmentMembers()
     {
-        var actor = SeedUser("admin");
+        var dept = SeedDepartment("Sales");
+        var child = SeedDepartment("Sales-North", parentId: dept.Id);
+        var group = SeedGroupInDept("Sales-Team", dept.Id);
+        var bob = SeedUser("bob");
+        var carol = SeedUser("carol");
+        await DepartmentRepo().AddUserAsync(dept.Id, bob.Id);
+        await DepartmentRepo().AddUserAsync(child.Id, carol.Id);
+        var alice = SeedUser("alice");
+
+        var sut = await EditGroupAsGlobalAdminAsync(group);
+
+        Assert.Contains(sut.EditGroupMembers, m => m.Item.Id == bob.Id);
+        Assert.DoesNotContain(sut.EditGroupMembers, m => m.Item.Id == carol.Id);
+        Assert.DoesNotContain(sut.EditGroupMembers, m => m.Item.Id == alice.Id);
+    }
+
+    [Fact]
+    public async Task SaveGroupAsync_DepartmentMemberJoins_DepartmentsUnchanged()
+    {
+        var dept = SeedDepartment("Sales");
+        var group = SeedGroupInDept("Sales-Team", dept.Id);
+        var bob = SeedUser("bob");
+        await DepartmentRepo().AddUserAsync(dept.Id, bob.Id);
+
+        var sut = await EditGroupAsGlobalAdminAsync(group);
+        sut.EditGroupMembers.Single(m => m.Item.Id == bob.Id).IsChecked = true;
+        await sut.SaveGroupAsync();
+
+        Assert.Null(sut.ErrorMessage);
+        Assert.Equal(Resources.Web_Members_Saved, sut.SuccessMessage);
+        await using var db = NewContext();
+        Assert.True(await db.UserGroups.AnyAsync(ug => ug.GroupId == group.Id && ug.UserId == bob.Id));
+        Assert.Equal(1, await db.DepartmentUsers.CountAsync(du => du.UserId == bob.Id));
+    }
+
+    [Fact]
+    public async Task SaveGroupAsync_NonMemberForcedIntoDeptGroup_IsRefused()
+    {
         var dept = SeedDepartment("Sales");
         var group = SeedGroupInDept("Sales-Team", dept.Id);
         var alice = SeedUser("alice", "Alice");
 
-        var sut = BuildGlobalAdminSut(actor);
-        await sut.LoadAsync();
-        await sut.SwitchTabAsync(AdminTab.Groups);
-        await sut.SelectGroupAsync(sut.Groups.Single(g => g.Id == group.Id));
-        await sut.StartEditGroupAsync();
+        var sut = await EditGroupAsGlobalAdminAsync(group);
+        sut.EditGroupMembers.Add(new CheckboxItem<User>(alice, true));
+        await sut.SaveGroupAsync();
 
-        Assert.Null(sut.EditGroupDeptWarning); // nothing selected yet
-
-        foreach (var m in sut.EditGroupMembers)
-            m.IsChecked = m.Item.Id == alice.Id;
-
-        Assert.NotNull(sut.EditGroupDeptWarning);
-        Assert.Contains("Alice", sut.EditGroupDeptWarning);
-        Assert.Contains("Sales", sut.EditGroupDeptWarning);
+        Assert.Equal(string.Format(Resources.Web_Group_MembersNotInDepartment, "Sales", "Alice"), sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.False(await db.UserGroups.AnyAsync(ug => ug.GroupId == group.Id && ug.UserId == alice.Id));
+        Assert.False(await db.DepartmentUsers.AnyAsync(du => du.UserId == alice.Id));
     }
 }

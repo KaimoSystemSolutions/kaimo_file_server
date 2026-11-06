@@ -301,8 +301,11 @@ public partial class ScopedAdminEscalationDatabaseTests
         Assert.False(await HasAssignmentAsync(readers.Id, helper));
     }
 
+    // Department roles go to members of exactly that department only: leaving it revokes them,
+    // so a role held without membership could never be cleaned up.
+
     [Fact]
-    public async Task Delegator_CanGrantRoleToMemberOfDescendant()
+    public async Task Delegator_CannotGrantRoleToMemberOfDescendantOnly()
     {
         var delegator = SeedDelegator();
         var helper = SeedNamedRole("Helper", ManagementPermission.ResetPasswords);
@@ -310,18 +313,18 @@ public partial class ScopedAdminEscalationDatabaseTests
         AddToDepartment(_ownChild, bob);
 
         var sut = await StartDepartmentAssignmentAsync(delegator, _own, helper);
-        Assert.Contains(sut.AllUsers, u => u.Id == bob.Id);
+        Assert.DoesNotContain(sut.AllUsers, u => u.Id == bob.Id);
         sut.NewAssignmentPrincipalId = bob.Id;
         await sut.CreateAssignmentAsync();
 
-        Assert.Null(sut.ErrorMessage);
-        Assert.True(await HasAssignmentAsync(bob.Id, helper));
+        Assert.NotNull(sut.ErrorMessage);
+        Assert.False(await HasAssignmentAsync(bob.Id, helper));
     }
 
     [Fact]
-    public async Task Delegator_CanGrantChildScopedRoleToMemberOfOwnDepartment()
+    public async Task Delegator_CannotGrantChildScopedRoleToMemberOfParentOnly()
     {
-        // The recipient sits outside the target scope (OwnChild) but within the actor's reach (Own).
+        // The recipient is within the actor's reach (Own) but not a member of the target (OwnChild).
         var delegator = SeedDelegator();
         var helper = SeedNamedRole("Helper", ManagementPermission.ResetPasswords);
         var bob = SeedUser("bob");
@@ -331,17 +334,34 @@ public partial class ScopedAdminEscalationDatabaseTests
         sut.NewAssignmentPrincipalId = bob.Id;
         await sut.CreateAssignmentAsync();
 
+        Assert.NotNull(sut.ErrorMessage);
+        Assert.False(await HasAssignmentAsync(bob.Id, helper));
+    }
+
+    [Fact]
+    public async Task Delegator_CanGrantRoleToMemberOfOwnDepartment()
+    {
+        var delegator = SeedDelegator();
+        var helper = SeedNamedRole("Helper", ManagementPermission.ResetPasswords);
+        var bob = SeedUser("bob");
+        AddToDepartment(_ownChild, bob);
+
+        var sut = await StartDepartmentAssignmentAsync(delegator, _ownChild, helper);
+        Assert.Contains(sut.AllUsers, u => u.Id == bob.Id);
+        sut.NewAssignmentPrincipalId = bob.Id;
+        await sut.CreateAssignmentAsync();
+
         Assert.Null(sut.ErrorMessage);
         Assert.True(await HasAssignmentAsync(bob.Id, helper));
     }
 
     [Fact]
-    public async Task GlobalAdmin_CanGrantRoleToAnyone()
+    public async Task GlobalAdmin_CanGrantRoleToAnyMemberOrGroupOfTheDepartment()
     {
         var helper = SeedNamedRole("Helper", ManagementPermission.ResetPasswords);
         var carol = SeedUser("carol");
         AddToDepartment(_foreign, carol);
-        var readers = SeedGroup("Readers");
+        var readers = SeedGroup("Readers", _foreign.Id);
 
         foreach (var principal in new[] { carol.Id, readers.Id })
         {

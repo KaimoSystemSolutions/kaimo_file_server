@@ -1014,6 +1014,27 @@
   <data name="Web_Dept_GroupMembershipsRemoved" xml:space="preserve">
     <value>{0} Gruppenzuordnung(en) wurden entfernt, weil der Benutzer nicht mehr Mitglied dieser Abteilung ist.</value>
   </data>
+  <data name="Web_Error_AssignmentRequiresMembership" xml:space="preserve">
+    <value>Eine Rolle kann in einer Abteilung nur deren Mitgliedern zugewiesen werden: Der Benutzer muss zu dieser Abteilung gehören bzw. die Gruppe eine ihrer Gruppen sein.</value>
+  </data>
+  <data name="Web_Dept_RoleAssignmentsRemoved" xml:space="preserve">
+    <value>{0} Rollenzuweisung(en) in dieser Abteilung wurden entfernt.</value>
+  </data>
+  <data name="Web_Dept_LeaveWarning_Title" xml:space="preserve">
+    <value>Aus Abteilung entfernen?</value>
+  </data>
+  <data name="Web_Dept_LeaveWarning_Text" xml:space="preserve">
+    <value>Wird ein Benutzer aus einer Abteilung entfernt, verliert er auch seine Mitgliedschaften in den Gruppen dieser Abteilung und die Rollen, die ihm in dieser Abteilung zugewiesen sind:</value>
+  </data>
+  <data name="Web_Dept_LeaveWarning_Groups" xml:space="preserve">
+    <value>Gruppen</value>
+  </data>
+  <data name="Web_Dept_LeaveWarning_Roles" xml:space="preserve">
+    <value>Rollen</value>
+  </data>
+  <data name="Web_Dept_LeaveWarning_Confirm" xml:space="preserve">
+    <value>Trotzdem entfernen</value>
+  </data>
   <data name="Web_Dept_NameRequired" xml:space="preserve">
     <value>Abteilungsname erforderlich.</value>
   </data>
@@ -1110,11 +1131,8 @@
   <data name="Web_Members_Saved" xml:space="preserve">
     <value>Mitglieder gespeichert.</value>
   </data>
-  <data name="Web_Group_MembersAddedToDept" xml:space="preserve">
-    <value>Hinweis: Folgende Mitglieder wurden zusätzlich der Abteilung „{0}“ hinzugefügt, da die Gruppe dieser Abteilung zugeordnet ist: {1}</value>
-  </data>
-  <data name="Web_Group_DeptWarning" xml:space="preserve">
-    <value>Hinweis: Folgende ausgewählte Benutzer sind noch nicht Mitglied der Abteilung „{0}“ und werden ihr beim Speichern hinzugefügt: {1}</value>
+  <data name="Web_Group_MembersNotInDepartment" xml:space="preserve">
+    <value>Nur Mitglieder der Abteilung „{0}“ können dieser Gruppe beitreten. Keine Mitglieder: {1}</value>
   </data>
   <data name="Web_Settings_LoadFailed" xml:space="preserve">
     <value>Fehler beim Laden der Einstellungen.</value>
@@ -8026,9 +8044,6 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   </data>
   <data name="Web_Dept_ChangesNotPermitted" xml:space="preserve">
     <value>Folgende Änderungen dürfen Sie nicht vornehmen: {0}</value>
-  </data>
-  <data name="Web_Group_MembersNotPermitted" xml:space="preserve">
-    <value>Folgende Benutzer dürfen Sie nicht in die Abteilung dieser Gruppe aufnehmen: {0}</value>
   </data>
   <data name="Web_Dept_InvalidParent" xml:space="preserve">
     <value>Die gewählte übergeordnete Abteilung ist ungültig.</value>

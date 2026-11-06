@@ -102,6 +102,7 @@ public partial class ScopedAdminEscalationDatabaseTests
         var sut = await EditDepartmentAsync(_deptAdmin, _own);
         sut.EditMembers.Single(m => m.Item.Id == bob.Id).IsChecked = false;
         await sut.SaveAsync();
+        await sut.ConfirmDepartmentLeaveAsync();
 
         Assert.Null(sut.ErrorMessage);
         Assert.False(await IsMemberAsync(_own, bob));
@@ -133,7 +134,6 @@ public partial class ScopedAdminEscalationDatabaseTests
         SeedMembership(group, carol); // e.g. the group was moved into Own by a global admin
 
         var sut = await EditGroupAsync(_deptAdmin, group);
-        Assert.Null(sut.EditGroupDeptWarning);
         await sut.SaveGroupAsync();
 
         Assert.Null(sut.ErrorMessage);

@@ -111,7 +111,7 @@
                                         <ScopedRoleAssignmentForm Principals="VM.AllUsers.ToAssigneeItems(VM.AllGroups)"
                                                                   @bind-PrincipalId="VM.NewAssignmentPrincipalId"
                                                                   RolePermissions="@role.ManagementPermissions"
-                                                                  Departments="VM.AllDepartments.ToDepartmentItems()"
+                                                                  Departments="VM.AssignmentDepartments.ToDepartmentItems()"
                                                                   Shares="ShareItems()"
                                                                   @bind-ScopeType="VM.NewAssignmentScopeType"
                                                                   @bind-ScopeId="VM.NewAssignmentScopeId"

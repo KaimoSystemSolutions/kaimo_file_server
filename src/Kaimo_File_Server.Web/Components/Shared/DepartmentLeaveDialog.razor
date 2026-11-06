@@ -1,0 +1,43 @@
+@using Kaimo_File_Server.Core.Language
+@* Warns that leaving a department also drops the user's groups and roles there. Shown by the
+   department editor (one entry per removed member) and the user form (one per unchecked department). *@
+
+@if (Items.Count > 0)
+{
+    <div class="modal-backdrop" @onclick="OnCancel">
+        <div class="modal-dialog" role="alertdialog" aria-modal="true"
+             aria-labelledby="dept-leave-title" aria-describedby="dept-leave-text" @onclick:stopPropagation="true">
+            <h2 class="modal-title" id="dept-leave-title">@Resources.Web_Dept_LeaveWarning_Title</h2>
+            <p class="modal-text" id="dept-leave-text">@Resources.Web_Dept_LeaveWarning_Text</p>
+            <ul class="dept-leave-list">
+                @foreach (var item in Items)
+                {
+                    <li>
+                        <strong>@item.Subject</strong>
+                        @if (item.GroupNames.Count > 0)
+                        {
+                            <div class="dept-leave-detail">@Resources.Web_Dept_LeaveWarning_Groups: @string.Join(", ", item.GroupNames)</div>
+                        }
+                        @if (item.RoleNames.Count > 0)
+                        {
+                            <div class="dept-leave-detail">@Resources.Web_Dept_LeaveWarning_Roles: @string.Join(", ", item.RoleNames)</div>
+                        }
+                    </li>
+                }
+            </ul>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" @onclick="OnCancel">@Resources.Web_Common_Cancel</button>
+                <button type="button" class="btn-danger" disabled="@IsSaving" @onclick="OnConfirm">
+                    @(IsSaving ? Resources.Web_Common_Saving : Resources.Web_Dept_LeaveWarning_Confirm)
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<DepartmentLeaveWarning> Items { get; set; } = [];
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+}
