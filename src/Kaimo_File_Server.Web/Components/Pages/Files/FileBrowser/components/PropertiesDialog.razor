@@ -19,7 +19,8 @@
     is the same for all items and "Varies" otherwise, and the Security tab is not offered.
 
     The context menu's "Permissions" command opens the dialog directly on the Security tab
-    (<see cref="OpenPermissions" />). A mounted virtual share (<see cref="OpenMountPermissions" />)
+    (<see cref="OpenPermissions" />); the toolbar's "Manage permissions" does the same for the
+    browsed folder itself, showing only the Security tab. A mounted virtual share (<see cref="OpenMountPermissions" />)
     has no metadata of its own, so only the Security tab with its access list is shown.
     The dialog widens slightly on the Security tab to give the ACL editor room; size changes
     (tab switch, editor loaded) are animated by kaimoSmoothResize and the new tab fades in.
@@ -56,7 +57,7 @@
 
             @* -- Tabs -- *@
             <div class="properties-tabs">
-                @if (_mount is null)
+                @if (_mount is null && _virtualShareId is null && !_securityOnly)
                 {
                     <button class="properties-tab @(_activeTab == Tab.General ? "properties-tab--active" : "")"
                             @onclick="() => _activeTab = Tab.General">
@@ -135,12 +136,17 @@
                 {
                     <MountGrantsEditor @key="_mount" Mount="_mount" OnSaved="OnMountGrantsSaved" />
                 }
+                else if (_virtualShareId is { } virtualShareId)
+                {
+                    <MountGrantsEditor @key="virtualShareId" ShareId="virtualShareId" OnSaved="OnMountGrantsSaved" />
+                }
                 else if (_showSecurityTab)
                 {
                     <AclEditor @key="@($"props-acl-{VM.CurrentShare?.Id}-{_relativePath}")"
                                Path="@_relativePath"
                                ShareId="@VM.CurrentShare!.Id"
-                               IsDirectory="@_target.IsDirectory" />
+                               IsDirectory="@_target.IsDirectory"
+                               OnChanged="OnAclChanged" />
                 }
                 </div>
             </div>
@@ -157,10 +163,20 @@
     /// <summary>Raised after a mount's access list was saved (its visibility may have changed).</summary>
     [Parameter] public EventCallback OnMountSaved { get; set; }
 
+    /// <summary>Raised after the ACL editor changed an entry (ACL counts/emblems may be stale).</summary>
+    [Parameter] public EventCallback OnAclChanged { get; set; }
+
     private enum Tab { General, Security }
 
     // Set while the dialog shows the access list of a mounted virtual share.
     private MountedFolder? _mount;
+
+    // Set while the dialog shows the access list of the browsed virtual share's root.
+    private Guid? _virtualShareId;
+
+    // Set when opened for a location without listing metadata (the browsed folder itself):
+    // only the Security tab is offered.
+    private bool _securityOnly;
 
     // The dialog element is re-created on every open; each instance is handed to the resize animator once.
     private ElementReference _dialogRef;
@@ -191,8 +207,13 @@
     /// <summary>Opens the properties dialog for a single file or directory.</summary>
     public Task Open(FileMetadata target) => Open(new[] { target });
 
-    /// <summary>Opens the properties dialog for a single item directly on its Security tab.</summary>
-    public Task OpenPermissions(FileMetadata target) => Open(new[] { target }, permissions: true);
+    /// <summary>
+    /// Opens the properties dialog for a single item directly on its Security tab. With
+    /// <paramref name="securityOnly" /> the General tab is hidden — used for the browsed folder
+    /// itself (toolbar "Manage permissions"), which has no listing metadata to show.
+    /// </summary>
+    public Task OpenPermissions(FileMetadata target, bool securityOnly = false)
+        => Open(new[] { target }, permissions: true, securityOnly);
 
     /// <summary>Opens the access list of a virtual share mounted as a folder (its mount entry).</summary>
     public void OpenMountPermissions(MountedFolder mount, FileMetadata entry)
@@ -200,6 +221,23 @@
         _targets = [entry];
         _target = entry;
         _mount = mount;
+        _virtualShareId = null;
+        _securityOnly = false;
+        _showSecurityTab = true;
+        _activeTab = Tab.Security;
+        _show = true;
+        StateHasChanged();
+    }
+
+    /// <summary>Opens the access list of a virtual share at its root (toolbar "Manage permissions").</summary>
+    public void OpenVirtualSharePermissions(Guid shareId, string shareName)
+    {
+        var root = new FileMetadata { Name = shareName, Path = "", IsDirectory = true };
+        _targets = [root];
+        _target = root;
+        _mount = null;
+        _virtualShareId = shareId;
+        _securityOnly = false;
         _showSecurityTab = true;
         _activeTab = Tab.Security;
         _show = true;
@@ -207,7 +245,7 @@
     }
 
     /// <summary>Opens the properties dialog for one or more files/directories.</summary>
-    public async Task Open(IReadOnlyList<FileMetadata> targets, bool permissions = false)
+    public async Task Open(IReadOnlyList<FileMetadata> targets, bool permissions = false, bool securityOnly = false)
     {
         if (targets.Count == 0) return;
 
@@ -215,8 +253,11 @@
         _targets = list;
         _target = list[0];
         _mount = null;
+        _virtualShareId = null;
         _relativePath = VM.ShareRelativeOf(_target);
         _showSecurityTab = list.Count == 1 && VM.CanManageAcls && VM.CurrentShare is not null;
+        // Without the Security tab there is nothing else to show: fall back to General.
+        _securityOnly = securityOnly && permissions && _showSecurityTab;
         _activeTab = permissions && _showSecurityTab ? Tab.Security : Tab.General;
         _ownerName = null;
         _itemId = null;
@@ -281,6 +322,7 @@
         _targets = new();
         _target = null;
         _mount = null;
+        _virtualShareId = null;
         _resizeObserved = false;
         StateHasChanged();
     }

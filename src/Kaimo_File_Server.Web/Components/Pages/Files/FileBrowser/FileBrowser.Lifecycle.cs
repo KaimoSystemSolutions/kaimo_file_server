@@ -195,9 +195,14 @@ public partial class FileBrowser
 
     private void UpdateAclPath() => _aclPath = VM.CurrentPath ?? "";
 
-    private void ToggleAclPanel()
+    /// <summary>Toolbar "Manage permissions": the browsed folder's ACLs in the properties dialog.</summary>
+    private Task OpenCurrentFolderPermissions()
     {
-        _showAclPanel = !_showAclPanel;
+        var name = _aclPath == ""
+            ? VM.CurrentBrowserShare?.Name ?? Resources.Web_Acl_ShareRoot
+            : System.IO.Path.GetFileName(_aclPath);
+        var folder = new FileMetadata { Name = name, Path = _aclPath, IsDirectory = true };
+        return _propertiesDialogComponent.OpenPermissions(folder, securityOnly: true);
     }
 
     // ========== Create folder ==========
@@ -587,10 +592,6 @@ public partial class FileBrowser
 
     // ========== Virtual (Cloud Access) share ACLs ==========
 
-    private bool _showVirtualAclPanel;
-    private readonly Dictionary<Guid, CloudAccessPermission> _virtualGrants = new();
-    private IReadOnlyList<PrincipalPickerItem> _virtualPrincipals = [];
-
     /// <summary>
     /// True when the browser sits at the root of a virtual (Cloud Access) share the actor
     /// may manage. Gates the "manage permissions" action for virtual shares, mirroring
@@ -603,44 +604,11 @@ public partial class FileBrowser
            && !VM.IsLoading
            && VM.ErrorMessage is null;
 
-    private async Task ToggleVirtualAclPanel()
+    /// <summary>Toolbar "Manage permissions" at a virtual share's root: its access list in the properties dialog.</summary>
+    private void OpenVirtualSharePermissions()
     {
-        _showVirtualAclPanel = !_showVirtualAclPanel;
-        _showAclPanel = false;
-        if (_showVirtualAclPanel && VM.CurrentBrowserShare is { } share)
-            await LoadVirtualGrantsAsync(share.Id);
-    }
-
-    private async Task LoadVirtualGrantsAsync(Guid shareId)
-    {
-        try
-        {
-            var grants = await CloudAcl.LoadShareGrantsAsync(shareId);
-            _virtualGrants.Clear();
-            foreach (var (principalId, level) in grants)
-                _virtualGrants[principalId] = level;
-            _virtualPrincipals = CloudAcl.AvailablePrincipals
-                .Select(p => new PrincipalPickerItem(p.Id, p.Name, p is Group ? PrincipalKind.Group : PrincipalKind.User))
-                .ToList();
-        }
-        catch (Exception exception)
-        {
-            _showVirtualAclPanel = false;
-            Toast.Show(exception.Message, ToastType.Error);
-        }
-    }
-
-    private async Task SaveVirtualGrantsAsync()
-    {
-        if (VM.CurrentBrowserShare is not { } share) return;
-        try
-        {
-            await CloudAcl.UpdateShareGrantsAsync(share.Id, _virtualGrants);
-        }
-        catch (Exception exception)
-        {
-            Toast.Show(exception.Message, ToastType.Error);
-        }
+        if (VM.CurrentBrowserShare is { } share)
+            _propertiesDialogComponent.OpenVirtualSharePermissions(share.Id, share.Name);
     }
 }
 

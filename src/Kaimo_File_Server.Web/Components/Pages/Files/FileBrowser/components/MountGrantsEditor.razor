@@ -4,10 +4,14 @@
 @inherits AppComponentBase
 @inject CloudAccessViewModel CloudAccess
 
-@* Access list of a virtual share mounted as a folder, shown in the Permissions tab of the
-   properties dialog. Same editor as Shares → Virtual shares → Access; changes are saved
-   explicitly because a grant change may hide the mount from its viewers. *@
-<p class="form-hint mount-grants-hint">@R("Web_CloudAccess_MountGrantsHint")</p>
+@* Access list of a virtual share — mounted as a folder (Mount) or browsed at its root
+   (ShareId) — shown in the Permissions tab of the properties dialog. Same editor as
+   Shares → Virtual shares → Access; changes are saved explicitly because a grant change may
+   hide the share or mount from its viewers. *@
+@if (Mount is not null)
+{
+    <p class="form-hint mount-grants-hint">@R("Web_CloudAccess_MountGrantsHint")</p>
+}
 
 @if (_error is not null)
 {
@@ -27,7 +31,13 @@ else if (_loaded)
 </div>
 
 @code {
-    [Parameter, EditorRequired] public MountedFolder Mount { get; set; } = default!;
+    /// <summary>The mount entry whose virtual share is edited; takes precedence over <see cref="ShareId" />.</summary>
+    [Parameter] public MountedFolder? Mount { get; set; }
+
+    /// <summary>The virtual share edited when no <see cref="Mount" /> is given (share root).</summary>
+    [Parameter] public Guid ShareId { get; set; }
+
+    private Guid TargetShareId => Mount?.ShareId ?? ShareId;
 
     /// <summary>Raised after the grants were saved (visibility of the mount may have changed).</summary>
     [Parameter] public EventCallback OnSaved { get; set; }
@@ -44,7 +54,7 @@ else if (_loaded)
         try
         {
             // Loads the principals of the share's department too; throws without manage rights.
-            _grants = await CloudAccess.LoadShareGrantsAsync(Mount.ShareId);
+            _grants = await CloudAccess.LoadShareGrantsAsync(TargetShareId);
             _principals = CloudAccess.AvailablePrincipals
                 .Select(p => new PrincipalPickerItem(p.Id, p.Name, p is Group ? PrincipalKind.Group : PrincipalKind.User))
                 .ToList();
@@ -66,7 +76,7 @@ else if (_loaded)
         _error = null;
         try
         {
-            await CloudAccess.UpdateShareGrantsAsync(Mount.ShareId, _grants);
+            await CloudAccess.UpdateShareGrantsAsync(TargetShareId, _grants);
             await OnSaved.InvokeAsync();
         }
         catch (Exception exception)

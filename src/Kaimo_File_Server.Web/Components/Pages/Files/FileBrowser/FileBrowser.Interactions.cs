@@ -21,7 +21,6 @@ public partial class FileBrowser
 // ========== State ==========
 
     private Dictionary<string, int> _aclCounts = new();
-    private bool _showAclPanel;
     private string _aclPath = "";
     private bool _showCreateFolder;
     private string _newFolderName = "";

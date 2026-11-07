@@ -20,7 +20,6 @@
 @inject CrossShareTransferService CrossShareTransfer
 @inject FileBrowserClipboardService BrowserClipboard
 @inject DateFormatService DateFmt
-@inject CloudAccessViewModel CloudAcl
 
 <PageTitle>@(VM.CurrentBrowserShare?.Name ?? Resources.Web_Files) - Kaimo File Server</PageTitle>
 
@@ -104,10 +103,9 @@
         }
         @if (CanManageAcls())
         {
-            <button class="btn-secondary page-command @(_showAclPanel ? "page-command--active" : "")" title="@Resources.Web_ManagePermissions"
-                    @onclick="ToggleAclPanel">
-
-                @Assets.SVG("acl_panel.svg", new SvgOptions(Color: _showAclPanel ? "var(--accent)" : "currentColor"))
+            <button class="btn-secondary page-command" title="@Resources.Web_ManagePermissions"
+                    @onclick="OpenCurrentFolderPermissions">
+                @Assets.SVG("acl_panel.svg", new SvgOptions(Color: "currentColor"))
                 <span>@Resources.Web_ManagePermissions</span>
             </button>
             var rootCount = GetAclCount(_aclPath);
@@ -118,9 +116,9 @@
         }
         @if (CanManageVirtualShareAcls())
         {
-            <button class="btn-secondary page-command @(_showVirtualAclPanel ? "page-command--active" : "")" title="@Resources.Web_ManagePermissions"
-                    @onclick="ToggleVirtualAclPanel">
-                @Assets.SVG("acl_panel.svg", new SvgOptions(Color: _showVirtualAclPanel ? "var(--accent)" : "currentColor"))
+            <button class="btn-secondary page-command" title="@Resources.Web_ManagePermissions"
+                    @onclick="OpenVirtualSharePermissions">
+                @Assets.SVG("acl_panel.svg", new SvgOptions(Color: "currentColor"))
                 <span>@Resources.Web_ManagePermissions</span>
             </button>
         }
@@ -379,40 +377,6 @@ else if (VM.ErrorMessage is not null)
 }
 else
 {
-    @* -- ACL Panel (Slide-Down) Root -- *@
-    @if (_showAclPanel && CanManageAcls())
-    {
-        <div class="acl-panel">
-            <div class="acl-panel-header">
-                <h3>
-                    @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
-                </h3>
-                <span class="detail-subtitle">@(_aclPath == "" ? Resources.Web_Acl_ShareRoot : _aclPath)</span>
-            </div>
-            <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclPath}-{_showAclPanel}")"
-                       Path="@_aclPath"
-                       ShareId="@VM.CurrentShare!.Id"
-                       IsDirectory="true"
-                       OnChanged="LoadAclCounts"/>
-        </div>
-    }
-
-    @* -- Virtual (Cloud Access) share root ACL panel -- *@
-    @if (_showVirtualAclPanel && CanManageVirtualShareAcls())
-    {
-        <div class="acl-panel">
-            <div class="acl-panel-header">
-                <h3>
-                    @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
-                </h3>
-                <span class="detail-subtitle">@Resources.Web_Acl_ShareRoot</span>
-            </div>
-            <CloudAccessAclEditor Principals="_virtualPrincipals"
-                                  Grants="_virtualGrants"
-                                  OnChanged="SaveVirtualGrantsAsync" />
-        </div>
-    }
-
     @* ══════════════════════════════════════════════════
        Resizable Column Table – 5 Spalten (ohne Actions)
        Name-Spalte (1fr) nimmt den Rest.
@@ -669,7 +633,7 @@ else
                OnRestored="OnVersionRestored"/>
 
 @* -- Properties dialog (size / metadata / ACL) -- *@
-<PropertiesDialog @ref="_propertiesDialogComponent" VM="VM" Mount="Mount" OnMountSaved="Refresh"/>
+<PropertiesDialog @ref="_propertiesDialogComponent" VM="VM" Mount="Mount" OnMountSaved="Refresh" OnAclChanged="LoadAclCounts"/>
 
 @* -- Create-hash dialog (checksum of a single file) -- *@
 <HashDialog @ref="_hashDialogComponent" VM="VM"/>

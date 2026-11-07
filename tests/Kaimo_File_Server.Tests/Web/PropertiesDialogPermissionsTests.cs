@@ -64,6 +64,47 @@ public class PropertiesDialogPermissionsTests
     }
 
     [Fact]
+    public async Task OpenPermissions_SecurityOnly_ShowsOnlyTheAclEditorForThatPath()
+    {
+        using var ctx = NewContext();
+        var cut = Render(ctx, canManageAcls: true);
+        var shareRoot = new FileMetadata { Name = "host", Path = "", IsDirectory = true };
+
+        await cut.InvokeAsync(() => cut.Instance.OpenPermissions(shareRoot, securityOnly: true));
+
+        Assert.Contains("properties-dialog--wide", cut.Find(".properties-dialog").ClassName);
+        Assert.Single(cut.FindAll(".properties-tab"));
+        var editor = Assert.Single(cut.FindComponents<Stub<AclEditor>>());
+        Assert.Equal("", editor.Instance.Parameters.Get(e => e.Path));
+    }
+
+    [Fact]
+    public async Task Open_AfterSecurityOnly_ShowsTheGeneralTabAgain()
+    {
+        using var ctx = NewContext();
+        var cut = Render(ctx, canManageAcls: true);
+        await cut.InvokeAsync(() => cut.Instance.OpenPermissions(Folder, securityOnly: true));
+
+        await cut.InvokeAsync(() => cut.Instance.Open(Folder));
+
+        Assert.Equal(2, cut.FindAll(".properties-tab").Count);
+    }
+
+    [Fact]
+    public async Task AclEditorChange_IsForwardedToTheHost()
+    {
+        using var ctx = NewContext();
+        var changed = 0;
+        var cut = Render(ctx, canManageAcls: true, onAclChanged: () => changed++);
+        await cut.InvokeAsync(() => cut.Instance.OpenPermissions(Folder));
+
+        var editor = cut.FindComponent<Stub<AclEditor>>();
+        await cut.InvokeAsync(() => editor.Instance.Parameters.Get(e => e.OnChanged).InvokeAsync());
+
+        Assert.Equal(1, changed);
+    }
+
+    [Fact]
     public async Task OpenMountPermissions_ShowsOnlyTheAccessList()
     {
         using var ctx = NewContext();
@@ -77,6 +118,36 @@ public class PropertiesDialogPermissionsTests
         var editor = Assert.Single(cut.FindComponents<Stub<MountGrantsEditor>>());
         Assert.Equal(mount, editor.Instance.Parameters.Get(e => e.Mount));
         Assert.Empty(cut.FindComponents<Stub<AclEditor>>());
+    }
+
+    [Fact]
+    public async Task OpenVirtualSharePermissions_ShowsOnlyThatSharesAccessList()
+    {
+        using var ctx = NewContext();
+        var cut = Render(ctx, canManageAcls: false);
+        var shareId = Guid.NewGuid();
+
+        await cut.InvokeAsync(() => cut.Instance.OpenVirtualSharePermissions(shareId, "cloud"));
+
+        Assert.Contains("properties-dialog--wide", cut.Find(".properties-dialog").ClassName);
+        Assert.Equal("cloud", cut.Find(".properties-header-name").TextContent);
+        Assert.Single(cut.FindAll(".properties-tab"));
+        var editor = Assert.Single(cut.FindComponents<Stub<MountGrantsEditor>>());
+        Assert.Equal(shareId, editor.Instance.Parameters.Get(e => e.ShareId));
+        Assert.Throws<ParameterNotFoundException>(() => editor.Instance.Parameters.Get(e => e.Mount));
+    }
+
+    [Fact]
+    public async Task Open_AfterVirtualSharePermissions_ShowsTheRegularDialogAgain()
+    {
+        using var ctx = NewContext();
+        var cut = Render(ctx, canManageAcls: true);
+        await cut.InvokeAsync(() => cut.Instance.OpenVirtualSharePermissions(Guid.NewGuid(), "cloud"));
+
+        await cut.InvokeAsync(() => cut.Instance.Open(Folder));
+
+        Assert.Equal(2, cut.FindAll(".properties-tab").Count);
+        Assert.Empty(cut.FindComponents<Stub<MountGrantsEditor>>());
     }
 
     [Fact]
@@ -121,13 +192,17 @@ public class PropertiesDialogPermissionsTests
         Assert.NotSame(generalPane, cut.Find(".properties-pane"));
     }
 
-    private static IRenderedComponent<PropertiesDialog> Render(BunitContext ctx, bool canManageAcls)
+    private static IRenderedComponent<PropertiesDialog> Render(BunitContext ctx, bool canManageAcls, Action? onAclChanged = null)
     {
         var vm = new Mock<IFileBrowserViewModel> { CallBase = true };
         vm.SetupGet(v => v.CanManageAcls).Returns(canManageAcls);
         vm.SetupGet(v => v.CurrentShare).Returns(new ShareDefinition("host", "/mnt/host") { Id = Guid.NewGuid() });
         vm.Setup(v => v.ShareRelativeOf(It.IsAny<FileMetadata>())).Returns<FileMetadata>(f => f.Path);
-        return ctx.Render<PropertiesDialog>(p => p.Add(d => d.VM, vm.Object));
+        return ctx.Render<PropertiesDialog>(p =>
+        {
+            p.Add(d => d.VM, vm.Object);
+            if (onAclChanged is not null) p.Add(d => d.OnAclChanged, onAclChanged);
+        });
     }
 
     private static BunitContext NewContext()
