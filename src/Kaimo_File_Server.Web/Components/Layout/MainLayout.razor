@@ -122,10 +122,13 @@
 
 
         <div class="sidebar-footer">
-            <NavLink class="nav-item" href="/settings" Match="NavLinkMatch.All">
-                @Assets.SVG("gear.svg", new SvgOptions())
-                <span class="nav-label">@Resources.Web_Nav_Settings</span>
-            </NavLink>
+            @if (_canAccessSettings)
+            {
+                <NavLink class="nav-item" href="/settings" Match="NavLinkMatch.All">
+                    @Assets.SVG("gear.svg", new SvgOptions())
+                    <span class="nav-label">@Resources.Web_Nav_Settings</span>
+                </NavLink>
+            }
             <div class="sidebar-user-row">
                 @if (!string.IsNullOrEmpty(_displayName))
                 {
@@ -245,6 +248,7 @@
     private bool _canManageSyncs;
     private bool _canManageCloudAccess;
     private bool _canManageSettings;
+    private bool _canAccessSettings;
     private bool _canManageHomeFolders;
     private bool _canManageUsers;
     private bool _canViewDepartments;
@@ -428,6 +432,8 @@
                 ? await ManagementAuthService.GetEffectivePermissionsAtAsync(_currentUser, ScopeType.Global, Guid.Empty)
                 : ManagementPermission.None;
             _canManageSettings = globalMask.HasFlag(ManagementPermission.ManageSystemSettings);
+            // Show the Settings link only if at least one Settings tab is permitted.
+            _canAccessSettings = SettingsViewModel.CanAccessWith(globalMask);
             // Mirror HomesAdminViewModel.CanAccessPage (Global ManageHomes); the home-folder
             // settings live on the Settings page.
             _canManageHomeFolders = _currentUser != null

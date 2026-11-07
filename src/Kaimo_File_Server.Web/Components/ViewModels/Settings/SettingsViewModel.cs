@@ -125,6 +125,19 @@ public partial class SettingsViewModel
     /// <summary>True if the user may access the settings page at all.</summary>
     public bool CanAccessPage => CanManageSettings || CanManageDataServices || CanManageCertificates || CanViewLogs || CanManageBackups || CanManageClientDevices || CanManageMailServer;
 
+    /// <summary>Global permissions that each unlock at least one Settings tab.</summary>
+    public const ManagementPermission PagePermissions =
+        ManagementPermission.ManageSystemSettings | ManagementPermission.ManageDataServices
+        | ManagementPermission.ManageCertificates | ManagementPermission.ViewSystemLogs
+        | ManagementPermission.ManageBackups | ManagementPermission.ManageClientDevices
+        | ManagementPermission.ManageMailServer;
+
+    /// <summary>
+    /// Page gate for callers that only hold the global permission mask (e.g. the sidebar link);
+    /// equivalent to <see cref="CanAccessPage"/>.
+    /// </summary>
+    public static bool CanAccessWith(ManagementPermission globalMask) => (globalMask & PagePermissions) != 0;
+
     // ── Load ──
 
     public async Task LoadAsync()
