@@ -1,10 +1,11 @@
 # Database tests
 
-The .NET test project (`tests/Kaimo_File_Server.Tests`) runs against two database backends.
+The .NET test projects (see [dotnet-test-projects.md](dotnet-test-projects.md)) run against two
+database backends. Both harnesses live in the shared helper library `tests/Kaimo_File_Server.Tests.Common`.
 
 ## Sqlite (default)
 
-`DatabaseTestBase` (`tests/Kaimo_File_Server.Tests/Infrastructure/`) stands up an in-memory Sqlite
+`DatabaseTestBase` stands up an in-memory Sqlite
 database with the production EF schema and real repositories. It covers constraints, persistence
 round trips and repository logic, and runs on every `dotnet test` without any setup.
 
@@ -28,8 +29,11 @@ docker run -d --rm --name kaimo_test_pg -p 127.0.0.1:55432:5432 -e POSTGRES_PASS
 ```
 
 ```bash
-KAIMO_TEST_PG="Host=127.0.0.1;Port=55432;Username=postgres;Password=test" dotnet test tests/Kaimo_File_Server.Tests
+KAIMO_TEST_PG="Host=127.0.0.1;Port=55432;Username=postgres;Password=test" dotnet test Kaimo_File_Server.slnx
 ```
+
+The PostgreSQL tests live in `Kaimo_File_Server.Infrastructure.Tests` and `Kaimo_File_Server.Search.Tests`;
+pass one of those project folders instead of the solution to run only them.
 
 `PostgresDatabaseCommunicationTests` currently covers:
 

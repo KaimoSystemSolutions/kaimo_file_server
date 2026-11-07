@@ -22,7 +22,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ hashFiles('**/*.csproj') }}
+          # Package versions live in Directory.Packages.props (Central Package Management) and the
+          # shared test packages in tests/Directory.Build.props, so both belong in the key.
+          key: nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props', '**/Directory.Build.props') }}
           restore-keys: nuget-
 
       - name: Restore dependencies
@@ -41,7 +43,12 @@ jobs:
           test -f publish-web/wwwroot/js/themeInit.js
 
       - name: Test
-        # Coverage uses the collector bundled with Microsoft.NET.Test.Sdk (no extra package).
+        # Runs every test project in tests/ (Core, Infrastructure, Search, SmbBridge, Web; the
+        # helper library Tests.Common has no tests) as separate processes in parallel. The step
+        # fails if any project fails. Each project writes its own .trx (same-second names get a
+        # [n] suffix). Coverage uses the collector bundled with Microsoft.NET.Test.Sdk (no extra
+        # package); it also merges the per-project reports into one cobertura file.
+        # PostgreSQL tests are skipped here because KAIMO_TEST_PG is not set.
         run: dotnet test Kaimo_File_Server.slnx --no-build --configuration Release --verbosity normal --logger trx --results-directory TestResults --collect:"Code Coverage;Format=cobertura"
 
       - name: Upload Test Results
@@ -49,7 +56,9 @@ jobs:
         if: always()
         with:
           name: test-results
+          # Only the merged coverage report (TestResults/<guid>/); the per-project copies under
+          # TestResults/*/In/ hold the same data again and would roughly double the upload.
           path: |
             TestResults/*.trx
-            TestResults/**/*.cobertura.xml
+            TestResults/*/*.cobertura.xml
           retention-days: 14

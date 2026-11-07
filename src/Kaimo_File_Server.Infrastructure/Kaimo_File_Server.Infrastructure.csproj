@@ -8,7 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Kaimo_File_Server.Tests" />
+    <InternalsVisibleTo Include="Kaimo_File_Server.Tests.Common" />
+    <InternalsVisibleTo Include="Kaimo_File_Server.Infrastructure.Tests" />
+    <InternalsVisibleTo Include="Kaimo_File_Server.Search.Tests" />
+    <InternalsVisibleTo Include="Kaimo_File_Server.Web.Tests" />
   </ItemGroup>
 
   <ItemGroup>

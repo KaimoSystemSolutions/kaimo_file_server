@@ -24,7 +24,8 @@
 
 	<ItemGroup>
 		<!-- Expose internal members (e.g. JwtAuthenticationStateProvider revalidation seam) to tests. -->
-		<InternalsVisibleTo Include="Kaimo_File_Server.Tests" />
+		<InternalsVisibleTo Include="Kaimo_File_Server.Web.Tests" />
+		<InternalsVisibleTo Include="Kaimo_File_Server.Infrastructure.Tests" />
 	</ItemGroup>
 
 	<ItemGroup>

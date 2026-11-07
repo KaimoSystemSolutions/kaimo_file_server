@@ -1,0 +1,153 @@
+using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Web.Components.ViewModels;
+using Xunit;
+
+namespace Kaimo_File_Server.Web.Tests.ViewModels.Files;
+
+public sealed class SyncItemStateEvaluatorTests
+{
+    private static readonly DateTime LastRun = new(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+
+    [Theory]
+    [InlineData(SyncMode.Push)]
+    [InlineData(SyncMode.TwoWay)]
+    public void WrittenBeforeLastRun_UnderPushOrTwoWay_IsSynced(SyncMode mode)
+    {
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(-5), LastRun, mode, isRemoteBacked: null);
+        Assert.Equal(SyncItemState.Synced, state);
+    }
+
+    [Theory]
+    [InlineData(SyncMode.Push)]
+    [InlineData(SyncMode.TwoWay)]
+    public void ChangedAfterLastRun_UnderPushOrTwoWay_IsPendingUpload(SyncMode mode)
+    {
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(5), LastRun, mode, isRemoteBacked: null);
+        Assert.Equal(SyncItemState.PendingUpload, state);
+    }
+
+    [Theory]
+    [InlineData(SyncMode.Push)]
+    [InlineData(SyncMode.TwoWay)]
+    public void ManifestMiss_UnderPushOrTwoWay_IsPendingUpload_EvenWithOldWriteTime(SyncMode mode)
+    {
+        // E.g. a file written by the client app sync keeps its original (older) mtime,
+        // but it never reached the remote — it must not read as synced.
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddDays(-30), LastRun, mode, isRemoteBacked: false);
+        Assert.Equal(SyncItemState.PendingUpload, state);
+    }
+
+    [Theory]
+    [InlineData(SyncMode.Push)]
+    [InlineData(SyncMode.TwoWay)]
+    public void ManifestHit_ChangedAfterLastRun_UnderPushOrTwoWay_IsPendingUpload(SyncMode mode)
+    {
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(5), LastRun, mode, isRemoteBacked: true);
+        Assert.Equal(SyncItemState.PendingUpload, state);
+    }
+
+    [Theory]
+    [InlineData(SyncMode.Push)]
+    [InlineData(SyncMode.TwoWay)]
+    public void ManifestHit_WrittenBeforeLastRun_UnderPushOrTwoWay_IsSynced(SyncMode mode)
+    {
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(-5), LastRun, mode, isRemoteBacked: true);
+        Assert.Equal(SyncItemState.Synced, state);
+    }
+
+    [Fact]
+    public void NoSuccessfulRunYet_UnderPush_TreatsItemAsPending()
+    {
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun, lastSuccessfulRunAtUtc: null, SyncMode.Push, isRemoteBacked: null);
+        Assert.Equal(SyncItemState.PendingUpload, state);
+    }
+
+    [Fact]
+    public void Pull_LocalOnlyItem_IsPullBlocked_RegardlessOfRunTime()
+    {
+        // Manifest is known and the item is absent from it: pull never uploads it,
+        // so a run (however recent) must not clear the flag.
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(-30), LastRun, SyncMode.Pull, isRemoteBacked: false);
+        Assert.Equal(SyncItemState.PullBlocked, state);
+    }
+
+    [Fact]
+    public void Pull_RemoteBackedItem_IsSynced()
+    {
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(5), LastRun, SyncMode.Pull, isRemoteBacked: true);
+        Assert.Equal(SyncItemState.Synced, state);
+    }
+
+    [Fact]
+    public void Pull_NoManifestYet_FallsBackToTimestamp_OldItemIsSynced()
+    {
+        // No manifest recorded (isRemoteBacked null): don't flag everything — an item
+        // written before the last run reads as synced, as it did before manifest tracking.
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(-5), LastRun, SyncMode.Pull, isRemoteBacked: null);
+        Assert.Equal(SyncItemState.Synced, state);
+    }
+
+    [Fact]
+    public void Pull_NoManifestYet_NewItemIsSynced()
+    {
+        // Sync not converged (no manifest): a just-pulled item must not be warned as
+        // local-only. Only an explicit manifest miss blocks — see the isRemoteBacked:false case.
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(5), LastRun, SyncMode.Pull, isRemoteBacked: null);
+        Assert.Equal(SyncItemState.Synced, state);
+    }
+
+    [Fact]
+    public void Pull_NoManifestAndNoRunYet_IsSynced()
+    {
+        // Mid first run: no successful run, no manifest — every entry must stay quiet.
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun, lastSuccessfulRunAtUtc: null, SyncMode.Pull, isRemoteBacked: null);
+        Assert.Equal(SyncItemState.Synced, state);
+    }
+
+    [Fact]
+    public void TwoWay_FirstRunInProgress_IsSyncing_NotPendingUpload()
+    {
+        // Initial two-way run: items just pulled must not be flagged as "not yet uploaded".
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun, lastSuccessfulRunAtUtc: null, SyncMode.TwoWay, isRemoteBacked: null, isRunning: true);
+        Assert.Equal(SyncItemState.Syncing, state);
+    }
+
+    [Theory]
+    [InlineData(SyncMode.Push)]
+    [InlineData(SyncMode.TwoWay)]
+    public void ChangedAfterLastRun_WhileRunning_IsSyncing(SyncMode mode)
+    {
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(5), LastRun, mode, isRemoteBacked: null, isRunning: true);
+        Assert.Equal(SyncItemState.Syncing, state);
+    }
+
+    [Fact]
+    public void Pull_ManifestMiss_WhileRunning_IsSyncing()
+    {
+        // A file pulled by the current run is not in the previous manifest yet.
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(5), LastRun, SyncMode.Pull, isRemoteBacked: false, isRunning: true);
+        Assert.Equal(SyncItemState.Syncing, state);
+    }
+
+    [Fact]
+    public void SyncedItem_StaysSynced_WhileRunning()
+    {
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun.AddMinutes(-5), LastRun, SyncMode.TwoWay, isRemoteBacked: null, isRunning: true);
+        Assert.Equal(SyncItemState.Synced, state);
+    }
+}

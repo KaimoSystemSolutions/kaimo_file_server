@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shared test helpers (no tests): Sqlite/PostgreSQL database harnesses and common fakes. -->
+  <PropertyGroup>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- In-memory relational DB for database tests (Sqlite supports TPC inheritance) -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <!-- Pin up the vulnerable native SQLite bundle pulled in transitively by EF Sqlite
+         (NU1903, GHSA-2m69-gcr7-jv3q on SQLitePCLRaw.lib.e_sqlite3 2.1.11). 3.0.3 brings a
+         patched SQLite native library and is API-compatible with EF Core's provider. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- DatabaseTestBase.AuthStateFor builds an AuthenticationStateProvider for view-model tests. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Kaimo_File_Server.Core\Kaimo_File_Server.Core.csproj" />
+    <ProjectReference Include="..\..\src\Kaimo_File_Server.Infrastructure\Kaimo_File_Server.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Kaimo_File_Server.Search\Kaimo_File_Server.Search.csproj" />
+  </ItemGroup>
+
+</Project>

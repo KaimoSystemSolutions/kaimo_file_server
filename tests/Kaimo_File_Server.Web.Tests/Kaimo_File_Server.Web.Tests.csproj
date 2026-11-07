@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <ItemGroup>
+    <!-- Match the Web project: the transitive AspNetCore.OpenApi 10.0.x source generator
+         targets the 2.x API, and 2.12.2 is patched for NU1903 (GHSA-v5pm-xwqc-g5wc). -->
+    <PackageReference Include="Microsoft.OpenApi" />
+    <PackageReference Include="bunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Kaimo_File_Server.Web\Kaimo_File_Server.Web.csproj" />
+  </ItemGroup>
+
+</Project>

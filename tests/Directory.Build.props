@@ -1,0 +1,37 @@
+<Project>
+
+  <!-- Shared settings for every project under tests/. Package versions live in
+       ../Directory.Packages.props (Central Package Management). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Tasks.Git">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="xunit" />
+    <PackageReference Include="Moq" />
+    <PackageReference Include="Grpc.Core.Api" />
+  </ItemGroup>
+
+  <!-- Test runner only for the actual test projects, not for the shared helper library.
+       Item conditions are evaluated after all properties, so IsTestProject from the csproj applies. -->
+  <ItemGroup Condition="'$(IsTestProject)' != 'false'">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Kaimo_File_Server.Tests.Common'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Kaimo_File_Server.Tests.Common\Kaimo_File_Server.Tests.Common.csproj" />
+    <Using Include="Kaimo_File_Server.Tests.Common" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Kaimo_File_Server.Infrastructure\Kaimo_File_Server.Infrastructure.csproj" />
+    <!-- HomeDirectoryServiceTests check the home-folder rules end-to-end through the SMB bridge. -->
+    <ProjectReference Include="..\..\src\Kaimo_File_Server.SmbBridge\Kaimo_File_Server.SmbBridge.csproj" />
+    <!-- The only ICredentialVault implementation (DataProtectionCredentialVault) and the backup
+         repository form live in Web; cloud, restic and share-link tests use them as real collaborators. -->
+    <ProjectReference Include="..\..\src\Kaimo_File_Server.Web\Kaimo_File_Server.Web.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -27,7 +27,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <InternalsVisibleTo Include="Kaimo_File_Server.Tests" />
+      <InternalsVisibleTo Include="Kaimo_File_Server.Search.Tests" />
+      <InternalsVisibleTo Include="Kaimo_File_Server.Infrastructure.Tests" />
     </ItemGroup>
 
 	<ItemGroup>

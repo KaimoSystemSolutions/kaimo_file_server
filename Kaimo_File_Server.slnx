@@ -110,5 +110,13 @@
   <Project Path="src/Kaimo_File_Server.Search/Kaimo_File_Server.Search.csproj" />
   <Project Path="src/Kaimo_File_Server.SmbBridge/Kaimo_File_Server.SmbBridge.csproj" />
   <Project Path="src/Kaimo_File_Server.Web/Kaimo_File_Server.Web.csproj" Id="25b5aa0a-5188-49d6-81f9-1442ebf1dd91" />
-  <Project Path="tests/Kaimo_File_Server.Tests/Kaimo_File_Server.Tests.csproj" />
+  <Folder Name="/tests/">
+    <File Path="tests/Directory.Build.props" />
+    <Project Path="tests/Kaimo_File_Server.Tests.Common/Kaimo_File_Server.Tests.Common.csproj" />
+    <Project Path="tests/Kaimo_File_Server.Core.Tests/Kaimo_File_Server.Core.Tests.csproj" />
+    <Project Path="tests/Kaimo_File_Server.Infrastructure.Tests/Kaimo_File_Server.Infrastructure.Tests.csproj" />
+    <Project Path="tests/Kaimo_File_Server.Search.Tests/Kaimo_File_Server.Search.Tests.csproj" />
+    <Project Path="tests/Kaimo_File_Server.SmbBridge.Tests/Kaimo_File_Server.SmbBridge.Tests.csproj" />
+    <Project Path="tests/Kaimo_File_Server.Web.Tests/Kaimo_File_Server.Web.Tests.csproj" />
+  </Folder>
 </Solution>

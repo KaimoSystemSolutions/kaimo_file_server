@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Kaimo_File_Server.Core\Kaimo_File_Server.Core.csproj" />
+  </ItemGroup>
+
+</Project>
