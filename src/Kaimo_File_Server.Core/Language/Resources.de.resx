@@ -2758,31 +2758,31 @@
     <value>Deaktiviert</value>
   </data>
   <data name="Web_Nav_CloudSync" xml:space="preserve">
-    <value>Cloud-Synchronisierung</value>
+    <value>Synchronisierung mit externem Speicher</value>
   </data>
   <data name="Web_CloudSync_Title" xml:space="preserve">
-    <value>Cloud-Synchronisierung</value>
+    <value>Synchronisierung mit externem Speicher</value>
   </data>
   <data name="Web_CloudSync_Subtitle" xml:space="preserve">
-    <value>Lokale und entfernte Ordnersynchronisierungen für alle Cloud-Anbieter verwalten.</value>
+    <value>Lokale und Remote-Ordnersynchronisierungen für alle Cloud-Anbieter verwalten.</value>
   </data>
   <data name="Web_CloudSync_Create" xml:space="preserve">
-    <value>Cloud-Synchronisierung hinzufügen</value>
+    <value>Synchronisierung mit externem Speicher hinzufügen</value>
   </data>
   <data name="Web_CloudSync_Create_Title" xml:space="preserve">
     <value>Ordner verbinden</value>
   </data>
   <data name="Web_CloudSync_Create_Help" xml:space="preserve">
-    <value>Lokalen Ordner und Anbieter auswählen. Der entfernte Ordner kann nach der Autorisierung gewählt werden.</value>
+    <value>Lokalen Ordner und Anbieter auswählen. Der Remote-Ordner kann nach der Autorisierung gewählt werden.</value>
   </data>
   <data name="Web_CloudSync_Loading" xml:space="preserve">
-    <value>Cloud-Synchronisierungen werden geladen…</value>
+    <value>Synchronisierungen mit externem Speicher werden geladen…</value>
   </data>
   <data name="Web_CloudSync_Empty" xml:space="preserve">
-    <value>Es wurden noch keine Cloud-Synchronisierungen eingerichtet.</value>
+    <value>Es wurden noch keine Synchronisierungen mit externem Speicher eingerichtet.</value>
   </data>
   <data name="Web_CloudSync_Select" xml:space="preserve">
-    <value>Eine Cloud-Synchronisierung auswählen, um ihre Einstellungen anzuzeigen.</value>
+    <value>Eine Synchronisierung mit externem Speicher auswählen, um ihre Einstellungen anzuzeigen.</value>
   </data>
   <data name="Web_CloudSync_Share" xml:space="preserve">
     <value>Share</value>
@@ -2794,7 +2794,7 @@
     <value>Lokaler Ordner</value>
   </data>
   <data name="Web_CloudSync_RemoteFolder" xml:space="preserve">
-    <value>Entfernter Ordner</value>
+    <value>Remote-Ordner</value>
   </data>
   <data name="Web_CloudSync_Browse" xml:space="preserve">
     <value>Durchsuchen…</value>
@@ -2944,7 +2944,7 @@
     <value>Jetzt synchronisieren</value>
   </data>
   <data name="Web_CloudSync_Unsync" xml:space="preserve">
-    <value>Cloud-Synchronisierung entfernen</value>
+    <value>Synchronisierung mit externem Speicher entfernen</value>
   </data>
   <data name="Web_CloudSync_Unsync_Confirm" xml:space="preserve">
     <value>Diese Konfiguration entfernen und ihre Cloud-Verbindung widerrufen?</value>
@@ -2953,10 +2953,10 @@
     <value>Der Cloud-Anbieter wurde erfolgreich verbunden.</value>
   </data>
   <data name="Web_CloudSync_Saved" xml:space="preserve">
-    <value>Cloud-Synchronisierungseinstellungen wurden gespeichert.</value>
+    <value>Einstellungen der Synchronisierung mit externem Speicher wurden gespeichert.</value>
   </data>
   <data name="Web_CloudSync_Removed" xml:space="preserve">
-    <value>Cloud-Synchronisierung wurde entfernt.</value>
+    <value>Synchronisierung mit externem Speicher wurde entfernt.</value>
   </data>
   <data name="Web_CloudSync_Progress" xml:space="preserve">
     <value>Synchronisierung läuft…</value>
@@ -2968,7 +2968,7 @@
     <value>Lokalen Ordner auswählen</value>
   </data>
   <data name="Web_CloudSync_Directory_RemoteTitle" xml:space="preserve">
-    <value>Entfernten Ordner auswählen</value>
+    <value>Remote-Ordner auswählen</value>
   </data>
   <data name="Web_CloudSync_Directory_Parent" xml:space="preserve">
     <value>Übergeordneter Ordner</value>
@@ -2989,7 +2989,7 @@
     <value>Dieser Ordner konnte nicht geöffnet werden.</value>
   </data>
   <data name="Web_CloudSync_Error_Load" xml:space="preserve">
-    <value>Die Cloud-Synchronisierungen konnten nicht geladen werden.</value>
+    <value>Die Synchronisierungen mit externem Speicher konnten nicht geladen werden.</value>
   </data>
   <data name="Web_CloudSync_Error_ShareRequired" xml:space="preserve">
     <value>Bitte einen verwaltbaren Share auswählen.</value>
@@ -3001,13 +3001,13 @@
     <value>Für diese Aktion besteht keine Berechtigung.</value>
   </data>
   <data name="Web_CloudSync_Error_Missing" xml:space="preserve">
-    <value>Diese Cloud-Synchronisierung existiert nicht mehr.</value>
+    <value>Diese Synchronisierung mit externem Speicher existiert nicht mehr.</value>
   </data>
   <data name="Web_CloudSync_Error_Save" xml:space="preserve">
-    <value>Die Cloud-Synchronisierungseinstellungen konnten nicht gespeichert werden.</value>
+    <value>Die Einstellungen der Synchronisierung mit externem Speicher konnten nicht gespeichert werden.</value>
   </data>
   <data name="Web_CloudSync_Error_Run" xml:space="preserve">
-    <value>Die Cloud-Synchronisierung ist fehlgeschlagen. Bitte das Serverprotokoll prüfen.</value>
+    <value>Die Synchronisierung mit externem Speicher ist fehlgeschlagen. Bitte das Serverprotokoll prüfen.</value>
   </data>
   <data name="Web_CloudSync_Error_Busy" xml:space="preserve">
     <value>Dieser Ordner wird bereits synchronisiert oder geändert. Bitte später erneut versuchen.</value>
@@ -3016,13 +3016,13 @@
     <value>Bitte einen vorhandenen lokalen Ordner auswählen.</value>
   </data>
   <data name="Web_CloudSync_SharePanel_Help" xml:space="preserve">
-    <value>Die lokalen und entfernten Ordnerzuordnungen dieses Shares zentral in der Cloud-Synchronisierung verwalten.</value>
+    <value>Die lokalen und Remote-Ordnerzuordnungen dieses Shares zentral in der Synchronisierung mit externem Speicher verwalten.</value>
   </data>
   <data name="Web_CloudSync_SharePanel_Count" xml:space="preserve">
     <value>Eingerichtete Synchronisierungen: {0}</value>
   </data>
   <data name="Web_CloudSync_SharePanel_Open" xml:space="preserve">
-    <value>Cloud-Synchronisierung öffnen</value>
+    <value>Synchronisierung mit externem Speicher öffnen</value>
   </data>
   <data name="Web_CloudSync_Device_Title" xml:space="preserve">
     <value>Microsoft OneDrive verbinden</value>
@@ -3040,7 +3040,7 @@
     <value>Die Cloud-Autorisierungsanfrage ist abgelaufen. Bitte erneut starten.</value>
   </data>
   <data name="Web_CloudSync_Device_Failed" xml:space="preserve">
-    <value>Die Microsoft-Autorisierung ist fehlgeschlagen. Bitte zur Cloud-Synchronisierung zurückkehren und erneut versuchen.</value>
+    <value>Die Microsoft-Autorisierung ist fehlgeschlagen. Bitte zu Externer Speicher zurückkehren und erneut versuchen.</value>
   </data>
   <data name="Web_CloudSync_Device_CopyCode" xml:space="preserve">
     <value>Code kopieren</value>
@@ -3106,7 +3106,7 @@
     <value>Lokale Größe wird ermittelt…</value>
   </data>
   <data name="Web_Jobs_CloudSync_RemoteScan" xml:space="preserve">
-    <value>Entfernter Ordner wird durchsucht… Gefundene Dateien: {0} ({1})</value>
+    <value>Remote-Ordner wird durchsucht… Gefundene Dateien: {0} ({1})</value>
   </data>
   <data name="Web_Jobs_CloudSync_Comparing" xml:space="preserve">
     <value>Dateien werden verglichen…</value>
@@ -3140,16 +3140,16 @@
     <value>{0} / {1}</value>
   </data>
   <data name="Web_CloudAccess_Title" xml:space="preserve">
-    <value>Cloud-Zugriff</value>
+    <value>Virtuelle Shares aus externem Speicher</value>
   </data>
   <data name="Web_CloudAccess_Subtitle" xml:space="preserve">
-    <value>Entfernte Ordner als virtuelle, nur im Web-Dateibrowser sichtbare Shares bereitstellen.</value>
+    <value>Remote-Ordner als virtuelle, nur im Web-Dateibrowser sichtbare Shares bereitstellen.</value>
   </data>
   <data name="Web_CloudAccess_Loading" xml:space="preserve">
-    <value>Cloud-Zugriff wird geladen…</value>
+    <value>Virtuelle Shares aus externem Speicher werden geladen…</value>
   </data>
   <data name="Web_CloudAccess_NoPermission" xml:space="preserve">
-    <value>Keine Berechtigung zum Verwalten des Cloud-Zugriffs.</value>
+    <value>Keine Berechtigung zum Verwalten virtueller Shares aus externem Speicher.</value>
   </data>
   <data name="Web_CloudAccess_AddConnection" xml:space="preserve">
     <value>Verbindung hinzufügen</value>
@@ -3224,7 +3224,7 @@
     <value>Zu den Verbindungen</value>
   </data>
   <data name="Web_CloudAccess_CreateShareHelp" xml:space="preserve">
-    <value>Eine verbundene Cloud auswählen und einen ihrer entfernten Ordner im Web-Dateibrowser bereitstellen.</value>
+    <value>Eine verbundene Cloud auswählen und einen ihrer Remote-Ordner im Web-Dateibrowser bereitstellen.</value>
   </data>
   <data name="Web_CloudAccess_Connection" xml:space="preserve">
     <value>Verbindung</value>
@@ -3233,7 +3233,7 @@
     <value>Share-Name</value>
   </data>
   <data name="Web_CloudAccess_RemoteFolder" xml:space="preserve">
-    <value>Entfernter Ordner</value>
+    <value>Remote-Ordner</value>
   </data>
   <data name="Web_CloudAccess_Browse" xml:space="preserve">
     <value>Durchsuchen…</value>
@@ -3371,13 +3371,13 @@
     <value>Bitte eine bereite Verbindung auswählen.</value>
   </data>
   <data name="Web_CloudAccess_FolderRequired" xml:space="preserve">
-    <value>Bitte einen entfernten Ordner auswählen.</value>
+    <value>Bitte einen Remote-Ordner auswählen.</value>
   </data>
   <data name="Web_CloudAccess_ConnectionNotReady" xml:space="preserve">
     <value>Die OneDrive-Verbindung ist nicht bereit.</value>
   </data>
   <data name="Web_CloudAccess_InvalidRemotePath" xml:space="preserve">
-    <value>Der entfernte Pfad ist ungültig.</value>
+    <value>Der Remote-Pfad ist ungültig.</value>
   </data>
   <data name="Web_CloudAccess_ShareMissing" xml:space="preserve">
     <value>Der virtuelle Share existiert nicht mehr.</value>
@@ -3386,13 +3386,13 @@
     <value>Die Verbindung existiert nicht mehr.</value>
   </data>
   <data name="Web_CloudAccess_DepartmentDenied" xml:space="preserve">
-    <value>Keine Berechtigung für Cloud-Zugriff in dieser Abteilung.</value>
+    <value>Keine Berechtigung für virtuelle Shares aus externem Speicher in dieser Abteilung.</value>
   </data>
   <data name="Web_CloudAccess_LoadFailed" xml:space="preserve">
-    <value>Cloud-Zugriff konnte nicht geladen werden.</value>
+    <value>Virtuelle Shares aus externem Speicher konnten nicht geladen werden.</value>
   </data>
   <data name="Web_CloudAccess_FolderPickerTitle" xml:space="preserve">
-    <value>Entfernten Ordner auswählen</value>
+    <value>Remote-Ordner auswählen</value>
   </data>
   <data name="Web_CloudAccess_User" xml:space="preserve">
     <value>Benutzer</value>
@@ -3407,7 +3407,7 @@
     <value>In lokalen Share kopieren</value>
   </data>
   <data name="Web_CloudAccess_CopyDescription" xml:space="preserve">
-    <value>Die ausgewählten entfernten Elemente werden direkt in den lokalen Share gestreamt.</value>
+    <value>Die ausgewählten Remote-Elemente werden direkt in den lokalen Share gestreamt.</value>
   </data>
   <data name="Web_CloudAccess_TargetShare" xml:space="preserve">
     <value>Ziel-Share</value>
@@ -3425,7 +3425,7 @@
     <value>Wird kopiert…</value>
   </data>
   <data name="Web_CloudAccess_Remote" xml:space="preserve">
-    <value>Entfernt</value>
+    <value>Remote</value>
   </data>
   <data name="Web_CloudAccess_StatusReady" xml:space="preserve">
     <value>Bereit</value>
@@ -3479,13 +3479,13 @@
     <value>Der Kopiervorgang wurde abgebrochen.</value>
   </data>
   <data name="Web_CloudAccess_Error_CopyFailed" xml:space="preserve">
-    <value>Die entfernten Dateien konnten nicht in den lokalen Share kopiert werden.</value>
+    <value>Die Remote-Dateien konnten nicht in den lokalen Share kopiert werden.</value>
   </data>
   <data name="Web_CloudAccess_Error_NoLocalTarget" xml:space="preserve">
     <value>Kein beschreibbarer lokaler Share verfügbar.</value>
   </data>
   <data name="Web_CloudAccess_CopySuccess" xml:space="preserve">
-    <value>Die entfernten Elemente wurden in den lokalen Share kopiert.</value>
+    <value>Die Remote-Elemente wurden in den lokalen Share kopiert.</value>
   </data>
   <data name="Web_CloudAccess_Error_InvalidShare" xml:space="preserve">
     <value>Der virtuelle Share ist ungültig.</value>
@@ -3524,13 +3524,13 @@
     <value>Die Datei konnte nicht hochgeladen werden.</value>
   </data>
   <data name="Web_ExternalStorage_RemoteReadDenied" xml:space="preserve">
-    <value>Der entfernte Speicherserver hat den Lesezugriff verweigert. Prüfen Sie die Berechtigungen des für diese Verbindung hinterlegten Kontos.</value>
+    <value>Der Remote-Speicherserver hat den Lesezugriff verweigert. Prüfen Sie die Berechtigungen des für diese Verbindung hinterlegten Kontos.</value>
   </data>
   <data name="Web_ExternalStorage_RemoteWriteDenied" xml:space="preserve">
-    <value>Der entfernte Speicherserver hat den Schreibzugriff verweigert. Prüfen Sie die Share- und Dateisystemrechte des für diese Verbindung hinterlegten Kontos.</value>
+    <value>Der Remote-Speicherserver hat den Schreibzugriff verweigert. Prüfen Sie die Share- und Dateisystemrechte des für diese Verbindung hinterlegten Kontos.</value>
   </data>
   <data name="Web_ExternalStorage_RemoteOperationDenied" xml:space="preserve">
-    <value>Der entfernte Speicherserver hat diesen Vorgang verweigert. Prüfen Sie die Berechtigungen des für diese Verbindung hinterlegten Kontos.</value>
+    <value>Der Remote-Speicherserver hat diesen Vorgang verweigert. Prüfen Sie die Berechtigungen des für diese Verbindung hinterlegten Kontos.</value>
   </data>
   <data name="Web_CloudAccess_Error_ReadOnly" xml:space="preserve">
     <value>Dieser virtuelle Share ist schreibgeschützt.</value>
@@ -3635,7 +3635,7 @@
     <value>Verzeichnis-Metadaten-Cache</value>
   </data>
   <data name="Web_Settings_CloudAccess_CacheDescription" xml:space="preserve">
-    <value>Legt fest, wie lange entfernte Verzeichnislisten wiederverwendet werden. Dateiinhalte, Zugangsdaten und Zugriffsentscheidungen werden niemals gecacht. Änderungen gelten sofort.</value>
+    <value>Legt fest, wie lange Remote-Verzeichnislisten wiederverwendet werden. Dateiinhalte, Zugangsdaten und Zugriffsentscheidungen werden niemals gecacht. Änderungen gelten sofort.</value>
   </data>
   <data name="Web_Settings_CloudAccess_CacheSeconds" xml:space="preserve">
     <value>Cache-Dauer (Sekunden)</value>
@@ -3644,10 +3644,10 @@
     <value>Erlaubter Bereich: {0}–{1} Sekunden. Der Standardwert beträgt 20 Sekunden.</value>
   </data>
   <data name="Web_Settings_CloudAccess_CacheSaved" xml:space="preserve">
-    <value>Cloud-Zugriff-Cache-Einstellungen gespeichert.</value>
+    <value>Cache-Einstellungen für externen Speicher gespeichert.</value>
   </data>
   <data name="Web_Settings_CloudAccess_CacheSaveFailed" xml:space="preserve">
-    <value>Cloud-Zugriff-Cache-Einstellungen konnten nicht gespeichert werden.</value>
+    <value>Cache-Einstellungen für externen Speicher konnten nicht gespeichert werden.</value>
   </data>
   <data name="Web_Settings_Cert_SettingsSaved" xml:space="preserve">
     <value>Zertifikatseinstellungen gespeichert und neues Zertifikat erzeugt.</value>
@@ -3731,7 +3731,7 @@
     <value>Lokaler Ordner</value>
   </data>
   <data name="Web_ExternalStorage_RemotePath" xml:space="preserve">
-    <value>Entfernter Ordner</value>
+    <value>Remote-Ordner</value>
   </data>
   <data name="Web_ExternalStorage_Mode" xml:space="preserve">
     <value>Richtung</value>
@@ -3953,7 +3953,7 @@
     <value>Virtuelle Shares</value>
   </data>
   <data name="Web_ExternalStorage_RemoteBrowseFailed" xml:space="preserve">
-    <value>Die entfernten Ordner konnten nicht geladen werden.</value>
+    <value>Die Remote-Ordner konnten nicht geladen werden.</value>
   </data>
   <data name="Web_ShareList_Tab_Cloud" xml:space="preserve">
     <value>Cloud</value>
@@ -3971,7 +3971,7 @@
     <value>Keine</value>
   </data>
   <data name="Web_ExternalStorage_BrowseUnsupported" xml:space="preserve">
-    <value>Dieser Anbieter unterstützt kein Durchsuchen entfernter Ordner.</value>
+    <value>Dieser Anbieter unterstützt kein Durchsuchen von Remote-Ordnern.</value>
   </data>
   <data name="Web_ExternalStorage_SyncUnsupported" xml:space="preserve">
     <value>Dieser Anbieter unterstützt keine Synchronisierung.</value>
@@ -4121,7 +4121,7 @@
     <value>Wählen Sie bei einer Synchronisierung „Bearbeiten“, um ihre Einstellungen zu öffnen.</value>
   </data>
   <data name="Web_ExternalStorage_RemoteRoot" xml:space="preserve">
-    <value>Entfernter Stammordner</value>
+    <value>Remote-Stammordner</value>
   </data>
   <data name="Web_ExternalStorage_SshHostFingerprint" xml:space="preserve">
     <value>SSH-Hostschlüssel-Fingerabdruck (SHA-256)</value>
@@ -4139,7 +4139,7 @@
     <value>Externe Secret-Dateien</value>
   </data>
   <data name="Web_ExternalStorage_SshKeySetupHelp" xml:space="preserve">
-    <value>Laden oder erzeugen Sie einen Schlüssel, hinterlegen Sie den öffentlichen Schlüssel beim entfernten Konto und prüfen Sie ausdrücklich die Serveridentität.</value>
+    <value>Laden oder erzeugen Sie einen Schlüssel, hinterlegen Sie den öffentlichen Schlüssel beim Remote-Konto und prüfen Sie ausdrücklich die Serveridentität.</value>
   </data>
   <data name="Web_ExternalStorage_SshAdvancedMode" xml:space="preserve">
     <value>Externe Secret-Dateien verwenden</value>
@@ -4157,7 +4157,7 @@
     <value>Wählen Sie eine unverschlüsselte private OpenSSH-Schlüsseldatei, z. B. ~/.ssh/id_ed25519 – nicht die .pub-Datei. Sie wird verschlüsselt im Verbindungs-Tresor gespeichert.</value>
   </data>
   <data name="Web_ExternalStorage_SshGenerateKeyHelp" xml:space="preserve">
-    <value>Der Server erzeugt ein neues Ed25519-Schlüsselpaar für diese Verbindung. Der private Schlüssel verlässt den Server nie und wird verschlüsselt im Verbindungs-Tresor gespeichert; Sie hinterlegen nur den unten angezeigten öffentlichen Schlüssel beim entfernten Konto.</value>
+    <value>Der Server erzeugt ein neues Ed25519-Schlüsselpaar für diese Verbindung. Der private Schlüssel verlässt den Server nie und wird verschlüsselt im Verbindungs-Tresor gespeichert; Sie hinterlegen nur den unten angezeigten öffentlichen Schlüssel beim Remote-Konto.</value>
   </data>
   <data name="Web_ExternalStorage_SshChooseKeyFile" xml:space="preserve">
     <value>Schlüsseldatei wählen</value>
@@ -4169,7 +4169,7 @@
     <value>Hochgeladener Schlüssel ist gültig</value>
   </data>
   <data name="Web_ExternalStorage_SshPublicKeyInstallHint" xml:space="preserve">
-    <value>Fügen Sie diese Zeile in ~/.ssh/authorized_keys des entfernten Kontos ein.</value>
+    <value>Fügen Sie diese Zeile in ~/.ssh/authorized_keys des Remote-Kontos ein.</value>
   </data>
   <data name="Web_ExternalStorage_SshGenerateKey" xml:space="preserve">
     <value>Ed25519-Schlüssel erzeugen</value>
@@ -6933,7 +6933,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Gespeicherte Daten monatlich auslesen und prüfen</value>
   </data>
   <data name="Web_Backup_Maintenance_ReadDataHelp" xml:space="preserve">
-    <value>Die normale Prüfung kontrolliert nur die Struktur des Repositorys (Index und Verweise), nicht den gespeicherten Inhalt. Mit dieser Option lädt die erste Wartung jedes Monats zusätzlich ein Zwölftel der gespeicherten Daten herunter, entschlüsselt es und prüft die Prüfsummen. Nach zwölf Monaten ist jeder Teil einmal gelesen; so fallen Schäden am Speichermedium auf, bevor eine Wiederherstellung die Daten braucht. Bei entfernten Repositorys entsteht dadurch pro Monat Download-Verkehr von etwa einem Zwölftel der Repository-Größe.</value>
+    <value>Die normale Prüfung kontrolliert nur die Struktur des Repositorys (Index und Verweise), nicht den gespeicherten Inhalt. Mit dieser Option lädt die erste Wartung jedes Monats zusätzlich ein Zwölftel der gespeicherten Daten herunter, entschlüsselt es und prüft die Prüfsummen. Nach zwölf Monaten ist jeder Teil einmal gelesen; so fallen Schäden am Speichermedium auf, bevor eine Wiederherstellung die Daten braucht. Bei Remote-Repositorys entsteht dadurch pro Monat Download-Verkehr von etwa einem Zwölftel der Repository-Größe.</value>
   </data>
   <data name="Web_Backup_Maintenance_SampleSize" xml:space="preserve">
     <value>Test-Wiederherstellung: Anzahl Dateien</value>
@@ -7380,7 +7380,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Verbindung „{0}“ löschen?</value>
   </data>
   <data name="Web_ExternalStorage_DeleteConnectionHint" xml:space="preserve">
-    <value>Die gespeicherten Zugangsdaten werden von diesem Server entfernt. Dateien im entfernten Speicher bleiben unverändert.</value>
+    <value>Die gespeicherten Zugangsdaten werden von diesem Server entfernt. Dateien im Remote-Speicher bleiben unverändert.</value>
   </data>
   <data name="Web_ExternalStorage_Section_Locations" xml:space="preserve">
     <value>Speicherorte</value>
@@ -7905,7 +7905,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Das Kennwort wird verschlüsselt gespeichert und auch von SFTP-Backup-Repositorys verwendet. Nutzen Sie nach Möglichkeit einen SSH-Schlüssel.</value>
   </data>
   <data name="Web_ExternalStorage_SshPasswordSetupHelp" xml:space="preserve">
-    <value>Geben Sie das Kennwort des entfernten Kontos ein und prüfen Sie ausdrücklich die Serveridentität.</value>
+    <value>Geben Sie das Kennwort des Remote-Kontos ein und prüfen Sie ausdrücklich die Serveridentität.</value>
   </data>
   <data name="Web_ExternalStorage_ErrorCode_ssh_password_missing" xml:space="preserve">
     <value>Das SSH-Kennwort fehlt. Bearbeiten Sie die Verbindung und geben Sie es erneut ein.</value>

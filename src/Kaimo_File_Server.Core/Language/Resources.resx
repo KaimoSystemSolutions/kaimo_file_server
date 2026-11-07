@@ -2758,16 +2758,16 @@
     <value>Disabled</value>
   </data>
   <data name="Web_Nav_CloudSync" xml:space="preserve">
-    <value>Cloud Sync</value>
+    <value>External storage sync</value>
   </data>
   <data name="Web_CloudSync_Title" xml:space="preserve">
-    <value>Cloud Sync</value>
+    <value>External storage sync</value>
   </data>
   <data name="Web_CloudSync_Subtitle" xml:space="preserve">
     <value>Manage local and remote folder synchronization across all cloud providers.</value>
   </data>
   <data name="Web_CloudSync_Create" xml:space="preserve">
-    <value>Add cloud sync</value>
+    <value>Add external storage sync</value>
   </data>
   <data name="Web_CloudSync_Create_Title" xml:space="preserve">
     <value>Connect a folder</value>
@@ -2776,13 +2776,13 @@
     <value>Choose a local folder and provider. You can select the remote folder after authorization.</value>
   </data>
   <data name="Web_CloudSync_Loading" xml:space="preserve">
-    <value>Loading cloud syncs…</value>
+    <value>Loading external storage syncs…</value>
   </data>
   <data name="Web_CloudSync_Empty" xml:space="preserve">
-    <value>No cloud syncs have been configured yet.</value>
+    <value>No external storage syncs have been configured yet.</value>
   </data>
   <data name="Web_CloudSync_Select" xml:space="preserve">
-    <value>Select a cloud sync to view its settings.</value>
+    <value>Select an external storage sync to view its settings.</value>
   </data>
   <data name="Web_CloudSync_Share" xml:space="preserve">
     <value>Share</value>
@@ -2944,7 +2944,7 @@
     <value>Sync now</value>
   </data>
   <data name="Web_CloudSync_Unsync" xml:space="preserve">
-    <value>Remove cloud sync</value>
+    <value>Remove external storage sync</value>
   </data>
   <data name="Web_CloudSync_Unsync_Confirm" xml:space="preserve">
     <value>Remove this configuration and revoke its cloud connection?</value>
@@ -2953,10 +2953,10 @@
     <value>The cloud provider was connected successfully.</value>
   </data>
   <data name="Web_CloudSync_Saved" xml:space="preserve">
-    <value>Cloud sync settings saved.</value>
+    <value>External storage sync settings saved.</value>
   </data>
   <data name="Web_CloudSync_Removed" xml:space="preserve">
-    <value>Cloud sync removed.</value>
+    <value>External storage sync removed.</value>
   </data>
   <data name="Web_CloudSync_Progress" xml:space="preserve">
     <value>Synchronizing…</value>
@@ -2989,7 +2989,7 @@
     <value>This folder could not be opened.</value>
   </data>
   <data name="Web_CloudSync_Error_Load" xml:space="preserve">
-    <value>The cloud syncs could not be loaded.</value>
+    <value>The external storage syncs could not be loaded.</value>
   </data>
   <data name="Web_CloudSync_Error_ShareRequired" xml:space="preserve">
     <value>Select a share you may manage.</value>
@@ -3001,13 +3001,13 @@
     <value>You are not authorized for this action.</value>
   </data>
   <data name="Web_CloudSync_Error_Missing" xml:space="preserve">
-    <value>This cloud sync no longer exists.</value>
+    <value>This external storage sync no longer exists.</value>
   </data>
   <data name="Web_CloudSync_Error_Save" xml:space="preserve">
-    <value>The cloud sync settings could not be saved.</value>
+    <value>The external storage sync settings could not be saved.</value>
   </data>
   <data name="Web_CloudSync_Error_Run" xml:space="preserve">
-    <value>The cloud sync failed. Check the server log.</value>
+    <value>The external storage sync failed. Check the server log.</value>
   </data>
   <data name="Web_CloudSync_Error_Busy" xml:space="preserve">
     <value>This folder is already being synchronized or modified. Please try again later.</value>
@@ -3016,13 +3016,13 @@
     <value>Select an existing local folder.</value>
   </data>
   <data name="Web_CloudSync_SharePanel_Help" xml:space="preserve">
-    <value>Manage this share's local and remote folder mappings in the central cloud-sync workspace.</value>
+    <value>Manage this share's local and remote folder mappings centrally in external storage sync.</value>
   </data>
   <data name="Web_CloudSync_SharePanel_Count" xml:space="preserve">
     <value>Configured syncs: {0}</value>
   </data>
   <data name="Web_CloudSync_SharePanel_Open" xml:space="preserve">
-    <value>Open cloud-sync management</value>
+    <value>Open external storage sync</value>
   </data>
   <data name="Web_CloudSync_Device_Title" xml:space="preserve">
     <value>Connect Microsoft OneDrive</value>
@@ -3040,7 +3040,7 @@
     <value>The cloud authorization request has expired. Please start again.</value>
   </data>
   <data name="Web_CloudSync_Device_Failed" xml:space="preserve">
-    <value>Microsoft authorization failed. Please return to Cloud Sync and try again.</value>
+    <value>Microsoft authorization failed. Please return to External Storage and try again.</value>
   </data>
   <data name="Web_CloudSync_Device_CopyCode" xml:space="preserve">
     <value>Copy code</value>
@@ -3140,16 +3140,16 @@
     <value>{0} / {1}</value>
   </data>
   <data name="Web_CloudAccess_Title" xml:space="preserve">
-    <value>Cloud Access</value>
+    <value>External storage virtual shares</value>
   </data>
   <data name="Web_CloudAccess_Subtitle" xml:space="preserve">
     <value>Expose remote folders as virtual shares available only in the web file browser.</value>
   </data>
   <data name="Web_CloudAccess_Loading" xml:space="preserve">
-    <value>Loading Cloud Access…</value>
+    <value>Loading external storage virtual shares…</value>
   </data>
   <data name="Web_CloudAccess_NoPermission" xml:space="preserve">
-    <value>You are not permitted to manage Cloud Access.</value>
+    <value>You are not permitted to manage external storage virtual shares.</value>
   </data>
   <data name="Web_CloudAccess_AddConnection" xml:space="preserve">
     <value>Add connection</value>
@@ -3386,10 +3386,10 @@
     <value>The connection no longer exists.</value>
   </data>
   <data name="Web_CloudAccess_DepartmentDenied" xml:space="preserve">
-    <value>You are not permitted to manage Cloud Access in this department.</value>
+    <value>You are not permitted to manage external storage virtual shares in this department.</value>
   </data>
   <data name="Web_CloudAccess_LoadFailed" xml:space="preserve">
-    <value>Cloud Access could not be loaded.</value>
+    <value>External storage virtual shares could not be loaded.</value>
   </data>
   <data name="Web_CloudAccess_FolderPickerTitle" xml:space="preserve">
     <value>Select remote folder</value>
@@ -3644,10 +3644,10 @@
     <value>Allowed range: {0}–{1} seconds. The default is 20 seconds.</value>
   </data>
   <data name="Web_Settings_CloudAccess_CacheSaved" xml:space="preserve">
-    <value>Cloud Access cache settings saved.</value>
+    <value>External storage cache settings saved.</value>
   </data>
   <data name="Web_Settings_CloudAccess_CacheSaveFailed" xml:space="preserve">
-    <value>Cloud Access cache settings could not be saved.</value>
+    <value>External storage cache settings could not be saved.</value>
   </data>
   <data name="Web_Settings_Cert_SettingsSaved" xml:space="preserve">
     <value>Certificate settings saved and a new certificate was issued.</value>
