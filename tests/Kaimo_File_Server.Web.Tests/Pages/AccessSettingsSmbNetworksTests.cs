@@ -27,6 +27,7 @@ public sealed class AccessSettingsSmbNetworksTests
     private readonly Mock<IManagementAuthService> _mgmtAuth = new();
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
     private AccessRestrictionSettings _stored = new();
+    private List<PrincipalSummary> _users = [];
     private int _saves;
 
     public AccessSettingsSmbNetworksTests()
@@ -53,16 +54,20 @@ public sealed class AccessSettingsSmbNetworksTests
         var contexts = new Mock<IUserContextFactory>();
         contexts.Setup(c => c.CreateByUsernameAsync("admin")).ReturnsAsync(_actor);
         var users = new Mock<IUserRepository>();
-        users.Setup(u => u.GetAllAsync()).ReturnsAsync([]);
+        users.Setup(u => u.GetSummariesAsync()).ReturnsAsync(() => _users.ToList());
         var groups = new Mock<IGroupRepository>();
         groups.Setup(g => g.GetAllAsync()).ReturnsAsync([]);
+        var roles = new Mock<IRoleRepository>();
+        roles.Setup(r => r.GetAllAsync()).ReturnsAsync([]);
+        var principals = new PrincipalDirectoryCache(
+            () => PrincipalDirectoryCache.LoadAsync(users.Object, groups.Object, roles.Object), TimeSpan.Zero);
         var departments = new Mock<IDepartmentRepository>();
         departments.Setup(d => d.GetAllAsync()).ReturnsAsync([]);
         var access = new AccessRestrictionService(_config.Object, contexts.Object, departments.Object,
             _cache);
 
         return new AccessSettingsViewModel(authState.Object, contexts.Object, _mgmtAuth.Object, _config.Object,
-            access, users.Object, groups.Object, departments.Object,
+            access, principals, departments.Object,
             new ClientConnectionInfo { RemoteAddress = "10.0.0.5", Host = "files.example.com" },
             NullLogger<AccessSettingsViewModel>.Instance);
     }
@@ -228,5 +233,32 @@ public sealed class AccessSettingsSmbNetworksTests
         Assert.Equal(["192.168.0.0/16"], _stored.SmbAllowedNetworks);
         // The tab now shows the rule saved elsewhere, so its next rule save keeps it.
         Assert.Equal("Office", Assert.Single(first.Rules).Name);
+    }
+
+    [Fact]
+    public async Task Load_OffersUsersWithEmailHint_AndRevalidationPicksUpNewUsers()
+    {
+        _users = [new PrincipalSummary(Guid.NewGuid(), "Alice", "alice", "alice@example.com")];
+        var vm = Create();
+        await vm.LoadAsync();
+        Assert.Equal("alice@example.com", Assert.Single(vm.UserItems).Hint);
+
+        _users = [.. _users, new PrincipalSummary(Guid.NewGuid(), "Bob", "bob")];
+
+        Assert.True(await vm.RevalidatePrincipalsAsync());
+        Assert.Equal(2, vm.UserItems.Count);
+        Assert.Equal("bob", vm.UserItems[1].Hint);
+    }
+
+    [Fact]
+    public async Task RevalidatePrincipals_WithoutPermission_DoesNothing()
+    {
+        SetPermission(false);
+        _users = [new PrincipalSummary(Guid.NewGuid(), "Alice", "alice")];
+        var vm = Create();
+        await vm.LoadAsync();
+
+        Assert.False(await vm.RevalidatePrincipalsAsync());
+        Assert.Empty(vm.UserItems);
     }
 }

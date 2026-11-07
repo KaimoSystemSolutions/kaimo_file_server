@@ -10672,15 +10672,6 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Error loading the access rights. ähnelt.
-        /// </summary>
-        public static string Web_Error_LoadAccessRightsFailed {
-            get {
-                return ResourceManager.GetString("Web_Error_LoadAccessRightsFailed", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Error loading. ähnelt.
         /// </summary>
         public static string Web_Error_LoadFailedGeneric {

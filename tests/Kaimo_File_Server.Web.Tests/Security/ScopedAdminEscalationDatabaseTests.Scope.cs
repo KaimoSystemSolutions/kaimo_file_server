@@ -255,7 +255,7 @@ public partial class ScopedAdminEscalationDatabaseTests
     private const string Pool = "/data/pool-01";
 
     private ShareListViewModel BuildShareList(User actor)
-        => new(ShareRepo(), UserRepo(), GroupRepo(), AclRepo(), FileMetadataRepo(),
+        => new(ShareRepo(), UserRepo(), AclRepo(), FileMetadataRepo(),
             new Mock<IAclService>().Object, BuildManagementAuthService(),
             new UserContextFactory(DbFactory), new ShareLockManager(), AuthStateFor(actor.Username),
             NullLogger<ShareListViewModel>.Instance, [Pool], departmentRepo: DepartmentRepo());

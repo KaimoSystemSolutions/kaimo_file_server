@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Web.Services;
 using System.Security.Claims;
 using System.Threading;
 using Kaimo_File_Server.Core.Domain;
@@ -72,15 +73,18 @@ public class AclEditorViewModelSyncFolderTests
             .Setup(a => a.AddAsync(It.IsAny<AccessEntry>()))
             .ReturnsAsync((AccessEntry e) => e);
         _aclRepo.Setup(a => a.DeleteAsync(It.IsAny<Guid>())).Returns(Task.CompletedTask);
-        _userRepo.Setup(u => u.GetAllAsync()).ReturnsAsync(new List<User>());
+        _userRepo.Setup(u => u.GetSummariesAsync()).ReturnsAsync(new List<PrincipalSummary>());
         _groupRepo.Setup(g => g.GetAllAsync()).ReturnsAsync(new List<Group>());
         _roleRepo.Setup(r => r.GetAllAsync()).ReturnsAsync(new List<Role>());
         // Null share → no department default lookup; keeps LoadAsync clean.
         _shareRepo.Setup(s => s.GetByIdAsync(It.IsAny<Guid>())).ReturnsAsync((ShareDefinition?)null);
 
         _sut = new AclEditorViewModel(
-            _aclRepo.Object, _metaRepo.Object, _userRepo.Object,
-            _groupRepo.Object, _roleRepo.Object, _shareRepo.Object,
+            _aclRepo.Object, _metaRepo.Object,
+            new PrincipalDirectoryCache(
+                () => PrincipalDirectoryCache.LoadAsync(_userRepo.Object, _groupRepo.Object, _roleRepo.Object),
+                TimeSpan.Zero),
+            _shareRepo.Object,
             _syncDefinitions.Object,
             _departmentRepo.Object, _deptPermissions.Object, _mgmtAuth.Object,
             _userContextFactory.Object, _authState.Object,

@@ -92,7 +92,7 @@ public partial class ScopedAdminEscalationDatabaseTests
 
     private async Task<ShareListViewModel> LoadShareListAsync(User actor, string pool)
     {
-        var sut = new ShareListViewModel(ShareRepo(), UserRepo(), GroupRepo(), AclRepo(), FileMetadataRepo(),
+        var sut = new ShareListViewModel(ShareRepo(), UserRepo(), AclRepo(), FileMetadataRepo(),
             new Mock<IAclService>().Object, BuildManagementAuthService(),
             new UserContextFactory(DbFactory), new ShareLockManager(), AuthStateFor(actor.Username),
             NullLogger<ShareListViewModel>.Instance, [pool], departmentRepo: DepartmentRepo());

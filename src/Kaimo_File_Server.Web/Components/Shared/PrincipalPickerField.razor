@@ -33,7 +33,7 @@
         triggerStyle = $"border-color:{frameColor};background:{frameSoft};";
     }
 <div class="principal-picker @Class" @attributes="AdditionalAttributes">
-    <div class="principal-picker-trigger @(Disabled ? "is-disabled" : "")" style="@triggerStyle" @onclick="OpenDialog" role="button"
+    <div class="principal-picker-trigger @(Disabled ? "is-disabled" : "")" style="@triggerStyle" @onclick="OpenFromTrigger" role="button"
          tabindex="@(Disabled ? -1 : 0)" aria-disabled="@(Disabled ? "true" : "false")"
          @onkeydown="TriggerKeyDown" aria-haspopup="dialog">
         @if (_selected.Count == 0)
@@ -234,6 +234,11 @@
 
     [Parameter] public EventCallback<bool> OpenChanged { get; set; }
 
+    /// <summary>Fired after the user opened the dialog from the trigger (click, Enter or Space).
+    /// Lets callers revalidate cached <see cref="Items"/> in the background while the dialog
+    /// already shows them; the handler should not block.</summary>
+    [Parameter] public EventCallback OnOpened { get; set; }
+
     private bool _open;
     private bool _focusPending;
     private string _search = string.Empty;
@@ -320,10 +325,17 @@
         await SelectedIdsChanged.InvokeAsync([]);
     }
 
-    private void TriggerKeyDown(KeyboardEventArgs e)
+    private async Task TriggerKeyDown(KeyboardEventArgs e)
     {
         if (e.Key is "Enter" or " ")
-            OpenDialog();
+            await OpenFromTrigger();
+    }
+
+    private async Task OpenFromTrigger()
+    {
+        OpenDialog();
+        if (_open && OnOpened.HasDelegate)
+            await OnOpened.InvokeAsync();
     }
 
     private void SetKind(PrincipalKind kind) => _activeKind = kind;

@@ -48,6 +48,17 @@ public static class PrincipalPickerBindings
     public static IReadOnlyList<PrincipalPickerItem> ToDepartmentItems(this IEnumerable<Department> depts) =>
         depts.Select(d => new PrincipalPickerItem(d.Id, d.Name, PrincipalKind.Department, Color: d.Color)).ToList();
 
+    /// <summary>Users from the shared principal list; the hint is the e-mail address, else the username.</summary>
+    public static IReadOnlyList<PrincipalPickerItem> ToUserItems(this IEnumerable<PrincipalSummary> users) =>
+        users.Select(u => new PrincipalPickerItem(u.Id, u.Name, PrincipalKind.User,
+            string.IsNullOrWhiteSpace(u.Email) ? u.Username : u.Email)).ToList();
+
+    public static IReadOnlyList<PrincipalPickerItem> ToGroupItems(this IEnumerable<PrincipalSummary> groups) =>
+        groups.Select(g => new PrincipalPickerItem(g.Id, g.Name, PrincipalKind.Group)).ToList();
+
+    public static IReadOnlyList<PrincipalPickerItem> ToRoleItems(this IEnumerable<PrincipalSummary> roles) =>
+        roles.Select(r => new PrincipalPickerItem(r.Id, r.Name, PrincipalKind.Role)).ToList();
+
     public static IReadOnlyList<PrincipalPickerItem> ToRoleItems(this IEnumerable<Role> roles) =>
         roles.Select(r => new PrincipalPickerItem(r.Id, r.Name, PrincipalKind.Role)).ToList();
 

@@ -63,8 +63,12 @@ public partial class Notifications
     protected override async Task OnInitializedAsync()
     {
         await VM.LoadAsync();
+        RevalidatePrincipals();
         await VM.RefreshLayoutPreviewAsync();
     }
+
+    // Shows the cached principal list at once and refreshes it in the background.
+    private void RevalidatePrincipals() => RefreshInBackground(VM.RevalidatePrincipalsAsync);
 
     private void SwitchTab(NotifTab tab)
     {

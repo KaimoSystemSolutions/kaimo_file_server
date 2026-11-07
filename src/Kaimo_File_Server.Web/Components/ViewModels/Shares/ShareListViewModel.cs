@@ -27,7 +27,6 @@ public partial class ShareListViewModel
 
     private readonly IShareRepository _shareRepo;
     private readonly IUserRepository _userRepo;
-    private readonly IGroupRepository _groupRepo;
     private readonly IAclRepository _aclRepo;
     private readonly IFileMetadataRepository _metaRepo;
     private readonly IAclService _aclService;
@@ -52,7 +51,6 @@ public partial class ShareListViewModel
     public ShareListViewModel(
         IShareRepository shareRepo,
         IUserRepository userRepo,
-        IGroupRepository groupRepo,
         IAclRepository aclRepo,
         IFileMetadataRepository metaRepo,
         IAclService aclService,
@@ -71,7 +69,6 @@ public partial class ShareListViewModel
     {
         _shareRepo = shareRepo;
         _userRepo = userRepo;
-        _groupRepo = groupRepo;
         _aclRepo = aclRepo;
         _metaRepo = metaRepo;
         _aclService = aclService;
@@ -476,7 +473,6 @@ public partial class ShareListViewModel
         EditSuccessMessage = null;
         ShowDeleteConfirm = false;
         ShowDepartmentConfirm = false;
-        ShowAccessPanel = false;
         IsCreating = false;
     }
 
@@ -490,7 +486,6 @@ public partial class ShareListViewModel
         EditSuccessMessage = null;
         ShowDeleteConfirm = false;
         ShowDepartmentConfirm = false;
-        ShowAccessPanel = false;
     }
 
     public sealed record StoragePoolItem(string Name, string Path);

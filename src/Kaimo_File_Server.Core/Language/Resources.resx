@@ -1107,9 +1107,6 @@
   <data name="Web_Scope_SelectScope" xml:space="preserve">
     <value>Please select a scope.</value>
   </data>
-  <data name="Web_Error_LoadAccessRightsFailed" xml:space="preserve">
-    <value>Error loading the access rights.</value>
-  </data>
   <data name="Web_Error_GrantAccessFailed" xml:space="preserve">
     <value>Error granting access.</value>
   </data>

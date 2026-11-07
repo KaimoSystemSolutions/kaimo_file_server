@@ -25,8 +25,7 @@ public sealed partial class AccessSettingsViewModel(
     IManagementAuthService mgmtAuth,
     IConfigRepository config,
     AccessRestrictionService access,
-    IUserRepository users,
-    IGroupRepository groups,
+    PrincipalDirectoryCache principals,
     IDepartmentRepository departments,
     ClientConnectionInfo client,
     ILogger<AccessSettingsViewModel> logger,
@@ -56,6 +55,25 @@ public sealed partial class AccessSettingsViewModel(
     public List<AccessRule> Rules { get; private set; } = new();
     public IReadOnlyList<PrincipalPickerItem> UserItems { get; private set; } = [];
     public IReadOnlyList<PrincipalPickerItem> GroupItems { get; private set; } = [];
+
+    // Shared principal list (stale-while-revalidate); see RevalidatePrincipalsAsync.
+    private PrincipalDirectory _principals = PrincipalDirectory.Empty;
+
+    /// <summary>Background refresh of the user and group pickers; true when they changed.</summary>
+    public async Task<bool> RevalidatePrincipalsAsync()
+    {
+        if (!CanManage || await principals.RevalidateSinceAsync(_principals, logger) is not { } newer)
+            return false;
+        ApplyPrincipals(newer);
+        return true;
+    }
+
+    private void ApplyPrincipals(PrincipalDirectory directory)
+    {
+        _principals = directory;
+        UserItems = directory.Users.ToUserItems();
+        GroupItems = directory.Groups.ToGroupItems();
+    }
     public IReadOnlyList<PrincipalPickerItem> DepartmentItems { get; private set; } = [];
 
     /// <summary>The rule in the editor (a copy; null when the editor is closed).</summary>
@@ -83,13 +101,7 @@ public sealed partial class AccessSettingsViewModel(
             Rules = restrictions.Rules.Select(r => r.Clone()).ToList();
             LoadSmbNetworks(restrictions);
 
-            UserItems = (await users.GetAllAsync()).OrderBy(u => u.Name)
-                .Select(u => new PrincipalPickerItem(u.Id, u.Name, PrincipalKind.User,
-                    string.IsNullOrWhiteSpace(u.Email) ? u.Username : u.Email))
-                .ToList();
-            GroupItems = (await groups.GetAllAsync()).OrderBy(g => g.Name)
-                .Select(g => new PrincipalPickerItem(g.Id, g.Name, PrincipalKind.Group))
-                .ToList();
+            ApplyPrincipals(await principals.GetAsync());
             DepartmentItems = (await departments.GetAllAsync()).OrderBy(d => d.Name).ToDepartmentItems();
             _loaded = true;
         }

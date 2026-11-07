@@ -101,7 +101,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
             .ReturnsAsync(true);
 
         return new ShareListViewModel(
-            ShareRepo(), UserRepo(), GroupRepo(), AclRepo(), FileMetadataRepo(),
+            ShareRepo(), UserRepo(), AclRepo(), FileMetadataRepo(),
             _aclService.Object, _mgmtAuth.Object,
             UserContextFactoryFor((actor.Username, ctx)).Object,
             _lockManager,
@@ -197,7 +197,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
             .ReturnsAsync(false);
 
         return new ShareListViewModel(
-            ShareRepo(), UserRepo(), GroupRepo(), AclRepo(), FileMetadataRepo(),
+            ShareRepo(), UserRepo(), AclRepo(), FileMetadataRepo(),
             _aclService.Object, _mgmtAuth.Object,
             UserContextFactoryFor((actor.Username, ctx)).Object,
             _lockManager,
@@ -562,7 +562,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
             .ReturnsAsync(true);
 
         var sut = new ShareListViewModel(
-            ShareRepo(), UserRepo(), GroupRepo(), AclRepo(), FileMetadataRepo(),
+            ShareRepo(), UserRepo(), AclRepo(), FileMetadataRepo(),
             _aclService.Object, _mgmtAuth.Object,
             UserContextFactoryFor().Object,
             _lockManager,

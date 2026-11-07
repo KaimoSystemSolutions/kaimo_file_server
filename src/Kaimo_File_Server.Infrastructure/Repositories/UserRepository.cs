@@ -54,6 +54,15 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         }
 
         /// <inheritdoc />
+        public async Task<IReadOnlyList<PrincipalSummary>> GetSummariesAsync()
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+            return await db.Users.AsNoTracking()
+                .Select(u => new PrincipalSummary(u.Id, u.Name, u.Username, u.Email))
+                .ToListAsync();
+        }
+
+        /// <inheritdoc />
         public async Task<IReadOnlyList<SambaCredentialSource>>
             GetSambaCredentialBatchAsync(
                 int offset,

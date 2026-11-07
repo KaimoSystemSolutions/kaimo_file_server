@@ -8,6 +8,7 @@ using Kaimo_File_Server.Core.Services.Notifications;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Infrastructure.Notifications;
 using Kaimo_File_Server.Web.Components.Shared;
+using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Web.Services.Notifications;
 using Microsoft.AspNetCore.Components.Authorization;
 
@@ -24,8 +25,7 @@ public sealed class NotificationsViewModel(
     IUserContextFactory userContextFactory,
     IManagementAuthService mgmtAuth,
     INotificationRepository repository,
-    IUserRepository users,
-    IGroupRepository groups,
+    PrincipalDirectoryCache principals,
     IConfigRepository config,
     ISmtpConfigStore smtp,
     ISmtpMailSender sender,
@@ -54,13 +54,7 @@ public sealed class NotificationsViewModel(
             CanAccessPage = await HasPermissionAsync();
             if (!CanAccessPage) return;
 
-            var allUsers = (await users.GetAllAsync()).OrderBy(u => u.Name).ToList();
-            var allGroups = (await groups.GetAllAsync()).OrderBy(g => g.Name).ToList();
-            UserItems = allUsers.Select(u => new PrincipalPickerItem(
-                u.Id, u.Name, PrincipalKind.User, string.IsNullOrWhiteSpace(u.Email) ? u.Username : u.Email)).ToList();
-            GroupItems = allGroups.Select(g => new PrincipalPickerItem(g.Id, g.Name, PrincipalKind.Group)).ToList();
-            _names = allUsers.Select(u => (u.Id, u.Name)).Concat(allGroups.Select(g => (g.Id, g.Name)))
-                .GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.First().Name);
+            ApplyPrincipals(await principals.GetAsync());
 
             await ReloadRulesAsync();
             await RefreshStatusAsync();
@@ -100,6 +94,28 @@ public sealed class NotificationsViewModel(
 
     public IReadOnlyList<PrincipalPickerItem> UserItems { get; private set; } = [];
     public IReadOnlyList<PrincipalPickerItem> GroupItems { get; private set; } = [];
+
+    // Shared principal list (stale-while-revalidate); see RevalidatePrincipalsAsync.
+    private PrincipalDirectory _principals = PrincipalDirectory.Empty;
+
+    /// <summary>Background refresh of the recipient pickers and rule names; true when they changed.</summary>
+    public async Task<bool> RevalidatePrincipalsAsync()
+    {
+        if (!CanAccessPage || await principals.RevalidateSinceAsync(_principals, logger) is not { } newer)
+            return false;
+        ApplyPrincipals(newer);
+        return true;
+    }
+
+    private void ApplyPrincipals(PrincipalDirectory directory)
+    {
+        _principals = directory;
+        UserItems = directory.Users.ToUserItems();
+        GroupItems = directory.Groups.ToGroupItems();
+        _names = directory.Users.Concat(directory.Groups)
+            .GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.First().Name);
+    }
+
     public List<MailRule> Rules { get; private set; } = [];
     public Dictionary<Guid, DateTime> LastSentByRule { get; private set; } = new();
 

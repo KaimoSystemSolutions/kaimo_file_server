@@ -24,8 +24,7 @@ public sealed class SecondFactorSettingsViewModel(
     SecondFactorPolicyService policyService,
     ISecondFactorRepository factors,
     IUserRepository users,
-    IGroupRepository groups,
-    IRoleRepository roles,
+    PrincipalDirectoryCache principals,
     IDepartmentRepository departments,
     ILogger<SecondFactorSettingsViewModel> logger,
     ToastService? toasts = null)
@@ -54,6 +53,26 @@ public sealed class SecondFactorSettingsViewModel(
     public IReadOnlyList<PrincipalPickerItem> UserItems { get; private set; } = [];
     public IReadOnlyList<PrincipalPickerItem> GroupItems { get; private set; } = [];
     public IReadOnlyList<PrincipalPickerItem> RoleItems { get; private set; } = [];
+
+    // Shared principal list (stale-while-revalidate); see RevalidatePrincipalsAsync.
+    private PrincipalDirectory _principals = PrincipalDirectory.Empty;
+
+    /// <summary>Background refresh of the user, group and role pickers; true when they changed.</summary>
+    public async Task<bool> RevalidatePrincipalsAsync()
+    {
+        if (!CanManage || await principals.RevalidateSinceAsync(_principals, logger) is not { } newer)
+            return false;
+        ApplyPrincipals(newer);
+        return true;
+    }
+
+    private void ApplyPrincipals(PrincipalDirectory directory)
+    {
+        _principals = directory;
+        UserItems = directory.Users.ToUserItems();
+        GroupItems = directory.Groups.ToGroupItems();
+        RoleItems = directory.Roles.ToRoleItems();
+    }
     public IReadOnlyList<PrincipalPickerItem> DepartmentItems { get; private set; } = [];
 
     /// <summary>Users the saved policy requires a second factor from, and how many of them have none yet.</summary>
@@ -71,14 +90,7 @@ public sealed class SecondFactorSettingsViewModel(
             if (!CanManage) return;
 
             Apply(await policyService.GetPolicyAsync());
-            UserItems = (await users.GetAllAsync()).OrderBy(u => u.Name)
-                .Select(u => new PrincipalPickerItem(u.Id, u.Name, PrincipalKind.User,
-                    string.IsNullOrWhiteSpace(u.Email) ? u.Username : u.Email))
-                .ToList();
-            GroupItems = (await groups.GetAllAsync()).OrderBy(g => g.Name)
-                .Select(g => new PrincipalPickerItem(g.Id, g.Name, PrincipalKind.Group))
-                .ToList();
-            RoleItems = (await roles.GetAllAsync()).OrderBy(r => r.Name).ToRoleItems();
+            ApplyPrincipals(await principals.GetAsync());
             DepartmentItems = (await departments.GetAllAsync()).OrderBy(d => d.Name).ToDepartmentItems();
             await CountAsync();
         }

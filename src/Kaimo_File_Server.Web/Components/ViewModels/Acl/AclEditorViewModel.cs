@@ -1,9 +1,10 @@
-﻿using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Runtime.Versioning;
 
@@ -11,9 +12,7 @@ public class AclEditorViewModel
 {
     private readonly IAclRepository _aclRepo;
     private readonly IFileMetadataRepository _metaRepo;
-    private readonly IUserRepository _userRepo;
-    private readonly IGroupRepository _groupRepo;
-    private readonly IRoleRepository _roleRepo;
+    private readonly PrincipalDirectoryCache _principalCache;
     private readonly IShareRepository _shareRepo;
     private readonly ISyncDefinitionRepository _syncDefinitions;
     private readonly IDepartmentRepository _departmentRepo;
@@ -26,9 +25,7 @@ public class AclEditorViewModel
     public AclEditorViewModel(
         IAclRepository aclRepo,
         IFileMetadataRepository metaRepo,
-        IUserRepository userRepo,
-        IGroupRepository groupRepo,
-        IRoleRepository roleRepo,
+        PrincipalDirectoryCache principalCache,
         IShareRepository shareRepo,
         ISyncDefinitionRepository syncDefinitions,
         IDepartmentRepository departmentRepo,
@@ -40,9 +37,7 @@ public class AclEditorViewModel
     {
         _aclRepo = aclRepo;
         _metaRepo = metaRepo;
-        _userRepo = userRepo;
-        _groupRepo = groupRepo;
-        _roleRepo = roleRepo;
+        _principalCache = principalCache;
         _shareRepo = shareRepo;
         _syncDefinitions = syncDefinitions;
         _departmentRepo = departmentRepo;
@@ -110,8 +105,11 @@ public class AclEditorViewModel
     /// </summary>
     public DepartmentDefaultInfo? DepartmentDefault { get; private set; }
 
-    public List<User> AllUsers { get; private set; } = [];
-    public List<Group> AllGroups { get; private set; } = [];
+    // Snapshot from the shared principal cache; replaced by RevalidatePrincipalsAsync.
+    private PrincipalDirectory _principals = PrincipalDirectory.Empty;
+
+    public IReadOnlyList<PrincipalSummary> AllUsers => _principals.Users;
+    public IReadOnlyList<PrincipalSummary> AllGroups => _principals.Groups;
 
     /// <summary>
     /// Roles are intentionally NOT offered as a principal when creating ACL entries:
@@ -121,7 +119,7 @@ public class AclEditorViewModel
     /// to resolve to a readable name and icon; <see cref="AclService"/> also still
     /// evaluates them, so no access silently changes.
     /// </summary>
-    public List<Role> AllRoles { get; private set; } = [];
+    public IReadOnlyList<PrincipalSummary> AllRoles => _principals.Roles;
 
     // ------------------ New Entry State ------------------
 
@@ -184,9 +182,9 @@ public class AclEditorViewModel
             // Resolve the share's department default (share-wide baseline)
             DepartmentDefault = await LoadDepartmentDefaultAsync(shareId);
 
-            AllUsers = (await _userRepo.GetAllAsync()).ToList();
-            AllGroups = (await _groupRepo.GetAllAsync()).ToList();
-            AllRoles = (await _roleRepo.GetAllAsync()).ToList();
+            // Served from the shared cache when warm; the editor revalidates it in the
+            // background (RevalidatePrincipalsAsync) so new or renamed principals appear.
+            _principals = await _principalCache.GetAsync();
 
             _logger.LogDebug(
                 "AclEditor loaded: metaId={MetaId}, own={OwnCount}, inherited={InhCount}, path='{Path}'",
@@ -314,7 +312,20 @@ public class AclEditorViewModel
         };
     }
 
-    // ------------------ Add/Edit/Delete bleiben gleich ------------------
+    /// <summary>
+    /// Reloads the shared principal cache (unless a reload is running or the snapshot is fresh)
+    /// and adopts the newest snapshot. Returns true when the lists changed and the editor must
+    /// re-render. Does nothing before an authorized load; a failed reload keeps the current lists.
+    /// </summary>
+    public async Task<bool> RevalidatePrincipalsAsync()
+    {
+        if (!IsLoaded || await _principalCache.RevalidateSinceAsync(_principals, _logger) is not { } newer)
+            return false;
+        _principals = newer;
+        return true;
+    }
+
+    // ------------------ Add/Edit/Delete ------------------
 
     public void StartAddEntry()
     {
@@ -464,7 +475,7 @@ public class AclEditorViewModel
     public string GetPrincipalDisplayName(Guid principalId)
     {
         var user = AllUsers.FirstOrDefault(u => u.Id == principalId);
-        if (user is not null) return user.Name ?? user.Username;
+        if (user is not null) return user.Name;
 
         var group = AllGroups.FirstOrDefault(g => g.Id == principalId);
         if (group is not null) return group.Name;

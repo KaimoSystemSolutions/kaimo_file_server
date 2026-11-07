@@ -2,6 +2,7 @@
 @using Kaimo_File_Server.Core.Security
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
 @inject AccessSettingsViewModel VM
 @inject AssetProvider Icons
 
@@ -54,13 +55,15 @@ else
                     </div>
                     <div class="form-group">
                         <label>@R("Web_AccessRestrictions_Users")</label>
-                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.UserItems" SelectedIds="rule.UserIds"
+                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.UserItems"
+                                              OnOpened="RevalidatePrincipals" SelectedIds="rule.UserIds"
                                               SelectedIdsChanged="ids => rule.UserIds = ids.ToList()"
                                               Title="@R("Web_AccessRestrictions_Users")" Placeholder="@R("Web_AccessRestrictions_None")" />
                     </div>
                     <div class="form-group">
                         <label>@R("Web_AccessRestrictions_Groups")</label>
-                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.GroupItems" SelectedIds="rule.GroupIds"
+                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.GroupItems"
+                                              OnOpened="RevalidatePrincipals" SelectedIds="rule.GroupIds"
                                               SelectedIdsChanged="ids => rule.GroupIds = ids.ToList()"
                                               Title="@R("Web_AccessRestrictions_Groups")" Placeholder="@R("Web_AccessRestrictions_None")" />
                     </div>
@@ -178,7 +181,11 @@ else
     {
         VM.ClearMessages();
         await VM.LoadAsync();
+        RevalidatePrincipals();
     }
+
+    // Shows the cached principal list at once and refreshes it in the background.
+    private void RevalidatePrincipals() => RefreshInBackground(VM.RevalidatePrincipalsAsync);
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 }

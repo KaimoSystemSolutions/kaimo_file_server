@@ -34,6 +34,12 @@ namespace Kaimo_File_Server.Core.Repositories
         Task<IEnumerable<User>> GetAllAsync();
 
         /// <summary>
+        /// Returns every user as a <see cref="PrincipalSummary"/> (id, display name, username, e-mail),
+        /// projected in the database so photos and credential hashes are never loaded.
+        /// </summary>
+        Task<IReadOnlyList<PrincipalSummary>> GetSummariesAsync();
+
+        /// <summary>
         /// Returns one deterministic, bounded projection of active Samba
         /// credential source rows. Stored NT hashes remain protected.
         /// </summary>

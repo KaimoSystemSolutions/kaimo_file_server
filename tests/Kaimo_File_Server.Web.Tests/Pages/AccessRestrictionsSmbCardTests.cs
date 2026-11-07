@@ -102,7 +102,7 @@ public partial class AccessRestrictionsSmbCardTests
         config.Setup(c => c.GetAsync(ServerDomainSettings.ConfigKey, It.IsAny<ServerDomainSettings>()))
             .ReturnsAsync(new ServerDomainSettings());
         var users = new Mock<IUserRepository>();
-        users.Setup(u => u.GetAllAsync()).ReturnsAsync([]);
+        users.Setup(u => u.GetSummariesAsync()).ReturnsAsync([]);
         var groups = new Mock<IGroupRepository>();
         groups.Setup(g => g.GetAllAsync()).ReturnsAsync([]);
         var departments = new Mock<IDepartmentRepository>();
@@ -111,7 +111,11 @@ public partial class AccessRestrictionsSmbCardTests
             new MemoryCache(new MemoryCacheOptions()));
 
         ctx.Services.AddScoped(_ => new AccessSettingsViewModel(authState.Object, contexts.Object, mgmtAuth.Object,
-            config.Object, access, users.Object, groups.Object, departments.Object,
+            config.Object, access,
+            new PrincipalDirectoryCache(
+                () => PrincipalDirectoryCache.LoadAsync(users.Object, groups.Object, Mock.Of<IRoleRepository>()),
+                TimeSpan.Zero),
+            departments.Object,
             new ClientConnectionInfo { RemoteAddress = "10.0.0.5", Host = "files.example.com" },
             NullLogger<AccessSettingsViewModel>.Instance));
 

@@ -1,6 +1,7 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Security
 @using Kaimo_File_Server.Web.Components.ViewModels
+@inherits AppComponentBase
 @inject SecondFactorSettingsViewModel VM
 
 @*
@@ -52,19 +53,22 @@ else
                 {
                     <div class="form-group">
                         <label>@R("Web_AccessRestrictions_Users")</label>
-                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.UserItems" SelectedIds="VM.UserIds"
+                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.UserItems"
+                                              OnOpened="RevalidatePrincipals" SelectedIds="VM.UserIds"
                                               SelectedIdsChanged="ids => VM.UserIds = ids.ToList()"
                                               Title="@R("Web_AccessRestrictions_Users")" Placeholder="@R("Web_AccessRestrictions_None")" />
                     </div>
                     <div class="form-group">
                         <label>@R("Web_AccessRestrictions_Groups")</label>
-                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.GroupItems" SelectedIds="VM.GroupIds"
+                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.GroupItems"
+                                              OnOpened="RevalidatePrincipals" SelectedIds="VM.GroupIds"
                                               SelectedIdsChanged="ids => VM.GroupIds = ids.ToList()"
                                               Title="@R("Web_AccessRestrictions_Groups")" Placeholder="@R("Web_AccessRestrictions_None")" />
                     </div>
                     <div class="form-group">
                         <label>@R("Web_SecondFactor_Settings_Roles")</label>
-                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.RoleItems" SelectedIds="VM.RoleIds"
+                        <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.RoleItems"
+                                              OnOpened="RevalidatePrincipals" SelectedIds="VM.RoleIds"
                                               SelectedIdsChanged="ids => VM.RoleIds = ids.ToList()"
                                               Title="@R("Web_SecondFactor_Settings_Roles")" Placeholder="@R("Web_AccessRestrictions_None")" />
                         <span class="form-hint">@R("Web_SecondFactor_Settings_RolesHint")</span>
@@ -104,7 +108,11 @@ else
     {
         VM.ClearMessages();
         await VM.LoadAsync();
+        RevalidatePrincipals();
     }
+
+    // Shows the cached principal list at once and refreshes it in the background.
+    private void RevalidatePrincipals() => RefreshInBackground(VM.RevalidatePrincipalsAsync);
 
     private RenderFragment ModeChoice(SecondFactorMode mode, string labelKey) =>
         @<button type="button" role="radio" aria-checked="@(VM.Mode == mode ? "true" : "false")"

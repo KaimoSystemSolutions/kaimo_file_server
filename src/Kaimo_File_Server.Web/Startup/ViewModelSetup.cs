@@ -31,6 +31,16 @@ internal static class ViewModelSetup
         builder.Services.AddScoped<UserListViewModel>();
         builder.Services.AddScoped<Kaimo_File_Server.Web.Components.ProfileNavigator>();
         builder.Services.AddScoped<AclEditorViewModel>();
+        // One principal list for all circuits; repositories are scoped, so each reload opens a scope.
+        builder.Services.AddSingleton(sp => new PrincipalDirectoryCache(async () =>
+        {
+            await using var scope = sp.CreateAsyncScope();
+            var s = scope.ServiceProvider;
+            return await PrincipalDirectoryCache.LoadAsync(
+                s.GetRequiredService<IUserRepository>(),
+                s.GetRequiredService<IGroupRepository>(),
+                s.GetRequiredService<IRoleRepository>());
+        }, minRevalidateInterval: TimeSpan.FromSeconds(2)));
         builder.Services.AddScoped<DepartmentViewModel>();
         builder.Services.AddScoped<ExternalStorageSyncViewModel>();
         builder.Services.AddScoped<HomeDashboardViewModel>();
@@ -62,7 +72,6 @@ internal static class ViewModelSetup
             new ShareListViewModel(
                 sp.GetRequiredService<IShareRepository>(),
                 sp.GetRequiredService<IUserRepository>(),
-                sp.GetRequiredService<IGroupRepository>(),
                 sp.GetRequiredService<IAclRepository>(),
                 sp.GetRequiredService<IFileMetadataRepository>(),
                 sp.GetRequiredService<IAclService>(),

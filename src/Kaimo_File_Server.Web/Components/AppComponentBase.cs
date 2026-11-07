@@ -13,6 +13,36 @@ public abstract class AppComponentBase : ComponentBase
 {
     [Inject]
     public new AssetProvider Assets { get; set; } = default!;
+
+    // Uniquely named so it never collides with a derived component's own injected logger.
+    [Inject]
+    private ILoggerFactory RefreshLoggerFactory { get; set; } = default!;
+
+    /// <summary>
+    /// Runs <paramref name="refresh"/> without blocking the caller and re-renders when it reports a
+    /// change (stale-while-revalidate, e.g. a cached principal list). The refresh handles its own
+    /// load errors. A disposed component or ended circuit is ignored; any other failure is a bug
+    /// and is logged, since nobody observes this fire-and-forget task.
+    /// </summary>
+    protected void RefreshInBackground(Func<Task<bool>> refresh) => _ = RefreshAsync(refresh);
+
+    private async Task RefreshAsync(Func<Task<bool>> refresh)
+    {
+        try
+        {
+            if (await refresh())
+                await InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Disposed component or ended circuit: nothing left to update.
+        }
+        catch (Exception ex)
+        {
+            RefreshLoggerFactory.CreateLogger(GetType())
+                .LogError(ex, "Background refresh of {Component} failed", GetType().Name);
+        }
+    }
 }
 
 /// <summary>

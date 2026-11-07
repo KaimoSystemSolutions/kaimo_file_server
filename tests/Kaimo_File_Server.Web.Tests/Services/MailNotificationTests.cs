@@ -660,7 +660,9 @@ public sealed class MailNotificationTests : DatabaseTestBase
         services.AddSingleton(mgmt.Object);
         services.AddScoped(sp => new NotificationsViewModel(
             sp.GetRequiredService<Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider>(),
-            sp.GetRequiredService<IUserContextFactory>(), mgmt.Object, _repo, UserRepo(), GroupRepo(),
+            sp.GetRequiredService<IUserContextFactory>(), mgmt.Object, _repo,
+            new PrincipalDirectoryCache(
+                () => PrincipalDirectoryCache.LoadAsync(UserRepo(), GroupRepo(), RoleRepo()), TimeSpan.Zero),
             sp.GetRequiredService<IConfigRepository>(), _smtp, _sender, _composer, new NotificationDispatchSignal(),
             NullLogger<NotificationsViewModel>.Instance));
         services.AddScoped(sp => new MailServerSettingsViewModel(
@@ -785,5 +787,19 @@ public sealed class MailNotificationTests : DatabaseTestBase
 
         Assert.True(vm.TestResult?.Success);
         Assert.Equal("check@example.com", Assert.Single(_sender.Sent).ToAddress);
+    }
+
+    [Fact]
+    public async Task NotificationsViewModel_RevalidationPicksUpUsersCreatedAfterLoad()
+    {
+        using var ctx = PageContext(ManagementPermission.ManageNotifications);
+        var vm = ctx.Services.GetRequiredService<NotificationsViewModel>();
+        await vm.LoadAsync();
+        Assert.False(await vm.RevalidatePrincipalsAsync());
+
+        var anna = SeedMailUser("anna", "anna@example.com");
+
+        Assert.True(await vm.RevalidatePrincipalsAsync());
+        Assert.Equal("anna@example.com", Assert.Single(vm.UserItems, i => i.Id == anna.Id).Hint);
     }
 }

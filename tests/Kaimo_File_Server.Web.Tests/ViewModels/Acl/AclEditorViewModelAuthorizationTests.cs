@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Web.Services;
 using System.Security.Claims;
 using System.Threading;
 using Kaimo_File_Server.Core.Domain;
@@ -64,7 +65,7 @@ public partial class AclEditorViewModelAuthorizationTests
         _aclRepo
             .Setup(a => a.GetAclsForPathsAsync(It.IsAny<Guid>(), It.IsAny<List<string>>()))
             .ReturnsAsync(new List<(string, bool, List<AccessEntry>)>());
-        _userRepo.Setup(u => u.GetAllAsync()).ReturnsAsync(new List<User>());
+        _userRepo.Setup(u => u.GetSummariesAsync()).ReturnsAsync(new List<PrincipalSummary>());
         _groupRepo.Setup(g => g.GetAllAsync()).ReturnsAsync(new List<Group>());
         _roleRepo.Setup(r => r.GetAllAsync()).ReturnsAsync(new List<Role>());
 
@@ -75,8 +76,11 @@ public partial class AclEditorViewModelAuthorizationTests
             .ReturnsAsync(new List<SyncDefinition>());
 
         _sut = new AclEditorViewModel(
-            _aclRepo.Object, _metaRepo.Object, _userRepo.Object,
-            _groupRepo.Object, _roleRepo.Object, _shareRepo.Object,
+            _aclRepo.Object, _metaRepo.Object,
+            new PrincipalDirectoryCache(
+                () => PrincipalDirectoryCache.LoadAsync(_userRepo.Object, _groupRepo.Object, _roleRepo.Object),
+                TimeSpan.Zero),
+            _shareRepo.Object,
             _syncDefinitions.Object,
             _departmentRepo.Object, _deptPermissions.Object, _mgmtAuth.Object,
             _userContextFactory.Object, _authState.Object,

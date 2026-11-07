@@ -7,6 +7,7 @@
 @using Kaimo_File_Server.Web.Components.Shared
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
 @inject NotificationsViewModel VM
 @inject AssetProvider Icons
 @inject DateFormatService DateFmt
@@ -213,13 +214,15 @@ else
                             <div class="workspace-form">
                                 <div class="workspace-field">
                                     <span>@R("Web_Notifications_Users")</span>
-                                    <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.UserItems" SelectedIds="VM.EditUserIds"
+                                    <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.UserItems"
+                                                          OnOpened="RevalidatePrincipals" SelectedIds="VM.EditUserIds"
                                                           SelectedIdsChanged="ids => VM.EditUserIds = ids"
                                                           Title="@R("Web_Notifications_Users")" Placeholder="@R("Web_Notifications_None")" />
                                 </div>
                                 <div class="workspace-field">
                                     <span>@R("Web_Notifications_Groups")</span>
-                                    <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.GroupItems" SelectedIds="VM.EditGroupIds"
+                                    <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.GroupItems"
+                                                          OnOpened="RevalidatePrincipals" SelectedIds="VM.EditGroupIds"
                                                           SelectedIdsChanged="ids => VM.EditGroupIds = ids"
                                                           Title="@R("Web_Notifications_Groups")" Placeholder="@R("Web_Notifications_None")" />
                                 </div>

@@ -30,7 +30,7 @@ public partial class AclEditor
             Logger.LogDebug(LogEvents.AclEditorLoading, LogMessages.AclEditorLoading, Path, ShareId, IsDirectory);
             await VM.LoadAsync(Path, ShareId, IsDirectory);
             Logger.LogDebug(LogEvents.AclEditorLoaded, LogMessages.AclEditorLoaded, VM.IsLoaded, VM.Entries.Count, VM.InheritedEntries.Count);
-            if (VM.IsLoaded) _loaded = true;
+            if (VM.IsLoaded) { _loaded = true; RevalidatePrincipalsInBackground(); }
             else { _errorMessage = VM.ErrorMessage ?? Resources.Web_Acl_Error_LoadFailed; Logger.LogDebug(LogEvents.AclEditorLoadFailed, LogMessages.AclEditorLoadFailed, _errorMessage); }
         }
         catch (Exception ex) { _errorMessage = $"{Resources.Web_Acl_Error_Exception}: {ex.Message}"; Logger.LogError(LogEvents.AclEditorException, ex, LogMessages.AclEditorException); }
@@ -52,9 +52,13 @@ public partial class AclEditor
     // Users and groups are pickable as ACL principals; the picker's own tabs replace the
     // former type toggle + native <select>. The chosen item's kind updates NewPrincipalType.
     private IReadOnlyList<PrincipalPickerItem> PrincipalItems =>
-        VM.AllUsers.Select(u => new PrincipalPickerItem(u.Id, u.Name ?? u.Username, PrincipalKind.User, u.Username))
+        VM.AllUsers.Select(u => new PrincipalPickerItem(u.Id, u.Name, PrincipalKind.User, u.Username))
             .Concat(VM.AllGroups.Select(g => new PrincipalPickerItem(g.Id, g.Name, PrincipalKind.Group)))
             .ToList();
+
+    // The principal list comes from a shared cache and is shown instantly; after a load and
+    // whenever the picker opens it is revalidated in the background and re-rendered on change.
+    private void RevalidatePrincipalsInBackground() => RefreshInBackground(VM.RevalidatePrincipalsAsync);
 
     private IReadOnlyCollection<Guid> SelectedPrincipalIds =>
         VM.NewPrincipalId is { } id ? new[] { id } : Array.Empty<Guid>();

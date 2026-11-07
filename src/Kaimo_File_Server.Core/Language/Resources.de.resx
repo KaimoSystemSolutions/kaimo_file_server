@@ -1107,9 +1107,6 @@
   <data name="Web_Scope_SelectScope" xml:space="preserve">
     <value>Bitte einen Geltungsbereich auswählen.</value>
   </data>
-  <data name="Web_Error_LoadAccessRightsFailed" xml:space="preserve">
-    <value>Fehler beim Laden der Zugriffsrechte.</value>
-  </data>
   <data name="Web_Error_GrantAccessFailed" xml:space="preserve">
     <value>Fehler beim Gewähren des Zugriffs.</value>
   </data>

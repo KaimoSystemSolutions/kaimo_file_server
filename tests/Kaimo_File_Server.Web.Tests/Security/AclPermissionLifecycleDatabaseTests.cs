@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
@@ -229,7 +230,9 @@ public class AclPermissionLifecycleDatabaseTests : DatabaseTestBase
         mgmtAuth = auth;
 
         return new AclEditorViewModel(
-            AclRepo(), FileMetadataRepo(), UserRepo(), GroupRepo(), RoleRepo(),
+            AclRepo(), FileMetadataRepo(),
+            new PrincipalDirectoryCache(
+                () => PrincipalDirectoryCache.LoadAsync(UserRepo(), GroupRepo(), RoleRepo()), TimeSpan.Zero),
             ShareRepo(), SyncDefinitionRepo(), DepartmentRepo(),
             new DepartmentPermissionService(DepartmentRepo(), ShareRepo(), GroupRepo()),
             auth.Object,

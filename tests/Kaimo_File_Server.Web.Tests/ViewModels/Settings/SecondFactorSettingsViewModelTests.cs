@@ -5,6 +5,8 @@ using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Infrastructure.Repositories;
 using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Components.ViewModels;
+using Kaimo_File_Server.Web.Components.Shared;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -23,7 +25,11 @@ public class SecondFactorSettingsViewModelTests : DatabaseTestBase
     private readonly ConfigRepository _config;
 
     public SecondFactorSettingsViewModelTests()
-        => _config = new ConfigRepository(DbFactory, new MemoryCache(new MemoryCacheOptions()));
+    {
+        _config = new ConfigRepository(DbFactory, new MemoryCache(new MemoryCacheOptions()));
+        _principals = new PrincipalDirectoryCache(
+            () => PrincipalDirectoryCache.LoadAsync(UserRepo(), GroupRepo(), RoleRepo()), TimeSpan.Zero);
+    }
 
     private SecondFactorPolicyService Policy() => new(
         _config, new UserContextFactory(DbFactory), DepartmentRepo(), ScopedRoleRepo(), RoleRepo(),
@@ -31,8 +37,10 @@ public class SecondFactorSettingsViewModelTests : DatabaseTestBase
 
     private SecondFactorSettingsViewModel Vm(User actor) => new(
         AuthStateFor(actor.Username), new UserContextFactory(DbFactory), _mgmt.Object, Policy(),
-        new SecondFactorRepository(DbFactory), UserRepo(), GroupRepo(), RoleRepo(), DepartmentRepo(),
+        new SecondFactorRepository(DbFactory), UserRepo(), _principals, DepartmentRepo(),
         NullLogger<SecondFactorSettingsViewModel>.Instance);
+
+    private readonly PrincipalDirectoryCache _principals;
 
     private User Admin()
     {
@@ -106,5 +114,43 @@ public class SecondFactorSettingsViewModelTests : DatabaseTestBase
         Assert.Equal(3, vm.RequiredCount);
         Assert.Equal(2, vm.RequiredNotEnrolledCount);
         Assert.Equal(1, vm.EnrolledCount);
+    }
+
+    [Fact]
+    public async Task Load_OffersUsersGroupsAndRolesFromTheSharedPrincipalList()
+    {
+        var admin = Admin();
+        var auditor = new Role(Guid.NewGuid(), "Auditor");
+        using (var db = NewContext()) { db.Roles.Add(auditor); db.SaveChanges(); }
+        var vm = Vm(admin);
+
+        await vm.LoadAsync();
+
+        var item = Assert.Single(vm.UserItems, i => i.Id == admin.Id);
+        Assert.Equal("admin", item.Hint); // no e-mail → the username is the hint
+        Assert.Contains(vm.RoleItems, i => i.Id == auditor.Id && i.Kind == PrincipalKind.Role);
+    }
+
+    [Fact]
+    public async Task RevalidatePrincipals_PicksUpUsersCreatedAfterLoad()
+    {
+        var admin = Admin();
+        var vm = Vm(admin);
+        await vm.LoadAsync();
+        var erika = SeedUser("erika");
+
+        Assert.True(await vm.RevalidatePrincipalsAsync());
+        Assert.Contains(vm.UserItems, i => i.Id == erika.Id);
+        Assert.False(await vm.RevalidatePrincipalsAsync());
+    }
+
+    [Fact]
+    public async Task RevalidatePrincipals_WithoutPermission_DoesNothing()
+    {
+        var vm = Vm(SeedUser("erika"));
+        await vm.LoadAsync();
+
+        Assert.False(await vm.RevalidatePrincipalsAsync());
+        Assert.Empty(vm.UserItems);
     }
 }
