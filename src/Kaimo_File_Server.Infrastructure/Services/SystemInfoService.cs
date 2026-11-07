@@ -133,7 +133,14 @@ public class SystemInfoService : ISystemInfoService
         }
     }
 
-    private static Dictionary<string, string> ReadMountInfo()
+    /// <summary>
+    /// Whether <paramref name="path"/> sits on the same device as <c>/</c>, e.g. a pool directory
+    /// whose volume is missing. <c>false</c> when no mountinfo is available.
+    /// </summary>
+    internal static bool IsOnRootFileSystem(string path, IReadOnlyDictionary<string, string> mounts)
+        => mounts.TryGetValue("/", out var root) && ResolveDeviceId(path, mounts) == root;
+
+    internal static Dictionary<string, string> ReadMountInfo()
     {
         try
         {

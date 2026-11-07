@@ -171,6 +171,24 @@ public sealed class PoolUsageBreakdownTests : IDisposable
         Assert.Null(SystemInfoService.ResolveDeviceId("/data/storage/pool01", new Dictionary<string, string>()));
     }
 
+    [Theory]
+    [InlineData("/data/storage/pool01", false)]
+    [InlineData("/data/storage/pool three", false)]
+    [InlineData("/data/storage/pool04", true)] // directory without a volume: container root fs
+    public void IsOnRootFileSystem_DetectsAPoolWithoutItsOwnMount(string path, bool expected)
+    {
+        var mounts = SystemInfoService.ParseMountInfo(MountInfoSample);
+
+        Assert.Equal(expected, SystemInfoService.IsOnRootFileSystem(path, mounts));
+    }
+
+    [Fact]
+    public void IsOnRootFileSystem_WithoutMountInfo_ReturnsFalse()
+    {
+        // No mountinfo (non-Linux): nothing is known, so nothing is excluded.
+        Assert.False(SystemInfoService.IsOnRootFileSystem("/data/storage/pool01", new Dictionary<string, string>()));
+    }
+
     // ─────────────────────────── Scan cache ───────────────────────────
 
     [Fact]

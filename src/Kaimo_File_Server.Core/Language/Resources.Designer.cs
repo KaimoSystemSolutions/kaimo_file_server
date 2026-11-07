@@ -19969,24 +19969,6 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Home folders are already set up. ähnelt.
-        /// </summary>
-        public static string Web_Settings_Homes_AlreadyConfigured {
-            get {
-                return ResourceManager.GetString("Web_Settings_Homes_AlreadyConfigured", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Home folders are set up. ähnelt.
-        /// </summary>
-        public static string Web_Settings_Homes_Configured {
-            get {
-                return ResourceManager.GetString("Web_Settings_Homes_Configured", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Home folders could not be set up. ähnelt.
         /// </summary>
         public static string Web_Settings_Homes_ConfigureFailed {
@@ -20086,20 +20068,11 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die A share named &quot;users&quot; already exists. Rename it before setting up home folders. ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Home folders are not set up yet. The server creates them on the first storage pool when it starts. If a share named &quot;users&quot; exists, rename it first. ähnelt.
         /// </summary>
-        public static string Web_Settings_Homes_NameTaken {
+        public static string Web_Settings_Homes_NotSetUp {
             get {
-                return ResourceManager.GetString("Web_Settings_Homes_NameTaken", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die You can move the home folders to another pool later. ähnelt.
-        /// </summary>
-        public static string Web_Settings_Homes_PoolHint {
-            get {
-                return ResourceManager.GetString("Web_Settings_Homes_PoolHint", resourceCulture);
+                return ResourceManager.GetString("Web_Settings_Homes_NotSetUp", resourceCulture);
             }
         }
         
@@ -20118,15 +20091,6 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Settings_Homes_RecycleSizeHint {
             get {
                 return ResourceManager.GetString("Web_Settings_Homes_RecycleSizeHint", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Set up home folders ähnelt.
-        /// </summary>
-        public static string Web_Settings_Homes_SetUp {
-            get {
-                return ResourceManager.GetString("Web_Settings_Homes_SetUp", resourceCulture);
             }
         }
         

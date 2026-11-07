@@ -5182,20 +5182,8 @@
   <data name="Web_Settings_Homes_Description" xml:space="preserve">
     <value>Every user gets a private folder users/&lt;user id&gt; that only they can access. Users see it as "user" in the web UI and app; administrators only see its size, status and links.</value>
   </data>
-  <data name="Web_Settings_Homes_PoolHint" xml:space="preserve">
-    <value>You can move the home folders to another pool later.</value>
-  </data>
-  <data name="Web_Settings_Homes_SetUp" xml:space="preserve">
-    <value>Set up home folders</value>
-  </data>
-  <data name="Web_Settings_Homes_Configured" xml:space="preserve">
-    <value>Home folders are set up.</value>
-  </data>
-  <data name="Web_Settings_Homes_AlreadyConfigured" xml:space="preserve">
-    <value>Home folders are already set up.</value>
-  </data>
-  <data name="Web_Settings_Homes_NameTaken" xml:space="preserve">
-    <value>A share named "users" already exists. Rename it before setting up home folders.</value>
+  <data name="Web_Settings_Homes_NotSetUp" xml:space="preserve">
+    <value>Home folders are not set up yet. The server creates them on the first storage pool when it starts. If a share named "users" exists, rename it first.</value>
   </data>
   <data name="Web_Settings_Homes_ConfigureFailed" xml:space="preserve">
     <value>Home folders could not be set up.</value>

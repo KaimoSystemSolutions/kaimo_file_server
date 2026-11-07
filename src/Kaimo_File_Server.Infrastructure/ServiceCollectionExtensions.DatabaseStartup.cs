@@ -117,11 +117,18 @@ public static partial class ServiceCollectionExtensions
                     // Never fatal: a missing pool mount must not keep the app from starting.
                     try
                     {
-                        await scope.ServiceProvider.GetRequiredService<HomeDirectoryService>().BackfillAsync();
+                        // Same pool discovery as Program.cs; a pool directory without its own
+                        // volume lives on the container's root fs and must never hold homes.
+                        var rootPath = host.Services.GetRequiredService<IConfiguration>()
+                            .GetValue<string>("Storage:RootPath") ?? "/data/storage";
+                        var mounts = SystemInfoService.ReadMountInfo();
+                        var pools = Directory.GetDirectories(rootPath)
+                            .Where(p => !SystemInfoService.IsOnRootFileSystem(p, mounts));
+                        await scope.ServiceProvider.GetRequiredService<HomeDirectoryService>().InitializeAsync(pools);
                     }
                     catch (Exception ex)
                     {
-                        logger.LogWarning(ex, "Home-folder backfill failed");
+                        logger.LogWarning(ex, "Home-folder initialization failed");
                     }
 
                     // 4) Ready marker, written last: Web and SmbBridge start only once it

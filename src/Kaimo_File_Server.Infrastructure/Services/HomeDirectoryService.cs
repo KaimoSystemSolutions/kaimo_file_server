@@ -111,6 +111,33 @@ public sealed class HomeDirectoryService(
     }
 
     /// <summary>
+    /// Startup initialization: creates the home-folder share on the first existing pool
+    /// (ordinal order) unless it is already configured, then provisions every user's home.
+    /// A missing pool directory is never created, and a regular share already named
+    /// <see cref="ShareName"/> is left alone. The caller excludes pools on the root file system.
+    /// </summary>
+    public async Task InitializeAsync(IEnumerable<string> poolPaths)
+    {
+        if (await GetHomesShareAsync() is not null)
+        {
+            await BackfillAsync();
+            return;
+        }
+
+        var pool = poolPaths.Where(Directory.Exists).Order(StringComparer.Ordinal).FirstOrDefault();
+        if (pool is null)
+        {
+            logger.LogWarning("No storage pool available; home folders are set up on a later start");
+            return;
+        }
+
+        // Created by the system, so the share root has no human owner.
+        var result = await ConfigureAsync(pool, Guid.Empty);
+        if (result != HomeConfigureResult.Ok)
+            logger.LogWarning("Home folders could not be set up on pool '{Pool}': {Result}", pool, result);
+    }
+
+    /// <summary>
     /// Idempotently creates the user's home folder and grants the owner entries.
     /// Returns the share and the home's share-relative path, or <c>null</c> when the user
     /// has no usable home.

@@ -9,20 +9,24 @@ Related: [Security model](../architecture/security-model.md) ·
 
 ## Share
 
-- The share is a regular `ShareDefinition` with `IsUserHomes = true`, created in a chosen pool as
-  `<pool>/users`. An existing `<pool>/users` directory is adopted, so homes re-attach to their users
-  after a database reset.
+- The share is a regular `ShareDefinition` with `IsUserHomes = true`, created as `<pool>/users`.
+  The Host creates it on startup on the first existing storage pool (ordinal order,
+  `HomeDirectoryService.InitializeAsync`) unless it already exists; no admin action is needed. A pool
+  directory on the container's root file system (its volume is missing, detected via
+  `/proc/self/mountinfo`) is skipped, and a regular share already named `users` blocks the setup
+  (logged) until it is renamed. An existing `<pool>/users` directory is adopted, so homes re-attach to
+  their users after a database reset.
 - Administration lives on its own page `/home-folders` (Storage → Home folders,
   `Components/Pages/HomeFolders/`): the **Overview** tab is the metadata overview of the individual
-  homes (Global `ManageHomes`, `HomeFolderOverview.razor`), the **Settings** tab holds setup, the
-  global switch, the pool move and the recycle-bin limits (`ManageSystemSettings`,
+  homes (Global `ManageHomes`, `HomeFolderOverview.razor`), the **Settings** tab holds the global
+  switch, the pool move and the recycle-bin limits (`ManageSystemSettings`,
   `HomeFolderSettings.razor`). Without `AccessHomeContents`, `/files/users` redirects there.
 - The name `users` is used because `[homes]` is a reserved Samba section with special semantics.
 - The names `users` and `user` are reserved and rejected for other shares.
 - Provisioning is idempotent (`HomeDirectoryService`,
-  `src/Kaimo_File_Server.Infrastructure/Services/HomeDirectoryService.cs`): for all users after setup,
-  when a user is created, on every application start, and lazily when a user first accesses their
-  home.
+  `src/Kaimo_File_Server.Infrastructure/Services/HomeDirectoryService.cs`): for all users on every
+  Host start (after the share is initialized), when a user is created, and lazily when a user first
+  accesses their home.
 
 ## Access model
 

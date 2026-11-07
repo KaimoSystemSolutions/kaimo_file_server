@@ -5182,20 +5182,8 @@
   <data name="Web_Settings_Homes_Description" xml:space="preserve">
     <value>Jeder Benutzer erhält einen privaten Ordner users/&lt;Benutzer-ID&gt;, auf den nur er zugreifen kann. Benutzer sehen ihn in Web-UI und App als "user"; Administratoren sehen nur Größe, Status und Links.</value>
   </data>
-  <data name="Web_Settings_Homes_PoolHint" xml:space="preserve">
-    <value>Die Home-Ordner können später in einen anderen Pool verschoben werden.</value>
-  </data>
-  <data name="Web_Settings_Homes_SetUp" xml:space="preserve">
-    <value>Home-Ordner einrichten</value>
-  </data>
-  <data name="Web_Settings_Homes_Configured" xml:space="preserve">
-    <value>Die Home-Ordner sind eingerichtet.</value>
-  </data>
-  <data name="Web_Settings_Homes_AlreadyConfigured" xml:space="preserve">
-    <value>Die Home-Ordner sind bereits eingerichtet.</value>
-  </data>
-  <data name="Web_Settings_Homes_NameTaken" xml:space="preserve">
-    <value>Es gibt bereits einen Share namens "users". Benenne ihn um, bevor du die Home-Ordner einrichtest.</value>
+  <data name="Web_Settings_Homes_NotSetUp" xml:space="preserve">
+    <value>Die Home-Ordner sind noch nicht eingerichtet. Der Server legt sie beim Start auf dem ersten Storage-Pool an. Gibt es bereits einen Share namens "users", benenne ihn vorher um.</value>
   </data>
   <data name="Web_Settings_Homes_ConfigureFailed" xml:space="preserve">
     <value>Die Home-Ordner konnten nicht eingerichtet werden.</value>

@@ -1,7 +1,7 @@
 @using Kaimo_File_Server.Core.Domain
 @using Kaimo_File_Server.Core.Language
 
-@* Settings → Home folders: setup, path, pool (move) and global switch, plus the recycle
+@* Settings → Home folders: path, pool (move) and global switch, plus the recycle
    limits of the per-user home bins. /home-folders lists the individual homes. *@
 
 <div class="detail-section">
@@ -47,31 +47,12 @@
             </div>
         </div>
     }
-    else if (VM.StorageUsages.Count > 0)
-    {
-        <div class="homes-fields">
-            <div class="homes-field">
-                <span class="settings-field-label label-with-info">
-                    @Resources.Web_ShareList_Label_StoragePool
-                    <InfoButton Text="@T("Web_Settings_Homes_PoolHint", "You can move the home folders to another pool later.")" />
-                </span>
-                <div class="homes-pool-row">
-                    <PrincipalPickerField Mode="SelectionMode.Single"
-                                          Items="PoolItems"
-                                          SelectedIds="VM.HomesSelectedPool.AsPoolSelection()"
-                                          SelectedIdsChanged="ids => VM.HomesSelectedPool = PoolPaths.PoolPathFor(ids) ?? VM.HomesSelectedPool"
-                                          AllowClear="false" Disabled="@Busy"
-                                          Title="@Resources.Web_ShareList_Label_StoragePool" />
-                    <button class="btn-primary" type="button" disabled="@Busy" @onclick="SetUp">
-                        @T("Web_Settings_Homes_SetUp", "Set up home folders")
-                    </button>
-                </div>
-            </div>
-        </div>
-    }
     else
     {
-        <p class="settings-empty">@Resources.Web_Settings_Storage_NoStoragePoolsFound</p>
+        @* Created by the Host on startup (HomeDirectoryService.InitializeAsync). *@
+        <p class="settings-empty">@(VM.StorageUsages.Count > 0
+            ? T("Web_Settings_Homes_NotSetUp", "Home folders are not set up yet. The server creates them on the first storage pool when it starts. If a share named \"users\" exists, rename it first.")
+            : Resources.Web_Settings_Storage_NoStoragePoolsFound)</p>
     }
 </div>
 
@@ -124,8 +105,6 @@
     private bool IsCurrentPool => string.Equals(VM.HomesTargetPool, VM.HomesPoolPath, StringComparison.Ordinal);
 
     private Task SetEnabled(bool enabled) => RunAsync(() => VM.SetHomesEnabledAsync(enabled));
-
-    private Task SetUp() => RunAsync(VM.ConfigureHomesAsync);
 
     private Task SaveRecycleLimits(RecycleLimits limits) => RunAsync(() => VM.SaveHomesRecycleLimitsAsync(limits));
 
