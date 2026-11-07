@@ -19,7 +19,8 @@ public sealed class RsyncCreationTimeTests : IDisposable
         try { Directory.Delete(_root, recursive: true); } catch { /* best effort */ }
     }
 
-    private string Expected(string relative) => Path.Combine(_root, relative);
+    // GetFullPath normalizes '/' to the platform separator (Windows: '\'), like the production code does.
+    private string Expected(string relative) => Path.GetFullPath(Path.Combine(_root, relative));
 
     [Fact]
     public void CreatedEntryAbsolutePath_ReturnsNewFilesAndNewFolders()
