@@ -259,7 +259,7 @@
     <value>Erstellen</value>
   </data>
   <data name="Web_Button_Close" xml:space="preserve">
-    <value>Schliesen</value>
+    <value>Schließen</value>
   </data>
   <data name="Web_Picker_Placeholder" xml:space="preserve">
     <value>Auswählen…</value>
@@ -2045,6 +2045,12 @@
   </data>
   <data name="Web_Admin_Photo_Remove" xml:space="preserve">
     <value>Entfernen</value>
+  </data>
+  <data name="Web_Admin_Photo_ZoomIn" xml:space="preserve">
+    <value>Vergrößern</value>
+  </data>
+  <data name="Web_Admin_Photo_ZoomOut" xml:space="preserve">
+    <value>Verkleinern</value>
   </data>
   <data name="Web_Admin_Photo_TooLarge" xml:space="preserve">
     <value>Das Bild ist zu groß (maximal 256 KB).</value>

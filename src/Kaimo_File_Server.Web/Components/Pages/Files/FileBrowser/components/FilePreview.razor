@@ -21,14 +21,14 @@
                 <div class="preview-actions">
                     @if (!string.IsNullOrEmpty(_downloadUrl))
                     {
-                        <a class="btn-icon" href="@_downloadUrl" download="@_previewFileName" title="Download">
+                        <a class="btn-icon" href="@_downloadUrl" download="@_previewFileName" title="@Resources.Web_Preview_Download">
                             @Assets.SVG("download.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                         </a>
                     }
                     @* No close button in version mode — the back arrow is the only exit, returning to the version dialog. *@
                     @if (_onBack is null)
                     {
-                        <button class="btn-icon" title="Close" @onclick="CloseFilePreview">
+                        <button class="btn-icon" title="@Resources.Web_Common_Close" @onclick="CloseFilePreview">
                             @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                         </button>
                     }

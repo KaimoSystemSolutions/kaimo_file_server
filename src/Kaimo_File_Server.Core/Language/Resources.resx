@@ -2046,6 +2046,12 @@
   <data name="Web_Admin_Photo_Remove" xml:space="preserve">
     <value>Remove</value>
   </data>
+  <data name="Web_Admin_Photo_ZoomIn" xml:space="preserve">
+    <value>Zoom in</value>
+  </data>
+  <data name="Web_Admin_Photo_ZoomOut" xml:space="preserve">
+    <value>Zoom out</value>
+  </data>
   <data name="Web_Admin_Photo_TooLarge" xml:space="preserve">
     <value>The image is too large (maximum 256 KB).</value>
   </data>

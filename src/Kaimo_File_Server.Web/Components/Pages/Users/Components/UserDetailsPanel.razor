@@ -518,8 +518,8 @@
                 <canvas @ref="_cropCanvas" width="@CropSize" height="@CropSize"></canvas>
             </div>
             <div class="avatar-crop-zoom">
-                <button type="button" class="btn-secondary" @onclick="() => ZoomCrop(0.8)" aria-label="Zoom out">&minus;</button>
-                <button type="button" class="btn-secondary" @onclick="() => ZoomCrop(1.25)" aria-label="Zoom in">+</button>
+                <button type="button" class="btn-secondary" @onclick="() => ZoomCrop(0.8)" aria-label="@Resources.Web_Admin_Photo_ZoomOut">&minus;</button>
+                <button type="button" class="btn-secondary" @onclick="() => ZoomCrop(1.25)" aria-label="@Resources.Web_Admin_Photo_ZoomIn">+</button>
             </div>
             <div class="avatar-crop-actions">
                 <button type="button" class="btn-primary" @onclick="ConfirmCrop">@Resources.Web_Common_Save</button>

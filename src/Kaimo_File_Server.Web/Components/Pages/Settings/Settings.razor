@@ -14,7 +14,7 @@
 
 @if (!_initialLoadComplete || VM.IsLoading)
 {
-    <div class="loading-state"><div class="spinner"></div><p>Lade Einstellungen…</p></div>
+    <div class="loading-state"><div class="spinner"></div><p>@Resources.Web_Common_Loading</p></div>
 }
 else if (!VM.CanAccessPage)
 {

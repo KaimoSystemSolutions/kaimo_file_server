@@ -2579,6 +2579,24 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Admin_Photo_Remove", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Zoom in ähnelt.
+        /// </summary>
+        public static string Web_Admin_Photo_ZoomIn {
+            get {
+                return ResourceManager.GetString("Web_Admin_Photo_ZoomIn", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Zoom out ähnelt.
+        /// </summary>
+        public static string Web_Admin_Photo_ZoomOut {
+            get {
+                return ResourceManager.GetString("Web_Admin_Photo_ZoomOut", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die The image is too large (maximum 256 KB). ähnelt.
