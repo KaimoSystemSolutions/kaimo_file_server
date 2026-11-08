@@ -40,9 +40,6 @@
 .storage-tab-panel.cloud-schedule-section { margin: 0; border: 0; border-radius: 0; background: transparent; }
 .storage-tab-panel.cloud-sync-advanced h4 { margin: 0; }
 .storage-tab-panel.cloud-sync-advanced > p { margin: 4px 0 14px; color: var(--text-secondary); font-size: 12px; }
-.storage-path-field { display: flex; gap: 6px; }
-.storage-path-field .edit-input { min-width: 0; flex: 1; }
-.storage-path-field > button { flex: 0 0 auto; width: auto; }
 .storage-editor .detail-actions { flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; margin-top: 14px; }
 .storage-editor .detail-actions > button { flex: 0 0 auto; width: auto; white-space: nowrap; }
 .storage-form-grid input[aria-invalid="true"] { border-color: var(--danger); }

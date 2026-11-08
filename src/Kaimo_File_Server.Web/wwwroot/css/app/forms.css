@@ -1,4 +1,21 @@
-﻿/* -- Multi-Select Dropdowns -- */
+﻿/* -- Path input with a Browse button -- */
+
+.storage-path-field {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.storage-path-field .edit-input {
+    min-width: 0;
+    flex: 1;
+}
+
+.storage-path-field > button {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+/* -- Multi-Select Dropdowns -- */
 
 .multi-select {
     position: relative;

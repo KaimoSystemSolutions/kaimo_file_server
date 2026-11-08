@@ -3,6 +3,7 @@
 @using Kaimo_File_Server.Core.Repositories
 @using Kaimo_File_Server.Core.Services.ExternalStorage
 @using Kaimo_File_Server.Infrastructure.ExternalStorage
+@using Kaimo_File_Server.Web.Components.Pages.CloudSync.Components
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Microsoft.AspNetCore.Components.Forms
@@ -304,7 +305,23 @@ else
             {
                 <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="backup.example.com" @bind="_server" @bind:event="oninput" @onchange="SshEndpointChangedAsync" /></label>
                 <label><span>@R("Web_ExternalStorage_Port")</span><input class="edit-input" type="number" min="1" max="65535" @bind="_port" @bind:after="SshEndpointChangedAsync" /></label>
-                <label class="storage-wide"><span>@R("Web_ExternalStorage_RemoteRoot")</span><input class="edit-input" maxlength="4096" placeholder="/srv/backups" @bind="_remoteRoot" @bind:event="oninput" /></label>
+                <label class="storage-wide"><span>@R("Web_ExternalStorage_RemoteRoot")</span><span class="storage-path-field"><input class="edit-input" maxlength="4096" placeholder="/srv/backups" @bind="_remoteRoot" @bind:event="oninput" /><button class="btn-secondary" type="button" disabled="@(_busy || _sshSetupBusy || !SshReadyToConnect)" @onclick="OpenRootPickerAsync">@R("Web_CloudAccess_Browse")</button></span>
+                    @if (!SshReadyToConnect)
+                    {
+                        <small>@R("Web_ExternalStorage_SshSetupIncomplete")</small>
+                    }
+                </label>
+                <DirectoryPickerDialog IsOpen="@_rootPickerOpen"
+                                       IsRemote="true"
+                                       IsLoading="@_rootPickerLoading"
+                                       CanSelect="@(!_rootPickerNotSyncable)"
+                                       Title="@R("Web_CloudAccess_FolderPickerTitle")"
+                                       CurrentPath="@_rootPickerPath"
+                                       ErrorMessage="@_rootPickerError"
+                                       Items="@_rootPickerItems"
+                                       OnNavigate="LoadRootPickerAsync"
+                                       OnSelected="SelectRootPickerFolder"
+                                       OnClosed="CloseRootPicker" />
                 @if (_advancedSshSetup || _editing)
                 {
                     <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_RsyncSshHelp")</p>

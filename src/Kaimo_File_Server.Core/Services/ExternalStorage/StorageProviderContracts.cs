@@ -67,6 +67,20 @@ public sealed record StorageDirectoryTarget(string Path, string? StableId = null
 public sealed class RemoteShareUnavailableException(string message, Exception? innerException = null)
     : IOException(message, innerException);
 
+/// <summary>
+/// A folder can be seen, but the sync transport may not read it, so it must not be picked as
+/// a sync folder. <see cref="Folders"/> still lets the picker navigate to a usable child.
+/// </summary>
+public sealed class RemoteFolderNotSyncableException(
+    IReadOnlyList<RemoteStorageItem> folders,
+    string code,
+    Exception? innerException = null)
+    : IOException("The remote folder can be listed but not synchronized.", innerException)
+{
+    public IReadOnlyList<RemoteStorageItem> Folders { get; } = folders;
+    public string Code { get; } = code;
+}
+
 /// <summary>The authenticated remote system rejected an operation.</summary>
 public sealed class RemoteStorageAccessDeniedException(string message, Exception? innerException = null)
     : IOException(message, innerException);
@@ -178,6 +192,15 @@ public interface IOptimizedStorageSync
     /// </summary>
     Task<IReadOnlyList<string>> SynchronizeAsync(
         OptimizedSyncRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists the child folders of <paramref name="path"/> so an administrator can pick a sync
+    /// folder. This is no item-level file contract: the provider stays sync-only.
+    /// Throws <see cref="RemoteFolderNotSyncableException"/> when the transport may not read the folder.
+    /// </summary>
+    Task<IReadOnlyList<RemoteStorageItem>> ListDirectoriesAsync(
+        string path,
         CancellationToken cancellationToken = default);
 }
 

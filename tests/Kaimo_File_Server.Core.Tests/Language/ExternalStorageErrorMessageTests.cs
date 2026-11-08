@@ -17,7 +17,7 @@ public sealed class ExternalStorageErrorMessageTests
         "local_path_missing", "remote_path_missing", "connection_failed",
         "remote_access_denied", "sync_failed", "invalid_grant", "invalid_token",
         "interaction_required", "access_denied", "authorization_declined",
-        "slow_down", "temporarily_unavailable"
+        "slow_down", "temporarily_unavailable", "rsync_read_denied"
     ];
 
     [Fact]

@@ -7913,6 +7913,9 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_ExternalStorage_ErrorCode_ssh_authentication_failed" xml:space="preserve">
     <value>The SSH server rejected the sign-in. Check the username and the password or key.</value>
   </data>
+  <data name="Web_ExternalStorage_ErrorCode_rsync_read_denied" xml:space="preserve">
+    <value>This folder cannot be synchronized because the rsync server does not let this account read it. Give the account write permission on the folder or use an SFTP connection.</value>
+  </data>
   <data name="Web_ExternalStorage_ErrorCode_sftp_unavailable" xml:space="preserve">
     <value>The sign-in succeeded, but the server does not provide SFTP for this account. Enable SFTP on the server (on a Synology NAS: File Services → FTP → SFTP).</value>
   </data>

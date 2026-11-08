@@ -11563,6 +11563,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This folder cannot be synchronized because the rsync server does not let this account read it. Give the account write permission on the folder or use an SFTP connection. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ErrorCode_rsync_read_denied {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ErrorCode_rsync_read_denied", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die The sign-in succeeded, but the server does not provide SFTP for this account. Enable SFTP on the server (on a Synology NAS: File Services → FTP → SFTP). ähnelt.
         /// </summary>
         public static string Web_ExternalStorage_ErrorCode_sftp_unavailable {

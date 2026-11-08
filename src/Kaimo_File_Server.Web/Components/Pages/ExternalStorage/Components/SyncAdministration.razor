@@ -130,7 +130,7 @@ else
                         <option value="@SyncMode.Pull">@R("Web_CloudSync_Mode_Pull")</option>
                     </select></label>
                     <label><span>@R("Web_ExternalStorage_LocalPath")</span><span class="storage-path-field"><input class="edit-input" @bind="LocalPathDisplay" /><button class="btn-secondary" type="button" disabled="@(_model.LocalShareId == Guid.Empty)" @onclick="OpenLocalPickerAsync">@R("Web_CloudAccess_Browse")</button></span></label>
-                    <label><span>@R("Web_ExternalStorage_RemotePath")</span><span class="storage-path-field"><input class="edit-input" @bind="_model.RemotePath" @bind:event="oninput" />@if (SelectedConnectionSupports(StorageProviderCapabilities.Browse)) { <button class="btn-secondary" type="button" disabled="@(_model.ConnectionId == Guid.Empty)" @onclick="OpenRemotePickerAsync">@R("Web_CloudAccess_Browse")</button> }</span></label>
+                    <label><span>@R("Web_ExternalStorage_RemotePath")</span><span class="storage-path-field"><input class="edit-input" @bind="_model.RemotePath" @bind:event="oninput" />@if (SelectedConnectionSupports(StorageProviderCapabilities.Browse) || SelectedConnectionSupports(StorageProviderCapabilities.OptimizedSync)) { <button class="btn-secondary" type="button" disabled="@(_model.ConnectionId == Guid.Empty)" @onclick="OpenRemotePickerAsync">@R("Web_CloudAccess_Browse")</button> }</span></label>
                     <label class="storage-wide"><span>@R("Web_ExternalStorage_Description")</span><textarea class="edit-input" maxlength="2000" @bind="_model.Description"></textarea></label>
                 </div>
             }
@@ -351,6 +351,7 @@ else
 <DirectoryPickerDialog IsOpen="@_pickerOpen"
                        IsRemote="@_pickerIsRemote"
                        IsLoading="@_pickerLoading"
+                       CanSelect="@(!_pickerNotSyncable)"
                        Title="@PickerTitle"
                        CurrentPath="@_pickerPath"
                        Items="@_pickerItems"

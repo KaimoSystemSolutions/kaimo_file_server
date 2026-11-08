@@ -99,18 +99,8 @@ public partial class ConnectionAdministration
                                   || (IsWebDavProvider && !string.IsNullOrWhiteSpace(_serverUrl)
                                       && !string.IsNullOrWhiteSpace(_username)
                                       && !string.IsNullOrEmpty(_password))
-                                  || (UsesPinnedSshSetup && !string.IsNullOrWhiteSpace(_server)
-                                      && _port is >= 1 and <= 65535
-                                      && !string.IsNullOrWhiteSpace(_username)
-                                      && !string.IsNullOrWhiteSpace(_remoteRoot)
-                                      && (!UsesSshPassword || !string.IsNullOrEmpty(_password))
-                                      && (_advancedSshSetup
-                                          ? !string.IsNullOrWhiteSpace(_sshHostFingerprint)
-                                            && (UsesSshPassword || !string.IsNullOrWhiteSpace(_privateKeySecretReference))
-                                            && (IsSftpProvider || !string.IsNullOrWhiteSpace(_knownHostsSecretReference))
-                                          : (UsesSshPassword || _sshPrivateKey is not null)
-                                            && SelectedHostKey is not null
-                                            && _hostKeyConfirmed))
+                                  || (UsesPinnedSshSetup && SshReadyToConnect
+                                      && !string.IsNullOrWhiteSpace(_remoteRoot))
                                   || (!IsSmbProvider && !UsesPinnedSshSetup
                                       && !string.IsNullOrWhiteSpace(_settingsJson)));
 
@@ -215,7 +205,7 @@ public partial class ConnectionAdministration
         catch { _error = R("Web_ExternalStorage_OperationFailed"); }
         finally { _busy = false; }
     }
-    private string BuildSettingsJson()
+    private string BuildSettingsJson(string? remoteRoot = null)
     {
         if (IsWebDavProvider)
             // The opt-in is only written when set, so existing HTTPS settings stay byte-identical.
@@ -238,7 +228,7 @@ public partial class ConnectionAdministration
                 Host = _server.Trim(),
                 Port = _port,
                 Username = _username.Trim(),
-                RemoteRoot = _remoteRoot.Trim(),
+                RemoteRoot = (remoteRoot ?? _remoteRoot).Trim(),
                 ExpectedHostKeySha256 = _sshHostFingerprint.Trim(),
                 PrivateKeySecretReference = UsesSshPassword ? string.Empty : _privateKeySecretReference.Trim(),
                 KnownHostsSecretReference = _knownHostsSecretReference.Trim()

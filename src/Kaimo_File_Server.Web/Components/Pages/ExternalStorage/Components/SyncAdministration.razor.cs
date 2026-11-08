@@ -32,6 +32,7 @@ public partial class SyncAdministration
     private bool _pickerOpen;
     private bool _pickerIsRemote = true;
     private bool _pickerLoading;
+    private bool _pickerNotSyncable;
     private string _pickerPath = "/";
     private string? _pickerError;
     private IReadOnlyList<CloudDirectoryItem> _pickerItems = [];
@@ -212,11 +213,18 @@ public partial class SyncAdministration
     {
         _pickerLoading = true;
         _pickerError = null;
+        _pickerNotSyncable = false;
         try
         {
             _pickerItems = _pickerIsRemote
                 ? await VM.ListRemoteDirectoriesAsync(_model.ConnectionId, _model.LocalShareId, path)
                 : await VM.ListLocalDirectoriesAsync(_model.LocalShareId, path);
+        }
+        catch (RemoteFolderNotSyncableException notSyncable)
+        {
+            _pickerItems = notSyncable.Folders.Select(folder => new CloudDirectoryItem(folder.Name, folder.Path)).ToArray();
+            _pickerNotSyncable = true;
+            _pickerError = ConnectionDisplay.ErrorMessage(notSyncable.Code);
         }
         catch
         {

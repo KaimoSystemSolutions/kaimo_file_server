@@ -18,8 +18,14 @@ public interface IRsyncProcessRunner
         RsyncSshConnectionSettings settings,
         OptimizedSyncRequest request,
         CancellationToken cancellationToken);
+
+    /// <summary>Lists the child folders of a connection-root-relative path with <c>rsync --list-only</c>.</summary>
+    Task<IReadOnlyList<RemoteStorageItem>> ListDirectoriesAsync(
+        RsyncSshConnectionSettings settings,
+        string path,
+        CancellationToken cancellationToken);
 }
-public sealed class RsyncProcessRunner : IRsyncProcessRunner
+public sealed partial class RsyncProcessRunner : IRsyncProcessRunner
 {
     private const int MaximumDiagnosticCharacters = 4096;
 
@@ -118,6 +124,105 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
             created);
         return received ?? (IReadOnlyList<string>)[];
     }
+
+    public async Task<IReadOnlyList<RemoteStorageItem>> ListDirectoriesAsync(
+        RsyncSshConnectionSettings settings,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        var folders = new List<RemoteStorageItem>();
+        string stderr = string.Empty;
+        int exitCode = await RunAsync("rsync", BuildListArguments(settings, path), cancellationToken, throwOnFailure: false, line =>
+        {
+            if (ListedDirectoryName(line) is { } name)
+                folders.Add(new RemoteStorageItem(name, SftpPaths.CombineChild(path, name), true, null, null));
+        }, settings.AskpassPath, text => stderr = text);
+        if (exitCode == 0)
+            return folders;
+        Exception failure = RsyncFailure(exitCode, stderr);
+        if (failure is ProtocolConfigurationException { Code: "rsync_read_denied" } refused)
+            throw new RemoteFolderNotSyncableException(
+                await ListOverSshAsync(settings, path, cancellationToken), refused.Code, refused);
+        throw failure;
+    }
+
+    // rsync refuses the sender role, but the account may still see folders over SSH, so an
+    // administrator can navigate down to a folder rsync may read. Accounts without a shell
+    // simply get an empty list: the folder stays unselectable either way.
+    private static async Task<IReadOnlyList<RemoteStorageItem>> ListOverSshAsync(
+        RsyncSshConnectionSettings settings,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        var folders = new List<RemoteStorageItem>();
+        await WithTimeoutAsync(async token =>
+        {
+            await RunAsync("ssh", BuildShellListArguments(settings, path), token, throwOnFailure: false, line =>
+            {
+                if (ShellListedDirectoryName(line) is { } name)
+                    folders.Add(new RemoteStorageItem(name, SftpPaths.CombineChild(path, name), true, null, null));
+            }, settings.AskpassPath);
+            return true;
+        }, SshTestTimeout, cancellationToken);
+        return folders.OrderBy(folder => folder.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+    }
+
+    // The remote shell parses this command, so the validated path is single-quoted.
+    internal static List<string> BuildShellListArguments(RsyncSshConnectionSettings settings, string path)
+    {
+        string remotePath = CombineRemote(settings.RemoteRoot, path).TrimEnd('/') + "/";
+        var arguments = BuildSshArguments(settings);
+        arguments.Add($"{settings.Username}@{settings.Host}");
+        arguments.Add($"ls -1Ap -- '{remotePath.Replace("'", @"'\''")}'");
+        return arguments;
+    }
+
+    /// <summary>Maps one <c>ls -p</c> line to a child folder name; only folders end in a slash.</summary>
+    internal static string? ShellListedDirectoryName(string line)
+        => line.EndsWith('/') && IsPickableFolderName(line[..^1]) ? line[..^1] : null;
+
+    /// <summary>
+    /// Builds the failure of an rsync run. The message may hold server-controlled text and
+    /// reaches only the log; the UI and notifications show the classified error code.
+    /// </summary>
+    internal static Exception RsyncFailure(int exitCode, string stderr)
+    {
+        string message = $"rsync failed with exit code {exitCode}: {stderr.Trim()}";
+        // The remote rsync refuses the sender role, which listing and pulling both need.
+        return stderr.Contains("module is write only", StringComparison.Ordinal)
+            ? new ProtocolConfigurationException("rsync_read_denied", message)
+            : new IOException(message);
+    }
+
+    // Without --recursive and with a trailing slash rsync lists exactly one level.
+    internal static List<string> BuildListArguments(RsyncSshConnectionSettings settings, string path)
+    {
+        string remotePath = CombineRemote(settings.RemoteRoot, path);
+        return
+        [
+            "--list-only", "--protect-args", "--8-bit-output", "--timeout=60",
+            "-e", BuildRemoteShell(settings),
+            "--", $"{settings.Username}@{settings.Host}:{remotePath.TrimEnd('/')}/"
+        ];
+    }
+
+    /// <summary>
+    /// Maps one <c>--list-only</c> line to a child folder name, or null for anything else.
+    /// Names a sync could not address (rsync-escaped control characters, globs) are not offered.
+    /// </summary>
+    internal static string? ListedDirectoryName(string line)
+    {
+        string name = ListedDirectoryPattern().Match(line).Groups[1].Value;
+        return IsPickableFolderName(name) ? name : null;
+    }
+
+    private static bool IsPickableFolderName(string name)
+        => name is not ("" or "." or "..") && !name.Contains('/') && PinnedSshSettings.IsValidRemotePath("/" + name);
+
+    [System.Text.RegularExpressions.GeneratedRegex(
+        @"^d\S{9,}\s+\S+\s+\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2} (.+)\z",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex ListedDirectoryPattern();
 
     /// <summary>
     /// Runs rsync, then stamps the creation times of what it created (<paramref name="created"/>,
@@ -427,13 +532,7 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
         await Task.WhenAll(stderr, stdout);
         onStderr?.Invoke(stderr.Result);
         if (throwOnFailure && process.ExitCode != 0)
-        {
-            // Do not return helper output because it can contain remote paths or
-            // server-controlled text. The bounded text is retained only to make
-            // debugger inspection safe and is not attached to the exception.
-            _ = stderr.Result[..Math.Min(stderr.Result.Length, MaximumDiagnosticCharacters)];
-            throw new IOException($"The rsync helper failed with exit code {process.ExitCode}.");
-        }
+            throw RsyncFailure(process.ExitCode, stderr.Result);
         return process.ExitCode;
     }
 

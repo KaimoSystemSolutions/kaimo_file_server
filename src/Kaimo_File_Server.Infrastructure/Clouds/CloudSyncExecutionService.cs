@@ -432,6 +432,7 @@ public sealed class CloudSyncExecutionService(
         SyncDirectoryMissingException => "remote_path_missing",
         DirectoryNotFoundException => "local_path_missing",
         RemoteStorageAccessDeniedException => "remote_access_denied",
+        ExternalStorage.ProtocolConfigurationException { Code: "rsync_read_denied" } => "rsync_read_denied",
         ProviderRequestException { StatusCode: HttpStatusCode.NotFound } => "remote_path_missing",
         ProviderRequestException providerError => providerError.ErrorCode,
         HttpRequestException => "connection_failed",

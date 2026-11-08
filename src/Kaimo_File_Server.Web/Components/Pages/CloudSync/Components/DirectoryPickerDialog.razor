@@ -55,7 +55,7 @@
 
             <div class="modal-actions">
                 <button class="btn-secondary" type="button" @onclick="CloseAsync">@Resources.Web_Button_Cancel</button>
-                <button class="btn-primary" type="button" disabled="@IsLoading"
+                <button class="btn-primary" type="button" disabled="@(IsLoading || !CanSelect)"
                         @onclick="() => OnSelected.InvokeAsync(CurrentPath)">
                     @Text("Web_CloudSync_Directory_Select", "Select this folder")
                 </button>
@@ -68,6 +68,8 @@
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public bool IsRemote { get; set; }
     [Parameter] public bool IsLoading { get; set; }
+    /// <summary>False keeps navigation working but greys out selecting the current folder.</summary>
+    [Parameter] public bool CanSelect { get; set; } = true;
     [Parameter] public string Title { get; set; } = "";
     [Parameter] public string CurrentPath { get; set; } = "";
     [Parameter] public string? ErrorMessage { get; set; }

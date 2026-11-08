@@ -201,4 +201,9 @@ internal sealed class RsyncSshOptimizedSync(
         OptimizedSyncRequest request,
         CancellationToken cancellationToken = default)
         => processRunner.RunRsyncAsync(settings, request, cancellationToken);
+
+    public Task<IReadOnlyList<RemoteStorageItem>> ListDirectoriesAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+        => processRunner.ListDirectoriesAsync(settings, path, cancellationToken);
 }

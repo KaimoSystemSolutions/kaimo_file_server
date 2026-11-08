@@ -119,13 +119,16 @@ internal static partial class PinnedSshSettings
 
     internal static void ValidateRemotePath(string path)
     {
-        if (string.IsNullOrWhiteSpace(path)
-            || !path.StartsWith('/')
-            || path.Length > 4096
-            || !RemotePathPattern().IsMatch(path)
-            || path.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(segment => segment is "." or ".."))
+        if (!IsValidRemotePath(path))
             throw new ProtocolConfigurationException("remote_path_invalid", "The SSH remote path is invalid.");
     }
+
+    internal static bool IsValidRemotePath(string path)
+        => !string.IsNullOrWhiteSpace(path)
+           && path.StartsWith('/')
+           && path.Length <= 4096
+           && RemotePathPattern().IsMatch(path)
+           && !path.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(segment => segment is "." or "..");
 
     internal static void ValidateSecretFile(string path, bool privateKey)
     {
@@ -185,6 +188,8 @@ internal static partial class PinnedSshSettings
     [GeneratedRegex("^[A-Za-z_][A-Za-z0-9._-]{0,63}$", RegexOptions.CultureInvariant)]
     private static partial Regex UsernamePattern();
 
-    [GeneratedRegex("^/[A-Za-z0-9._/-]*$", RegexOptions.CultureInvariant)]
+    // Spaces and umlauts are safe: arguments bypass the local shell and rsync uses --protect-args.
+    // Globs stay out because the remote rsync still expands them; backslash is its escape character.
+    [GeneratedRegex(@"^/[^\x00-\x1F\x7F*?\[\\]*\z", RegexOptions.CultureInvariant)]
     private static partial Regex RemotePathPattern();
 }

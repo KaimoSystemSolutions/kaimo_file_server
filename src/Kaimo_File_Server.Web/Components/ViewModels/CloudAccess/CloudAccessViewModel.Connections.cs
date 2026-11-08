@@ -214,7 +214,7 @@ public partial class CloudAccessViewModel
 
         if (connection.AuthorizationMode == StorageAuthorizationMode.UsernamePassword
             && string.IsNullOrEmpty(password)
-            && !SameSettings(connection.SettingsJson, settingsJson))
+            && !SameTarget(connection.SettingsJson, settingsJson))
             throw new ArgumentException(R("Web_ExternalStorage_PasswordRequiredForChangedTarget"));
 
         connection.Name = normalizedName;

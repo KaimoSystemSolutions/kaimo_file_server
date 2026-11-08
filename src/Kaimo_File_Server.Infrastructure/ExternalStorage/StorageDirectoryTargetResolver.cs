@@ -12,11 +12,18 @@ public sealed class StorageDirectoryTargetResolver(IStorageConnectionProviderCat
         string path,
         CancellationToken cancellationToken = default)
     {
-        var provider = GetBrowsableProvider(connection);
+        string normalized = Normalize(path);
+        var provider = providers.GetRequired(connection.ProviderId);
+        // Sync-only transports (rsync) list folders for picking but stay outside the Browse contract.
+        if ((provider.Capabilities & (StorageProviderCapabilities.Browse | StorageProviderCapabilities.OptimizedSync)) == 0)
+            throw new NotSupportedException("The storage provider does not support directory browsing.");
         await using var session = await provider.OpenSessionAsync(connection, cancellationToken);
-        var files = session.RemoteFiles
-                    ?? throw new NotSupportedException("The storage provider does not expose directory browsing.");
-        return (await files.ListAsync(Normalize(path), cancellationToken))
+        var items = session.RemoteFiles is { } files
+            ? await files.ListAsync(normalized, cancellationToken)
+            : session.OptimizedSync is { } optimizedSync
+                ? await optimizedSync.ListDirectoriesAsync(normalized, cancellationToken)
+                : throw new NotSupportedException("The storage provider does not expose directory browsing.");
+        return items
             .Where(item => item.IsDirectory)
             .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
