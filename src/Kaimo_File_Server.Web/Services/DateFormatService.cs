@@ -66,17 +66,20 @@ public class DateFormatService
         _loaded = true;
     }
 
-    /// <summary>Formats a UTC timestamp as local date + time, or <paramref name="nullText"/> when null.</summary>
+    /// <summary>Formats a UTC timestamp as local date + time, or <paramref name="nullText"/> when unknown.</summary>
     public string FormatDateTime(DateTime? utc, string nullText = "–")
-        => utc.HasValue
-            ? utc.Value.ToLocalTime().ToString(DateTimePattern, CultureInfo.InvariantCulture)
+        => IsKnown(utc)
+            ? utc!.Value.ToLocalTime().ToString(DateTimePattern, CultureInfo.InvariantCulture)
             : nullText;
 
-    /// <summary>Formats a UTC timestamp as a local date (no time), or <paramref name="nullText"/> when null.</summary>
+    /// <summary>Formats a UTC timestamp as a local date (no time), or <paramref name="nullText"/> when unknown.</summary>
     public string FormatDate(DateTime? utc, string nullText = "–")
-        => utc.HasValue
-            ? utc.Value.ToLocalTime().ToString(DatePattern, CultureInfo.InvariantCulture)
+        => IsKnown(utc)
+            ? utc!.Value.ToLocalTime().ToString(DatePattern, CultureInfo.InvariantCulture)
             : nullText;
+
+    /// <summary>Remote backends without timestamps report <see cref="DateTime.UnixEpoch"/> as a placeholder.</summary>
+    private static bool IsKnown(DateTime? utc) => utc.HasValue && utc != DateTime.UnixEpoch;
 
     /// <summary>Formats an already-local value as date + time, without re-converting the time zone.</summary>
     public string FormatDateTimeLocal(DateTime local)

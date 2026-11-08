@@ -32,4 +32,37 @@ public class DateFormatServiceTests
     [InlineData("", "HH:mm")]
     public void TimePatternFor_MapsKnownFormats_AndFallsBackTo24h(string timeFormat, string expected)
         => Assert.Equal(expected, DateFormatService.TimePatternFor(timeFormat));
+
+    // The pattern getters never touch the config repository, so no stub is needed.
+    private static DateFormatService Service() => new(null!);
+
+    [Fact]
+    public void Format_UnixEpoch_IsUnknown_AndRendersNullText()
+    {
+        var service = Service();
+        Assert.Equal("–", service.FormatDateTime(DateTime.UnixEpoch));
+        Assert.Equal("–", service.FormatDate(DateTime.UnixEpoch));
+        Assert.Equal("n/a", service.FormatDateTime(DateTime.UnixEpoch, "n/a"));
+    }
+
+    [Fact]
+    public void Format_Null_RendersNullText()
+    {
+        var service = Service();
+        Assert.Equal("–", service.FormatDateTime(null));
+        Assert.Equal("–", service.FormatDate(null));
+    }
+
+    [Fact]
+    public void Format_RealTimestamp_IsStillRendered_EvenOneSecondAfterEpoch()
+    {
+        var service = Service();
+        var justAfterEpoch = DateTime.UnixEpoch.AddSeconds(1);
+        Assert.Equal(
+            justAfterEpoch.ToLocalTime().ToString("yyyy-MM-dd HH:mm"),
+            service.FormatDateTime(justAfterEpoch));
+        Assert.Equal(
+            justAfterEpoch.ToLocalTime().ToString("yyyy-MM-dd"),
+            service.FormatDate(justAfterEpoch));
+    }
 }
