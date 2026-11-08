@@ -92,7 +92,7 @@ public sealed partial class CloudSyncReconciliationTests
         }
 
         public async Task DownloadAsync(string path, Stream target, CancellationToken ct = default)
-            => await target.WriteAsync(_files[Normalize(path)].Data, ct);
+            => await target.WriteAsync(_files[Resolve(Normalize(path))].Data, ct);
 
         public Task CreateDirectoryAsync(string path, CancellationToken ct = default)
         {
@@ -129,19 +129,125 @@ public sealed partial class CloudSyncReconciliationTests
         /// <summary>Counts how often each directory is listed, to prove reconciliation reuses the pre-scan.</summary>
         public Dictionary<string, int> ListCalls { get; } = new();
 
-        public Task<IReadOnlyList<CloudItemMeta>> ListAsync(string path, CancellationToken ct = default)
+        // Listing hooks: parallelism the engine may use, a delay per listing (to observe
+        // overlap), the highest number of listings seen in flight at once, and failures:
+        // transient ones (count down, then succeed) and permanent ones, by normalized path.
+        public int ListConcurrency { get; set; } = 1;
+        public TimeSpan ListDelay { get; set; }
+        public int MaxListsInFlight { get; private set; }
+        public Dictionary<string, int> TransientLists { get; } = new();
+        public HashSet<string> HardFailLists { get; } = new();
+        private int _listsInFlight;
+
+        // Whole-tree listing: off by default (per-directory walk); can throw or omit folders.
+        public bool SupportsTreeListing { get; set; }
+        public bool TreeListingThrows { get; set; }
+        public HashSet<string> TreeListingOmits { get; } = new();
+        public int TreeListCalls { get; private set; }
+        // Invoked when a whole-tree listing starts, to observe what was reported before it.
+        public Action? TreeListingStarted { get; set; }
+
+        public Task<IReadOnlyDictionary<string, IReadOnlyList<CloudItemMeta>>?> TryListTreeAsync(
+            string path, CancellationToken ct = default)
+        {
+            if (!SupportsTreeListing)
+                return Task.FromResult<IReadOnlyDictionary<string, IReadOnlyList<CloudItemMeta>>?>(null);
+            TreeListCalls++;
+            TreeListingStarted?.Invoke();
+            if (TreeListingThrows)
+                throw new IOException("tree listing failed");
+            string root = Normalize(path);
+            var tree = new Dictionary<string, IReadOnlyList<CloudItemMeta>>();
+            void Walk(string dir)
+            {
+                var children = Children(dir);
+                if (!TreeListingOmits.Contains(dir))
+                    tree[dir == root ? "" : dir[(root.Length == 0 ? 0 : root.Length + 1)..]] = children;
+                // Like a server, the walk follows links until it reaches its path length limit.
+                if (Depth(dir) < MaxPathDepth)
+                    foreach (var child in children.Where(item => item.IsDirectory))
+                        Walk(Join(dir, child.Name));
+            }
+            Walk(root);
+            return Task.FromResult<IReadOnlyDictionary<string, IReadOnlyList<CloudItemMeta>>?>(tree);
+        }
+
+        // Folder links (path → target folder), followed like a Samba server does: a link lists as a
+        // folder with its target's time and content. Paths deeper than MaxPathDepth fail to list,
+        // like a server at its path length limit.
+        public Dictionary<string, string> Links { get; } = new();
+        private const int MaxPathDepth = 12;
+
+        public void PutLink(string path, string target) => Links[Normalize(path)] = Normalize(target);
+
+        private static int Depth(string key) => key.Split('/', StringSplitOptions.RemoveEmptyEntries).Length;
+
+        private static string Join(string parent, string name) => parent.Length == 0 ? name : $"{parent}/{name}";
+
+        private string Resolve(string key)
+        {
+            if (Depth(key) > MaxPathDepth)
+                throw new UnauthorizedAccessException($"path too long: {key}");
+            for (bool resolved = true; resolved;)
+            {
+                resolved = false;
+                foreach (var (link, target) in Links)
+                    if (key == link || key.StartsWith(link + "/", StringComparison.Ordinal))
+                    {
+                        key = target + key[link.Length..];
+                        resolved = true;
+                        break;
+                    }
+            }
+            return key;
+        }
+
+        public async Task<IReadOnlyList<CloudItemMeta>> ListAsync(string path, CancellationToken ct = default)
         {
             string key = Normalize(path);
-            ListCalls[key] = ListCalls.TryGetValue(key, out int n) ? n + 1 : 1;
-            var items = new List<CloudItemMeta>();
-            foreach (var (file, value) in _files.Where(f => Parent(f.Key) == key))
-                items.Add(new CloudItemMeta(false, NameOf(file), "/" + file, value.Data.Length, value.Modified,
-                    CreatedOf(file)));
-            foreach (var dir in _dirs.Where(d => Parent(d) == key))
-                items.Add(new CloudItemMeta(true, NameOf(dir), "/" + dir, 0,
-                    _dirTimes.TryGetValue(dir, out var time) ? time : DateTime.UnixEpoch, CreatedOf(dir)));
-            return Task.FromResult<IReadOnlyList<CloudItemMeta>>(items);
+            lock (ListCalls)
+            {
+                ListCalls[key] = ListCalls.TryGetValue(key, out int n) ? n + 1 : 1;
+                MaxListsInFlight = Math.Max(MaxListsInFlight, ++_listsInFlight);
+            }
+            try
+            {
+                if (ListDelay > TimeSpan.Zero)
+                    await Task.Delay(ListDelay, ct);
+                lock (ListCalls)
+                {
+                    if (HardFailLists.Contains(key))
+                        throw new UnauthorizedAccessException($"list denied for {key}");
+                    if (TransientLists.TryGetValue(key, out int remaining) && remaining > 0)
+                    {
+                        TransientLists[key] = remaining - 1;
+                        throw new IOException($"transient list failure for {key}");
+                    }
+                }
+                return Children(key);
+            }
+            finally
+            {
+                lock (ListCalls)
+                    _listsInFlight--;
+            }
         }
+
+        private IReadOnlyList<CloudItemMeta> Children(string key)
+        {
+            string real = Resolve(key);
+            var items = new List<CloudItemMeta>();
+            foreach (var (file, value) in _files.Where(f => Parent(f.Key) == real))
+                items.Add(new CloudItemMeta(false, NameOf(file), "/" + Join(key, NameOf(file)),
+                    value.Data.Length, value.Modified, CreatedOf(file)));
+            foreach (var dir in _dirs.Where(d => Parent(d) == real))
+                items.Add(new CloudItemMeta(true, NameOf(dir), "/" + Join(key, NameOf(dir)), 0, DirTime(dir), CreatedOf(dir)));
+            foreach (var (link, target) in Links.Where(l => Parent(l.Key) == real))
+                items.Add(new CloudItemMeta(true, NameOf(link), "/" + Join(key, NameOf(link)), 0, DirTime(Resolve(target)), null));
+            return items;
+        }
+
+        private DateTime DirTime(string dir) => _dirTimes.TryGetValue(dir, out var time) ? time : DateTime.UnixEpoch;
 
         private DateTime? CreatedOf(string path) => _createdTimes.TryGetValue(path, out var created) ? created : null;
     }

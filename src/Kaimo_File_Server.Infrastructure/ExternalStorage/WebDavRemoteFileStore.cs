@@ -20,6 +20,9 @@ internal sealed class WebDavRemoteFileStore(
     internal static readonly TimeSpan DefaultIdleTimeout = TimeSpan.FromSeconds(120);
     private readonly TimeSpan _idleTimeout = idleTimeout ?? DefaultIdleTimeout;
 
+    // Stateless PROPFIND requests over a shared HttpClient: safe to run side by side.
+    public int ListConcurrency => 4;
+
     public async Task<IReadOnlyList<RemoteStorageItem>> ListAsync(
         string path, CancellationToken cancellationToken = default)
     {

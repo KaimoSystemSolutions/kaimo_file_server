@@ -42,6 +42,26 @@ public sealed partial class CloudSyncReconciliationTests
         Assert.Equal(0, reports[scan].Percent);
     }
 
+    // Regression: a whole-tree listing (one smbclient call) can run for many minutes; the job
+    // must announce the scan before it starts instead of showing nothing until it completes.
+    [Fact]
+    public async Task Pull_WholeTreeListing_AnnouncesRemoteScanBeforeListingStarts()
+    {
+        var remote = new InMemoryRemote { SupportsTreeListing = true };
+        remote.PutFile("/a.txt", "aaaa", Time(10));
+        var local = new InMemoryFileService();
+        List<(string? Text, int Percent)>? reports = null;
+        int reportedBeforeListing = -1;
+        remote.TreeListingStarted = () => reportedBeforeListing = reports!.Count;
+
+        reports = await SyncWithReportsAsync(remote, local, SyncMode.Pull, onStart: list => reports = list);
+
+        Assert.Equal(1, remote.TreeListCalls);
+        Assert.Equal(1, reportedBeforeListing);
+        Assert.Equal("Scanning remote folder…", reports[0].Text);
+        Assert.Equal(0, reports[0].Percent);
+    }
+
     [Fact]
     public async Task Push_ReportsLocalSizeCalculation_BeforeTransferring()
     {
@@ -86,9 +106,11 @@ public sealed partial class CloudSyncReconciliationTests
 
     /// <summary>Runs one sync under the English UI culture and returns every progress report.</summary>
     private static async Task<List<(string? Text, int Percent)>> SyncWithReportsAsync(
-        InMemoryRemote remote, InMemoryFileService local, SyncMode mode, List<SyncFailure>? failures = null)
+        InMemoryRemote remote, InMemoryFileService local, SyncMode mode, List<SyncFailure>? failures = null,
+        Action<List<(string? Text, int Percent)>>? onStart = null)
     {
         var reports = new List<(string? Text, int Percent)>();
+        onStart?.Invoke(reports);
         var previous = CultureInfo.CurrentUICulture;
         CultureInfo.CurrentUICulture = new CultureInfo("en");
         try

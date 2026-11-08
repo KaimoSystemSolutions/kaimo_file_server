@@ -3108,6 +3108,9 @@
   <data name="Web_Jobs_CloudSync_LocalSize" xml:space="preserve">
     <value>Calculating local size…</value>
   </data>
+  <data name="Web_Jobs_CloudSync_RemoteTreeScan" xml:space="preserve">
+    <value>Scanning remote folder…</value>
+  </data>
   <data name="Web_Jobs_CloudSync_RemoteScan" xml:space="preserve">
     <value>Scanning remote folder… Files found: {0} ({1})</value>
   </data>

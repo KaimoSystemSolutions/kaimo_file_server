@@ -261,6 +261,10 @@ internal sealed class SftpStorageSession(
 /// </summary>
 internal sealed class SftpRemoteFileStore(ISftpClient client, string remoteRoot) : IRemoteFileStore
 {
+    // SSH.NET multiplexes SFTP requests by request id on one session, so overlapping
+    // directory reads hide the round-trip latency.
+    public int ListConcurrency => 4;
+
     public async Task<IReadOnlyList<RemoteStorageItem>> ListAsync(
         string path, CancellationToken cancellationToken = default)
     {

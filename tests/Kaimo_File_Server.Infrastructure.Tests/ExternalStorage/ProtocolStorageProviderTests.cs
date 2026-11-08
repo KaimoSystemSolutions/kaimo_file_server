@@ -164,11 +164,12 @@ public sealed class ProtocolStorageProviderTests : IDisposable
     {
         var commands = new List<string>();
         var runner = new Mock<IProtocolCommandRunner>();
-        runner.Setup(candidate => candidate.RunAsync(
-                "smbclient", It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>(), true))
-            .Callback((string _, IReadOnlyList<string> arguments, CancellationToken _, bool _) =>
+        // Directory listings run through the stop-at-output-limit entry point.
+        runner.Setup(candidate => candidate.RunUntilOutputLimitAsync(
+                "smbclient", It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()))
+            .Callback((string _, IReadOnlyList<string> arguments, CancellationToken _, int? _) =>
                 commands.Add(Command(arguments)))
-            .ReturnsAsync((string _, IReadOnlyList<string> arguments, CancellationToken _, bool _) =>
+            .ReturnsAsync((string _, IReadOnlyList<string> arguments, CancellationToken _, int? _) =>
             {
                 string command = Command(arguments);
                 string output = command == "ls"
@@ -752,6 +753,10 @@ public sealed class ProtocolStorageProviderTests : IDisposable
         var runner = new Mock<IProtocolCommandRunner>();
         runner.Setup(candidate => candidate.RunAsync(
                 "smbclient", It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .ReturnsAsync(new ProtocolCommandResult(0, output));
+        // Directory listings run through the stop-at-output-limit entry point.
+        runner.Setup(candidate => candidate.RunUntilOutputLimitAsync(
+                "smbclient", It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()))
             .ReturnsAsync(new ProtocolCommandResult(0, output));
         return runner;
     }

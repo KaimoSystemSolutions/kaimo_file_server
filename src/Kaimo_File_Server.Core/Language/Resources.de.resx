@@ -3108,6 +3108,9 @@
   <data name="Web_Jobs_CloudSync_LocalSize" xml:space="preserve">
     <value>Lokale Größe wird ermittelt…</value>
   </data>
+  <data name="Web_Jobs_CloudSync_RemoteTreeScan" xml:space="preserve">
+    <value>Remote-Ordner wird durchsucht…</value>
+  </data>
   <data name="Web_Jobs_CloudSync_RemoteScan" xml:space="preserve">
     <value>Remote-Ordner wird durchsucht… Gefundene Dateien: {0} ({1})</value>
   </data>

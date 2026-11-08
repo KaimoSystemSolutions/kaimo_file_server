@@ -101,6 +101,23 @@ public interface ICloudConnection
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// How many <see cref="ListAsync"/> calls the sync pre-scan may run at once. Providers whose
+    /// client is safe for concurrent requests raise it; the default lists one folder at a time.
+    /// </summary>
+    int ListConcurrency => 1;
+
+    /// <summary>
+    /// Optional: lists every folder below <paramref name="path"/> in one call, keyed by the folder
+    /// path relative to <paramref name="path"/> ("" = the folder itself, "a/b" = nested). A folder
+    /// missing from the result is listed on its own later, so a provider must leave out any folder
+    /// it could not list completely. <c>null</c> = not supported (the default).
+    /// </summary>
+    Task<IReadOnlyDictionary<string, IReadOnlyList<CloudItemMeta>>?> TryListTreeAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyDictionary<string, IReadOnlyList<CloudItemMeta>>?>(null);
+
+    /// <summary>
     /// Synchronizes one configured local/remote directory pair. Cancellation is
     /// checked between local file-service calls and is forwarded to every cloud
     /// operation so long-running uploads and downloads can stop immediately.

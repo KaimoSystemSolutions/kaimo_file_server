@@ -88,7 +88,19 @@ internal sealed class RemoteFileStoreSyncAdapter(
     public async Task<IReadOnlyList<CloudItemMeta>> ListAsync(
         string path,
         CancellationToken cancellationToken = default)
-        => (await remoteFiles.ListAsync(path, cancellationToken))
+        => ToMeta(await remoteFiles.ListAsync(path, cancellationToken));
+
+    public int ListConcurrency => remoteFiles.ListConcurrency;
+
+    public async Task<IReadOnlyDictionary<string, IReadOnlyList<CloudItemMeta>>?> TryListTreeAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+        => await remoteFiles.TryListTreeAsync(path, cancellationToken) is { } tree
+            ? tree.ToDictionary(entry => entry.Key, entry => ToMeta(entry.Value), StringComparer.OrdinalIgnoreCase)
+            : null;
+
+    private static IReadOnlyList<CloudItemMeta> ToMeta(IEnumerable<RemoteStorageItem> items)
+        => items
             .Select(item => new CloudItemMeta(
                 item.IsDirectory,
                 item.Name,

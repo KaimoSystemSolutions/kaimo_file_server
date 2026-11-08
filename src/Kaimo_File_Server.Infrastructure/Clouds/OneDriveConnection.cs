@@ -92,6 +92,9 @@ public sealed partial class OneDriveConnection : ICloudConnection, IAsyncDisposa
     /// Follows trusted Graph pagination links and omits Personal Vault because
     /// Microsoft exposes it in listings without making it normally downloadable.
     /// </remarks>
+    // Graph requests are independent and the token refresh is serialized by _tokenLock.
+    public int ListConcurrency => 4;
+
     public async Task<IReadOnlyList<CloudItemMeta>> ListAsync(
         string path,
         CancellationToken cancellationToken = default)

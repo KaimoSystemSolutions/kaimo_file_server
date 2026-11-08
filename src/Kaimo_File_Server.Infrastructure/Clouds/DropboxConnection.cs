@@ -70,6 +70,9 @@ public sealed class DropboxConnection : ICloudConnection, IAsyncDisposable
     }
 
     /// <inheritdoc />
+    // API requests are independent and the token refresh is serialized by _tokenLock.
+    public int ListConcurrency => 4;
+
     public async Task<IReadOnlyList<CloudItemMeta>> ListAsync(
         string path,
         CancellationToken cancellationToken = default)

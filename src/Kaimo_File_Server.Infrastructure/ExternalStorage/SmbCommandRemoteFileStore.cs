@@ -6,11 +6,17 @@ using Kaimo_File_Server.Core.Services.ExternalStorage;
 namespace Kaimo_File_Server.Infrastructure.ExternalStorage;
 
 internal sealed record SmbCredentials(string Username, string Password, string? Domain);
-internal sealed class SmbCommandRemoteFileStore(
+internal sealed partial class SmbCommandRemoteFileStore(
     SmbConnectionSettings settings,
     SmbCredentials credentials,
     IProtocolCommandRunner runner) : IRemoteFileStore
 {
+    // A folder's listing may pass the runner's general output limit: 32M characters hold roughly
+    // 350,000 entries. A larger folder fails to list instead of being cut short.
+    // ponytail: the output is buffered whole (about three times its size in memory at peak);
+    // parse it as a stream if folders beyond that size must be listed.
+    private const int DirectoryListingOutputCharacters = 32 * 1024 * 1024;
+
     public async Task<IReadOnlyList<RemoteStorageItem>> ListAsync(
         string path,
         CancellationToken cancellationToken = default)
@@ -18,7 +24,7 @@ internal sealed class SmbCommandRemoteFileStore(
         string normalized = Normalize(path);
         if (normalized == "/")
         {
-            ProtocolCommandResult result = await RunAsync(null, null, listShares: true, cancellationToken);
+            ProtocolCommandResult result = Complete(await RunAsync(null, null, listShares: true, cancellationToken));
             return ParseShares(result.StandardOutput);
         }
         (string share, string relative) = Split(normalized);
@@ -26,9 +32,40 @@ internal sealed class SmbCommandRemoteFileStore(
         // directory to enter. Change directory first so nested browsing lists
         // the children instead of merely matching the selected folder itself.
         string command = relative.Length == 0 ? "ls" : $"cd {QuoteRemote(relative)}; ls";
-        ProtocolCommandResult listing = await RunAsync(share, command, false, cancellationToken);
+        // Stopped at the listing limit instead of drained: output beyond it is rejected anyway.
+        ProtocolCommandResult listing = Complete(await RunAsync(
+            share, command, false, cancellationToken,
+            stopAtOutputLimit: true, outputLimit: DirectoryListingOutputCharacters));
         return ParseDirectory(share, relative, listing.StandardOutput);
     }
+
+    /// <summary>
+    /// Rejects a listing that is not the complete content of the requested folder, which a sync
+    /// would read as deletions: output cut off at the limit (not an <see cref="IOException"/>, so it
+    /// is not retried as transient), a failed <c>cd</c>, or a failed helper. smbclient runs the next
+    /// <c>-c</c> command after a failed one, in the old directory, and exits with that command's
+    /// code, so after a failed <c>cd</c> the share root would come back as the folder's content.
+    /// </summary>
+    private static ProtocolCommandResult Complete(ProtocolCommandResult result)
+    {
+        if (result.OutputTruncated)
+            throw new InvalidDataException("The SMB folder has too many entries to list them completely.");
+        Match failedCd = FailedCd().Match(result.StandardOutput + "\n" + result.StandardError);
+        if (failedCd.Success)
+        {
+            string status = failedCd.Groups["status"].Value;
+            if (status.Contains("NOT_FOUND", StringComparison.Ordinal))
+                throw new DirectoryNotFoundException("The SMB folder does not exist.");
+            if (ProtocolCommandRunner.IsAccessDeniedOutput(status))
+                throw new RemoteStorageAccessDeniedException("The remote storage system denied the requested operation.");
+            throw new IOException($"The SMB folder could not be opened ({status}).");
+        }
+        ProtocolCommandRunner.ThrowIfFailed(result);
+        return result;
+    }
+
+    [GeneratedRegex(@"^cd .*: (?<status>NT_STATUS_\w+)\s*$", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
+    private static partial Regex FailedCd();
 
     public async Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
     {
@@ -157,7 +194,9 @@ internal sealed class SmbCommandRemoteFileStore(
         CancellationToken cancellationToken,
         bool throwOnFailure = true,
         bool encryptionProbe = false,
-        IReadOnlyDictionary<string, string>? environment = null)
+        IReadOnlyDictionary<string, string>? environment = null,
+        bool stopAtOutputLimit = false,
+        int? outputLimit = null)
     {
         string authFile = ProtocolTemporaryFile.CreatePath();
         try
@@ -187,6 +226,8 @@ internal sealed class SmbCommandRemoteFileStore(
                 arguments.Add("--client-protection=encrypt");
             if (command is not null)
                 arguments.AddRange(["-c", command]);
+            if (stopAtOutputLimit)
+                return await runner.RunUntilOutputLimitAsync("smbclient", arguments, cancellationToken, outputLimit);
             return environment is null
                 ? await runner.RunAsync("smbclient", arguments, cancellationToken, throwOnFailure)
                 : await runner.RunAsync("smbclient", arguments, environment, cancellationToken, throwOnFailure);

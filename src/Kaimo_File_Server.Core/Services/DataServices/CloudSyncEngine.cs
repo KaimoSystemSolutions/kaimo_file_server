@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
@@ -15,6 +17,9 @@ namespace Kaimo_File_Server.Core.Services.DataServices;
 /// </summary>
 internal sealed partial class CloudSyncEngine
 {
+    // Upper bound for any provider's parallel listings, whatever it declares.
+    private const int MaxListConcurrency = 16;
+
     private readonly ICloudConnection _remote;
     private readonly IFileService _local;
     private readonly UserContext _user;
@@ -39,8 +44,11 @@ internal sealed partial class CloudSyncEngine
     // ponytail: holds the full remote tree's metadata in memory for the run;
     // fuse listing and reconciliation into one streaming walk if that ever
     // matters on very large trees.
-    private readonly Dictionary<string, IReadOnlyList<CloudItemMeta>> _remoteListings =
+    private readonly ConcurrentDictionary<string, IReadOnlyList<CloudItemMeta>> _remoteListings =
         new(StringComparer.OrdinalIgnoreCase);
+
+    // Caps the pre-scan's parallel folder listings at what the provider allows.
+    private readonly SemaphoreSlim _listGate;
 
     public CloudSyncEngine(
         ICloudConnection remote,
@@ -61,6 +69,7 @@ internal sealed partial class CloudSyncEngine
         _failures = failures;
         _progress = new SyncProgress { Report = reportProgress };
         _cancellationToken = cancellationToken;
+        _listGate = new SemaphoreSlim(Math.Clamp(remote.ListConcurrency, 1, MaxListConcurrency));
 
         // A manifest of the converged state is maintained for every two-way run,
         // even when delete propagation is off, so that enabling the option later
@@ -109,10 +118,10 @@ internal sealed partial class CloudSyncEngine
     }
 
     /// <summary>
-    /// Recursively lists the remote tree once, caching every directory's listing
-    /// by path and returning the total byte size. Replaces a separate size-only
-    /// walk so reconciliation can reuse these listings instead of re-listing the
-    /// whole remote tree, halving remote metadata round-trips on pull/two-way.
+    /// Lists the remote tree once, caching every directory's listing by path and
+    /// returning the total byte size, so reconciliation reuses these listings instead
+    /// of fetching each folder a second time. Uses the provider's whole-tree listing
+    /// when it offers one, otherwise lists folders in parallel up to its limit.
     /// </summary>
     private async Task<long> ListRemoteTreeAsync(string remoteDir)
     {
@@ -120,20 +129,108 @@ internal sealed partial class CloudSyncEngine
         // Match the exact path SyncDirectoryAsync lists and looks up by, so the cache
         // hits: the trimmed directory at the root and "{dir}/{name}" for children,
         // never the provider's own item.Path (which may be normalized differently).
-        string dir = remoteDir.TrimEnd('/');
-        var items = await _remote.ListAsync(dir, _cancellationToken);
-        _remoteListings[dir] = items;
-        _progress.Scanned(items);
+        string root = remoteDir.TrimEnd('/');
+        if (await TryListWholeTreeAsync(root))
+            return _remoteListings.Values.SelectMany(items => items)
+                .Where(item => !item.IsDirectory).Sum(item => item.Size);
+        return await ListRemoteSubtreeAsync(root, isRoot: true);
+    }
 
-        long total = 0;
-        foreach (var item in items)
+    /// <summary>
+    /// Fills the cache from one whole-tree listing. Any failure falls back to the
+    /// per-folder walk, which reports a broken folder precisely instead of failing all.
+    /// </summary>
+    private async Task<bool> TryListWholeTreeAsync(string root)
+    {
+        IReadOnlyDictionary<string, IReadOnlyList<CloudItemMeta>>? tree;
+        // One call yields no intermediate counts and may run for minutes on a large or slow
+        // remote, so announce the scan before it starts.
+        _progress.ReportPhase(SyncProgress.Text("Web_Jobs_CloudSync_RemoteTreeScan", "Scanning remote folder…"));
+        try
         {
-            _cancellationToken.ThrowIfCancellationRequested();
-            total += item.IsDirectory
-                ? await ListRemoteTreeAsync($"{dir}/{item.Name}")
-                : item.Size;
+            tree = await _remote.TryListTreeAsync(root, _cancellationToken);
         }
-        return total;
+        catch (OperationCanceledException) when (_cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+        if (tree is null || !tree.ContainsKey(""))
+            return false;
+
+        // Parents first, so a folder linking back to an ancestor is caught before its repetitions.
+        foreach (var (relative, items) in tree.OrderBy(pair => pair.Key.Length == 0 ? 0 : 1 + pair.Key.Count(c => c == '/')))
+        {
+            string dir = relative.Length == 0 ? root : $"{root}/{relative}";
+            if (IsBelowRemoteLoop(dir) || IsRemoteLoop(dir, items))
+                continue;
+            _remoteListings[dir] = items;
+        }
+        _progress.Scanned(_remoteListings.Values.SelectMany(items => items));
+        return true;
+    }
+
+    /// <summary>
+    /// Lists one folder and, in parallel, its subfolders. A folder below the root that
+    /// cannot be listed stays out of the cache: reconciliation lists it again and records
+    /// the failure, so one broken folder cannot abort the run. A root failure propagates.
+    /// </summary>
+    private async Task<long> ListRemoteSubtreeAsync(string dir, bool isRoot)
+    {
+        IReadOnlyList<CloudItemMeta> items;
+        await _listGate.WaitAsync(_cancellationToken);
+        try
+        {
+            items = await ListRemoteWithRetryAsync(dir);
+        }
+        catch (Exception) when (!isRoot && !_cancellationToken.IsCancellationRequested)
+        {
+            return 0;
+        }
+        finally
+        {
+            _listGate.Release();
+        }
+
+        if (IsRemoteLoop(dir, items))
+            return 0;
+        _remoteListings[dir] = items;
+        lock (_progress)
+            _progress.Scanned(items);
+
+        var subtrees = items.Where(item => item.IsDirectory)
+            .Select(item => ListRemoteSubtreeAsync($"{dir}/{item.Name}", isRoot: false));
+        return items.Where(item => !item.IsDirectory).Sum(item => item.Size)
+               + (await Task.WhenAll(subtrees)).Sum();
+    }
+
+    /// <summary>
+    /// Lists one remote folder, retrying transient faults (throttling, network blips) with
+    /// exponential back-off. A missing or denied folder fails at once.
+    /// </summary>
+    // ponytail: fixed back-off, Retry-After is ignored; honor it if a provider throttles harder.
+    private async Task<IReadOnlyList<CloudItemMeta>> ListRemoteWithRetryAsync(string dir)
+    {
+        const int maxAttempts = 5;
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await _remote.ListAsync(dir, _cancellationToken);
+            }
+            catch (Exception exception) when (attempt < maxAttempts
+                                              && !_cancellationToken.IsCancellationRequested
+                                              && IsTransient(exception)
+                                              && exception is not (DirectoryNotFoundException
+                                                  or FileNotFoundException
+                                                  or RemoteStorageAccessDeniedException))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(500 << (attempt - 1)), _cancellationToken);
+            }
+        }
     }
 
     /// <summary>
@@ -255,7 +352,7 @@ internal sealed partial class CloudSyncEngine
             var remoteListing = _remoteListings.TryGetValue(remoteDir, out var cachedRemote)
                 ? cachedRemote
                 : await Guard(SyncEndpoint.Remote,
-                    () => _remote.ListAsync(remoteDir, _cancellationToken));
+                    () => ListRemoteWithRetryAsync(remoteDir));
 
             localItems = (await Guard(SyncEndpoint.Local,
                     () => _local.ListAsync(localDir, _user)))
@@ -311,6 +408,9 @@ internal sealed partial class CloudSyncEngine
             // not user content. Skipping them keeps a locally recycled file from
             // being re-uploaded (which would otherwise defeat delete propagation).
             if (ShareEntryPolicy.Classify(localChild).Kind != ShareEntryKind.Regular)
+                continue;
+
+            if (remote is { IsDirectory: true } && SkipRemoteLoop(remoteChild, localChild))
                 continue;
 
             (bool Local, bool Remote) changed;

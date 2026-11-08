@@ -89,6 +89,19 @@ public interface IRemoteFileStore
         string path,
         CancellationToken cancellationToken = default);
 
+    /// <summary>How many <see cref="ListAsync"/> calls a sync may run at once (default: one).</summary>
+    int ListConcurrency => 1;
+
+    /// <summary>
+    /// Optional: lists every folder below <paramref name="path"/> in one call, keyed by the folder
+    /// path relative to it ("" = the folder itself, "a/b" = nested). Leave out any folder that could
+    /// not be listed completely. <c>null</c> = not supported (the default).
+    /// </summary>
+    Task<IReadOnlyDictionary<string, IReadOnlyList<RemoteStorageItem>>?> TryListTreeAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyDictionary<string, IReadOnlyList<RemoteStorageItem>>?>(null);
+
     Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default);
 
     Task WriteAsync(
