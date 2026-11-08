@@ -86,7 +86,7 @@ public sealed partial class WebDavController : ControllerBase
         if (shareName.Length == 0)
             return await PropFindRootAsync(user, depth.Value, request);
 
-        var share = await GetVisibleShareAsync(shareName);
+        var share = await GetVisibleShareAsync(shareName, user);
         if (share is null) return new StatusCodeResult(StatusCodes.Status404NotFound);
         var fs = await _router.ForPathAsync(share, relativePath, user);
 
@@ -130,6 +130,15 @@ public sealed partial class WebDavController : ControllerBase
                 if (share.IsShareHidden) continue;
                 var fs = _fileServiceFactory.CreateForShare(share);
                 if (!await fs.CanListAsync(string.Empty, user)) continue;
+                entries.Add(new WebDavEntry(
+                    BuildHref(share.Name, string.Empty, isCollection: true),
+                    share.Name, IsCollection: true, 0, now, now, null, []));
+            }
+
+            foreach (var share in await _router.VisibleVirtualSharesAsync(user))
+            {
+                // Shares are addressed by name here, so a local share of that name hides it.
+                if (await _shares.GetByNameAsync(share.Name) is not null) continue;
                 entries.Add(new WebDavEntry(
                     BuildHref(share.Name, string.Empty, isCollection: true),
                     share.Name, IsCollection: true, 0, now, now, null, []));
@@ -294,10 +303,10 @@ public sealed partial class WebDavController : ControllerBase
         if (outcome != WebDavPathResolver.DestinationOutcome.Ok || destPath.Length == 0)
             return new StatusCodeResult(StatusCodes.Status400BadRequest);
 
-        var destShare = await GetVisibleShareAsync(destShareName);
+        var destShare = await GetVisibleShareAsync(destShareName, source!.User);
         if (destShare is null)
             return new StatusCodeResult(StatusCodes.Status409Conflict);
-        var destFs = await _router.ForPathAsync(destShare, destPath, source!.User, freshListings: true);
+        var destFs = await _router.ForPathAsync(destShare, destPath, source.User, freshListings: true);
         var sameBackend = ReferenceEquals(source.Fs, destFs);
 
         // Same rule as the REST transfer: overwriting an ancestor would delete the source itself,

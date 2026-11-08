@@ -117,6 +117,9 @@ public sealed partial class BrowseApiController : ApiControllerBase
                 visible.Add(new ShareDto(share.Id, share.Name, share.IsRecycleEnabled));
         }
 
+        visible.AddRange((await _router.VisibleVirtualSharesAsync(user))
+            .Select(share => new ShareDto(share.Id, share.Name, share.IsRecycleEnabled, IsVirtual: true)));
+
         return Ok(visible);
     }
 
@@ -253,7 +256,7 @@ public sealed partial class BrowseApiController : ApiControllerBase
         var user = await ResolveUserAsync(_userContextFactory);
         if (user is null) return (null, ApiUnauthorized());
 
-        var share = await _shares.GetByIdAsync(shareId);
+        var share = await FindShareAsync(shareId, user);
         if (share is null || !share.IsEnabled) return (null, ApiNotFound("Share not found."));
 
         if (!ShareRelativePath.TryNormalizeStrict(path ?? string.Empty, out var normalized, allowRoot))
@@ -262,6 +265,10 @@ public sealed partial class BrowseApiController : ApiControllerBase
         var fs = await _router.ForPathAsync(share, normalized, user, freshListings: !HttpMethods.IsGet(Request.Method));
         return (new Resolved(user, share, fs, normalized), null);
     }
+
+    /// <summary>A local share, or the standalone virtual share with this id if the caller may open it.</summary>
+    private async Task<ShareDefinition?> FindShareAsync(Guid shareId, UserContext user)
+        => await _shares.GetByIdAsync(shareId) ?? await _router.GetVirtualShareAsync(shareId, user);
 
     /// <summary>Maps the file service's exceptions to the uniform error envelope.</summary>
     private async Task<IActionResult> GuardAsync(Func<Task<IActionResult>> action)

@@ -20,7 +20,7 @@ public partial class BrowseApiController
         var user = await ResolveUserAsync(_userContextFactory);
         if (user is null) return ApiUnauthorized();
 
-        var share = await _shares.GetByIdAsync(shareId);
+        var share = await FindShareAsync(shareId, user);
         if (share is null || !share.IsEnabled) return ApiNotFound("Share not found.");
 
         if (request is null
@@ -102,10 +102,10 @@ public partial class BrowseApiController
             || !ShareRelativePath.TryNormalizeStrict(request.TargetPath, out var to, allowRoot: false))
             return ApiBadRequest("invalid_path", "Both 'sourcePath' and 'targetPath' must be valid paths.");
 
-        var source = await _shares.GetByIdAsync(request.SourceShareId);
+        var source = await FindShareAsync(request.SourceShareId, user);
         var target = request.TargetShareId == request.SourceShareId
             ? source
-            : await _shares.GetByIdAsync(request.TargetShareId);
+            : await FindShareAsync(request.TargetShareId, user);
         if (source is null || !source.IsEnabled || target is null || !target.IsEnabled)
             return ApiNotFound("Share not found.");
 

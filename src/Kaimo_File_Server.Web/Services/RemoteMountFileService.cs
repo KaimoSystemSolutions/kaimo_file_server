@@ -88,8 +88,10 @@ public sealed partial class RemoteMountFileService(
     /// <summary>Path below the mount root ("" = the root); anything outside the mount is refused.</summary>
     private string ToRemote(string hostPath)
     {
-        if (!ShareRelativePath.TryNormalizeStrict(hostPath ?? string.Empty, out var normalized)
-            || !ShareRelativePath.IsSameOrDescendant(mount.MountPath, normalized))
+        if (!ShareRelativePath.TryNormalizeStrict(hostPath ?? string.Empty, out var normalized))
+            throw new UnauthorizedAccessException("The path is outside the mounted folder.");
+        if (mount.MountPath.Length == 0) return normalized; // a standalone virtual share has no host path
+        if (!ShareRelativePath.IsSameOrDescendant(mount.MountPath, normalized))
             throw new UnauthorizedAccessException("The path is outside the mounted folder.");
         return normalized.Length == mount.MountPath.Length ? string.Empty : normalized[(mount.MountPath.Length + 1)..];
     }

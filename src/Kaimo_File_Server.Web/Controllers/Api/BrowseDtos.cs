@@ -8,7 +8,7 @@ namespace Kaimo_File_Server.Web.Controllers.Api;
 /// sends and hide it from the user). Set only for the caller's home folder ("user"), whose
 /// backing share holds all homes; <c>null</c> for regular shares.
 /// </param>
-public sealed record ShareDto(Guid Id, string Name, bool IsRecycleEnabled, string? RootPath = null);
+public sealed record ShareDto(Guid Id, string Name, bool IsRecycleEnabled, string? RootPath = null, bool IsVirtual = false);
 
 /// <summary>A file or directory entry in a listing.</summary>
 /// <param name="IsVirtualFolder">

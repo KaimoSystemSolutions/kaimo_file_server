@@ -454,6 +454,17 @@ public sealed class BrowseApiControllerMountTests : IDisposable
         Assert.Equal(201, Status(result));
     }
 
+    [Fact]
+    public async Task Sync_ExcludesStandaloneVirtualShares()
+    {
+        var (sut, profiles, deviceId) = NewSyncController();
+
+        Assert.Equal(404, Status(await sut.Delta(_h.Standalone.Id, null)));
+        Assert.Equal(404, Status(await sut.CreateProfile(
+            new CreateSyncProfileRequest(deviceId, _h.Standalone.Id, "", "C:/x", default, true))));
+        profiles.Verify(p => p.CreateAsync(It.IsAny<DeviceSyncProfile>()), Times.Never);
+    }
+
     // ── search ───────────────────────────────────────────────────────
 
     private (SearchApiController Sut, Mock<ISearchService> Search) NewSearchController()

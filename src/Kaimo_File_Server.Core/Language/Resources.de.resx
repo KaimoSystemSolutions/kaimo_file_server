@@ -3149,7 +3149,7 @@
     <value>Virtuelle Shares aus externem Speicher</value>
   </data>
   <data name="Web_CloudAccess_Subtitle" xml:space="preserve">
-    <value>Remote-Ordner als virtuelle, nur im Web-Dateibrowser sichtbare Shares bereitstellen.</value>
+    <value>Remote-Ordner als virtuelle Shares für Web-Dateibrowser, App und WebDAV bereitstellen.</value>
   </data>
   <data name="Web_CloudAccess_Loading" xml:space="preserve">
     <value>Virtuelle Shares aus externem Speicher werden geladen…</value>

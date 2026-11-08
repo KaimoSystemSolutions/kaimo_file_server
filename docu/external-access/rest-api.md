@@ -136,8 +136,12 @@ segment a transfer. Uploads stream straight to disk with an atomic replace.
 share; the endpoints above work below it with host-relative paths. The folder and everything below
 it carry `isVirtualFolder: true`. There the content lives at a storage provider: a delete is
 permanent, versions are empty, `Range` works only on seekable provider streams (otherwise `200` with
-the whole file), and timestamps are best effort. See
-[Mounted folders over REST and WebDAV](../external-storage/virtual-shares.md#mounted-folders-over-rest-and-webdav).
+the whole file), and timestamps are best effort.
+
+**Virtual shares.** A standalone virtual share is listed by `browse/shares` with `isVirtual: true` and
+addressed by its ID like any share. Everything in it carries `isVirtualFolder: true` and follows the
+rules of a mounted folder. Sync endpoints answer `404` for it. See
+[Virtual shares and mounted folders over REST and WebDAV](../external-storage/virtual-shares.md#virtual-shares-and-mounted-folders-over-rest-and-webdav).
 
 **Preserving the modification time.** By default an upload's modified time is the
 write time. A sync client sends `X-Kaimo-Modified-At: <Unix epoch milliseconds, UTC>`

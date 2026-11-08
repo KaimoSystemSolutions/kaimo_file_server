@@ -42,7 +42,8 @@ and uses the same DI graph (`IFileServiceFactory`, `IShareRepository`, `IUserCon
 - Disabled or unknown shares answer `404`, never `403`.
 - Paths are normalized with `ShareRelativePath.TryNormalizeStrict`; rejected paths answer `400`.
 - Internal `.kaimo-*` entries are omitted and refused. `.RECYCLE_BIN` is visible and browsable.
-- Only local shares are exposed; Cloud Access virtual shares are not part of the DAV namespace.
+- Local shares and the Cloud Access virtual shares a user may open are exposed. A local share wins over
+  a virtual share of the same name.
 
 ## Authentication
 
@@ -91,11 +92,12 @@ Exceptions map uniformly: `UnauthorizedAccessException` → `403`, `FileNotFound
 `DirectoryNotFoundException` / `KeyNotFoundException` → `404`, `InvalidOperationException` → `409`,
 `RemoteShareUnavailableException` → `503`.
 
-A virtual share mounted as a folder appears as a normal collection of its host share. Inside it a
-`DELETE` is permanent (no recycle bin, no confirmation), a `MOVE` out of it answers `403` (use `COPY`),
-`Overwrite: T` keeps the old target until the copy has replaced it (folders merge, a file/folder clash
-answers `409`), and `Range` works only on seekable provider streams. See
-[Mounted folders over REST and WebDAV](../external-storage/virtual-shares.md#mounted-folders-over-rest-and-webdav).
+A virtual share appears at `/dav/<name>`, or as a normal collection of its host share when it is
+mounted as a folder. Inside it a `DELETE` is permanent (no recycle bin, no confirmation), a `MOVE` out
+of it answers `403` (use `COPY`), `Overwrite: T` keeps the old target until the copy has replaced it
+(folders merge, a file/folder clash answers `409`), and `Range` works only on seekable provider
+streams. See
+[Virtual shares and mounted folders over REST and WebDAV](../external-storage/virtual-shares.md#virtual-shares-and-mounted-folders-over-rest-and-webdav).
 
 ## Locking
 

@@ -115,4 +115,106 @@ public sealed class MountAwareFileServiceRouterTests : IDisposable
         _h.Host.IsUserHomes = true;
         Assert.IsNotType<RemoteMountFileService>(await _h.NewRouter().ForPathAsync(_h.Host, "Team/Cloud", _h.User));
     }
+
+    // ── standalone virtual shares ────────────────────────────────────
+
+    [Fact]
+    public async Task VirtualShare_ById_IsAddressableLikeAShare()
+    {
+        var share = await _h.NewRouter().GetVirtualShareAsync(_h.Standalone.Id, _h.User);
+
+        Assert.NotNull(share);
+        Assert.Equal(_h.Standalone.Id, share.Id);
+        Assert.Equal("Archiv", share.Name);
+        Assert.True(share.IsEnabled);
+        Assert.False(share.IsRecycleEnabled);
+    }
+
+    [Fact]
+    public async Task VirtualShare_WithoutGrant_IsNotFound()
+    {
+        _h.Granted = null;
+        var router = _h.NewRouter();
+        Assert.Null(await router.GetVirtualShareAsync(_h.Standalone.Id, _h.User));
+        Assert.Null(await router.GetVirtualShareByNameAsync("Archiv", _h.User));
+        Assert.Empty(await router.VisibleVirtualSharesAsync(_h.User));
+    }
+
+    [Fact]
+    public async Task VirtualShare_Disabled_IsNotFound()
+    {
+        _h.Standalone.IsEnabled = false;
+        Assert.Null(await _h.NewRouter().GetVirtualShareAsync(_h.Standalone.Id, _h.User));
+    }
+
+    [Fact]
+    public async Task VirtualShare_UnknownId_IsNotFound()
+        => Assert.Null(await _h.NewRouter().GetVirtualShareAsync(Guid.NewGuid(), _h.User));
+
+    [Fact]
+    public async Task MountedShare_IsReachableOnlyThroughItsHost()
+    {
+        var router = _h.NewRouter();
+        Assert.Null(await router.GetVirtualShareAsync(_h.Share.Id, _h.User));
+        Assert.Null(await router.GetVirtualShareByNameAsync("Cloud", _h.User));
+        Assert.DoesNotContain(await router.VisibleVirtualSharesAsync(_h.User), s => s.Id == _h.Share.Id);
+    }
+
+    [Fact]
+    public async Task OrphanedMount_NeverFallsBackToStandalone()
+    {
+        _h.Share.MountShareId = null;
+        _h.Share.MountPath = null;
+        Assert.Null(await _h.NewRouter().GetVirtualShareAsync(_h.Share.Id, _h.User));
+    }
+
+    [Fact]
+    public async Task VirtualShare_ByName_MatchesLikeLocalShares()
+    {
+        var router = _h.NewRouter();
+        Assert.Equal(_h.Standalone.Id, (await router.GetVirtualShareByNameAsync("Archiv", _h.User))?.Id);
+        Assert.Null(await router.GetVirtualShareByNameAsync("archiv", _h.User));
+        Assert.Null(await router.GetVirtualShareByNameAsync("Nope", _h.User));
+    }
+
+    [Fact]
+    public async Task VisibleVirtualShares_LeaveOutConnectionsThatAreNotReady()
+    {
+        Assert.Equal(_h.Standalone.Id, Assert.Single(await _h.NewRouter().VisibleVirtualSharesAsync(_h.User)).Id);
+
+        _h.Connection.State = StorageConnectionState.Disabled;
+        Assert.Empty(await _h.NewRouter().VisibleVirtualSharesAsync(_h.User));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("a.txt")]
+    [InlineData("docs/b.txt")]
+    public async Task VirtualShare_RoutesEveryPathToOneAdapter(string path)
+    {
+        var router = _h.NewRouter();
+        var share = (await router.GetVirtualShareAsync(_h.Standalone.Id, _h.User))!;
+
+        var adapter = await router.ForPathAsync(share, path, _h.User);
+
+        Assert.IsType<RemoteMountFileService>(adapter);
+        Assert.Same(adapter, await router.ForPathAsync(share, "other", _h.User));
+    }
+
+    [Fact]
+    public async Task VirtualShare_AdapterCarriesTheGrant()
+    {
+        _h.Granted = CloudAccessPermission.Read;
+        var router = _h.NewRouter();
+        var share = (await router.GetVirtualShareAsync(_h.Standalone.Id, _h.User))!;
+        Assert.False(await (await router.ForPathAsync(share, "a", _h.User)).CanWriteAsync("a", _h.User));
+    }
+
+    [Fact]
+    public async Task LocalShare_StaysLocal_AfterVirtualSharesWereLoaded()
+    {
+        var router = _h.NewRouter();
+        await router.VisibleVirtualSharesAsync(_h.User);
+        Assert.IsNotType<RemoteMountFileService>(await router.ForPathAsync(_h.Host, "Team", _h.User));
+    }
 }

@@ -28,7 +28,7 @@ public partial class WebDavController
         if (!allowRoot && relativePath.Length == 0)
             return (null, new StatusCodeResult(StatusCodes.Status403Forbidden));
 
-        var share = await GetVisibleShareAsync(shareName);
+        var share = await GetVisibleShareAsync(shareName, user);
         if (share is null) return (null, new StatusCodeResult(StatusCodes.Status404NotFound));
 
         var isRead = HttpMethods.IsGet(Request.Method) || HttpMethods.IsHead(Request.Method);
@@ -73,10 +73,13 @@ public partial class WebDavController
     private static bool IsCreatableName(string path)
         => WindowsFileNameHelper.IsValid(ShareRelativePath.GetFileName(path));
 
-    /// <summary>A share addressable over WebDAV: enabled and known. Hidden shares stay reachable by direct URL.</summary>
-    private async Task<ShareDefinition?> GetVisibleShareAsync(string name)
+    /// <summary>
+    /// A share addressable over WebDAV: enabled and known, a local one winning over a virtual share
+    /// of the same name. Hidden shares stay reachable by direct URL.
+    /// </summary>
+    private async Task<ShareDefinition?> GetVisibleShareAsync(string name, UserContext user)
     {
-        var share = await _shares.GetByNameAsync(name);
+        var share = await _shares.GetByNameAsync(name) ?? await _router.GetVirtualShareByNameAsync(name, user);
         return share is { IsEnabled: true } ? share : null;
     }
 

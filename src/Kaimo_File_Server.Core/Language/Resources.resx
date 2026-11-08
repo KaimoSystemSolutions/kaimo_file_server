@@ -3149,7 +3149,7 @@
     <value>External storage virtual shares</value>
   </data>
   <data name="Web_CloudAccess_Subtitle" xml:space="preserve">
-    <value>Expose remote folders as virtual shares available only in the web file browser.</value>
+    <value>Expose remote folders as virtual shares for the web file browser, the app and WebDAV.</value>
   </data>
   <data name="Web_CloudAccess_Loading" xml:space="preserve">
     <value>Loading external storage virtual shares…</value>

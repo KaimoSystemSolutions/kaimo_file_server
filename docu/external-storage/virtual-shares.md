@@ -1,10 +1,10 @@
 # Virtual Shares (Cloud Access)
 
 A virtual share exposes a folder behind a storage connection (OneDrive, Dropbox, Google Drive, SMB,
-SFTP, WebDAV) as a share in the web file browser. Content stays at the provider and is accessed
-lazily on demand; nothing is copied to local storage. Virtual shares are a separate backend from
-local shares and are available in the Web host only. A virtual share mounted as a folder is also
-reachable over REST and WebDAV ([rules](#mounted-folders-over-rest-and-webdav)).
+SFTP, WebDAV) as a share in the web file browser, the REST API and WebDAV
+([rules](#virtual-shares-and-mounted-folders-over-rest-and-webdav)). Content stays at the provider
+and is accessed lazily on demand; nothing is copied to local storage. Virtual shares are a separate
+backend from local shares and are served by the Web host only.
 
 Related: [Connections and credentials](connections-and-credentials.md) · [Providers](providers.md) ·
 [Downloads and share links](../external-access/downloads-and-share-links.md)
@@ -18,8 +18,10 @@ Related: [Connections and credentials](connections-and-credentials.md) · [Provi
 
 Defined in `src/Kaimo_File_Server.Core/Domain/CloudAccessShare.cs`.
 
-- Share names are valid Samba share names and unique case-insensitively across local **and** virtual
-  shares.
+- Share names are valid Samba share names. Creating or renaming a virtual share checks them
+  case-insensitively against local and virtual shares. Creating a local share does not check virtual
+  shares; on WebDAV, which addresses shares by name, the local share then wins and the virtual share
+  is not listed. REST addresses shares by ID and is not affected.
 - Changing the remote root re-resolves the provider item and keeps the share ID and its grants.
 - Deleting a virtual share never deletes remote data.
 - A connection referenced by a virtual share cannot be deleted (restrictive foreign key).
@@ -28,7 +30,7 @@ Defined in `src/Kaimo_File_Server.Core/Domain/CloudAccessShare.cs`.
 
 | Aspect | Local share | Virtual share |
 |---|---|---|
-| Protocols | Web, REST, WebDAV, SMB | Web file browser only |
+| Protocols | Web, REST, WebDAV, SMB | Web, REST, WebDAV |
 | Access control | Per-item ACLs (`AccessEntry`) | Whole-share grants, default deny |
 | Versioning, recycle bin, search index, change log, snapshots | Yes | No |
 | Effective access | Kaimo ACLs | Kaimo grant **and** the provider account's own permissions |
@@ -104,15 +106,33 @@ mount is a synthetic, open-only folder entry (`IFileBrowserViewModel.IsMountEntr
 keeps its rules: the host share is searched through the index (which never contains remote content),
 and inside the mounted folder the name walk of virtual shares is used.
 
-### Mounted folders over REST and WebDAV
+### Virtual shares and mounted folders over REST and WebDAV
 
-REST and WebDAV run in the Web host, next to the credential vault, and show a mounted folder as a
-normal folder of the host share. `MountAwareFileServiceRouter` (scoped to one request) resolves the
-visible mounts of the host share once and hands the endpoint either the normal `IFileService` or a
-`RemoteMountFileService`, an adapter over the provider's `IRemoteFileStore`. Endpoints, `WebDavCopy`
-and the error mapping stay the same. Paths stay host-share-relative (`Team/Cloud/a.txt`): the adapter
-strips the mount path on the way in and puts it back on the way out. Listings go through the
-`CloudAccessDirectoryCache` shared with the web browser, and every change invalidates the share.
+REST and WebDAV run in the Web host, next to the credential vault. They show a mounted folder as a
+normal folder of the host share, and a standalone virtual share next to the local shares
+(`GET api/v1/browse/shares` with `isVirtual`, `/dav/<name>`). `MountAwareFileServiceRouter` (scoped to
+one request) resolves the visible mounts of the host share once and hands the endpoint either the
+normal `IFileService` or a `RemoteMountFileService`, an adapter over the provider's `IRemoteFileStore`.
+Endpoints, `WebDavCopy` and the error mapping stay the same. Paths stay host-share-relative
+(`Team/Cloud/a.txt`): the adapter strips the mount path on the way in and puts it back on the way out.
+A standalone virtual share is the same adapter with an empty mount path; for the endpoints the router
+presents it as a `ShareDefinition` that exists only for the request and is never stored. Listings go
+through the `CloudAccessDirectoryCache` shared with the web browser, and every change invalidates the
+share.
+
+Existing grants apply on every transport; there is no per-share switch for REST or WebDAV. The per-user
+service switches (app, WebDAV) still apply. The table below is written for mounts; a standalone virtual
+share follows the same rules, with these differences:
+
+| Topic | Standalone virtual share |
+|---|---|
+| Visibility | Listed if the user holds a grant or manages the share and its connection is `Ready`. Without access, or for an ID or name of a mounted share, the share answers as unknown (`404`). A mounted or orphaned share is reachable only through its host, so the host ACL cannot be bypassed |
+| Rights | The grant alone (or management of the share), intersected with the provider capabilities |
+| Share root | Cannot be deleted or renamed (`403` on WebDAV, `400 invalid_path` on REST, which needs a path) |
+| Move | Into the share: copy, then delete the source. Within the share: rename. Out of it, also into another virtual share: refused, as for a mount |
+| Connection not `Ready` | Not listed; a direct request answers `503` |
+| Sync | Not supported. All sync endpoints answer `404` for its ID; the app does not offer it |
+| Search | With its `shareId`: name walk at the provider. Without `shareId` it is not searched, because the index never contains remote content |
 
 | Topic | Rule |
 |---|---|
@@ -134,6 +154,6 @@ strips the mount path on the way in and puts it back on the way out. Listings go
 
 Each request opens its own provider session on first use and closes it at the end of the request.
 
-Out of scope: the mount is invisible over SMB, and every recursive host-side operation (copy or ZIP
+Out of scope: virtual shares and mounts are invisible over SMB, and every recursive host-side operation (copy or ZIP
 of a parent folder, folder sizes, backup, indexing, sync delta, share pool move) skips it, because
 the remote content is not part of the host share.

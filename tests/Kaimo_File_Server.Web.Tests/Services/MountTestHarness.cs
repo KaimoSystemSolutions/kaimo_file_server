@@ -113,7 +113,10 @@ internal sealed class FakeRemoteFileStore : IRemoteFileStore
     }
 }
 
-/// <summary>A local host share on disk with one virtual share mounted at Team/Cloud.</summary>
+/// <summary>
+/// A local host share on disk with one virtual share mounted at Team/Cloud, and one standalone
+/// virtual share. Both use the same provider folder.
+/// </summary>
 internal sealed class MountTestHarness : IDisposable
 {
     public const StorageProviderCapabilities AllCapabilities =
@@ -130,8 +133,10 @@ internal sealed class MountTestHarness : IDisposable
     public ShareDefinition Host { get; }
     public string HostPath => _root;
     public CloudAccessShare Share { get; }
+    public CloudAccessShare Standalone { get; }
     public CloudAccessDirectoryCache Cache { get; }
     public Mock<ICloudAccessRepository> Repository { get; } = new();
+    public Mock<IStorageConnectionRepository> Connections { get; } = new();
     public Mock<IAclService> Acl { get; } = new();
     public Mock<ICloudAccessMountGuard> MountGuard { get; } = new();
     public Mock<IFileServiceFactory> Factory { get; } = new();
@@ -154,14 +159,18 @@ internal sealed class MountTestHarness : IDisposable
             MountShareId = Host.Id,
             MountPath = "Team/Cloud"
         };
+        Standalone = new CloudAccessShare { ConnectionId = _connection.Id, Name = "Archiv", RemoteRootPath = "root" };
 
         var settings = new Mock<ICloudAccessSettingsStore>();
         settings.Setup(x => x.GetAsync()).ReturnsAsync(CloudAccessRuntimeSettings.Default());
         Cache = new CloudAccessDirectoryCache(_memory, settings.Object);
 
-        Repository.Setup(r => r.GetSharesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => [Share]);
+        Repository.Setup(r => r.GetSharesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => [Share, Standalone]);
         Repository.Setup(r => r.GetMountedSharesAsync(Host.Id, It.IsAny<CancellationToken>())).ReturnsAsync(() => [Share]);
         Repository.Setup(r => r.GetShareAsync(Share.Id, It.IsAny<CancellationToken>())).ReturnsAsync(Share);
+        Repository.Setup(r => r.GetShareAsync(Standalone.Id, It.IsAny<CancellationToken>())).ReturnsAsync(Standalone);
+        Connections.Setup(x => x.GetAsync(_connection.Id, It.IsAny<CancellationToken>())).ReturnsAsync(_connection);
+        Connections.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => [_connection]);
         Repository.Setup(r => r.GetEffectivePermissionAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<Guid>>()))
             .ReturnsAsync(() => Granted);
 
@@ -183,8 +192,6 @@ internal sealed class MountTestHarness : IDisposable
 
     public CloudAccessRemoteSessionOpener NewOpener()
     {
-        var connections = new Mock<IStorageConnectionRepository>();
-        connections.Setup(x => x.GetAsync(_connection.Id, It.IsAny<CancellationToken>())).ReturnsAsync(_connection);
         var provider = new Mock<IStorageConnectionProvider>();
         provider.Setup(x => x.OpenSessionAsync(_connection, It.IsAny<CancellationToken>()))
             .ReturnsAsync(() =>
@@ -202,27 +209,41 @@ internal sealed class MountTestHarness : IDisposable
             });
         var providers = new Mock<IStorageConnectionProviderCatalog>();
         providers.Setup(x => x.GetRequired("test")).Returns(provider.Object);
-        return new CloudAccessRemoteSessionOpener(Repository.Object, connections.Object, providers.Object);
+        return new CloudAccessRemoteSessionOpener(Repository.Object, Connections.Object, providers.Object);
     }
 
-    public CloudAccessMountResolver NewResolver()
+    private Mock<IShareRepository> NewShares()
+    {
+        var shares = new Mock<IShareRepository>();
+        shares.Setup(s => s.GetByIdAsync(Host.Id)).ReturnsAsync(Host);
+        return shares;
+    }
+
+    private CloudAccessAuthorizationService NewAuthorization(IShareRepository shares)
     {
         var management = new Mock<IManagementAuthService>();
         management.Setup(m => m.GetAuthorizedDepartmentIdsAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
             .ReturnsAsync(AuthorizedScopeResult.None());
-        var shares = new Mock<IShareRepository>();
-        shares.Setup(s => s.GetByIdAsync(Host.Id)).ReturnsAsync(Host);
-        var authorization = new CloudAccessAuthorizationService(Repository.Object, management.Object, shares.Object, Acl.Object);
-        return new CloudAccessMountResolver(Repository.Object, shares.Object, authorization,
+        return new CloudAccessAuthorizationService(Repository.Object, management.Object, shares, Acl.Object);
+    }
+
+    public CloudAccessMountResolver NewResolver()
+    {
+        var shares = NewShares();
+        return new CloudAccessMountResolver(Repository.Object, shares.Object, NewAuthorization(shares.Object),
             new Mock<AuthenticationStateProvider>().Object, new Mock<IUserContextFactory>().Object);
     }
 
     public MountAwareFileServiceRouter NewRouter()
-        => new(NewResolver(), Factory.Object, NewOpener(), Cache);
+        => new(NewResolver(), Factory.Object, NewOpener(), Cache,
+            Repository.Object, NewAuthorization(NewShares().Object), Connections.Object);
 
     public RemoteMountFileService NewAdapter(
         CloudAccessPermission permission = CloudAccessPermission.Write, bool freshListings = false)
         => new(new MountedFolder(Share.Id, Host.Name, "Team/Cloud") { Permission = permission }, NewOpener(), Cache, freshListings);
+
+    public RemoteMountFileService NewStandaloneAdapter(CloudAccessPermission permission = CloudAccessPermission.Write)
+        => new(new MountedFolder(Standalone.Id, Standalone.Name, string.Empty) { Permission = permission }, NewOpener(), Cache);
 
     public void Dispose()
     {
@@ -238,15 +259,18 @@ internal static class TestMountRouters
     {
         var repository = new Mock<ICloudAccessRepository>();
         repository.Setup(r => r.GetMountedSharesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        repository.Setup(r => r.GetSharesAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
         var settings = new Mock<ICloudAccessSettingsStore>();
         settings.Setup(x => x.GetAsync()).ReturnsAsync(CloudAccessRuntimeSettings.Default());
+        var authorization = new CloudAccessAuthorizationService(repository.Object, Mock.Of<IManagementAuthService>());
+        var connections = Mock.Of<IStorageConnectionRepository>(
+            c => c.GetAllAsync(It.IsAny<CancellationToken>()) == Task.FromResult(new List<StorageConnection>()));
         return new MountAwareFileServiceRouter(
-            new CloudAccessMountResolver(repository.Object, Mock.Of<IShareRepository>(),
-                new CloudAccessAuthorizationService(repository.Object, Mock.Of<IManagementAuthService>()),
+            new CloudAccessMountResolver(repository.Object, Mock.Of<IShareRepository>(), authorization,
                 new Mock<AuthenticationStateProvider>().Object, Mock.Of<IUserContextFactory>()),
             factory,
-            new CloudAccessRemoteSessionOpener(repository.Object, Mock.Of<IStorageConnectionRepository>(),
-                Mock.Of<IStorageConnectionProviderCatalog>()),
-            new CloudAccessDirectoryCache(new MemoryCache(new MemoryCacheOptions()), settings.Object));
+            new CloudAccessRemoteSessionOpener(repository.Object, connections, Mock.Of<IStorageConnectionProviderCatalog>()),
+            new CloudAccessDirectoryCache(new MemoryCache(new MemoryCacheOptions()), settings.Object),
+            repository.Object, authorization, connections);
     }
 }

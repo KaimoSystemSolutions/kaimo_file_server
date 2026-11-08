@@ -77,7 +77,8 @@ public sealed class SearchApiController : ApiControllerBase
         string? pathPrefix = null;
         if (request!.ShareId is { } shareId)
         {
-            var share = enabledShares.FirstOrDefault(s => s.Id == shareId);
+            var share = enabledShares.FirstOrDefault(s => s.Id == shareId)
+                        ?? await _router.GetVirtualShareAsync(shareId, user);
             // An unknown or disabled share answers like a share the caller cannot read
             // (no hits), so share ids cannot be probed for existence.
             if (share is null) return Ok(Array.Empty<SearchHitDto>());
@@ -87,7 +88,7 @@ public sealed class SearchApiController : ApiControllerBase
                 return ApiBadRequest("invalid_path", "The path is not a valid share-relative path.");
             pathPrefix = normalized;
 
-            // A mounted folder is not indexed: its names are walked at the provider instead.
+            // A virtual share or mounted folder is not indexed: its names are walked at the provider instead.
             if (await _router.ForPathAsync(share, normalized, user) is RemoteMountFileService mounted)
                 return Ok(await SearchMountAsync(mounted, share, normalized, query, request.Limit, user));
         }
