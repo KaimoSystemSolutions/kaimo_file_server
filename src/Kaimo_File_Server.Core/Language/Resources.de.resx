@@ -7896,13 +7896,16 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Kennwort des Kontos eingeben</value>
   </data>
   <data name="Web_ExternalStorage_SshPasswordHelp" xml:space="preserve">
-    <value>Das Kennwort wird verschlüsselt gespeichert und auch von SFTP-Backup-Repositorys verwendet. Nutzen Sie nach Möglichkeit einen SSH-Schlüssel.</value>
+    <value>Das Kennwort wird verschlüsselt gespeichert und auch von Backup-Repositorys verwendet, die diese Verbindung nutzen. Nutzen Sie nach Möglichkeit einen SSH-Schlüssel.</value>
   </data>
   <data name="Web_ExternalStorage_SshPasswordSetupHelp" xml:space="preserve">
     <value>Geben Sie das Kennwort des Remote-Kontos ein und prüfen Sie ausdrücklich die Serveridentität.</value>
   </data>
   <data name="Web_ExternalStorage_ErrorCode_ssh_password_missing" xml:space="preserve">
     <value>Das SSH-Kennwort fehlt. Bearbeiten Sie die Verbindung und geben Sie es erneut ein.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_ssh_askpass_unavailable" xml:space="preserve">
+    <value>Das SSH-Kennwort-Hilfsprogramm konnte nicht gestartet werden. Das temporäre Verzeichnis muss das Ausführen von Programmen erlauben (kein noexec-Mount).</value>
   </data>
   <data name="Web_ExternalStorage_ErrorCode_ssh_connection_failed" xml:space="preserve">
     <value>Der SSH-Server ist nicht erreichbar oder hat die Verbindung beendet. Prüfen Sie Host, Port und Firewall.</value>

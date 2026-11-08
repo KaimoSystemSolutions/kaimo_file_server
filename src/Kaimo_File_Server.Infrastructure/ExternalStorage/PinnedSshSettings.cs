@@ -24,12 +24,8 @@ internal static partial class PinnedSshSettings
     public static RsyncSshConnectionSettings ParseAndValidate(
         StorageConnection connection, string expectedProviderId, bool requireKnownHosts)
     {
-        // SFTP may also authenticate with a password; rsync runs ssh in batch mode and stays key-only.
-        bool modeAllowed = connection.AuthorizationMode == StorageAuthorizationMode.SshKey
-            || (connection.AuthorizationMode == StorageAuthorizationMode.UsernamePassword
-                && string.Equals(connection.ProviderId, "sftp", StringComparison.OrdinalIgnoreCase));
         if (!string.Equals(connection.ProviderId, expectedProviderId, StringComparison.OrdinalIgnoreCase)
-            || !modeAllowed)
+            || connection.AuthorizationMode is not (StorageAuthorizationMode.SshKey or StorageAuthorizationMode.UsernamePassword))
             throw new ProtocolConfigurationException(
                 "connection_mode_invalid", "The connection mode is invalid for pinned SSH.");
         var settings = ProtocolConnectionSettings.Parse<RsyncSshConnectionSettings>(
@@ -96,7 +92,7 @@ internal static partial class PinnedSshSettings
     }
 
     /// <summary>
-    /// Reads the vault-protected SSH password of a password-mode SFTP connection, or
+    /// Reads the vault-protected SSH password of a password-mode connection, or
     /// returns false when none is stored.
     /// </summary>
     public static bool TryReadVaultPassword(

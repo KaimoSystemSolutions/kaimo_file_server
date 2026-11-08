@@ -228,8 +228,10 @@ public sealed class CloudAccessViewModelTests
         provider.Verify(x => x.TestAsync(It.IsAny<StorageConnection>(), default), Times.Once);
     }
 
-    [Fact]
-    public async Task CreateConfiguredConnectionAsync_SftpPasswordMode_ProtectsPasswordAndRecordsMode()
+    [Theory]
+    [InlineData("sftp")]
+    [InlineData("rsync-ssh")]
+    public async Task CreateConfiguredConnectionAsync_SshPasswordMode_ProtectsPasswordAndRecordsMode(string providerId)
     {
         var user = new User(Guid.NewGuid(), "Alice", "alice", "hash", "nt");
         var actor = new UserContext(user, [], [], []);
@@ -261,7 +263,7 @@ public sealed class CloudAccessViewModelTests
             .Callback<IReadOnlyDictionary<string, string>, CredentialContext>((credentials, _) => protectedCredentials = credentials)
             .Returns("protected-password");
         var provider = new Mock<IStorageConnectionProvider>();
-        provider.SetupGet(x => x.Id).Returns("sftp");
+        provider.SetupGet(x => x.Id).Returns(providerId);
         provider.SetupGet(x => x.AuthorizationModes).Returns(new HashSet<StorageAuthorizationMode>
             { StorageAuthorizationMode.SshKey, StorageAuthorizationMode.UsernamePassword });
         provider.Setup(x => x.TestAsync(It.IsAny<StorageConnection>(), default))
@@ -277,15 +279,18 @@ public sealed class CloudAccessViewModelTests
 
         // A provider offering several modes needs an explicit, supported choice.
         await Assert.ThrowsAsync<NotSupportedException>(() => viewModel.CreateConfiguredConnectionAsync(
-            "sftp", "NAS", settings, "backup", "pw"));
+            providerId, "NAS", settings, "backup", "pw"));
         await Assert.ThrowsAsync<NotSupportedException>(() => viewModel.CreateConfiguredConnectionAsync(
-            "sftp", "NAS", settings, "backup", "pw", authorizationMode: StorageAuthorizationMode.HostMount));
+            providerId, "NAS", settings, "backup", "pw", authorizationMode: StorageAuthorizationMode.HostMount));
         // Password mode needs a password.
         await Assert.ThrowsAsync<ArgumentException>(() => viewModel.CreateConfiguredConnectionAsync(
-            "sftp", "NAS", settings, "backup", "", authorizationMode: StorageAuthorizationMode.UsernamePassword));
+            providerId, "NAS", settings, "backup", "", authorizationMode: StorageAuthorizationMode.UsernamePassword));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => viewModel.CreateConfiguredConnectionAsync(
+            providerId, "NAS", settings, null, null, authorizationMode: StorageAuthorizationMode.UsernamePassword));
 
         await viewModel.CreateConfiguredConnectionAsync(
-            "sftp", "NAS", settings, "backup", "pw", authorizationMode: StorageAuthorizationMode.UsernamePassword);
+            providerId, "NAS", settings, "backup", "pw", authorizationMode: StorageAuthorizationMode.UsernamePassword);
 
         var connection = Assert.Single(savedConnections);
         Assert.Equal(StorageAuthorizationMode.UsernamePassword, connection.AuthorizationMode);

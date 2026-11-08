@@ -23,14 +23,54 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
 {
     private const int MaximumDiagnosticCharacters = 4096;
 
-    public async Task<bool> TestSshAsync(
+    // Longer than ConnectTimeout plus a slow sign-in; only a stalled peer reaches it.
+    private static readonly TimeSpan SshTestTimeout = TimeSpan.FromSeconds(60);
+
+    public Task<bool> TestSshAsync(
         RsyncSshConnectionSettings settings,
         CancellationToken cancellationToken)
+        => WithTimeoutAsync(async token =>
+        {
+            var arguments = BuildSshArguments(settings);
+            arguments.Add($"{settings.Username}@{settings.Host}");
+            arguments.Add("true");
+            string stderr = string.Empty;
+            int exitCode = await RunAsync(
+                "ssh", arguments, token, throwOnFailure: false, askpassPath: settings.AskpassPath, onStderr: text => stderr = text);
+            if (exitCode != 0 && SshFailureCode(stderr) is { } code)
+                throw new ProtocolConfigurationException(code, "The SSH client reported a sign-in problem.");
+            return exitCode == 0;
+        }, SshTestTimeout, cancellationToken);
+
+    /// <summary>Runs a probe with an upper time limit; exceeding it counts as a failed probe.</summary>
+    internal static async Task<bool> WithTimeoutAsync(
+        Func<CancellationToken, Task<bool>> probe,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
     {
-        var arguments = BuildSshArguments(settings);
-        arguments.Add($"{settings.Username}@{settings.Host}");
-        arguments.Add("true");
-        return (await RunAsync("ssh", arguments, cancellationToken, throwOnFailure: false)) == 0;
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        limit.CancelAfter(timeout);
+        try
+        {
+            return await probe(limit.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Maps the OpenSSH client's stderr to a localizable error code, or null for other failures.
+    /// The helper check comes first: a helper that cannot start also ends in a rejected sign-in.
+    /// </summary>
+    internal static string? SshFailureCode(string stderr)
+    {
+        if (stderr.Contains("ssh_askpass:", StringComparison.Ordinal))
+            return "ssh_askpass_unavailable";
+        return stderr.Contains("Permission denied (", StringComparison.Ordinal)
+            ? "ssh_authentication_failed"
+            : null;
     }
 
     // ponytail: 100k received paths held in memory per run; a massive first-seed
@@ -74,7 +114,7 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
         }
 
         await RunThenStampCreatedAsync(
-            () => RunAsync("rsync", arguments, cancellationToken, throwOnFailure: true, CollectReceived),
+            () => RunAsync("rsync", arguments, cancellationToken, throwOnFailure: true, CollectReceived, settings.AskpassPath),
             created);
         return received ?? (IReadOnlyList<string>)[];
     }
@@ -210,8 +250,19 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
         }
     }
 
-    private static List<string> BuildSshArguments(RsyncSshConnectionSettings settings)
+    /// <summary>Makes ssh read the password from the helper; requires OpenSSH 8.4 or later.</summary>
+    internal static void ApplyAskpass(ProcessStartInfo startInfo, string? askpassPath)
     {
+        if (askpassPath is null)
+            return;
+        startInfo.Environment["SSH_ASKPASS"] = askpassPath;
+        startInfo.Environment["SSH_ASKPASS_REQUIRE"] = "force";
+    }
+
+    internal static List<string> BuildSshArguments(RsyncSshConnectionSettings settings)
+    {
+        if (settings.AskpassPath is not null)
+            return PasswordSshArguments(settings);
         string privateKey = settings.PrivateKeySecretReference
             ?? throw new ProtocolConfigurationException("private_key_missing", "The SSH private key is missing.");
         return
@@ -230,6 +281,8 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
 
     internal static string BuildRemoteShell(RsyncSshConnectionSettings settings)
     {
+        if (settings.AskpassPath is not null)
+            return BuildPasswordRemoteShell(settings);
         // rsync parses -e as one command string. Secret paths are therefore
         // deliberately restricted to shell-neutral absolute paths.
         if (string.IsNullOrWhiteSpace(settings.PrivateKeySecretReference)
@@ -246,22 +299,35 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
     }
 
     /// <summary>
-    /// The password-mode variant for SFTP backups: identical host pinning, but no key
+    /// The password-mode variant for rsync and SFTP backups: identical host pinning, but no key
     /// and no batch mode. The password reaches ssh only through an <c>SSH_ASKPASS</c>
     /// helper the caller provides; at most one attempt is made. With public keys off, the
     /// client's defaults leave keyboard-interactive and password. The command contains no
     /// comma: restic splits its <c>-o</c> values at commas.
     /// </summary>
     internal static string BuildPasswordRemoteShell(RsyncSshConnectionSettings settings)
+        => "ssh " + string.Join(' ', PasswordSshArguments(settings));
+
+    // Keepalives replace those batch mode implies on Debian and Ubuntu, so a dead peer ends the session.
+    private static List<string> PasswordSshArguments(RsyncSshConnectionSettings settings)
     {
         if (!ShellNeutralPath(settings.KnownHostsSecretReference))
             throw new ProtocolConfigurationException(
                 "secret_path_unsafe",
                 "SSH secret references must contain only shell-neutral path characters.");
-        return "ssh -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "
-               + $"-o UserKnownHostsFile={settings.KnownHostsSecretReference} "
-               + "-o PubkeyAuthentication=no -o GSSAPIAuthentication=no -o HostbasedAuthentication=no "
-               + $"-o NumberOfPasswordPrompts=1 -p {settings.Port}";
+        return
+        [
+            "-o", "ConnectTimeout=15",
+            "-o", "ServerAliveInterval=30",
+            "-o", "ServerAliveCountMax=4",
+            "-o", "StrictHostKeyChecking=yes",
+            "-o", $"UserKnownHostsFile={settings.KnownHostsSecretReference}",
+            "-o", "PubkeyAuthentication=no",
+            "-o", "GSSAPIAuthentication=no",
+            "-o", "HostbasedAuthentication=no",
+            "-o", "NumberOfPasswordPrompts=1",
+            "-p", settings.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        ];
     }
 
     private static bool ShellNeutralPath(string path)
@@ -314,7 +380,9 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
         IReadOnlyCollection<string> arguments,
         CancellationToken cancellationToken,
         bool throwOnFailure,
-        Action<string>? onStdoutLine = null)
+        Action<string>? onStdoutLine = null,
+        string? askpassPath = null,
+        Action<string>? onStderr = null)
     {
         var startInfo = new ProcessStartInfo(fileName)
         {
@@ -327,6 +395,7 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
         };
         foreach (string argument in arguments)
             startInfo.ArgumentList.Add(argument);
+        ApplyAskpass(startInfo, askpassPath);
         using var process = new Process { StartInfo = startInfo };
         try
         {
@@ -356,6 +425,7 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
             throw;
         }
         await Task.WhenAll(stderr, stdout);
+        onStderr?.Invoke(stderr.Result);
         if (throwOnFailure && process.ExitCode != 0)
         {
             // Do not return helper output because it can contain remote paths or

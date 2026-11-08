@@ -26,7 +26,15 @@ public sealed record RsyncSshConnectionSettings(
     string RemoteRoot,
     string ExpectedHostKeySha256,
     string? PrivateKeySecretReference,
-    string KnownHostsSecretReference);
+    string KnownHostsSecretReference)
+{
+    /// <summary>
+    /// Runtime-only path of the <c>SSH_ASKPASS</c> helper of a password-mode rsync session.
+    /// ssh executes this file, so it is never read from or written to the stored settings.
+    /// </summary>
+    [JsonIgnore]
+    public string? AskpassPath { get; init; }
+}
 
 internal static class ProtocolConnectionSettings
 {

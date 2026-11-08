@@ -19,7 +19,7 @@ Related: [Connections and credentials](connections-and-credentials.md) ·
 | `smb` | `smbclient` | `UsernamePassword` | Yes | Pull, Push, TwoWay | Yes |
 | `sftp` | SSH.NET (in process) | `SshKey`, `UsernamePassword` | Yes | Pull, Push, TwoWay | Yes |
 | `webdav` | HTTPS (in process) | `UsernamePassword` | Yes | Pull, Push, TwoWay | Yes |
-| `rsync-ssh` | `rsync` over `ssh` | `SshKey` | No (`IOptimizedStorageSync`) | Pull, Push | No |
+| `rsync-ssh` | `rsync` over `ssh` | `SshKey`, `UsernamePassword` | No (`IOptimizedStorageSync`) | Pull, Push | No |
 
 The Web image installs `smbclient`, `rsync` and `openssh-client` for the helper-process providers.
 
@@ -93,7 +93,7 @@ credential payload.
   written to disk.
 - Alternatively the connection authenticates with a vault-protected password (`UsernamePassword`
   mode; offered as `password` and `keyboard-interactive`). The mode is chosen at creation; host
-  pinning is identical. rsync over SSH stays key-only.
+  pinning is identical.
 - **Host identity** is pinned in process: the server key is accepted only if its SHA-256 fingerprint
   equals `ExpectedHostKeySha256`. A mismatch is an identity failure, not a transient error.
 - Paths are normalized, traversal is rejected, every request is resolved beneath `RemoteRoot`, and
@@ -109,6 +109,13 @@ credential payload.
 - SSH runs with batch mode, strict host-key checking, and password and keyboard-interactive
   authentication disabled. Each operation materializes the private key into a random mode-`0600`
   temporary file that is deleted when the session is disposed. Passphrase-protected keys are rejected.
+- Alternatively the connection authenticates with a vault-protected password (`UsernamePassword`
+  mode, chosen at creation). ssh then runs without batch mode and public keys, with one password
+  attempt and the same host pinning; each operation writes a mode-`0700` temporary directory holding
+  the password and an `SSH_ASKPASS` helper, so the password never appears in arguments or the
+  environment. Requires OpenSSH 8.4 or later on the client and an executable temp directory: the
+  system temp directory, or `Backup:Restic:TempDirectory` when that is set. Entries left by a crash
+  are removed when the web application starts.
 - The host key is pinned against a dedicated known-hosts entry for the exact host and port, stored
   under `/data/kaimo-system/.external-storage/rsync-ssh/`; hashed known-host entries are rejected.
   `ssh-keyscan` is used only to discover candidate keys; the administrator confirms the fingerprint.

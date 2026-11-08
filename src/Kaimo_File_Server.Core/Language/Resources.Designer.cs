@@ -11581,6 +11581,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The SSH password helper could not be started. The temporary directory must allow running programs (no noexec mount). ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ErrorCode_ssh_askpass_unavailable {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ErrorCode_ssh_askpass_unavailable", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die The SSH server rejected the sign-in. Check the username and the password or key. ähnelt.
         /// </summary>
         public static string Web_ExternalStorage_ErrorCode_ssh_authentication_failed {
@@ -12409,7 +12418,7 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die The password is stored encrypted and is also used by SFTP backup repositories. Prefer an SSH key where the server allows it. ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die The password is stored encrypted and is also used by backup repositories that reuse this connection. Prefer an SSH key where the server allows it. ähnelt.
         /// </summary>
         public static string Web_ExternalStorage_SshPasswordHelp {
             get {

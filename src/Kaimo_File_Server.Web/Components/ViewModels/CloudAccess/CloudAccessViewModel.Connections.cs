@@ -57,7 +57,7 @@ public partial class CloudAccessViewModel
     /// Creates a provider-configured protocol connection. Passwords are stored
     /// only in the context-bound credential vault and never in SettingsJson.
     /// <paramref name="authorizationMode"/> picks the mode of a provider that offers
-    /// several (SFTP: key or password); otherwise the provider's single mode is used.
+    /// several (SFTP and rsync: key or password); otherwise the provider's single mode is used.
     /// </summary>
     public async Task CreateConfiguredConnectionAsync(
         string providerId,
@@ -92,7 +92,7 @@ public partial class CloudAccessViewModel
         bool hasUsername = !string.IsNullOrWhiteSpace(username);
         bool hasPassword = !string.IsNullOrEmpty(password);
         if ((string.Equals(provider.Id, "smb", StringComparison.OrdinalIgnoreCase)
-             || mode == StorageAuthorizationMode.UsernamePassword && string.Equals(provider.Id, "sftp", StringComparison.OrdinalIgnoreCase))
+             || mode == StorageAuthorizationMode.UsernamePassword && provider.Id is "sftp" or "rsync-ssh")
             && (!hasUsername || !hasPassword))
             throw new ArgumentException(R("Web_ExternalStorage_InvalidCredentials"));
         if (mode == StorageAuthorizationMode.SshKey

@@ -521,19 +521,21 @@ public sealed class ProtocolStorageProviderTests : IDisposable
     }
 
     [Fact]
-    public void PinnedSshSettings_AcceptsPasswordModeForSftpOnly()
+    public void PinnedSshSettings_AcceptsKeyAndPasswordModeOnly()
     {
         var settings = new RsyncSshConnectionSettings(
             "backup.example.test", 22, "backup", "/srv/archive", SampleFingerprint(),
             PrivateKeySecretReference: null, KnownHostsSecretReference: string.Empty);
 
-        var parsed = PinnedSshSettings.ParseAndValidate(
-            Connection("sftp", StorageAuthorizationMode.UsernamePassword, settings), "sftp", requireKnownHosts: false);
-        Assert.Equal("backup", parsed.Username);
+        foreach (string providerId in new[] { "sftp", "rsync-ssh" })
+        {
+            var parsed = PinnedSshSettings.ParseAndValidate(
+                Connection(providerId, StorageAuthorizationMode.UsernamePassword, settings), providerId, requireKnownHosts: false);
+            Assert.Equal("backup", parsed.Username);
+        }
 
-        // rsync runs ssh in batch mode and has no password path: keep it key-only.
         var exception = Assert.Throws<ProtocolConfigurationException>(() => PinnedSshSettings.ParseAndValidate(
-            Connection("rsync-ssh", StorageAuthorizationMode.UsernamePassword, settings), "rsync-ssh", requireKnownHosts: false));
+            Connection("rsync-ssh", StorageAuthorizationMode.HostMount, settings), "rsync-ssh", requireKnownHosts: false));
         Assert.Equal("connection_mode_invalid", exception.Code);
     }
 

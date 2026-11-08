@@ -37,6 +37,12 @@ internal static class StartupTasks
             Kaimo_File_Server.Infrastructure.Startup.WritableDirectoryCheck.VerifyFromConfiguration(
                 preflightLogger, app.Configuration, includeBackups: true);
 
+        // A crash skips session cleanup and would leave SSH keys or passwords on disk.
+        // Runs before background services start, so no session is using these entries yet.
+        Kaimo_File_Server.Infrastructure.ExternalStorage.ProtocolTemporaryFile.DeleteOrphans(
+            [Path.GetTempPath(), app.Configuration[Kaimo_File_Server.Infrastructure.ExternalStorage.ProtocolTemporaryFile.TempDirectoryKey]],
+            preflightLogger);
+
         // The Host process owns the schema (migrations + seeding). Web must not migrate;
         // it waits until the Host has finished so tables and seed data are present.
         // Must complete BEFORE search init: the search router reads its on/off flag from

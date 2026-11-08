@@ -80,10 +80,9 @@ public partial class ConnectionAdministration
     private bool IsSftpProvider => string.Equals(_provider, "sftp", StringComparison.OrdinalIgnoreCase);
     private bool IsWebDavProvider => string.Equals(_provider, "webdav", StringComparison.OrdinalIgnoreCase);
     private bool IsInsecureWebDavUrl => _serverUrl.TrimStart().StartsWith("http://", StringComparison.OrdinalIgnoreCase);
-    // rsync-over-SSH and SFTP share the identical pinned-SSH setup (key + host key).
+    // rsync-over-SSH and SFTP share the identical pinned-SSH setup (key or password + host key).
     private bool UsesPinnedSshSetup => IsRsyncSshProvider || IsSftpProvider;
-    // SFTP may sign in with a password instead of a key; rsync stays key-only.
-    private bool UsesSshPassword => IsSftpProvider && _sshUsePassword;
+    private bool UsesSshPassword => UsesPinnedSshSetup && _sshUsePassword;
     /// <summary>Live duplicate-name check against the loaded list; the view model re-checks on save.</summary>
     private bool ConnectionNameTaken => !string.IsNullOrWhiteSpace(_name)
         && !(_editing && string.Equals(_selected?.Name, _name.Trim(), StringComparison.Ordinal))
@@ -195,9 +194,10 @@ public partial class ConnectionAdministration
     private async Task ProviderChanged()
     {
         if (!UsesPinnedSshSetup)
+        {
             await ResetGuidedSshStateAsync();
-        if (!IsSftpProvider)
             _sshUsePassword = false;
+        }
         _port = IsSmbProvider ? 445 : UsesPinnedSshSetup ? 22 : _port;
         _remoteRoot = "/";
         _serverUrl = string.Empty;

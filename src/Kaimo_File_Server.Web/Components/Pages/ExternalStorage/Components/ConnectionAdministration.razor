@@ -245,7 +245,7 @@ else
         </Tabs>
     </text>;
 
-    // Segmented key/password choice of SFTP (DESIGN_SPEC: .toggle-button-group).
+    // Segmented key/password choice of SFTP and rsync (DESIGN_SPEC: .toggle-button-group).
     private RenderFragment SshAuthChoice(bool password, string label) => @<button type="button" role="radio"
         aria-checked="@(_sshUsePassword == password ? "true" : "false")"
         class="toggle-btn @(_sshUsePassword == password ? "toggle-btn--active" : null)"
@@ -305,7 +305,10 @@ else
                 <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="backup.example.com" @bind="_server" @bind:event="oninput" @onchange="SshEndpointChangedAsync" /></label>
                 <label><span>@R("Web_ExternalStorage_Port")</span><input class="edit-input" type="number" min="1" max="65535" @bind="_port" @bind:after="SshEndpointChangedAsync" /></label>
                 <label class="storage-wide"><span>@R("Web_ExternalStorage_RemoteRoot")</span><input class="edit-input" maxlength="4096" placeholder="/srv/backups" @bind="_remoteRoot" @bind:event="oninput" /></label>
-                <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_RsyncSshHelp")</p>
+                @if (_advancedSshSetup || _editing)
+                {
+                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_RsyncSshHelp")</p>
+                }
             }
             else
             {
@@ -326,7 +329,7 @@ else
             else if (UsesPinnedSshSetup)
             {
                 <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="64" autocomplete="username" @bind="_username" @bind:event="oninput" /></label>
-                @if (IsSftpProvider && !_editing)
+                @if (!_editing)
                 {
                     <div class="storage-wide ssh-auth-method">
                         <span id="ssh-auth-method-label">@R("Web_ExternalStorage_SshAuthMethod")</span>

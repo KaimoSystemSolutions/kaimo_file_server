@@ -115,7 +115,8 @@ public sealed class ResticTargetResolver(
                     if (!PinnedSshSettings.TryReadVaultPassword(connection, vault, out var sshPassword))
                         throw new ResticException("ssh_password_missing", "The SSH connection has no password.");
                     tempDir ??= CreateTempDirectory();
-                    sshEnvironment["SSH_ASKPASS"] = await WriteAskpassAsync(tempDir, sshPassword, ct);
+                    try { sshEnvironment["SSH_ASKPASS"] = await ProtocolTemporaryFile.WriteAskpassAsync(tempDir, sshPassword, ct); }
+                    catch (ProtocolConfigurationException ex) { throw new ResticException(ex.Code, ex.Message, ex); }
                     sshEnvironment["SSH_ASKPASS_REQUIRE"] = "force";
                 }
                 else if (string.IsNullOrWhiteSpace(ssh.PrivateKeySecretReference))
@@ -322,25 +323,6 @@ public sealed class ResticTargetResolver(
         {
             throw new ResticException(ex.Code is "secret_reference_invalid" ? "known_hosts_missing" : ex.Code, ex.Message, ex);
         }
-    }
-
-    /// <summary>
-    /// Writes the SSH password (0600) and the <c>SSH_ASKPASS</c> helper (0700) that prints it.
-    /// ssh runs the helper instead of prompting, so the password never appears in arguments
-    /// or the environment. Returns the helper path.
-    /// </summary>
-    internal static async Task<string> WriteAskpassAsync(string tempDir, string password, CancellationToken ct)
-    {
-        var passwordPath = Path.Combine(tempDir, "ssh-password");
-        if (passwordPath.Contains('\''))
-            throw new ResticException("temp_path_invalid", "The restic temp directory must not contain quotes.");
-        await ProtocolTemporaryFile.WriteRestrictedTextAsync(passwordPath, password, ct);
-        var helperPath = Path.Combine(tempDir, "askpass");
-        // ssh executes the helper, so Backup:Restic:TempDirectory must not be on a noexec mount.
-        await ProtocolTemporaryFile.WriteRestrictedTextAsync(helperPath, $"#!/bin/sh\nexec /bin/cat '{passwordPath}'\n", ct);
-        if (!OperatingSystem.IsWindows())
-            File.SetUnixFileMode(helperPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        return helperPath;
     }
 
     /// <summary>Loads the storage connection a repository reuses; its provider must be one of <paramref name="providerIds"/>.</summary>

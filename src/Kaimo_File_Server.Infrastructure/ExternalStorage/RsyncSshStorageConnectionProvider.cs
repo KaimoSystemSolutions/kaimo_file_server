@@ -2,13 +2,17 @@ using System.Security.Cryptography;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Infrastructure.ExternalStorage;
 
 public sealed class RsyncSshStorageConnectionProvider(
     IRsyncProcessRunner processRunner,
     ICredentialVault? credentialVault = null,
-    IRsyncSshSetupService? setupService = null)
+    IRsyncSshSetupService? setupService = null,
+    IConfiguration? configuration = null,
+    ILogger<RsyncSshStorageConnectionProvider>? logger = null)
     : IStorageConnectionProvider
 {
     public string Id => "rsync-ssh";
@@ -20,7 +24,7 @@ public sealed class RsyncSshStorageConnectionProvider(
         | StorageProviderCapabilities.Read
         | StorageProviderCapabilities.Write;
     public IReadOnlySet<StorageAuthorizationMode> AuthorizationModes { get; }
-        = new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.SshKey };
+        = new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.SshKey, StorageAuthorizationMode.UsernamePassword };
 
     public async Task<IStorageSession> OpenSessionAsync(
         StorageConnection connection,
@@ -28,13 +32,14 @@ public sealed class RsyncSshStorageConnectionProvider(
     {
         cancellationToken.ThrowIfCancellationRequested();
         var settings = ParseAndValidate(connection);
-        (settings, string? temporaryKey) = await ResolvePrivateKeyAsync(
+        (settings, string? temporarySecret) = await ResolveSecretAsync(
             connection, settings, cancellationToken);
         IStorageSession session = new RsyncOptimizedStorageSession(
             connection.Id,
             Capabilities,
             new RsyncSshOptimizedSync(settings, processRunner),
-            temporaryKey);
+            temporarySecret,
+            logger);
         return session;
     }
 
@@ -45,7 +50,7 @@ public sealed class RsyncSshStorageConnectionProvider(
         try
         {
             var settings = ParseAndValidate(connection);
-            (settings, string? temporaryKey) = await ResolvePrivateKeyAsync(
+            (settings, string? temporarySecret) = await ResolveSecretAsync(
                 connection, settings, cancellationToken);
             try
             {
@@ -56,8 +61,7 @@ public sealed class RsyncSshStorageConnectionProvider(
             }
             finally
             {
-                if (temporaryKey is not null)
-                    File.Delete(temporaryKey);
+                ProtocolTemporaryFile.TryDelete(temporarySecret, logger);
             }
         }
         catch (ProtocolConfigurationException exception)
@@ -114,11 +118,17 @@ public sealed class RsyncSshStorageConnectionProvider(
     internal static RsyncSshConnectionSettings ParseAndValidate(StorageConnection connection)
         => PinnedSshSettings.ParseAndValidate(connection, "rsync-ssh", requireKnownHosts: true);
 
-    private async Task<(RsyncSshConnectionSettings Settings, string? TemporaryKey)> ResolvePrivateKeyAsync(
+    /// <summary>
+    /// Materializes the connection's secret for the OpenSSH client and returns the temporary
+    /// file or directory the caller must remove (null for an external secret file).
+    /// </summary>
+    private async Task<(RsyncSshConnectionSettings Settings, string? TemporarySecret)> ResolveSecretAsync(
         StorageConnection connection,
         RsyncSshConnectionSettings settings,
         CancellationToken cancellationToken)
     {
+        if (connection.AuthorizationMode == StorageAuthorizationMode.UsernamePassword)
+            return await WriteAskpassAsync(connection, settings, cancellationToken);
         if (!string.IsNullOrWhiteSpace(settings.PrivateKeySecretReference))
             return (settings, null);
         if (!PinnedSshSettings.TryReadVaultPrivateKey(connection, credentialVault, out byte[] privateKey))
@@ -136,13 +146,39 @@ public sealed class RsyncSshStorageConnectionProvider(
             CryptographicOperations.ZeroMemory(privateKey);
         }
     }
+
+    private async Task<(RsyncSshConnectionSettings Settings, string? TemporarySecret)> WriteAskpassAsync(
+        StorageConnection connection,
+        RsyncSshConnectionSettings settings,
+        CancellationToken cancellationToken)
+    {
+        if (!PinnedSshSettings.TryReadVaultPassword(connection, credentialVault, out string password))
+            throw new ProtocolConfigurationException("ssh_password_missing", "The SSH password is missing.");
+        string directory = ProtocolTemporaryFile.CreatePath(configuration?[ProtocolTemporaryFile.TempDirectoryKey]);
+        try
+        {
+            if (OperatingSystem.IsWindows())
+                Directory.CreateDirectory(directory);
+            else
+                Directory.CreateDirectory(
+                    directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            string askpass = await ProtocolTemporaryFile.WriteAskpassAsync(directory, password, cancellationToken);
+            return (settings with { AskpassPath = askpass }, directory);
+        }
+        catch
+        {
+            ProtocolTemporaryFile.TryDelete(directory, logger);
+            throw;
+        }
+    }
 }
 
 internal sealed class RsyncOptimizedStorageSession(
     Guid connectionId,
     StorageProviderCapabilities capabilities,
     IOptimizedStorageSync optimizedSync,
-    string? temporaryPrivateKey = null)
+    string? temporarySecret = null,
+    ILogger? logger = null)
     : IStorageSession
 {
     public Guid ConnectionId { get; } = connectionId;
@@ -152,8 +188,7 @@ internal sealed class RsyncOptimizedStorageSession(
     IOptimizedStorageSync? IStorageSession.OptimizedSync => OptimizedSync;
     public ValueTask DisposeAsync()
     {
-        if (temporaryPrivateKey is not null)
-            File.Delete(temporaryPrivateKey);
+        ProtocolTemporaryFile.TryDelete(temporarySecret, logger);
         return ValueTask.CompletedTask;
     }
 }
