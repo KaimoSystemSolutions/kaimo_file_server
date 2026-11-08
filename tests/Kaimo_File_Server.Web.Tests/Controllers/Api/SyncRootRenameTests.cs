@@ -62,7 +62,7 @@ public sealed class SyncRootRenameTests : DatabaseTestBase, IDisposable
         _sut = new SyncApiController(
             users.Object, Mock.Of<ISyncDeviceRepository>(), Mock.Of<IDeviceSyncProfileRepository>(),
             shares.Object, factory.Object, Mock.Of<ISyncQueryService>(),
-            Mock.Of<IFileChangeCursorRepository>(), _log)
+            Mock.Of<IFileChangeCursorRepository>(), _log, Kaimo_File_Server.Web.Tests.Services.TestMountRouters.None(factory.Object))
         {
             ControllerContext = new ControllerContext
             {

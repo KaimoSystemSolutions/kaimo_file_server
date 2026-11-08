@@ -35,8 +35,8 @@ public static class WebDavCopy
             await using var content = await sourceFs.ReadFileAsync(sourcePath, user, preserveAccessTime: preserveTimes);
             await destinationFs.WriteFileAsync(
                 destinationPath, content, user,
-                preserveTimes ? meta.ModifiedAt.ToUniversalTime() : null,
-                preserveCreated ? meta.CreatedAt.ToUniversalTime() : null, ct);
+                preserveTimes ? Known(meta.ModifiedAt) : null,
+                preserveCreated ? Known(meta.CreatedAt) : null, ct);
             return;
         }
 
@@ -53,8 +53,8 @@ public static class WebDavCopy
                 user, infinity, ct, preserveTimes, preserveCreated);
         }
 
-        DateTime? modified = preserveTimes ? meta.ModifiedAt.ToUniversalTime() : null;
-        DateTime? created = preserveCreated ? meta.CreatedAt.ToUniversalTime() : null;
+        DateTime? modified = preserveTimes ? Known(meta.ModifiedAt) : null;
+        DateTime? created = preserveCreated ? Known(meta.CreatedAt) : null;
         if (merged is not null)
         {
             // Like an overwritten file, a merged folder only moves its time forward and its
@@ -65,6 +65,9 @@ public static class WebDavCopy
         if (modified is not null || created is not null)
             await destinationFs.SetModifiedAtAsync(destinationPath, user, modified, created);
     }
+
+    /// <summary>A time worth copying: remote storage reports an unknown one as the Unix epoch.</summary>
+    private static DateTime? Known(DateTime time) => time == DateTime.UnixEpoch ? null : time.ToUniversalTime();
 
     /// <summary>
     /// Creates the destination collection unless it already exists (so an overwrite copy merges);

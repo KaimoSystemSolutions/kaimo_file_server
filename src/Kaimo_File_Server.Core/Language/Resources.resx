@@ -3320,7 +3320,7 @@
     <value>The folder that contained the mount point was deleted or moved to the recycle bin. Mount the virtual share again to make it accessible.</value>
   </data>
   <data name="Web_CloudAccess_MountHelp" xml:space="preserve">
-    <value>As a folder in a share, the virtual share appears as a folder inside a local share and is no longer listed on its own. Users need access to that folder in the share and to the virtual share; the lower of both rights applies. The folder is shown in the web interface only (not via SMB, WebDAV or the API), its name stays reserved everywhere, and its remote content is not included in copies, ZIP downloads, backups or the search index of the share.</value>
+    <value>As a folder in a share, the virtual share appears as a folder inside a local share and is no longer listed on its own. Users need access to that folder in the share and to the virtual share; the lower of both rights applies. The folder is shown in the web interface, the app and over WebDAV (not via SMB), and deleting inside it is permanent. Its name stays reserved everywhere, and its remote content is not included in copies, ZIP downloads, backups or the search index of the share.</value>
   </data>
   <data name="Web_CloudAccess_Mount_Error_NotAllowed" xml:space="preserve">
     <value>You need permission to manage both the virtual share and the target share.</value>

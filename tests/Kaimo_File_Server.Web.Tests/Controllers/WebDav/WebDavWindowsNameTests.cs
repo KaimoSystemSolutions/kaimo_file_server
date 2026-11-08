@@ -46,7 +46,7 @@ public sealed class WebDavWindowsNameTests : IDisposable
                 new FileSystemStorage(s.Path, s.Id, null), acl.Object, null, s.Id));
 
         _sut = new WebDavController(users.Object, shares.Object, factory.Object,
-            new WebDavLockManager(TimeProvider.System), null!)
+            new WebDavLockManager(TimeProvider.System), null!, Kaimo_File_Server.Web.Tests.Services.TestMountRouters.None(factory.Object))
         {
             ControllerContext = new ControllerContext
             {

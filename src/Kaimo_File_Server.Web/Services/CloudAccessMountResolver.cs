@@ -19,6 +19,9 @@ public sealed record MountedFolder(Guid ShareId, string HostShareName, string Mo
     /// <summary>Whether the current user may manage the virtual share (its access grants).</summary>
     public bool CanManage { get; init; }
 
+    /// <summary>What the current user may do inside the mount (host ACL and virtual-share grant combined).</summary>
+    public CloudAccessPermission Permission { get; init; }
+
     /// <summary>Host-side location of a path inside the mount: host share, mount path, remote path.</summary>
     public string HostLocationOf(string remoteRelativePath)
         => ShareRelativePath.Combine($"{HostShareName}/{MountPath}", ShareRelativePath.Normalize(remoteRelativePath));
@@ -80,27 +83,39 @@ public sealed class CloudAccessMountResolver(
 
     /// <summary>Loads the visible mounts of <paramref name="host"/> for <paramref name="actor"/>.</summary>
     public async Task RefreshAsync(ShareDefinition host, UserContext actor)
+        => _byHost[host.Name] = await GetVisibleAsync(host, actor);
+
+    /// <summary>
+    /// The mounts of <paramref name="host"/> that <paramref name="actor"/> may open. Needs no Blazor
+    /// circuit and keeps no state, so REST and WebDAV requests can use it.
+    /// </summary>
+    /// <param name="includeCanManage">False leaves <see cref="MountedFolder.CanManage"/> unset, for callers that never show it.</param>
+    public async Task<List<MountedFolder>> GetVisibleAsync(ShareDefinition host, UserContext actor, bool includeCanManage = true)
     {
         var visible = new List<MountedFolder>();
         if (host.IsEnabled && !host.IsUserHomes)
         {
-            foreach (var share in await repository.GetSharesAsync())
+            foreach (var share in await repository.GetMountedSharesAsync(host.Id))
             {
-                if (share.MountShareId != host.Id || !share.IsMounted) continue;
-                if (await authorization.GetEffectivePermissionAsync(actor, share) is null) continue;
+                if (!share.IsMounted) continue;
+                if (await authorization.GetEffectivePermissionAsync(actor, share) is not { } permission) continue;
                 visible.Add(new MountedFolder(share.Id, host.Name, ShareRelativePath.Normalize(share.MountPath))
                 {
-                    CanManage = await authorization.CanManageAsync(actor, share)
+                    CanManage = includeCanManage && await authorization.CanManageAsync(actor, share),
+                    Permission = permission
                 });
             }
         }
-        _byHost[host.Name] = visible;
+        return visible;
     }
 
     /// <summary>The mount the route <paramref name="subPath"/> of the host share lies in, if any.</summary>
     public MountMatch? Match(string hostShareName, string? subPath)
+        => _byHost.TryGetValue(hostShareName, out var mounts) ? Match(mounts, subPath) : null;
+
+    /// <summary>The mount of <paramref name="mounts"/> the path <paramref name="subPath"/> lies in, if any.</summary>
+    public static MountMatch? Match(IReadOnlyList<MountedFolder> mounts, string? subPath)
     {
-        if (!_byHost.TryGetValue(hostShareName, out var mounts) || mounts.Count == 0) return null;
         var path = ShareRelativePath.Normalize(subPath);
         foreach (var mount in mounts)
         {
@@ -113,8 +128,11 @@ public sealed class CloudAccessMountResolver(
 
     /// <summary>Visible mounts located directly in folder <paramref name="directory"/> of the host share.</summary>
     public IReadOnlyList<MountedFolder> ChildrenOf(string hostShareName, string? directory)
+        => _byHost.TryGetValue(hostShareName, out var mounts) ? ChildrenOf(mounts, directory) : [];
+
+    /// <summary>The mounts of <paramref name="mounts"/> located directly in folder <paramref name="directory"/>.</summary>
+    public static IReadOnlyList<MountedFolder> ChildrenOf(IReadOnlyList<MountedFolder> mounts, string? directory)
     {
-        if (!_byHost.TryGetValue(hostShareName, out var mounts)) return [];
         var dir = ShareRelativePath.Normalize(directory);
         return mounts
             .Where(m => string.Equals(ShareRelativePath.GetParent(m.MountPath), dir, StringComparison.OrdinalIgnoreCase))

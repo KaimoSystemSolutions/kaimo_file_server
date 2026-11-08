@@ -6,10 +6,12 @@ using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Controllers.WebDav;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
@@ -58,6 +60,7 @@ public sealed partial class BrowseApiController : ApiControllerBase
     private readonly IFileServiceFactory _fileServiceFactory;
     private readonly HomeDirectoryService _homes;
     private readonly IManagementAuthService _mgmtAuth;
+    private readonly MountAwareFileServiceRouter _router;
     private readonly ILogger<BrowseApiController> _logger;
 
     public BrowseApiController(
@@ -66,6 +69,7 @@ public sealed partial class BrowseApiController : ApiControllerBase
         IFileServiceFactory fileServiceFactory,
         HomeDirectoryService homes,
         IManagementAuthService mgmtAuth,
+        MountAwareFileServiceRouter router,
         ILogger<BrowseApiController> logger)
     {
         _userContextFactory = userContextFactory;
@@ -73,6 +77,7 @@ public sealed partial class BrowseApiController : ApiControllerBase
         _fileServiceFactory = fileServiceFactory;
         _homes = homes;
         _mgmtAuth = mgmtAuth;
+        _router = router;
         _logger = logger;
     }
 
@@ -125,7 +130,10 @@ public sealed partial class BrowseApiController : ApiControllerBase
         return await GuardAsync(async () =>
         {
             var items = await resolved!.Fs.ListAsync(resolved.Path, resolved.User);
-            var dtos = items.Select(FileEntryDto.From).ToList();
+            var dtos = items.Select(resolved.ToDto).ToList();
+            if (!resolved.IsMounted)
+                dtos.AddRange((await _router.MountEntriesInAsync(resolved.Share, resolved.Path, resolved.User))
+                    .Select(mount => FileEntryDto.From(mount, isVirtualFolder: true)));
 
             string etag = ComputeListEtag(dtos);
             if (RequestHasMatchingETag(etag))
@@ -147,7 +155,7 @@ public sealed partial class BrowseApiController : ApiControllerBase
         {
             var meta = await resolved!.Fs.GetMetadataAsync(resolved.Path, resolved.User);
             Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
-            return Ok(FileEntryDto.From(meta));
+            return Ok(resolved.ToDto(meta));
         });
     }
 
@@ -163,7 +171,7 @@ public sealed partial class BrowseApiController : ApiControllerBase
 
         if (string.IsNullOrEmpty(resolved!.Path))
             return ApiBadRequest("invalid_path", "A directory path is required.");
-        var target = SanitizeTarget(resolved.Fs, resolved.Path);
+        var target = await SanitizeTargetAsync(resolved.Fs, resolved.Path, resolved.User);
 
         var fingerprint = RequestFingerprint.Compute("POST", $"{shareId}/{resolved.Path}", "mkdir");
 
@@ -232,7 +240,12 @@ public sealed partial class BrowseApiController : ApiControllerBase
 
     // ─────────────────────────── helpers ───────────────────────────
 
-    private sealed record Resolved(UserContext User, ShareDefinition Share, IFileService Fs, string Path);
+    private sealed record Resolved(UserContext User, ShareDefinition Share, IFileService Fs, string Path)
+    {
+        public bool IsMounted => Fs is RemoteMountFileService;
+
+        public FileEntryDto ToDto(FileMetadata item) => FileEntryDto.From(item, IsMounted);
+    }
 
     private async Task<(Resolved? resolved, IActionResult? error)> ResolveAsync(
         Guid shareId, string? path, bool allowRoot = true)
@@ -246,7 +259,7 @@ public sealed partial class BrowseApiController : ApiControllerBase
         if (!ShareRelativePath.TryNormalizeStrict(path ?? string.Empty, out var normalized, allowRoot))
             return (null, ApiBadRequest("invalid_path", "The path is not a valid share-relative path."));
 
-        var fs = _fileServiceFactory.CreateForShare(share);
+        var fs = await _router.ForPathAsync(share, normalized, user, freshListings: !HttpMethods.IsGet(Request.Method));
         return (new Resolved(user, share, fs, normalized), null);
     }
 
@@ -298,6 +311,11 @@ public sealed partial class BrowseApiController : ApiControllerBase
         {
             Response.Headers[HeaderNames.RetryAfter] = "5";
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new ApiError("path_busy", ex.Message));
+        }
+        catch (RemoteShareUnavailableException ex)
+        {
+            Response.Headers[HeaderNames.RetryAfter] = "30";
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new ApiError("remote_unavailable", ex.Message));
         }
         catch (IOException ex)
         {

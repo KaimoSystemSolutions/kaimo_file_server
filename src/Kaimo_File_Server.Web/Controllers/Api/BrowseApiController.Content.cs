@@ -1,6 +1,8 @@
 ﻿using System.Globalization;
+using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 
@@ -67,7 +69,7 @@ public partial class BrowseApiController
 
         if (string.IsNullOrEmpty(resolved!.Path))
             return ApiBadRequest("invalid_path", "A file path is required.");
-        var target = SanitizeTarget(resolved.Fs, resolved.Path);
+        var target = await SanitizeTargetAsync(resolved.Fs, resolved.Path, resolved.User);
 
         // The body is the raw file content. A form content-type makes MVC's form value provider
         // read and drain Request.Body during model binding, so WriteFileAsync would persist an
@@ -119,7 +121,7 @@ public partial class BrowseApiController
                 new FileTimes(sourceCreatedAt, modifiedAtUtc, accessedAtUtc), ct);
             var meta = await resolved.Fs.GetMetadataAsync(target, resolved.User);
             Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
-            return Ok(FileEntryDto.From(meta));
+            return Ok(resolved.ToDto(meta));
         }));
     }
 
@@ -156,7 +158,7 @@ public partial class BrowseApiController
                 new FileTimes(createdAtUtc, modifiedAtUtc, accessedAtUtc));
             var meta = await resolved.Fs.GetMetadataAsync(resolved.Path, resolved.User);
             Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
-            return Ok(FileEntryDto.From(meta));
+            return Ok(resolved.ToDto(meta));
         });
     }
 
@@ -165,9 +167,11 @@ public partial class BrowseApiController
     /// existing entries keep their name) and reports the final path in <see cref="FinalPathHeader"/>.
     /// The idempotency fingerprint stays on the requested path; the mapping is deterministic.
     /// </summary>
-    private string SanitizeTarget(IFileService fs, string path)
+    private async Task<string> SanitizeTargetAsync(IFileService fs, string path, UserContext user)
     {
-        var target = WindowsFileNameHelper.SanitizeNewSegments(path, p => Path.Exists(fs.ToAbsolutePath(p)));
+        var target = fs is RemoteMountFileService mounted
+            ? await WindowsFileNameHelper.SanitizeNewSegmentsAsync(path, p => mounted.ExistsAsync(p, user))
+            : WindowsFileNameHelper.SanitizeNewSegments(path, p => Path.Exists(fs.ToAbsolutePath(p)));
         if (target != path)
             Response.Headers[FinalPathHeader] = target;
         return target;

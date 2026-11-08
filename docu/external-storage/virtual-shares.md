@@ -3,7 +3,8 @@
 A virtual share exposes a folder behind a storage connection (OneDrive, Dropbox, Google Drive, SMB,
 SFTP, WebDAV) as a share in the web file browser. Content stays at the provider and is accessed
 lazily on demand; nothing is copied to local storage. Virtual shares are a separate backend from
-local shares and are available in the Web host only.
+local shares and are available in the Web host only. A virtual share mounted as a folder is also
+reachable over REST and WebDAV ([rules](#mounted-folders-over-rest-and-webdav)).
 
 Related: [Connections and credentials](connections-and-credentials.md) · [Providers](providers.md) ·
 [Downloads and share links](../external-access/downloads-and-share-links.md)
@@ -103,6 +104,36 @@ mount is a synthetic, open-only folder entry (`IFileBrowserViewModel.IsMountEntr
 keeps its rules: the host share is searched through the index (which never contains remote content),
 and inside the mounted folder the name walk of virtual shares is used.
 
-Out of scope in this phase: the mount is invisible over REST, WebDAV and SMB, and every recursive
-host-side operation (copy or ZIP of a parent folder, folder sizes, backup, indexing, sync delta,
-share pool move) skips it, because the remote content is not part of the host share.
+### Mounted folders over REST and WebDAV
+
+REST and WebDAV run in the Web host, next to the credential vault, and show a mounted folder as a
+normal folder of the host share. `MountAwareFileServiceRouter` (scoped to one request) resolves the
+visible mounts of the host share once and hands the endpoint either the normal `IFileService` or a
+`RemoteMountFileService`, an adapter over the provider's `IRemoteFileStore`. Endpoints, `WebDavCopy`
+and the error mapping stay the same. Paths stay host-share-relative (`Team/Cloud/a.txt`): the adapter
+strips the mount path on the way in and puts it back on the way out. Listings go through the
+`CloudAccessDirectoryCache` shared with the web browser, and every change invalidates the share.
+
+| Topic | Rule |
+|---|---|
+| Visibility | A mount the user may not open never matches, so the path behaves as if nothing were mounted: `404` when reading, `403` when writing (name reservation). The parent listing has no entry for it, so its existence does not leak |
+| Rights | `Permission` of the mount (host ACL and grant combined) intersected with the session's provider capabilities; a missing right is a `403` |
+| Mount point | Synthetic folder (epoch timestamps); cannot be written, deleted or renamed (`403`) |
+| Delete | Always **permanent** and recursive, on WebDAV without any confirmation. The host share's recycle bin does not apply |
+| Copy | Both ways across the mount boundary, through `WebDavCopy` |
+| Move | Local → mount: copy, then delete the source. Mount → anywhere else: REST `403 move_not_supported`, WebDAV `403`, checked before anything changes, because the source could not be restored |
+| Overwrite | The old target stays until the new content has replaced it. WebDAV `Overwrite: T` into a mount therefore merges folders and answers `409` on a file/folder clash, instead of deleting the target first |
+| Uploads | A body still arriving from a client is spooled to a temp file first, so an aborted upload leaves the remote file untouched |
+| Range requests | Only when the provider's stream is seekable (SFTP, SMB, cloud temp file). A provider stream that cannot seek (WebDAV) answers `200` with the whole file. SMB and cloud providers fetch the whole file for every ranged request; WebDAV `HEAD` answers from the metadata and fetches nothing |
+| Preconditions | A request that changes something reloads the listings it consults, so `If-Match`, `If-None-Match` and existence checks see changes made at the provider. Reads stay on the cache |
+| Timestamps | Best effort: a provider that cannot set them keeps its own time, without an error. An overwrite follows the upload contract: Modified only moves forward, Created only back. A copy leaves an unknown source time (epoch) to the target |
+| Versions, snapshots | Empty lists; `version-content` answers `404` |
+| Sync | Not supported. `delta` and `changes` walk the local tree and never see a mount; a profile rooted in a mount is refused with `409 sync_root_in_mount` |
+| Search | With `shareId` and a `path` in a mount: name walk at the provider (same limits as in the web browser, empty snippets). Everywhere else the index, which never contains remote content |
+| Connection or provider down | REST `503 remote_unavailable` with `Retry-After`, WebDAV `503`. A missing path is told apart from an outage through the parent listing, because providers report both differently |
+
+Each request opens its own provider session on first use and closes it at the end of the request.
+
+Out of scope: the mount is invisible over SMB, and every recursive host-side operation (copy or ZIP
+of a parent folder, folder sizes, backup, indexing, sync delta, share pool move) skips it, because
+the remote content is not part of the host share.

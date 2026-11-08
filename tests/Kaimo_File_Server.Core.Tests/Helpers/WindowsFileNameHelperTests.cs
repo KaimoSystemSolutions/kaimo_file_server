@@ -104,4 +104,24 @@ public class WindowsFileNameHelperTests
     [InlineData("ok/a?b", "", "ok/a_b")]
     public void SanitizeNewSegments_KeepsExistingEntries(string path, string existing, string expected)
         => Assert.Equal(expected, WindowsFileNameHelper.SanitizeNewSegments(path, p => p == existing));
+
+    [Theory]
+    [InlineData("old:file", "old:file", "old:file")]
+    [InlineData("ok/a?b", "", "ok/a_b")]
+    [InlineData("", "", "")]
+    public async Task SanitizeNewSegmentsAsync_MatchesTheSynchronousVariant(string path, string existing, string expected)
+        => Assert.Equal(expected,
+            await WindowsFileNameHelper.SanitizeNewSegmentsAsync(path, p => Task.FromResult(p == existing)));
+
+    [Fact]
+    public async Task SanitizeNewSegmentsAsync_ProbesOnlyInvalidSegments()
+    {
+        var probed = new List<string>();
+        await WindowsFileNameHelper.SanitizeNewSegmentsAsync("ok/a:b/c", p =>
+        {
+            probed.Add(p);
+            return Task.FromResult(false);
+        });
+        Assert.Equal(["ok/a:b"], probed);
+    }
 }

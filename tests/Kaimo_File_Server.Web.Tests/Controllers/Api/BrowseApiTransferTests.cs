@@ -59,7 +59,7 @@ public sealed class BrowseApiTransferTests : IDisposable
             .Returns<ShareDefinition>(s => new FileService(
                 new FileSystemStorage(s.Path, s.Id, null), _acl.Object, null, s.Id));
 
-        _sut = new BrowseApiController(users.Object, shares.Object, factory.Object, null!, Mock.Of<IManagementAuthService>(),
+        _sut = new BrowseApiController(users.Object, shares.Object, factory.Object, null!, Mock.Of<IManagementAuthService>(), Kaimo_File_Server.Web.Tests.Services.TestMountRouters.None(factory.Object),
             NullLogger<BrowseApiController>.Instance)
         {
             ControllerContext = new ControllerContext

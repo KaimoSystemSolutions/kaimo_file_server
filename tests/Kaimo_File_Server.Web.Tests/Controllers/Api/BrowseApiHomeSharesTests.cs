@@ -37,7 +37,7 @@ public sealed class BrowseApiHomeSharesTests
         var factory = new Mock<IFileServiceFactory>();
         factory.Setup(f => f.CreateForShare(It.IsAny<ShareDefinition>())).Returns(fs.Object);
 
-        _sut = new BrowseApiController(users.Object, shares.Object, factory.Object, null!, _mgmt.Object,
+        _sut = new BrowseApiController(users.Object, shares.Object, factory.Object, null!, _mgmt.Object, Kaimo_File_Server.Web.Tests.Services.TestMountRouters.None(factory.Object),
             NullLogger<BrowseApiController>.Instance)
         {
             ControllerContext = new ControllerContext

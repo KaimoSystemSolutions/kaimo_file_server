@@ -132,6 +132,13 @@ mutating endpoints — see [§3.1](#31-safe-mutations-conditional-requests--idem
 **Large files.** `content` downloads honor HTTP `Range`, so a client can resume or
 segment a transfer. Uploads stream straight to disk with an atomic replace.
 
+**Mounted folders.** A virtual share mounted as a folder appears as a normal folder of its host
+share; the endpoints above work below it with host-relative paths. The folder and everything below
+it carry `isVirtualFolder: true`. There the content lives at a storage provider: a delete is
+permanent, versions are empty, `Range` works only on seekable provider streams (otherwise `200` with
+the whole file), and timestamps are best effort. See
+[Mounted folders over REST and WebDAV](../external-storage/virtual-shares.md#mounted-folders-over-rest-and-webdav).
+
 **Preserving the modification time.** By default an upload's modified time is the
 write time. A sync client sends `X-Kaimo-Modified-At: <Unix epoch milliseconds, UTC>`
 on `PUT content` to keep the source file's mtime; the file, the returned item tag /
@@ -200,6 +207,8 @@ One item per request; `targetPath` is the full new path (its parent must exist).
 - `400 invalid_target` — the target is the source or lies inside it (same share).
 - `404` — source (or the target's parent) missing; `403` — no read/write access (for a move also
   no delete access on the source, checked before anything is copied).
+- `403 move_not_supported` — the source lies in a mounted folder and the target does not. Copy it
+  instead. `rename` answers the same when it would leave a mounted folder.
 
 Copies keep the source **modification** times and get a new creation time (as in Explorer).
 A move within one share is an atomic rename (into an existing folder with `overwrite`: merged);
@@ -266,12 +275,12 @@ Every error uses a uniform envelope with a **stable, non-localized machine code*
 ```jsonc
 { "code": "forbidden", "message": "Access denied." }
 ```
-Common codes: `unauthorized` (401), `forbidden` (403), `not_found` (404),
+Common codes: `unauthorized` (401), `forbidden` / `move_not_supported` (403), `not_found` (404),
 `invalid_path` / `invalid_request` / `invalid_timestamp` / `invalid_idempotency_key` /
 `invalid_query` / `invalid_modified_at` / `invalid_created_at` / `invalid_target` (400),
 `precondition_failed` (412), `idempotency_key_conflict` (422), `conflict` / `target_exists` /
-`type_mismatch` / `sync_root_renamed` (409), `sync_root_missing` (404), `locked_out` /
-`rate_limited` (429), `https_required` (426), `search_timeout` (503). Clients should branch on `code`, not on `message` (the message
+`type_mismatch` / `sync_root_renamed` / `sync_root_in_mount` (409), `sync_root_missing` (404), `locked_out` /
+`rate_limited` (429), `https_required` (426), `search_timeout` / `remote_unavailable` (503). Clients should branch on `code`, not on `message` (the message
 is an English developer hint; user-facing text is localized in the app). A body or
 parameter that cannot be bound at all (malformed JSON, wrong types, invalid GUIDs)
 yields `invalid_request` (400) in the same envelope.

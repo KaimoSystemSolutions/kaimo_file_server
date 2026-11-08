@@ -376,13 +376,15 @@ internal sealed class WebDavRemoteFileStore(
                 new RemoteStorageAccessDeniedException(
                     $"WebDAV server returned {(int)response.StatusCode}: access denied."),
             HttpStatusCode.NotFound =>
-                new IOException($"WebDAV resource not found: {response.RequestMessage?.RequestUri}"),
+                new FileNotFoundException($"WebDAV resource not found: {response.RequestMessage?.RequestUri}"),
             HttpStatusCode.Conflict =>
                 new IOException("WebDAV server returned 409 Conflict. A parent directory may not exist."),
             HttpStatusCode.PreconditionFailed =>
                 new IOException("The remote item already exists."),
             HttpStatusCode.InsufficientStorage =>
                 new IOException("WebDAV server returned 507 Insufficient Storage."),
+            HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests or >= HttpStatusCode.InternalServerError =>
+                new RemoteShareUnavailableException($"WebDAV request failed with status {(int)response.StatusCode}."),
             _ => new IOException(
                 $"WebDAV request failed with status {(int)response.StatusCode}.")
         };

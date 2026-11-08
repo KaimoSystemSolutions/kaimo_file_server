@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
@@ -254,17 +252,7 @@ public sealed partial class RemoteCloudAccessFileBrowserViewModel : RemoteFileBr
         return await _directoryCache.GetOrCreateAsync(shareId, relativePath, async () =>
         {
             var remoteItems = await pin.Files.ListAsync(RemotePath(pin.Share, relativePath));
-            return remoteItems.Select(item => new FileMetadata
-            {
-                Id = StableGuid(item.StableId ?? item.Path),
-                ShareId = shareId,
-                Path = StripRoot(pin.Share, item.Path),
-                Name = item.Name,
-                IsDirectory = item.IsDirectory,
-                Size = item.IsDirectory ? 0 : item.Size ?? 0,
-                CreatedAt = item.ModifiedAtUtc ?? DateTime.UnixEpoch,
-                ModifiedAt = item.ModifiedAtUtc ?? DateTime.UnixEpoch
-            }).ToList();
+            return remoteItems.Select(item => CloudAccessRemoteSessionOpener.ToMetadata(pin.Share, item)).ToList();
         });
     }
 
@@ -314,25 +302,12 @@ public sealed partial class RemoteCloudAccessFileBrowserViewModel : RemoteFileBr
         => RemotePath(_share ?? throw new InvalidOperationException("No virtual share is loaded."), relativePath);
 
     private static string RemotePath(CloudAccessShare share, string relativePath)
-    {
-        if (!ShareRelativePath.TryNormalizeStrict(relativePath ?? string.Empty, out var normalized))
-            throw new UnauthorizedAccessException("The remote path is invalid.");
-        return ShareRelativePath.Combine(share.RemoteRootPath, normalized);
-    }
+        => CloudAccessRemoteSessionOpener.RemotePath(share, relativePath);
 
     private string StripRoot(string remotePath) => StripRoot(_share, remotePath);
 
     private static string StripRoot(CloudAccessShare? share, string remotePath)
-    {
-        var root = ShareRelativePath.Normalize(share?.RemoteRootPath);
-        var path = ShareRelativePath.Normalize(remotePath);
-        if (root.Length == 0) return path;
-        if (path.Equals(root, StringComparison.OrdinalIgnoreCase)) return string.Empty;
-        var prefix = root + "/";
-        if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            throw new UnauthorizedAccessException("Microsoft returned an item outside the configured root.");
-        return path[prefix.Length..];
-    }
+        => CloudAccessRemoteSessionOpener.StripRoot(share, remotePath);
 
     private async Task ReplaceConnectionAsync(StorageConnection record)
     {
@@ -391,12 +366,6 @@ public sealed partial class RemoteCloudAccessFileBrowserViewModel : RemoteFileBr
         return string.IsNullOrWhiteSpace(username)
             ? null
             : await _userContextFactory.CreateByUsernameAsync(username);
-    }
-
-    private static Guid StableGuid(string value)
-    {
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
-        return new Guid(hash.AsSpan(0, 16));
     }
 
     /// <summary>

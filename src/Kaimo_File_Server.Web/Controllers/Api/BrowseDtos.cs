@@ -11,6 +11,10 @@ namespace Kaimo_File_Server.Web.Controllers.Api;
 public sealed record ShareDto(Guid Id, string Name, bool IsRecycleEnabled, string? RootPath = null);
 
 /// <summary>A file or directory entry in a listing.</summary>
+/// <param name="IsVirtualFolder">
+/// True for a virtual share mounted as a folder and everything below it. The content lives at a
+/// storage provider: no versions, no sync, and a delete is permanent.
+/// </param>
 public sealed record FileEntryDto(
     string Path,
     string Name,
@@ -18,10 +22,13 @@ public sealed record FileEntryDto(
     long Size,
     DateTime CreatedAtUtc,
     DateTime ModifiedAtUtc,
-    DateTime? AccessedAtUtc = null)
+    DateTime? AccessedAtUtc = null,
+    bool IsVirtualFolder = false)
 {
-    public static FileEntryDto From(FileMetadata m) => new(
-        m.Path, m.Name, m.IsDirectory, m.Size, m.CreatedAt, m.ModifiedAt, m.LastAccessedAt);
+    public static FileEntryDto From(FileMetadata m) => From(m, isVirtualFolder: false);
+
+    public static FileEntryDto From(FileMetadata m, bool isVirtualFolder) => new(
+        m.Path, m.Name, m.IsDirectory, m.Size, m.CreatedAt, m.ModifiedAt, m.LastAccessedAt, isVirtualFolder);
 }
 
 /// <summary>Source and destination for a rename/move.</summary>

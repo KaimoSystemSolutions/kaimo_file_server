@@ -78,7 +78,7 @@ public sealed class CloudAccessDirectoryCache
             Volatile.Read(ref _globalGeneration),
             shareId,
             _shareGenerations.GetOrAdd(shareId, 0),
-            ShareRelativePath.Normalize(relativePath).ToUpperInvariant());
+            ShareRelativePath.Normalize(relativePath));
 
     private static List<FileMetadata> Clone(IEnumerable<FileMetadata> items)
         => items.Select(static item => new FileMetadata

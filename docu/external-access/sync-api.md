@@ -106,7 +106,8 @@ Shares, devices, tokens, item tags and idempotency keys are defined in the
 }
 ```
 `relativePath` is the remote endpoint (validated against the share and the user's
-ACLs — `403 forbidden` without list access). `localPath` is the device-local
+ACLs — `403 forbidden` without list access, `409 sync_root_in_mount` inside a mounted
+folder, which has no change log). `localPath` is the device-local
 endpoint: the server stores it verbatim and never touches it. The connection roams
 across the user's devices and is visible read-only to operators with
 `ManageClientDevices`.

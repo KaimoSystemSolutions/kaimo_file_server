@@ -59,7 +59,7 @@ public sealed partial class RemoteCloudAccessCacheReloadTests : IDisposable
 
         await Load("Docs");
         await Load("Other");
-        _cache.InvalidatePath(shareId, "docs/");
+        _cache.InvalidatePath(shareId, "Docs/");
         await Load("Docs");
         await Load("Other");
 

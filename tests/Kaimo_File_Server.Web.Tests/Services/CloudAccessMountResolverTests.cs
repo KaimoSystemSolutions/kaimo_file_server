@@ -24,9 +24,8 @@ public sealed class CloudAccessMountResolverTests
     {
         _visible = Mount("Team/Cloud");
         _hidden = Mount("Team/Secret");
-        var standalone = new CloudAccessShare { Name = "s" };
-        _repository.Setup(r => r.GetSharesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync([_visible, _hidden, standalone]);
+        _repository.Setup(r => r.GetMountedSharesAsync(_host.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([_visible, _hidden]);
         _repository.Setup(r => r.GetEffectivePermissionAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<Guid>>()))
             .ReturnsAsync(CloudAccessPermission.Read);
         _shares.Setup(s => s.GetByIdAsync(_host.Id)).ReturnsAsync(_host);
@@ -41,14 +40,34 @@ public sealed class CloudAccessMountResolverTests
 
     private async Task<CloudAccessMountResolver> LoadedSut(bool canManage = false)
     {
+        var sut = NewSut(canManage);
+        await sut.RefreshAsync(_host, _actor);
+        return sut;
+    }
+
+    private CloudAccessMountResolver NewSut(bool canManage)
+    {
         var management = new Mock<IManagementAuthService>();
         management.Setup(m => m.GetAuthorizedDepartmentIdsAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
             .ReturnsAsync(canManage ? AuthorizedScopeResult.Unrestricted() : AuthorizedScopeResult.None());
         var authorization = new CloudAccessAuthorizationService(_repository.Object, management.Object, _shares.Object, _acl.Object);
-        var sut = new CloudAccessMountResolver(_repository.Object, _shares.Object, authorization,
+        return new CloudAccessMountResolver(_repository.Object, _shares.Object, authorization,
             new Mock<AuthenticationStateProvider>().Object, new Mock<IUserContextFactory>().Object);
-        await sut.RefreshAsync(_host, _actor);
-        return sut;
+    }
+
+    [Fact]
+    public async Task GetVisibleAsync_LoadsOnlyTheMountsOfTheHost()
+    {
+        await NewSut(canManage: false).GetVisibleAsync(_host, _actor);
+        _repository.Verify(r => r.GetSharesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetVisibleAsync_WithoutCanManage_LeavesTheRightUnset()
+    {
+        var mount = (await NewSut(canManage: true).GetVisibleAsync(_host, _actor, includeCanManage: false))
+            .Single(m => m.ShareId == _visible.Id);
+        Assert.False(mount.CanManage);
     }
 
     [Fact]
@@ -111,6 +130,54 @@ public sealed class CloudAccessMountResolverTests
     {
         var mount = (await LoadedSut()).Match("projekte", "Team/Cloud")!.Mount;
         Assert.Equal(expected, mount.HostLocationOf(remote));
+    }
+
+    private CloudAccessMountResolver CircuitFreeSut()
+    {
+        var management = new Mock<IManagementAuthService>();
+        management.Setup(m => m.GetAuthorizedDepartmentIdsAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(AuthorizedScopeResult.None());
+        var authorization = new CloudAccessAuthorizationService(_repository.Object, management.Object, _shares.Object, _acl.Object);
+        // A strict provider proves the REST/WebDAV path never touches the Blazor authentication state.
+        return new CloudAccessMountResolver(_repository.Object, _shares.Object, authorization,
+            new Mock<AuthenticationStateProvider>(MockBehavior.Strict).Object, new Mock<IUserContextFactory>().Object);
+    }
+
+    [Fact]
+    public async Task GetVisibleAsync_ReturnsVisibleMounts_WithoutACircuit()
+    {
+        var mount = Assert.Single(await CircuitFreeSut().GetVisibleAsync(_host, _actor));
+        Assert.Equal(_visible.Id, mount.ShareId);
+    }
+
+    [Fact]
+    public async Task GetVisibleAsync_DoesNotPopulateTheCircuitState()
+    {
+        var sut = CircuitFreeSut();
+        await sut.GetVisibleAsync(_host, _actor);
+        Assert.False(sut.HasLoaded("projekte"));
+    }
+
+    [Theory]
+    [InlineData(CloudAccessPermission.Read)]
+    [InlineData(CloudAccessPermission.Write)]
+    public async Task GetVisibleAsync_CarriesTheVirtualSharePermission(CloudAccessPermission granted)
+    {
+        _repository.Setup(r => r.GetEffectivePermissionAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync(granted);
+        _acl.Setup(a => a.HasAccessAsync(_actor, _host.Id, "Team/Cloud", true, It.IsAny<FilePermission>()))
+            .ReturnsAsync(true);
+        var mount = Assert.Single(await CircuitFreeSut().GetVisibleAsync(_host, _actor));
+        Assert.Equal(granted, mount.Permission);
+    }
+
+    [Fact]
+    public async Task StaticOverloads_AnswerFromTheGivenList()
+    {
+        var mounts = await CircuitFreeSut().GetVisibleAsync(_host, _actor);
+        Assert.Equal("a.txt", CloudAccessMountResolver.Match(mounts, "team/cloud/a.txt")!.RemoteSubPath);
+        Assert.Null(CloudAccessMountResolver.Match(mounts, "Team/Secret"));
+        Assert.Equal(["Cloud"], CloudAccessMountResolver.ChildrenOf(mounts, "Team").Select(m => m.Name));
     }
 
     [Fact]

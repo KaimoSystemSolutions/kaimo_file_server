@@ -5,6 +5,8 @@ namespace Kaimo_File_Server.Core.Repositories;
 public interface ICloudAccessRepository
 {
     Task<List<CloudAccessShare>> GetSharesAsync(CancellationToken cancellationToken = default);
+    /// <summary>The shares mounted as a folder into <paramref name="hostShareId"/>.</summary>
+    Task<List<CloudAccessShare>> GetMountedSharesAsync(Guid hostShareId, CancellationToken cancellationToken = default);
     Task<CloudAccessShare?> GetShareAsync(Guid id, CancellationToken cancellationToken = default);
     /// <summary>
     /// Creates or updates a share. On update the provisioning mode and mount point are kept:

@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Services.Sync;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
@@ -33,6 +34,7 @@ public sealed class SyncApiController : ApiControllerBase
     private readonly ISyncQueryService _syncQuery;
     private readonly IFileChangeCursorRepository _changeCursors;
     private readonly IFileChangeLogRepository _changeLog;
+    private readonly MountAwareFileServiceRouter _router;
 
     // Default and ceiling for one change-feed page.
     private const int DefaultChangeLimit = 1000;
@@ -46,8 +48,10 @@ public sealed class SyncApiController : ApiControllerBase
         IFileServiceFactory fileServiceFactory,
         ISyncQueryService syncQuery,
         IFileChangeCursorRepository changeCursors,
-        IFileChangeLogRepository changeLog)
+        IFileChangeLogRepository changeLog,
+        MountAwareFileServiceRouter router)
     {
+        _router = router;
         _userContextFactory = userContextFactory;
         _devices = devices;
         _profiles = profiles;
@@ -112,6 +116,8 @@ public sealed class SyncApiController : ApiControllerBase
         if (!ShareRelativePath.TryNormalizeStrict(request.RelativePath ?? string.Empty, out var path))
             return ApiBadRequest("invalid_path", "RelativePath is not a valid share-relative path.");
 
+        if (await IsInMountAsync(share, path, user)) return SyncRootInMount();
+
         // The user must be able to list the chosen subtree to sync it.
         var fs = _fileServiceFactory.CreateForShare(share);
         if (IsHomesRoot(share, path)) return ApiForbidden();
@@ -151,6 +157,8 @@ public sealed class SyncApiController : ApiControllerBase
 
         var share = await _shares.GetByIdAsync(profile.ShareId);
         if (share is null || !share.IsEnabled) return ApiNotFound("Share not found.");
+
+        if (await IsInMountAsync(share, path, user)) return SyncRootInMount();
 
         var fs = _fileServiceFactory.CreateForShare(share);
         if (IsHomesRoot(share, path)) return ApiForbidden();
@@ -329,6 +337,13 @@ public sealed class SyncApiController : ApiControllerBase
     /// </summary>
     private static bool IsInRecycleBin(ShareDefinition share, SyncRootMove move)
         => ShareEntryPolicy.IsRecycleBinPath(move.NewPath, share.RecycleRootDepth);
+
+    /// <summary>A mounted folder has no change log, so it cannot be a sync root.</summary>
+    private async Task<bool> IsInMountAsync(ShareDefinition share, string path, UserContext user)
+        => await _router.ForPathAsync(share, path, user) is RemoteMountFileService;
+
+    private ObjectResult SyncRootInMount()
+        => Conflict(new ApiError("sync_root_in_mount", "A mounted folder cannot be synced."));
 
     /// <summary>
     /// The root of the home-folder share holds every user's home. Each user may list it (SMB

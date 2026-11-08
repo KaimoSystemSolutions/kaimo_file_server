@@ -116,6 +116,8 @@ internal static class WebServicesSetup
         builder.Services.AddSingleton<CloudAccessDirectoryCache>();
         builder.Services.AddScoped<CloudAccessAuthorizationService>();
         builder.Services.AddScoped<CloudAccessMountResolver>();
+        builder.Services.AddScoped<CloudAccessRemoteSessionOpener>();
+        builder.Services.AddScoped<MountAwareFileServiceRouter>();
         builder.Services.AddScoped<CloudAccessMountService>();
         builder.Services.AddScoped<CloudToLocalTransferService>();
         builder.Services.AddScoped<CrossShareTransferService>();

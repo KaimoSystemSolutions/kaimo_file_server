@@ -3320,7 +3320,7 @@
     <value>Der Ordner mit dem Einhängepunkt wurde gelöscht oder in den Papierkorb verschoben. Hängen Sie den virtuellen Share erneut ein, um ihn verfügbar zu machen.</value>
   </data>
   <data name="Web_CloudAccess_MountHelp" xml:space="preserve">
-    <value>Als Ordner in einem Share erscheint der virtuelle Share als Ordner innerhalb eines lokalen Shares und wird nicht mehr eigenständig aufgeführt. Benutzer benötigen Zugriff auf diesen Ordner im Share und auf den virtuellen Share; es gilt das geringere der beiden Rechte. Der Ordner wird nur in der Weboberfläche angezeigt (nicht über SMB, WebDAV oder die API), sein Name bleibt überall reserviert, und sein Remote-Inhalt ist nicht Teil von Kopien, ZIP-Downloads, Sicherungen oder dem Suchindex des Shares.</value>
+    <value>Als Ordner in einem Share erscheint der virtuelle Share als Ordner innerhalb eines lokalen Shares und wird nicht mehr eigenständig aufgeführt. Benutzer benötigen Zugriff auf diesen Ordner im Share und auf den virtuellen Share; es gilt das geringere der beiden Rechte. Der Ordner wird in der Weboberfläche, in der App und über WebDAV angezeigt (nicht über SMB), und Löschen darin ist endgültig. Sein Name bleibt überall reserviert, und sein Remote-Inhalt ist nicht Teil von Kopien, ZIP-Downloads, Sicherungen oder dem Suchindex des Shares.</value>
   </data>
   <data name="Web_CloudAccess_Mount_Error_NotAllowed" xml:space="preserve">
     <value>Sie benötigen Verwaltungsrechte für den virtuellen Share und für den Ziel-Share.</value>

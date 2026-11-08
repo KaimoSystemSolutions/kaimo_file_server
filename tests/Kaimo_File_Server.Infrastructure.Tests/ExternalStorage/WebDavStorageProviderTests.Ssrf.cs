@@ -20,7 +20,7 @@ public sealed partial class WebDavStorageProviderTests
             Content = new StringContent("{\"internal\":\"secret-metadata-token\"}")
         };
 
-        var exception = await Assert.ThrowsAsync<IOException>(
+        var exception = await Assert.ThrowsAnyAsync<IOException>(
             () => WebDavRemoteFileStore.EnsureSuccessOrThrowAsync(error, CancellationToken.None));
 
         Assert.DoesNotContain("secret-metadata-token", exception.Message);

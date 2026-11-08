@@ -1,9 +1,11 @@
-﻿using Kaimo_File_Server.Core.Domain.Identity;
+﻿using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.ViewModels;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -41,15 +43,18 @@ public sealed class SearchApiController : ApiControllerBase
     private readonly IUserContextFactory _userContextFactory;
     private readonly IShareRepository _shares;
     private readonly ISearchService _search;
+    private readonly MountAwareFileServiceRouter _router;
 
     public SearchApiController(
         IUserContextFactory userContextFactory,
         IShareRepository shares,
-        ISearchService search)
+        ISearchService search,
+        MountAwareFileServiceRouter router)
     {
         _userContextFactory = userContextFactory;
         _shares = shares;
         _search = search;
+        _router = router;
     }
 
     /// <summary>Searches file names and content across the shares the caller may read.</summary>
@@ -81,6 +86,10 @@ public sealed class SearchApiController : ApiControllerBase
             if (!ShareRelativePath.TryNormalizeStrict(request.Path ?? string.Empty, out var normalized))
                 return ApiBadRequest("invalid_path", "The path is not a valid share-relative path.");
             pathPrefix = normalized;
+
+            // A mounted folder is not indexed: its names are walked at the provider instead.
+            if (await _router.ForPathAsync(share, normalized, user) is RemoteMountFileService mounted)
+                return Ok(await SearchMountAsync(mounted, share, normalized, query, request.Limit, user));
         }
         else if (!string.IsNullOrEmpty(request.Path))
         {
@@ -125,6 +134,18 @@ public sealed class SearchApiController : ApiControllerBase
         }
 
         return Ok(dtos);
+    }
+
+    private async Task<List<SearchHitDto>> SearchMountAsync(
+        RemoteMountFileService mounted, ShareDefinition share, string path, string query, int? limit, UserContext user)
+    {
+        var items = await FileNameWalk.SearchAsync(
+            path, query, Math.Clamp(limit ?? DefaultLimit, 1, MaxLimit), SearchTimeout,
+            folder => mounted.ListAsync(folder, user), onFolderSkipped: null, HttpContext.RequestAborted);
+        return items.ConvertAll(item => new SearchHitDto(
+            share.Id, share.Name, item.Path, item.Name, item.IsDirectory,
+            item.IsDirectory ? string.Empty : Path.GetExtension(item.Name).TrimStart('.'),
+            item.Size, []));
     }
 
     private static bool IsInOwnHome(FileDocument hit, Guid userId)

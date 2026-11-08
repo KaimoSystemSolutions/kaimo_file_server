@@ -207,6 +207,23 @@ public static class WindowsFileNameHelper
         return result;
     }
 
+    /// <summary>As <see cref="SanitizeNewSegments"/>, for storage where the existence check is a remote call.</summary>
+    public static async Task<string> SanitizeNewSegmentsAsync(string path, Func<string, Task<bool>> exists)
+    {
+        if (string.IsNullOrEmpty(path))
+            return path;
+
+        var result = "";
+        foreach (var segment in path.Split('/'))
+        {
+            var prefix = result.Length == 0 ? "" : result + "/";
+            result = IsValid(segment) || await exists(prefix + segment)
+                ? prefix + segment
+                : prefix + Sanitize(segment);
+        }
+        return result;
+    }
+
     /// <summary>
     /// Windows-Explorer-style alternatives for a name that is taken:
     /// "a.txt" -> "a (2).txt", "a (3).txt", ...

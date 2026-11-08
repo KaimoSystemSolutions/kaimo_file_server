@@ -218,6 +218,20 @@ public sealed class RepositoryGapTests : DatabaseTestBase
     // ─────────────────────── Cloud access grants ───────────────────────
 
     [Fact]
+    public async Task CloudAccess_GetMountedShares_ReturnsOnlyTheMountsOfTheHost()
+    {
+        var (_, _, cloudShare) = SeedLinkTargets();
+        var repo = new CloudAccessRepository(DbFactory);
+        Assert.Empty(await repo.GetMountedSharesAsync(cloudShare.Id));
+
+        var hostId = SeedShare("projekte").Id;
+        await repo.SetMountAsync(cloudShare.Id, CloudAccessProvisioning.Folder, hostId, "Team/Cloud");
+
+        Assert.Equal(cloudShare.Id, Assert.Single(await repo.GetMountedSharesAsync(hostId)).Id);
+        Assert.Empty(await repo.GetMountedSharesAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
     public async Task CloudAccess_UpsertReplaceGrantsAndEffectivePermission()
     {
         var (_, _, cloudShare) = SeedLinkTargets();

@@ -49,7 +49,7 @@ public sealed partial class WebDavStorageProviderTests
             RequestMessage = new HttpRequestMessage(HttpMethod.Get, "https://example.com/missing.txt")
         };
 
-        var exception = await Assert.ThrowsAsync<IOException>(
+        var exception = await Assert.ThrowsAnyAsync<IOException>(
             () => WebDavRemoteFileStore.EnsureSuccessOrThrowAsync(notFound, CancellationToken.None));
 
         Assert.Contains("not found", exception.Message, StringComparison.OrdinalIgnoreCase);
@@ -105,9 +105,25 @@ public sealed partial class WebDavStorageProviderTests
             Content = new StringContent(new string('x', 2000))
         };
 
-        var exception = await Assert.ThrowsAsync<IOException>(
+        var exception = await Assert.ThrowsAnyAsync<IOException>(
             () => WebDavRemoteFileStore.EnsureSuccessOrThrowAsync(error, CancellationToken.None));
 
         Assert.True(exception.Message.Length < 600);
     }
+
+    [Theory]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    [InlineData(HttpStatusCode.BadGateway)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    [InlineData(HttpStatusCode.GatewayTimeout)]
+    [InlineData(HttpStatusCode.RequestTimeout)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    public async Task EnsureSuccessOrThrow_TransientFailures_AreReportedAsUnavailable(HttpStatusCode status)
+        => await Assert.ThrowsAsync<RemoteShareUnavailableException>(() =>
+            WebDavRemoteFileStore.EnsureSuccessOrThrowAsync(new HttpResponseMessage(status), CancellationToken.None));
+
+    [Fact]
+    public async Task EnsureSuccessOrThrow_NotFound_IsAFileNotFound()
+        => await Assert.ThrowsAsync<FileNotFoundException>(() =>
+            WebDavRemoteFileStore.EnsureSuccessOrThrowAsync(new HttpResponseMessage(HttpStatusCode.NotFound), CancellationToken.None));
 }

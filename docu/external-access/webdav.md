@@ -75,8 +75,8 @@ Rules:
 | `PUT` | `WriteFileAsync` | Streams the body; honors `If-Match` / `If-None-Match` via `ItemTag`; request size limit lifted for this action only |
 | `MKCOL` | `CreateDirectoryAsync` | `405` if the target exists, `409` if the parent is missing |
 | `DELETE` | `DeleteFileAsync(path, user, share.IsRecycleEnabled)` | Per-share recycle bin applies |
-| `MOVE` | `RenameAsync`, or copy + delete across shares | `Destination`, `Overwrite`; a foreign host in `Destination` answers `502` |
-| `COPY` | `WebDavCopy` | Recursive read/write |
+| `MOVE` | `RenameAsync`, or copy + delete across shares | `Destination`, `Overwrite`; a foreign host in `Destination` answers `502`; a destination that is the source, lies inside it or contains it answers `403` |
+| `COPY` | `WebDavCopy` | Recursive read/write; same destination rules as `MOVE` |
 | `LOCK` / `UNLOCK` | `WebDavLockManager` | See below |
 
 PROPFIND returns `resourcetype`, `displayname`, `getcontentlength`, `getcontenttype`,
@@ -88,7 +88,14 @@ A directory listing is one `ListAsync` call plus one batched `FilterReadablePath
 per-entry queries.
 
 Exceptions map uniformly: `UnauthorizedAccessException` → `403`, `FileNotFoundException` /
-`DirectoryNotFoundException` / `KeyNotFoundException` → `404`, `InvalidOperationException` → `409`.
+`DirectoryNotFoundException` / `KeyNotFoundException` → `404`, `InvalidOperationException` → `409`,
+`RemoteShareUnavailableException` → `503`.
+
+A virtual share mounted as a folder appears as a normal collection of its host share. Inside it a
+`DELETE` is permanent (no recycle bin, no confirmation), a `MOVE` out of it answers `403` (use `COPY`),
+`Overwrite: T` keeps the old target until the copy has replaced it (folders merge, a file/folder clash
+answers `409`), and `Range` works only on seekable provider streams. See
+[Mounted folders over REST and WebDAV](../external-storage/virtual-shares.md#mounted-folders-over-rest-and-webdav).
 
 ## Locking
 

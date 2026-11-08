@@ -246,7 +246,7 @@ public sealed class SearchApiTests : IDisposable
                 It.IsAny<string?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(hits.ToList());
 
-        var controller = new SearchApiController(users.Object, shares.Object, search.Object)
+        var controller = new SearchApiController(users.Object, shares.Object, search.Object, Kaimo_File_Server.Web.Tests.Services.TestMountRouters.None(Mock.Of<Kaimo_File_Server.Core.Services.File.IFileServiceFactory>()))
         {
             ControllerContext = new ControllerContext
             {

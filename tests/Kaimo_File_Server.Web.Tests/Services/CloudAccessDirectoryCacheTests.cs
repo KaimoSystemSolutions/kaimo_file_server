@@ -35,6 +35,19 @@ public sealed class CloudAccessDirectoryCacheTests
     }
 
     [Fact]
+    public async Task FoldersDifferingOnlyInCase_AreCachedSeparately()
+    {
+        using var memory = new MemoryCache(new MemoryCacheOptions());
+        var cache = CreateCache(memory);
+        var shareId = Guid.NewGuid();
+
+        await cache.GetOrCreateAsync(shareId, "Docs", () => Task.FromResult(new List<FileMetadata> { new() { Name = "upper" } }));
+        var lower = await cache.GetOrCreateAsync(shareId, "docs", () => Task.FromResult(new List<FileMetadata> { new() { Name = "lower" } }));
+
+        Assert.Equal("lower", Assert.Single(lower).Name);
+    }
+
+    [Fact]
     public async Task InvalidateShare_ForcesReloadForEveryPath()
     {
         using var memory = new MemoryCache(new MemoryCacheOptions());

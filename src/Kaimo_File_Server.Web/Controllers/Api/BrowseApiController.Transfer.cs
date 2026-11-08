@@ -1,5 +1,6 @@
 ﻿using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Web.Controllers.WebDav;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 
@@ -27,9 +28,10 @@ public partial class BrowseApiController
             || !ShareRelativePath.TryNormalizeStrict(request.To, out var to, allowRoot: false))
             return ApiBadRequest("invalid_path", "Both 'from' and 'to' must be valid paths.");
 
-        var fs = _fileServiceFactory.CreateForShare(share);
+        var fs = await _router.ForPathAsync(share, from, user, freshListings: true);
+        var toFs = await _router.ForPathAsync(share, to, user, freshListings: true);
         var fingerprint = RequestFingerprint.Compute("POST", $"{shareId}/rename", from, to);
-        to = SanitizeTarget(fs, to);
+        to = await SanitizeTargetAsync(toFs, to, user);
 
         return await ExecuteIdempotentAsync(user.User.Id, fingerprint, () => GuardAsync(async () =>
         {
@@ -38,7 +40,7 @@ public partial class BrowseApiController
             {
                 // Source gone: the rename may already have happened. If the
                 // destination is present, treat the operation as applied.
-                var toMeta = await TryGetMetadataAsync(fs, to, user);
+                var toMeta = await TryGetMetadataAsync(toFs, to, user);
                 return toMeta is not null ? NoContent() : ApiNotFound("Source not found.");
             }
 
@@ -46,10 +48,30 @@ public partial class BrowseApiController
             if (!ItemTag.Matches(ifMatch, fromMeta))
                 return ApiPreconditionFailed();
 
-            await fs.RenameAsync(from, to, user);
+            if (ReferenceEquals(fs, toFs))
+            {
+                await fs.RenameAsync(from, to, user);
+                return NoContent();
+            }
+
+            // Across the boundary of a mounted folder a rename is a move: same rules as TransferAsync.
+            if (fs is RemoteMountFileService) return MoveNotSupported();
+            if (await WebDavController.FindAsync(toFs, to, user) is not null)
+                return Conflict(new ApiError("target_exists", "The target already exists."));
+            if (!await WebDavController.ParentExistsAsync(toFs, to, user))
+                return NotFound(new ApiError("target_parent_missing", "The target folder does not exist."));
+            if (!await fs.CanDeleteAsync(from, user))
+                return ApiForbidden();
+
+            await WebDavCopy.CopyAsync(fs, from, toFs, to, user, infinity: true,
+                HttpContext.RequestAborted, preserveTimes: true, preserveCreated: true);
+            await fs.DeleteFileAsync(from, user, share.IsRecycleEnabled);
             return NoContent();
         }));
     }
+
+    private ObjectResult MoveNotSupported() => StatusCode(StatusCodes.Status403Forbidden, new ApiError(
+        "move_not_supported", "Items can be copied out of a mounted folder, but not moved."));
 
     /// <summary>
     /// Copies a file or directory (recursively), possibly into another share. The copy keeps the
@@ -94,16 +116,19 @@ public partial class BrowseApiController
                 || from.StartsWith(to + "/", StringComparison.Ordinal)))
             return ApiBadRequest("invalid_target", "The target must not be the source, lie inside it or contain it.");
 
-        var sourceFs = _fileServiceFactory.CreateForShare(source);
-        var targetFs = sameShare ? sourceFs : _fileServiceFactory.CreateForShare(target);
+        var sourceFs = await _router.ForPathAsync(source, from, user, freshListings: true);
+        var targetFs = await _router.ForPathAsync(target, to, user, freshListings: true);
+        var sameBackend = ReferenceEquals(sourceFs, targetFs);
         var fingerprint = RequestFingerprint.Compute(
             "POST", isMove ? "move" : "copy", $"{source.Id}/{from}", $"{target.Id}/{to}",
             request.Overwrite ? "overwrite" : null);
-        to = SanitizeTarget(targetFs, to);
+        to = await SanitizeTargetAsync(targetFs, to, user);
 
         // ponytail: runs inside the request; add a job endpoint if proxies time out on huge folders.
         return await ExecuteIdempotentAsync(user.User.Id, fingerprint, () => GuardAsync(async () =>
         {
+            if (isMove && !sameBackend && sourceFs is RemoteMountFileService) return MoveNotSupported();
+
             var item = await WebDavController.FindAsync(sourceFs, from, user);
             if (item is null) return ApiNotFound("Source not found.");
 
@@ -121,7 +146,7 @@ public partial class BrowseApiController
             if (isMove && !await sourceFs.CanDeleteAsync(from, user))
                 return ApiForbidden();
 
-            if (isMove && sameShare && existing is null)
+            if (isMove && sameBackend && existing is null)
             {
                 await sourceFs.RenameAsync(from, to, user);
             }

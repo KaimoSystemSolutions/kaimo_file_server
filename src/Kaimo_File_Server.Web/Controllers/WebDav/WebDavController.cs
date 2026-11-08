@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Web.Controllers.Api;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -32,19 +33,22 @@ public sealed partial class WebDavController : ControllerBase
     private readonly IFileServiceFactory _fileServiceFactory;
     private readonly WebDavLockManager _locks;
     private readonly WebDavOptions _options;
+    private readonly MountAwareFileServiceRouter _router;
 
     public WebDavController(
         IUserContextFactory userContextFactory,
         IShareRepository shares,
         IFileServiceFactory fileServiceFactory,
         WebDavLockManager locks,
-        WebDavOptions options)
+        WebDavOptions options,
+        MountAwareFileServiceRouter router)
     {
         _userContextFactory = userContextFactory;
         _shares = shares;
         _fileServiceFactory = fileServiceFactory;
         _locks = locks;
         _options = options;
+        _router = router;
     }
 
     // ─────────────────────────── OPTIONS ───────────────────────────
@@ -84,7 +88,7 @@ public sealed partial class WebDavController : ControllerBase
 
         var share = await GetVisibleShareAsync(shareName);
         if (share is null) return new StatusCodeResult(StatusCodes.Status404NotFound);
-        var fs = _fileServiceFactory.CreateForShare(share);
+        var fs = await _router.ForPathAsync(share, relativePath, user);
 
         return await GuardAsync(async () =>
         {
@@ -101,6 +105,9 @@ public sealed partial class WebDavController : ControllerBase
             {
                 foreach (var child in await fs.ListAsync(relativePath, user))
                     entries.Add(ToEntry(share, child.Path, child));
+                if (fs is not RemoteMountFileService)
+                    foreach (var mount in await _router.MountEntriesInAsync(share, relativePath, user))
+                        entries.Add(ToEntry(share, mount.Path, mount));
             }
 
             return MultiStatus(WebDavPropFind.WriteMultiStatus(entries, request));
@@ -149,10 +156,17 @@ public sealed partial class WebDavController : ControllerBase
                 return new StatusCodeResult(StatusCodes.Status405MethodNotAllowed);
             }
 
-            var stream = await target.Fs.ReadFileAsync(target.Path, target.User);
+            // A provider may have to fetch the whole file just to open it, so HEAD answers from the metadata.
+            var headOnly = HttpMethods.IsHead(Request.Method) && target.Fs is RemoteMountFileService;
+            var stream = headOnly ? null : await target.Fs.ReadFileAsync(target.Path, target.User);
             Response.Headers[HeaderNames.XContentTypeOptions] = "nosniff";
             Response.Headers[HeaderNames.ETag] = ItemTag.For(meta);
             Response.Headers[HeaderNames.LastModified] = meta.ModifiedAt.ToUniversalTime().ToString("R");
+            if (stream is null)
+            {
+                Response.ContentLength = meta.Size;
+                return new EmptyResult();
+            }
             return File(stream, "application/octet-stream",
                 fileDownloadName: meta.Name, enableRangeProcessing: true);
         });
@@ -283,7 +297,19 @@ public sealed partial class WebDavController : ControllerBase
         var destShare = await GetVisibleShareAsync(destShareName);
         if (destShare is null)
             return new StatusCodeResult(StatusCodes.Status409Conflict);
-        var destFs = _fileServiceFactory.CreateForShare(destShare);
+        var destFs = await _router.ForPathAsync(destShare, destPath, source!.User, freshListings: true);
+        var sameBackend = ReferenceEquals(source.Fs, destFs);
+
+        // Same rule as the REST transfer: overwriting an ancestor would delete the source itself,
+        // and moving a folder into a mount below it would detach that mount.
+        if (source.Share.Id == destShare.Id && (destPath == source.Path
+                || destPath.StartsWith(source.Path + "/", StringComparison.Ordinal)
+                || source.Path.StartsWith(destPath + "/", StringComparison.Ordinal)))
+            return new StatusCodeResult(StatusCodes.Status403Forbidden);
+
+        // Items are copied out of a mounted folder, never moved: remote deletes are permanent.
+        if (isMove && !sameBackend && source.Fs is RemoteMountFileService)
+            return new StatusCodeResult(StatusCodes.Status403Forbidden);
 
         var overwrite = !string.Equals(
             Request.Headers["Overwrite"].ToString().Trim(), "F", StringComparison.OrdinalIgnoreCase);
@@ -294,7 +320,8 @@ public sealed partial class WebDavController : ControllerBase
 
         return await GuardAsync(async () =>
         {
-            var destExisted = await FindAsync(destFs, destPath, source.User) is not null;
+            var destItem = await FindAsync(destFs, destPath, source.User);
+            var destExisted = destItem is not null;
             if (!destExisted && !IsCreatableName(destPath))
                 return new StatusCodeResult(StatusCodes.Status400BadRequest);
             if (destExisted && !overwrite)
@@ -303,10 +330,21 @@ public sealed partial class WebDavController : ControllerBase
             // COPY honors Depth (0 = collection only, default infinity); MOVE is always deep.
             var infinity = isMove || ParseDepth() != 0;
 
-            if (destExisted && overwrite)
+            // A delete in a mounted folder is permanent, so the old target stays until the copy
+            // has replaced it (a folder is merged, like the REST transfer).
+            var keepTarget = destExisted && destFs is RemoteMountFileService;
+            if (keepTarget)
+            {
+                var item = await FindAsync(source.Fs, source.Path, source.User);
+                if (item is null) return new StatusCodeResult(StatusCodes.Status404NotFound);
+                if (item.IsDirectory != destItem!.IsDirectory) return new StatusCodeResult(StatusCodes.Status409Conflict);
+            }
+            else if (destExisted && overwrite)
+            {
                 await destFs.DeleteFileAsync(destPath, source.User, destShare.IsRecycleEnabled);
+            }
 
-            if (isMove && source.Share.Id == destShare.Id)
+            if (isMove && sameBackend && !keepTarget)
             {
                 await source.Fs.RenameAsync(source.Path, destPath, source.User);
             }

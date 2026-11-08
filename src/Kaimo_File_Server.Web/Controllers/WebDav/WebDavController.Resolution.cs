@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -30,7 +31,8 @@ public partial class WebDavController
         var share = await GetVisibleShareAsync(shareName);
         if (share is null) return (null, new StatusCodeResult(StatusCodes.Status404NotFound));
 
-        var fs = _fileServiceFactory.CreateForShare(share);
+        var isRead = HttpMethods.IsGet(Request.Method) || HttpMethods.IsHead(Request.Method);
+        var fs = await _router.ForPathAsync(share, relativePath, user, freshListings: !isRead);
         return (new Target(user, share, fs, relativePath), null);
     }
 
@@ -87,6 +89,7 @@ public partial class WebDavController
         catch (DirectoryNotFoundException) { return new StatusCodeResult(StatusCodes.Status404NotFound); }
         catch (KeyNotFoundException) { return new StatusCodeResult(StatusCodes.Status404NotFound); }
         catch (InvalidOperationException) { return new StatusCodeResult(StatusCodes.Status409Conflict); }
+        catch (RemoteShareUnavailableException) { return new StatusCodeResult(StatusCodes.Status503ServiceUnavailable); }
         // A storage-level failure (e.g. the target directory is not writable by the
         // container's user) is not the client's fault — report 409 rather than letting
         // it surface as an unhandled 500.

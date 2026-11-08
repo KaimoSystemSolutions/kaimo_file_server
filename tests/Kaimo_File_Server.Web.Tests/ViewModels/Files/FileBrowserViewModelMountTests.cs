@@ -44,7 +44,7 @@ public sealed class FileBrowserViewModelMountTests
             Name = "remote", Provisioning = CloudAccessProvisioning.Folder,
             MountShareId = _host.Id, MountPath = "Team/Cloud"
         };
-        _cloud.Setup(r => r.GetSharesAsync(It.IsAny<CancellationToken>())).ReturnsAsync([_mount]);
+        _cloud.Setup(r => r.GetMountedSharesAsync(_host.Id, It.IsAny<CancellationToken>())).ReturnsAsync([_mount]);
         _cloud.Setup(r => r.GetEffectivePermissionAsync(_mount.Id, It.IsAny<IEnumerable<Guid>>()))
             .ReturnsAsync(CloudAccessPermission.Read);
         HostRead(true);

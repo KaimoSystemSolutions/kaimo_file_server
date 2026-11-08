@@ -15,7 +15,7 @@ internal sealed class ProtocolStorageSession(
     public IOptimizedStorageSync? OptimizedSync => null;
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
-internal static class ProtocolTemporaryFile
+public static class ProtocolTemporaryFile
 {
     public static string CreatePath() => Path.Combine(Path.GetTempPath(), $"kaimo-protocol-{Guid.NewGuid():N}");
 

@@ -14,6 +14,12 @@ public sealed class CloudAccessRepository(IDbContextFactory<ApplicationDbContext
         return await db.CloudAccessShares.AsNoTracking().OrderBy(x => x.Name).ToListAsync(cancellationToken);
     }
 
+    public async Task<List<CloudAccessShare>> GetMountedSharesAsync(Guid hostShareId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.CloudAccessShares.AsNoTracking().Where(x => x.MountShareId == hostShareId).OrderBy(x => x.Name).ToListAsync(cancellationToken);
+    }
+
     public async Task<CloudAccessShare?> GetShareAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);

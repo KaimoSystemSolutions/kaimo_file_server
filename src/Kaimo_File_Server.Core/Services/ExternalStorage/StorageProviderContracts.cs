@@ -60,6 +60,13 @@ public sealed record RemoteStorageItem(
 /// <summary>A validated remote directory that can be persisted by a virtual share or sync.</summary>
 public sealed record StorageDirectoryTarget(string Path, string? StableId = null);
 
+/// <summary>
+/// The provider behind a virtual share cannot be reached right now (connection not ready,
+/// authentication or transport failure, server error). Transports report a retryable 503.
+/// </summary>
+public sealed class RemoteShareUnavailableException(string message, Exception? innerException = null)
+    : IOException(message, innerException);
+
 /// <summary>The authenticated remote system rejected an operation.</summary>
 public sealed class RemoteStorageAccessDeniedException(string message, Exception? innerException = null)
     : IOException(message, innerException);
