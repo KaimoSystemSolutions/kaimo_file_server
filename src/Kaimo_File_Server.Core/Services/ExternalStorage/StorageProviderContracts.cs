@@ -85,6 +85,9 @@ public sealed class RemoteFolderNotSyncableException(
 public sealed class RemoteStorageAccessDeniedException(string message, Exception? innerException = null)
     : IOException(message, innerException);
 
+/// <summary>The remote system definitively refused this item (missing, wrong type, out of space): retrying cannot help.</summary>
+public sealed class RemoteItemRejectedException(string message) : IOException(message);
+
 /// <summary>
 /// Provider-neutral boundary for selecting and validating durable remote roots.
 /// Consumers do not need to know whether a provider identifies directories by
@@ -124,6 +127,17 @@ public interface IRemoteFileStore
         => Task.FromResult<IReadOnlyDictionary<string, IReadOnlyList<RemoteStorageItem>>?>(null);
 
     Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Copies a remote file into <paramref name="target"/>. Providers whose
+    /// <see cref="OpenReadAsync"/> spools to a temporary file override this to stream instead,
+    /// so a large file does not have to fit into the temporary directory.
+    /// </summary>
+    async Task DownloadToAsync(string path, Stream target, CancellationToken cancellationToken = default)
+    {
+        await using Stream source = await OpenReadAsync(path, cancellationToken);
+        await source.CopyToAsync(target, cancellationToken);
+    }
 
     Task WriteAsync(
         string path,

@@ -79,6 +79,13 @@ internal sealed partial class SmbCommandRemoteFileStore(
         catch { File.Delete(temporary); throw; }
     }
 
+    /// <summary>Streams the file from smbclient's standard output ("-" as the local name).</summary>
+    public async Task DownloadToAsync(string path, Stream target, CancellationToken cancellationToken = default)
+    {
+        (string share, string relative) = SplitFile(path);
+        await RunAsync(share, $"get {QuoteRemote(relative)} -", false, cancellationToken, outputTarget: target);
+    }
+
     public async Task WriteAsync(
         string path,
         Stream content,
@@ -196,7 +203,8 @@ internal sealed partial class SmbCommandRemoteFileStore(
         bool encryptionProbe = false,
         IReadOnlyDictionary<string, string>? environment = null,
         bool stopAtOutputLimit = false,
-        int? outputLimit = null)
+        int? outputLimit = null,
+        Stream? outputTarget = null)
     {
         string authFile = ProtocolTemporaryFile.CreatePath();
         try
@@ -226,6 +234,11 @@ internal sealed partial class SmbCommandRemoteFileStore(
                 arguments.Add("--client-protection=encrypt");
             if (command is not null)
                 arguments.AddRange(["-c", command]);
+            if (outputTarget is not null)
+            {
+                await runner.StreamOutputAsync("smbclient", arguments, outputTarget, cancellationToken);
+                return new ProtocolCommandResult(0, string.Empty);
+            }
             if (stopAtOutputLimit)
                 return await runner.RunUntilOutputLimitAsync("smbclient", arguments, cancellationToken, outputLimit);
             return environment is null

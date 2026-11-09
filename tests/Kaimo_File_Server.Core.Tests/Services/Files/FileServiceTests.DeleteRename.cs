@@ -294,12 +294,9 @@ public partial class FileServiceTests
         versions.Verify(v => v.DeletePathAsync(_shareId, "doc.txt"), Times.Once);
     }
 
-    [Theory]
-    [InlineData(false, 1)]
-    [InlineData(true, 0)]
-    public async Task DirtyClose_SnapshotsVersionUnlessSkipped(bool skipVersioning, int expectedVersions)
+    [Fact]
+    public async Task DirtyClose_SnapshotsVersion()
     {
-        // Cloud-sync pulls skip the snapshot so pulled data is not stored twice.
         var versions = new Mock<IFileVersionService>();
         var handle = new Mock<IStorageHandle>();
         handle.SetupGet(h => h.IsDirectory).Returns(false);
@@ -319,13 +316,11 @@ public partial class FileServiceTests
 
         var opened = await sut.OpenAsync(
             "doc.txt", OpenMode.CreateOrTruncate, AccessIntent.Write, ShareIntent.None, CreateContext());
-        if (skipVersioning)
-            opened.Session.SkipVersioning();
         await opened.Session.DisposeAsync();
 
         versions.Verify(v => v.CreateVersionAsync(
                 _shareId, "doc.txt", It.IsAny<Stream>(), It.IsAny<string>()),
-            Times.Exactly(expectedVersions));
+            Times.Once);
     }
 
     [Fact]

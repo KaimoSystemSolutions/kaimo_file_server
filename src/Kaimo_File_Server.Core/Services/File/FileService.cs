@@ -13,6 +13,9 @@ namespace Kaimo_File_Server.Core.Services.File;
 
 public partial class FileService : IFileService
 {
+    // Far longer than any live upload goes without writing a byte to its temporary file.
+    private static readonly TimeSpan AbandonedUploadAge = TimeSpan.FromDays(1);
+
     private readonly IStorageEngine _storage;
     private readonly IAclService _acl;
     private readonly ISearchService? _searchService;
@@ -199,7 +202,24 @@ public partial class FileService : IFileService
     public Task WriteFileAsync(string path, Stream data, UserContext user, DateTime? modifiedAtUtc, DateTime? createdAtUtc, CancellationToken cancellationToken = default)
         => WriteFileAsync(path, data, user, new FileTimes(createdAtUtc, modifiedAtUtc, null), cancellationToken);
 
-    public async Task WriteFileAsync(string path, Stream data, UserContext user, FileTimes sourceTimes, CancellationToken cancellationToken = default)
+    public Task WriteFileAsync(string path, Stream data, UserContext user, FileTimes sourceTimes, CancellationToken cancellationToken = default)
+        => StoreFileAsync(path, normalized => _storage.WriteAsync(normalized, data, cancellationToken), user, sourceTimes, isRemoteCopy: false);
+
+    public Task ReplaceFileAsync(string path, Func<Stream, CancellationToken, Task> writeContent, UserContext user, FileTimes sourceTimes, CancellationToken cancellationToken = default)
+        => StoreFileAsync(path, normalized => _storage.WriteAsync(normalized, writeContent, cancellationToken), user, sourceTimes, isRemoteCopy: true);
+
+    public async Task DeleteAbandonedUploadsAsync(string directoryPath, UserContext user)
+    {
+        var normalized = ShareRelativePath.Normalize(directoryPath);
+        await EnsureAccessAsync(user, normalized, true, FilePermission.CreateWriteData);
+        await _storage.DeleteAbandonedUploadsAsync(normalized, DateTime.UtcNow - AbandonedUploadAge);
+    }
+
+    /// <param name="isRemoteCopy">
+    /// The content is a copy of a file that lives elsewhere (sync pull): no local version, and
+    /// the access time is the source's, because this copy has not been opened since it was written.
+    /// </param>
+    private async Task StoreFileAsync(string path, Func<string, Task> writeContent, UserContext user, FileTimes sourceTimes, bool isRemoteCopy)
     {
         var (createdAtUtc, modifiedAtUtc, accessedAtUtc) = sourceTimes;
         var normalized = ShareRelativePath.Normalize(path);
@@ -220,7 +240,7 @@ public partial class FileService : IFileService
             : null;
         DateTime? previousModifiedAt = previous?.ModifiedAt.ToUniversalTime();
 
-        await _storage.WriteAsync(normalized, data, cancellationToken);
+        await writeContent(normalized);
 
         // Stamp the source mtime before the change-log append, so the feed entry (which stats
         // the file) carries the preserved time instead of the write time.
@@ -247,7 +267,7 @@ public partial class FileService : IFileService
         if (accessedAtUtc is { } sourceAccessedAt)
         {
             var previousAccessedAt = previous?.LastAccessedAt?.ToUniversalTime();
-            appliedAccessed = previousAccessedAt > sourceAccessedAt.ToUniversalTime()
+            appliedAccessed = !isRemoteCopy && previousAccessedAt > sourceAccessedAt.ToUniversalTime()
                 ? previousAccessedAt.Value
                 : sourceAccessedAt;
             await _storage.SetAccessedDateAsync(normalized, appliedAccessed.Value);
@@ -267,7 +287,7 @@ public partial class FileService : IFileService
         // build the same version history that SMB writes do (FileSession.DisposeAsync).
         // Content-addressable dedup skips this when the content is unchanged. A
         // versioning failure must never fail the upload itself.
-        if (!isDir && _versionService != null)
+        if (!isRemoteCopy && !isDir && _versionService != null)
         {
             try
             {

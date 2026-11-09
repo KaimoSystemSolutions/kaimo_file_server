@@ -36,6 +36,10 @@ public sealed partial class RemoteMountFileService
     public Task<FileOpenResult> OpenAsync(string path, OpenMode mode, AccessIntent intent, ShareIntent share, UserContext user, CancellationToken ct = default)
         => throw new NotSupportedException(LocalOnly);
 
+    // Sync pulls only ever target local shares.
+    public Task ReplaceFileAsync(string path, Func<Stream, CancellationToken, Task> writeContent, UserContext user, FileTimes sourceTimes, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException(LocalOnly);
+
     public Task<IFileSession> OpenSnapshotAsync(string realPath, DateTime snapshotTimestampUtc, UserContext user, CancellationToken ct = default)
         => throw new NotSupportedException(LocalOnly);
 

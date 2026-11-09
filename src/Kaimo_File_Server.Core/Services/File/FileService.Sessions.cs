@@ -16,7 +16,6 @@ public partial class FileService
         private readonly FileService _owner;
         private readonly bool _isNewFile;
         private bool _disposed;
-        private bool _skipVersioning;
 
         public string RelativePath { get; private set; }
         public string AbsolutePath => _handle.AbsolutePath;
@@ -48,8 +47,6 @@ public partial class FileService
         public ValueTask FlushAsync(CancellationToken ct) => _handle.FlushAsync(ct);
 
         public void MarkDeleteOnClose() => _handle.MarkDeleteOnClose();
-
-        public void SkipVersioning() => _skipVersioning = true;
 
         public async ValueTask RenameAsync(
             string newRelativePath, bool replaceExisting, CancellationToken ct = default)
@@ -104,7 +101,7 @@ public partial class FileService
 
             // === Pre-close hooks (need the open stream) ===
             // Versioning: snapshot the file content while the stream is still open.
-            if (isDirty && !isDir && !deleting && !_skipVersioning && _owner._versionService != null)
+            if (isDirty && !isDir && !deleting && _owner._versionService != null)
             {
                 try
                 {

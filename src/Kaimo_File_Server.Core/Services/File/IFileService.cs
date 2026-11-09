@@ -48,6 +48,13 @@ namespace Kaimo_File_Server.Core.Services.File
         // gets its stamped modification time as last access (see docu/external-access/rest-api.md).
         Task WriteFileAsync(string path, Stream data, UserContext user, FileTimes sourceTimes, CancellationToken cancellationToken = default)
             => WriteFileAsync(path, data, user, sourceTimes.LastWritten, sourceTimes.Created, cancellationToken);
+        // Creates or atomically replaces a file with content pushed by writeContent, which must not
+        // dispose the stream. If it throws, an existing file stays unchanged and a new one never
+        // appears. Takes no version snapshot: for writers whose source of truth lives elsewhere
+        // (sync pulls), where a local version would only duplicate the remote copy on disk.
+        Task ReplaceFileAsync(string path, Func<Stream, CancellationToken, Task> writeContent, UserContext user, FileTimes sourceTimes, CancellationToken cancellationToken = default);
+        // Removes temporary upload files that a crashed process left directly in this folder.
+        Task DeleteAbandonedUploadsAsync(string directoryPath, UserContext user) => Task.CompletedTask;
         Task CreateFileAsync(string path, UserContext user);
         Task CreateDirectoryAsync(string path, UserContext user);
         Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled);

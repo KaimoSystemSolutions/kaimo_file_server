@@ -91,8 +91,34 @@ public sealed partial class CloudSyncReconciliationTests
             return Task.CompletedTask;
         }
 
+        // Downloads of a path listed here deliver half of the file, then fail with a transient
+        // error, the given number of times.
+        public Dictionary<string, int> FailingDownloads { get; } = new();
+
+        /// <summary>Thrown by every download instead of delivering data.</summary>
+        public Exception? DownloadError { get; set; }
+
+        public int DownloadAttempts { get; private set; }
+
+        /// <summary>Runs after the data arrived, before the download returns: simulates a concurrent local change.</summary>
+        public Action? DuringDownload { get; set; }
+
         public async Task DownloadAsync(string path, Stream target, CancellationToken ct = default)
-            => await target.WriteAsync(_files[Resolve(Normalize(path))].Data, ct);
+        {
+            DownloadAttempts++;
+            if (DownloadError is { } error)
+                throw error;
+            string key = Resolve(Normalize(path));
+            byte[] data = _files[key].Data;
+            if (FailingDownloads.TryGetValue(key, out int remaining) && remaining > 0)
+            {
+                FailingDownloads[key] = remaining - 1;
+                await target.WriteAsync(data.AsMemory(0, data.Length / 2), ct);
+                throw new IOException($"transient download failure for {key}");
+            }
+            await target.WriteAsync(data, ct);
+            DuringDownload?.Invoke();
+        }
 
         public Task CreateDirectoryAsync(string path, CancellationToken ct = default)
         {
@@ -352,9 +378,28 @@ public sealed partial class CloudSyncReconciliationTests
         }
 
         public Task<FileMetadata> GetMetadataAsync(string path, UserContext user)
-            => DirExists(path) || HasFile(path)
-                ? Task.FromResult(new FileMetadata { Path = Normalize(path), IsDirectory = DirExists(path) })
+        {
+            string key = Normalize(path);
+            if (_files.TryGetValue(key, out var file))
+                return Task.FromResult(new FileMetadata
+                {
+                    Path = key, IsDirectory = false, Size = file.Data.Length, ModifiedAt = file.Modified
+                });
+            return DirExists(path)
+                ? Task.FromResult(new FileMetadata { Path = key, IsDirectory = true })
                 : throw new FileNotFoundException($"'{path}' not found");
+        }
+
+        /// <summary>Folders the engine asked to clean of abandoned uploads.</summary>
+        public List<string> AbandonedUploadSweeps { get; } = [];
+
+        public Exception? AbandonedUploadSweepError { get; set; }
+
+        public Task DeleteAbandonedUploadsAsync(string directoryPath, UserContext user)
+        {
+            AbandonedUploadSweeps.Add(Normalize(directoryPath));
+            return AbandonedUploadSweepError is { } error ? Task.FromException(error) : Task.CompletedTask;
+        }
 
         public Task WriteFileAsync(string path, Stream data, UserContext user, CancellationToken ct = default)
             => WriteFileAsync(path, data, user, modifiedAtUtc: null, ct);
@@ -436,68 +481,27 @@ public sealed partial class CloudSyncReconciliationTests
         public Task NotifyExternalRenameAsync(string oldPath, string newPath, bool isDirectory, Guid sambaLifecycleEventId) => throw new NotSupportedException();
         public Task<HashSet<string>> FilterReadablePathsAsync(IReadOnlyList<(string relativePath, bool isDirectory)> items, UserContext user) => throw new NotSupportedException();
         public Task<FileOpenResult> OpenAsync(string path, OpenMode mode, AccessIntent intent, ShareIntent share, UserContext user, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        // Like the real storage: nothing is published unless writeContent completes.
+        public async Task ReplaceFileAsync(string path, Func<Stream, CancellationToken, Task> writeContent, UserContext user, FileTimes sourceTimes, CancellationToken ct = default)
         {
-            // The pull path opens a write handle and streams the download into it.
-            // Commit happens on session dispose, mirroring FileSession semantics.
-            var session = new InMemorySession(this, Normalize(path), user);
-            return Task.FromResult(new FileOpenResult(session, FileOpenStatus.Created));
+            string key = Normalize(path);
+            using var unpublished = new MemoryStream();
+            await writeContent(unpublished, ct);
+            // Same time rules as FileService: the mtime only moves forward (otherwise the file keeps
+            // its write time), the creation time only moves back, the access time follows the source.
+            DateTime source = sourceTimes.LastWritten ?? DateTime.UnixEpoch;
+            bool overwrite = _files.TryGetValue(key, out var previous);
+            _files[key] = (unpublished.ToArray(), !overwrite || source > previous.Modified ? source : DateTime.UtcNow);
+            if (sourceTimes.LastAccessed is { } accessed)
+                Accessed[key] = accessed;
+            if (sourceTimes.Created is { } created
+                && (!Created.TryGetValue(key, out var knownCreated) || created < knownCreated))
+                Created[key] = created;
+            Log.Add("write:" + key);
         }
 
-        /// <summary>Buffers offset-based writes and commits them to the parent store on dispose.</summary>
-        private sealed class InMemorySession(
-            InMemoryFileService owner,
-            string key,
-            UserContext user) : IFileSession
-        {
-            private readonly MemoryStream _buffer = new();
-            private DateTime _modified = DateTime.UnixEpoch;
-
-            public string RelativePath => key;
-            public string AbsolutePath => key;
-            public bool IsDirectory => false;
-            public long Length => _buffer.Length;
-            public UserContext User => user;
-            public bool IsReadOnly => false;
-
-            public ValueTask WriteAsync(long offset, ReadOnlyMemory<byte> data, CancellationToken ct = default)
-            {
-                _buffer.Position = offset;
-                _buffer.Write(data.Span);
-                return ValueTask.CompletedTask;
-            }
-
-            public ValueTask SetTimesAsync(FileTimes times, CancellationToken ct = default)
-            {
-                if (times.LastWritten is { } written)
-                    _modified = written;
-                if (times.LastAccessed is { } accessed)
-                    owner.Accessed[key] = accessed;
-                if (times.Created is { } created)
-                    owner.Created[key] = created;
-                return ValueTask.CompletedTask;
-            }
-
-            public ValueTask SetLengthAsync(long length, CancellationToken ct = default)
-            {
-                _buffer.SetLength(length);
-                return ValueTask.CompletedTask;
-            }
-
-            public ValueTask FlushAsync(CancellationToken ct = default) => ValueTask.CompletedTask;
-
-            public ValueTask DisposeAsync()
-            {
-                owner._files[key] = (_buffer.ToArray(), _modified);
-                owner.Log.Add("write:" + key);
-                return ValueTask.CompletedTask;
-            }
-
-            public ValueTask<int> ReadAsync(long offset, Memory<byte> buffer, CancellationToken ct = default)
-                => throw new NotSupportedException();
-            public ValueTask RenameAsync(string newRelativePath, bool replaceExisting, CancellationToken ct = default)
-                => throw new NotSupportedException();
-            public void MarkDeleteOnClose() => throw new NotSupportedException();
-        }
         public Task<IFileSession> OpenSnapshotAsync(string realPath, DateTime snapshotTimestampUtc, UserContext user, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<List<DateTime>> GetSnapshotTimestampsAsync(UserContext user) => throw new NotSupportedException();
         public Task<List<FileVersion>> GetFileVersionsAsync(string path, UserContext user) => throw new NotSupportedException();

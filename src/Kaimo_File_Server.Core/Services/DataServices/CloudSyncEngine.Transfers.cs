@@ -53,14 +53,19 @@ internal sealed partial class CloudSyncEngine
 
     /// <summary>
     /// Downloads one remote file to the local endpoint with a transient-fault
-    /// retry. The payload streams straight through an <see cref="IFileSession"/>
-    /// write handle, so it is written to local storage exactly once (no temp-file
-    /// round-trip) while staying bounded in memory. Returns true only when the
-    /// download succeeded.
+    /// retry. The payload streams into an unpublished file next to the target, so
+    /// it is written to local storage exactly once while staying bounded in memory,
+    /// and a failed download leaves the local file untouched: a truncated copy with
+    /// the current time would count as the newer side and be pushed over the intact
+    /// remote file. Returns true only when the download succeeded.
     /// </summary>
     /// <param name="createdAt">
     /// Creation time to stamp, or <c>null</c> to keep the local one (an overwrite whose
     /// provider reports no creation time, or a later one).
+    /// </param>
+    /// <param name="listedLocal">
+    /// The local file as listed when this pull was decided, or <c>null</c> when there was none.
+    /// The pull is dropped if that no longer holds once the download has finished.
     /// </param>
     private async Task<bool> PullFileAsync(
         string localChild,
@@ -68,7 +73,8 @@ internal sealed partial class CloudSyncEngine
         string displayName,
         DateTime modifiedAt,
         DateTime? createdAt,
-        long size)
+        long size,
+        FileMetadata? listedLocal)
     {
         string action = string.Format(SyncProgress.Text("Web_Jobs_CloudSync_Downloading", "Downloading {0}"), displayName);
         _progress.Update(action);
@@ -81,31 +87,75 @@ internal sealed partial class CloudSyncEngine
                 return;
             }
 
-            // Open a write handle and stream the download directly into it. The
-            // session's dispose runs the same ownership/change-log and search-index
-            // hooks as WriteFileAsync. Versioning is skipped: the remote copy is the
-            // history, and a snapshot would store every pulled byte a second time.
-            var open = await _local.OpenAsync(
-                localChild, OpenMode.CreateOrTruncate, AccessIntent.Write, ShareIntent.None,
-                _user, _cancellationToken);
-            await using var session = open.Session;
-            session.SkipVersioning();
-            await using (var sink = _options.LimitDownload(new FileSessionWriteStream(session)))
-            {
-                await _remote.DownloadAsync(remoteChild, sink, _cancellationToken);
-                await sink.FlushAsync(_cancellationToken);
-            }
-            _cancellationToken.ThrowIfCancellationRequested();
-            // Stamp the source modification time so pull change-detection keeps
-            // working on the next run (mirrors the former SetModifiedAtAsync call).
+            // The source modification time keeps pull change-detection working on the next run.
             // atime = mtime: providers expose no access time, and the copy was not opened since.
             // Without a creation time the file would show the time of the sync run as created.
-            await session.SetTimesAsync(new FileTimes(createdAt, modifiedAt, modifiedAt), _cancellationToken);
+            try
+            {
+                await _local.ReplaceFileAsync(localChild, async (file, token) =>
+                {
+                    // Not disposed: the stream belongs to the storage, which still has to flush it.
+                    Stream sink = _options.LimitDownload(file);
+                    await _remote.DownloadAsync(remoteChild, sink, token);
+                    await sink.FlushAsync(token);
+                    await ThrowIfLocalChangedAsync(localChild, listedLocal);
+                }, _user, new FileTimes(createdAt, modifiedAt, modifiedAt), _cancellationToken);
+            }
+            catch (LocalFileChangedException)
+            {
+                // Not a failure: the next run reconciles the file in its new state.
+                vanished = true;
+            }
         }) && !vanished;
 
         _progress.FileDone(size);
         _progress.Update(action);
         return ok;
+    }
+
+    /// <summary>
+    /// Aborts a pull whose target changed since it was listed: a large download takes long
+    /// enough for a user to save a newer version, which would be lost without a snapshot.
+    /// </summary>
+    // ponytail: check-then-replace leaves a tiny race; an atomic compare needs a storage-level
+    // handle held across the download if that ever matters.
+    private async Task ThrowIfLocalChangedAsync(string localChild, FileMetadata? listedLocal)
+    {
+        FileMetadata? current;
+        try
+        {
+            current = await _local.GetMetadataAsync(localChild, _user);
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            current = null;
+        }
+
+        bool unchanged = listedLocal is null
+            ? current is null
+            : current is { IsDirectory: false }
+              && current.Size == listedLocal.Size
+              && current.ModifiedAt == listedLocal.ModifiedAt;
+        if (!unchanged)
+            throw new LocalFileChangedException();
+    }
+
+    private sealed class LocalFileChangedException : Exception;
+
+    /// <summary>
+    /// Removes what a crashed process left in a folder this run visits. Housekeeping only:
+    /// it must never affect the sync itself.
+    /// </summary>
+    private async Task DeleteAbandonedUploadsAsync(string localDir)
+    {
+        try
+        {
+            await _local.DeleteAbandonedUploadsAsync(localDir, _user);
+        }
+        catch (Exception) when (!_cancellationToken.IsCancellationRequested)
+        {
+            // Retried by the next run.
+        }
     }
 
     /// <summary>
@@ -140,6 +190,9 @@ internal sealed partial class CloudSyncEngine
         HttpRequestException => true,
         System.Net.Sockets.SocketException => true,
         TimeoutException => true,
+        Kaimo_File_Server.Core.Services.ExternalStorage.RemoteItemRejectedException => false,
+        // A full pool stays full: another attempt would only transfer the whole file again.
+        IOException io when StorageErrors.IsDiskFull(io) => false,
         IOException => true,
         _ => false
     };

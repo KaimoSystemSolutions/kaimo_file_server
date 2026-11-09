@@ -55,14 +55,11 @@ internal sealed class RemoteFileStoreSyncAdapter(
         string path, DateTime modifiedUtc, DateTime? createdUtc, CancellationToken cancellationToken = default)
         => remoteFiles.TrySetDirectoryTimesAsync(path, modifiedUtc, createdUtc, cancellationToken);
 
-    public async Task DownloadAsync(
+    public Task DownloadAsync(
         string path,
         Stream target,
         CancellationToken cancellationToken = default)
-    {
-        await using var source = await remoteFiles.OpenReadAsync(path, cancellationToken);
-        await source.CopyToAsync(target, cancellationToken);
-    }
+        => remoteFiles.DownloadToAsync(path, target, cancellationToken);
 
     public Task CreateDirectoryAsync(string path, CancellationToken cancellationToken = default)
         => remoteFiles.CreateDirectoryAsync(path, cancellationToken);

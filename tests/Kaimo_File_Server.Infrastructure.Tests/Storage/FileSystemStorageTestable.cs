@@ -40,6 +40,12 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
     public Task WriteAsync(string path, Stream data, CancellationToken cancellationToken = default)
         => Invoke("WriteAsync", path, data, cancellationToken);
 
+    public Task WriteAsync(string path, Func<Stream, CancellationToken, Task> writeContent, CancellationToken cancellationToken = default)
+        => Invoke("WriteAsync", path, writeContent, cancellationToken);
+
+    public Task DeleteAbandonedUploadsAsync(string directoryPath, DateTime modifiedBeforeUtc)
+        => Invoke("DeleteAbandonedUploadsAsync", directoryPath, modifiedBeforeUtc);
+
     public Task CreateDirectory(string path)
         => Invoke("CreateDirectory", path);
 
@@ -101,7 +107,9 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
 
     // Overloads (e.g. ReadAsync) make a lookup by name alone ambiguous; match the argument count.
     private System.Reflection.MethodInfo FindMethod(string method, object[] args)
-        => _type.GetMethods().Single(m => m.Name == method && m.GetParameters().Length == args.Length);
+        => _type.GetMethods().Single(m => m.Name == method
+            && m.GetParameters().Length == args.Length
+            && m.GetParameters().Zip(args).All(pair => pair.First.ParameterType.IsInstanceOfType(pair.Second)));
 
     private async Task Invoke(string method, params object[] args)
     {

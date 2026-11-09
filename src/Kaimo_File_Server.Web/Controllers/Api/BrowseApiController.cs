@@ -310,7 +310,7 @@ public sealed partial class BrowseApiController : ApiControllerBase
         {
             return ApiBadRequest("request_aborted", "The client aborted the request.");
         }
-        catch (IOException ex) when (IsDiskFull(ex))
+        catch (IOException ex) when (Kaimo_File_Server.Core.Helpers.StorageErrors.IsDiskFull(ex))
         {
             return StatusCode(StatusCodes.Status507InsufficientStorage, new ApiError("insufficient_storage", ex.Message));
         }
@@ -330,10 +330,6 @@ public sealed partial class BrowseApiController : ApiControllerBase
             return Conflict(new ApiError("conflict", ex.Message));
         }
     }
-
-    /// <summary>ENOSPC / EDQUOT (.NET puts the raw errno into HResult on Unix), or the Win32 disk-full HRESULTs.</summary>
-    private static bool IsDiskFull(IOException ex)
-        => ex.HResult is 28 or 122 or unchecked((int)0x80070070) or unchecked((int)0x80070027);
 
     /// <summary>
     /// Metadata for a path, or <c>null</c> when it does not exist — used for

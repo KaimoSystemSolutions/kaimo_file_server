@@ -54,12 +54,22 @@ public static class ShareEntryPolicy
             new(ShareEntryKind.Internal, IsVisibleInFileBrowser: false))
     ];
 
+    /// <summary>Name of the unpublished file an atomic write creates next to its target: prefix, id, suffix.</summary>
+    public const string TemporaryUploadPrefix = InternalNamespacePrefix + "upload-";
+    public const string TemporaryUploadSuffix = ".tmp";
+
     private static readonly ShareEntryClassification Regular =
         new(ShareEntryKind.Regular, IsVisibleInFileBrowser: true);
+
+    private static readonly ShareEntryClassification TemporaryUpload =
+        new(ShareEntryKind.Internal, IsVisibleInFileBrowser: false);
 
     public static ShareEntryClassification Classify(string? shareRelativePath, int rootDepth = 0)
     {
         var normalized = ShareRelativePath.Normalize(shareRelativePath);
+        // Unlike the namespaces below, these sit at any depth: never listed or synced as content.
+        if (IsTemporaryUploadName(normalized[(normalized.LastIndexOf('/') + 1)..]))
+            return TemporaryUpload;
         var classification = ClassifyFirstSegment(normalized);
         // Share-root rules always hold; a deeper root only adds reservations.
         return classification.Kind == ShareEntryKind.Regular && rootDepth > 0
@@ -91,6 +101,10 @@ public static class ShareEntryPolicy
             ? (normalized, "")
             : (string.Join('/', segments[..rootDepth]), string.Join('/', segments[rootDepth..]));
     }
+
+    private static bool IsTemporaryUploadName(string name) =>
+        name.StartsWith(TemporaryUploadPrefix, StringComparison.OrdinalIgnoreCase)
+        && name.EndsWith(TemporaryUploadSuffix, StringComparison.OrdinalIgnoreCase);
 
     private static ShareEntryClassification ClassifyFirstSegment(string normalized)
     {

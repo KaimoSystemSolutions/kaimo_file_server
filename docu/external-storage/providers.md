@@ -81,6 +81,21 @@ credential payload.
   version.
 - Implements `IRemoteFileStore` and therefore backs virtual shares and syncs
   (`RemoteFileStoreSyncAdapter`).
+- A sync pull streams the file from smbclient's standard output into its target
+  (`IRemoteFileStore.DownloadToAsync`), so it needs no space in the temporary directory. For every
+  provider that reports its failures as exceptions, a pull writes through `IFileService.ReplaceFileAsync`
+  into a hidden file next to the target and replaces the target only after a complete download, so a
+  failed pull leaves the local file unchanged. If the local file changed while the download ran, the
+  pull is dropped and the next run reconciles it. An overwrite temporarily needs free space for both
+  copies. The hidden file (`.kaimo-upload-*.tmp`) is never listed or synced; if a crash leaves one
+  behind, the next sync that visits the folder removes it once it is a day old. Other reads
+  (`OpenReadAsync`: virtual shares, browsing, transfers) still spool to a seekable temporary file in
+  the Web container's `/tmp`, so those are limited by the space available there.
+- A failed helper reports its last output line (smbclient's `NT_STATUS_*`) in the exception. Statuses
+  that a retry cannot fix (item not found, wrong type, remote disk full) and a full local pool are not
+  retried. Items that
+  fail during an otherwise completed sync are logged as warnings by `CloudSyncExecutionService`
+  (at most 100 per run).
 - Restic backup repositories of type SMB reuse the connection: `ParseAndValidate` and
   `ReadCredentials` are shared with `ResticTargetResolver`, which turns the connection into an rclone
   SMB remote (see [File backup](../operations/file-backup-restic.md#repositories)). As rclone cannot

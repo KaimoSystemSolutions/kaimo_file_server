@@ -9,6 +9,7 @@ using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Search;
+using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
 
@@ -52,8 +53,12 @@ public sealed class CloudSyncExecutionService(
     ICloudSyncOperationCoordinator operations,
     IStorageConnectionProviderCatalog? storageProviderCatalog = null,
     ISearchService? searchService = null,
-    Core.Services.Notifications.INotificationPublisher? notifications = null) : ICloudSyncExecutionService
+    Core.Services.Notifications.INotificationPublisher? notifications = null,
+    ILogger<CloudSyncExecutionService>? logger = null) : ICloudSyncExecutionService
 {
+    // A dead target can fail every file of a large tree.
+    private const int MaxLoggedFailures = 100;
+
     public async Task<CloudSyncExecutionResult> RunAsync(
         Guid shareId,
         string localPath,
@@ -234,6 +239,7 @@ public sealed class CloudSyncExecutionService(
             // A run that copied everything it could but hit individual-item
             // failures is completed (state and manifest are advanced), with the
             // failures recorded so the operator can see exactly what was skipped.
+            LogFailures(normalizedPath, failures);
             await syncDefinitions.MarkCompletedAsync(
                 definition.Id, completedAtUtc, failures, cancellationToken);
 
@@ -256,6 +262,18 @@ public sealed class CloudSyncExecutionService(
                 ? CloudSyncExecutionResult.CompletedWithErrors
                 : CloudSyncExecutionResult.Completed;
         }
+    }
+
+    private void LogFailures(string localPath, IReadOnlyList<SyncFailure> failures)
+    {
+        foreach (SyncFailure failure in failures.Take(MaxLoggedFailures))
+            logger?.LogWarning(
+                "Sync of {LocalPath}: {Operation} failed for {Path}: {Reason}",
+                localPath, failure.Operation, failure.Path, failure.Reason);
+        if (failures.Count > MaxLoggedFailures)
+            logger?.LogWarning(
+                "Sync of {LocalPath}: {Remaining} more failed items were not logged.",
+                localPath, failures.Count - MaxLoggedFailures);
     }
 
     private Task PublishFailedAsync(SyncDefinition definition, Exception exception)

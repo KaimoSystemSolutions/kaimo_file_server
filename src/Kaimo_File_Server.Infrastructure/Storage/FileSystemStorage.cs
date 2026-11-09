@@ -102,7 +102,15 @@ public partial class FileSystemStorage : IStorageEngine
         return Task.FromResult(stream);
     }
 
-    public async Task WriteAsync(string path, Stream data, CancellationToken cancellationToken = default)
+    public Task WriteAsync(string path, Stream data, CancellationToken cancellationToken = default)
+        => WriteAtomicallyAsync(path, (file, token) => data.CopyToAsync(file, token), flushToDisk: true, cancellationToken);
+
+    public Task WriteAsync(
+        string path, Func<Stream, CancellationToken, Task> writeContent, CancellationToken cancellationToken = default)
+        => WriteAtomicallyAsync(path, writeContent, flushToDisk: false, cancellationToken);
+
+    private async Task WriteAtomicallyAsync(
+        string path, Func<Stream, CancellationToken, Task> writeContent, bool flushToDisk, CancellationToken cancellationToken)
     {
         var fullPath = ToAbsolutePath(path);
         var parentPath = Path.GetDirectoryName(fullPath)!;
@@ -114,7 +122,7 @@ public partial class FileSystemStorage : IStorageEngine
             parentPath,
             // The name is not embedded: a long target name plus the suffix would exceed the
             // 255-byte name limit although the target name itself fits.
-            $".kaimo-upload-{Guid.NewGuid():N}.tmp");
+            $"{ShareEntryPolicy.TemporaryUploadPrefix}{Guid.NewGuid():N}{ShareEntryPolicy.TemporaryUploadSuffix}");
 
         try
         {
@@ -122,9 +130,10 @@ public partial class FileSystemStorage : IStorageEngine
                 tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
                 81920, FileOptions.Asynchronous | FileOptions.SequentialScan))
             {
-                await data.CopyToAsync(file, cancellationToken);
+                await writeContent(file, cancellationToken);
                 await file.FlushAsync(cancellationToken);
-                file.Flush(flushToDisk: true);
+                if (flushToDisk)
+                    file.Flush(flushToDisk: true);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -132,6 +141,8 @@ public partial class FileSystemStorage : IStorageEngine
             {
                 // An overwrite changes the content, not the identity: keep the creation time.
                 FileBirthTime.PreserveOnReplace(fullPath, tempPath);
+                if (!OperatingSystem.IsWindows())
+                    File.SetUnixFileMode(tempPath, File.GetUnixFileMode(fullPath));
                 File.Replace(tempPath, fullPath, destinationBackupFileName: null);
             }
             else
@@ -144,6 +155,28 @@ public partial class FileSystemStorage : IStorageEngine
             try { File.Delete(tempPath); }
             catch { /* preserve the original write exception */ }
         }
+    }
+
+    public Task DeleteAbandonedUploadsAsync(string directoryPath, DateTime modifiedBeforeUtc)
+    {
+        var fullPath = ToAbsolutePath(directoryPath);
+        if (!Directory.Exists(fullPath))
+            return Task.CompletedTask;
+
+        var pattern = $"{ShareEntryPolicy.TemporaryUploadPrefix}*{ShareEntryPolicy.TemporaryUploadSuffix}";
+        foreach (var file in Directory.EnumerateFiles(fullPath, pattern, WithoutLinks))
+        {
+            try
+            {
+                if (File.GetLastWriteTimeUtc(file) < modifiedBeforeUtc)
+                    File.Delete(file);
+            }
+            catch (IOException)
+            {
+                // Removed or still in use by someone else: nothing to clean up now.
+            }
+        }
+        return Task.CompletedTask;
     }
 
     public Task SetModifiedDateAsync(string path, DateTime time)

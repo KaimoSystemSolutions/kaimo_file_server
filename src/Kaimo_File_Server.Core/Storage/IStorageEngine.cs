@@ -17,6 +17,19 @@ namespace Kaimo_File_Server.Core.Storage
         /// destination unchanged and must not publish a partial new file.
         /// </summary>
         Task WriteAsync(string path, Stream data, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Same guarantee for content that is pushed instead of read: <paramref name="writeContent"/>
+        /// writes into the unpublished file and must not dispose the stream. The destination is
+        /// replaced only when it completes; if it throws, the destination stays unchanged.
+        /// Not forced to disk: meant for many files that exist elsewhere as well (sync pulls), where
+        /// one fsync per file would dominate the run.
+        /// </summary>
+        Task WriteAsync(string path, Func<Stream, CancellationToken, Task> writeContent, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Removes temporary upload files directly in <paramref name="directoryPath"/> that were
+        /// last written before <paramref name="modifiedBeforeUtc"/>: leftovers of a crashed process.
+        /// </summary>
+        Task DeleteAbandonedUploadsAsync(string directoryPath, DateTime modifiedBeforeUtc) => Task.CompletedTask;
         Task CreateDirectory(string path);
         Task DeleteAsync(string path);
         /// <summary>

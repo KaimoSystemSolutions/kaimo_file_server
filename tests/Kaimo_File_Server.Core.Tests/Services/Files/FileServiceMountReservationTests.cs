@@ -49,6 +49,11 @@ public sealed class FileServiceMountReservationTests
             () => _sut.WriteFileAsync("Team/Cloud", Stream.Null, _user));
 
     [Fact]
+    public async Task ReplaceFile_OnMount_IsRejected()
+        => await Assert.ThrowsAsync<MountPathReservedException>(() => _sut.ReplaceFileAsync(
+            "Team/Cloud", (_, _) => Task.CompletedTask, _user, new Kaimo_File_Server.Core.Storage.FileTimes(null, null, null)));
+
+    [Fact]
     public async Task Rename_OntoMount_IsRejected()
     {
         _storage.Setup(s => s.IsDirectoryAsync("Team/Local")).ReturnsAsync(true);

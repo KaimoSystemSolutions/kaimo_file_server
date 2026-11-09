@@ -27,6 +27,28 @@ public sealed class ShareEntryPolicyTests
     }
 
     [Theory]
+    [InlineData(".kaimo-upload-abc.tmp", 0)]
+    [InlineData("docs/.kaimo-upload-abc.tmp", 0)]
+    [InlineData("a/b/.KAIMO-UPLOAD-ABC.TMP", 0)]
+    [InlineData("uid/docs/.kaimo-upload-abc.tmp", 1)]
+    public void Classify_TemporaryUploadAtAnyDepth_IsHidden(string path, int rootDepth)
+    {
+        var result = ShareEntryPolicy.Classify(path, rootDepth);
+
+        Assert.Equal(ShareEntryKind.Internal, result.Kind);
+        Assert.False(result.IsVisibleInFileBrowser);
+    }
+
+    [Theory]
+    [InlineData("docs/.kaimo-upload-abc.txt")]
+    [InlineData("docs/kaimo-upload-abc.tmp")]
+    [InlineData("docs/.kaimo-upload-abc.tmp/file.txt")]
+    public void Classify_SimilarNames_RemainRegular(string path)
+    {
+        Assert.Equal(ShareEntryKind.Regular, ShareEntryPolicy.Classify(path).Kind);
+    }
+
+    [Theory]
     [InlineData(".RECYCLE_BIN")]
     [InlineData(".recycle_bin/folder/file.txt")]
     public void Classify_RecycleBin_IsVisibleSpecialEntry(string path)

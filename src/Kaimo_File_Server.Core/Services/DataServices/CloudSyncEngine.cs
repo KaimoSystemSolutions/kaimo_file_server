@@ -378,6 +378,7 @@ internal sealed partial class CloudSyncEngine
             return (false, false);
         }
         _cancellationToken.ThrowIfCancellationRequested();
+        await DeleteAbandonedUploadsAsync(localDir);
 
         // Which side this pass wrote into; adding or removing an entry moves a folder's mtime.
         bool localChanged = false;
@@ -533,7 +534,7 @@ internal sealed partial class CloudSyncEngine
         // A new local copy: providers without creation times (smbclient, SFTP) fall back to
         // the modification time, which is the oldest time known for the item.
         if (await PullFileAsync(localChild, remoteChild, remote.Name, remote.ModifiedAt,
-                remote.CreatedAt ?? remote.ModifiedAt, remote.Size))
+                remote.CreatedAt ?? remote.ModifiedAt, remote.Size, listedLocal: null))
         {
             _newManifest.Paths.Add(localChild);
             return (true, false);
@@ -573,7 +574,7 @@ internal sealed partial class CloudSyncEngine
 
         if (newer < 0 && _mode != SyncMode.Push)
             return (await PullFileAsync(localChild, remoteChild,
-                remote.Name, remote.ModifiedAt, EarlierCreatedAt(remote.CreatedAt, KnownCreatedAt(local)), remote.Size), false);
+                remote.Name, remote.ModifiedAt, EarlierCreatedAt(remote.CreatedAt, KnownCreatedAt(local)), remote.Size, local), false);
 
         // Unchanged (or not allowed in this direction): still progress for the user.
         _progress.FileDone(Math.Max(local.Size, remote.Size));

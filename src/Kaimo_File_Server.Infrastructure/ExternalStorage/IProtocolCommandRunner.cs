@@ -31,6 +31,18 @@ public interface IProtocolCommandRunner
         CancellationToken cancellationToken,
         int? maximumOutputCharacters = null)
         => RunAsync(executable, arguments, cancellationToken, throwOnFailure: false);
+
+    /// <summary>
+    /// Runs a helper and copies its binary standard output into <paramref name="target"/> without
+    /// buffering it. Throws when the helper fails, also after data was already written, so a
+    /// broken transfer never passes as a complete one. A short output of a failed helper is
+    /// treated as its error message and not written to the target.
+    /// </summary>
+    Task StreamOutputAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        Stream target,
+        CancellationToken cancellationToken);
 }
 /// <param name="OutputTruncated">True when the helper wrote more than the runner keeps; the output is incomplete.</param>
 public sealed record ProtocolCommandResult(
