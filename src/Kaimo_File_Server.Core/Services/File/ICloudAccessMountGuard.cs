@@ -14,6 +14,12 @@ public interface ICloudAccessMountGuard
     Task<bool> IsReservedAsync(Guid shareId, string relativePath, CancellationToken ct = default);
 
     /// <summary>
+    /// The mount paths of the share, for callers that test many paths in one operation.
+    /// Hidden or disabled mounts count too.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetMountPathsAsync(Guid shareId, CancellationToken ct = default);
+
+    /// <summary>
     /// Rebases mounts at or below <paramref name="oldRelativePath"/> onto
     /// <paramref name="newRelativePath"/>. A move into the recycle bin detaches them instead.
     /// Idempotent so durable SMB lifecycle events can be retried.

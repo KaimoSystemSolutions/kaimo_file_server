@@ -23,12 +23,18 @@ public sealed class CloudAccessMountGuard(
         if (path.Length == 0)
             return false;
 
+        var mountPaths = await GetMountPathsAsync(shareId, ct);
+        return mountPaths.Any(m => ShareRelativePath.IsSameOrDescendant(m, path));
+    }
+
+    public async Task<IReadOnlyList<string>> GetMountPathsAsync(Guid shareId, CancellationToken ct = default)
+    {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var mountPaths = await db.CloudAccessShares.AsNoTracking()
-            .Where(s => s.MountShareId == shareId && s.Provisioning == CloudAccessProvisioning.Folder)
-            .Select(s => s.MountPath)
+        return await db.CloudAccessShares.AsNoTracking()
+            .Where(s => s.MountShareId == shareId && s.Provisioning == CloudAccessProvisioning.Folder
+                        && s.MountPath != null && s.MountPath != "")
+            .Select(s => s.MountPath!)
             .ToListAsync(ct);
-        return mountPaths.Any(m => !string.IsNullOrEmpty(m) && ShareRelativePath.IsSameOrDescendant(m, path));
     }
 
     public async Task RenamePathAsync(Guid shareId, string oldRelativePath, string newRelativePath, int recycleRootDepth)

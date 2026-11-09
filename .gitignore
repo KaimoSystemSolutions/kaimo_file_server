@@ -266,6 +266,8 @@ Backup*/
 !src/Kaimo_File_Server.Core/Domain/Backup/
 !src/Kaimo_File_Server.Web/Components/Pages/Backup/
 !src/Kaimo_File_Server.Web/Components/ViewModels/Backup/
+!tests/Kaimo_File_Server.Infrastructure.Tests/Backup/
+!tests/Kaimo_File_Server.Web.Tests/ViewModels/Backup/
 UpgradeLog*.XML
 UpgradeLog*.htm
 ServiceFabricBackup/

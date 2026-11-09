@@ -156,4 +156,5 @@ Each request opens its own provider session on first use and closes it at the en
 
 Out of scope: virtual shares and mounts are invisible over SMB, and every recursive host-side operation (copy or ZIP
 of a parent folder, folder sizes, backup, indexing, sync delta, share pool move) skips it, because
-the remote content is not part of the host share.
+the remote content is not part of the host share. A restic restore into the host share never
+writes to a mount path, at any depth of the restored tree: such entries are reported as skipped.

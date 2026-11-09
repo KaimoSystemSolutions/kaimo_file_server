@@ -78,6 +78,22 @@ public sealed class CloudAccessMountGuardDatabaseTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task GetMountPathsAsync_ReturnsOnlyTheFolderMountsOfTheShare()
+    {
+        var host = SeedShare("projekte");
+        var other = SeedShare("other");
+        SeedMount(host.Id, "Team/Cloud", "a");
+        SeedMount(host.Id, "Archive", "b");
+        SeedMount(other.Id, "Elsewhere", "c");
+        SeedMount(host.Id, "Legacy", "d", CloudAccessProvisioning.VirtualShare);
+        SeedMount(null, null, "e");
+
+        var paths = await Sut().GetMountPathsAsync(host.Id);
+
+        Assert.Equal(["Archive", "Team/Cloud"], paths.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
     public async Task RenamePathAsync_RebasesMountAtAndBelowAndIsIdempotent()
     {
         var host = SeedShare("projekte");

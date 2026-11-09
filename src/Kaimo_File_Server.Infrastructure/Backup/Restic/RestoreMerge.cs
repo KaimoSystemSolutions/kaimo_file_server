@@ -6,7 +6,8 @@ namespace Kaimo_File_Server.Infrastructure.Backup.Restic;
 /// <summary>
 /// Moves staged entries into a share. Missing entries are moved as a whole (a directory in
 /// one atomic rename); existing directories are merged recursively; existing files follow the
-/// conflict policy. Nothing in the destination is ever deleted.
+/// conflict policy. Nothing in the destination is ever deleted. Entries at a virtual-share
+/// mount path are never restored and are reported as skipped.
 /// </summary>
 internal sealed class RestoreMerge(
     string shareRoot,
@@ -15,8 +16,11 @@ internal sealed class RestoreMerge(
     IFileVersionService versions,
     string? userId,
     string renameSuffix,
-    BackupRestoreOutcome outcome)
+    BackupRestoreOutcome outcome,
+    IReadOnlyCollection<string>? mountPaths = null)
 {
+    private readonly IReadOnlyCollection<string> _mountPaths = mountPaths ?? [];
+
     /// <summary>Destination paths that kept their current content (skipped or restored under a new name).</summary>
     public List<string> Untouched { get; } = [];
 
@@ -28,11 +32,26 @@ internal sealed class RestoreMerge(
 
     public async Task MoveAsync(string source, string relativeDestination)
     {
+        // A mount point exists only in the database; restored data must not claim its name.
+        if (_mountPaths.Any(mount => ShareRelativePath.IsSameOrDescendant(mount, relativeDestination)))
+        {
+            outcome.SkippedItems.Add(relativeDestination);
+            return;
+        }
+
         var destination = Absolute(relativeDestination);
         var sourceIsDirectory = Directory.Exists(source);
 
         if (!Path.Exists(destination))
         {
+            // One atomic move would carry the entries at a mount path along.
+            if (sourceIsDirectory && _mountPaths.Any(mount => ShareRelativePath.IsSameOrDescendant(relativeDestination, mount)))
+            {
+                Directory.CreateDirectory(destination);
+                await MoveChildrenAsync(source, relativeDestination);
+                return;
+            }
+
             if (sourceIsDirectory) Directory.Move(source, destination);
             else File.Move(source, destination);
             return;
@@ -41,13 +60,7 @@ internal sealed class RestoreMerge(
         if (sourceIsDirectory && Directory.Exists(destination))
         {
             Existing.Add(relativeDestination);
-            foreach (var child in Directory.EnumerateFileSystemEntries(source).ToList())
-            {
-                var name = Path.GetFileName(child);
-                if (name.StartsWith(ShareEntryPolicy.InternalNamespacePrefix, StringComparison.Ordinal))
-                    continue;
-                await MoveAsync(child, ShareRelativePath.Combine(relativeDestination, name));
-            }
+            await MoveChildrenAsync(source, relativeDestination);
             return;
         }
 
@@ -93,6 +106,17 @@ internal sealed class RestoreMerge(
         File.Move(source, destination, overwrite: true);
         outcome.Overwritten++;
         Existing.Add(relativeDestination);
+    }
+
+    private async Task MoveChildrenAsync(string source, string relativeDestination)
+    {
+        foreach (var child in Directory.EnumerateFileSystemEntries(source).ToList())
+        {
+            var name = Path.GetFileName(child);
+            if (name.StartsWith(ShareEntryPolicy.InternalNamespacePrefix, StringComparison.Ordinal))
+                continue;
+            await MoveAsync(child, ShareRelativePath.Combine(relativeDestination, name));
+        }
     }
 
     private void RestoreBeside(string source, string relativeDestination, bool sourceIsDirectory)

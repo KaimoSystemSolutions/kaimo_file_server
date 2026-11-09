@@ -129,21 +129,22 @@ public sealed class BackupRestoreExecutor(
             outcome.SkippedItems.AddRange(request.Items.Where(i => !Path.Exists(Path.Combine(data, i))));
 
             report(null, 90);
-            var merge = new RestoreMerge(destinationRoot, destination.Id, request.Conflict, versions,
-                run.ActorUserId?.ToString(), RenameSuffix(now, request.GetUiCulture()), outcome);
+            RestoreMerge merge;
             var shareLock = locks.GetLock(destination.Name);
             await shareLock.WaitAsync(ct);
             try
             {
+                // Loaded once, right before the merge: it can test every restored entry, and a
+                // mount created during the restic run or the wait for the lock still counts.
+                var mountPaths = mounts is null ? [] : await mounts.GetMountPathsAsync(destination.Id, ct);
+                merge = new RestoreMerge(destinationRoot, destination.Id, request.Conflict, versions,
+                    run.ActorUserId?.ToString(), RenameSuffix(now, request.GetUiCulture()), outcome, mountPaths);
                 Directory.CreateDirectory(ShareRelativePath.ToContainedAbsolutePath(destinationRoot, destinationBase, allowInternalNamespace: false));
                 foreach (var entry in Directory.EnumerateFileSystemEntries(data).ToList())
                 {
                     ct.ThrowIfCancellationRequested();
                     var relative = ShareRelativePath.Combine(destinationBase, Path.GetFileName(entry));
-                    // ponytail: only top-level entries are checked against virtual-share mounts;
-                    // a deeper collision is admin-made and the web listing shows the mount anyway.
-                    if (ShareEntryPolicy.IsReservedForUserWrites(relative, depth)
-                        || await IsMountAsync(destination.Id, relative, ct))
+                    if (ShareEntryPolicy.IsReservedForUserWrites(relative, depth))
                     {
                         outcome.SkippedItems.Add(relative);
                         continue;
