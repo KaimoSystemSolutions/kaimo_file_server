@@ -125,7 +125,14 @@ cannot mirror into each other at all: both need their own `RCLONE_CONFIG` file, 
 `restic copy` process sees only one (`mirror_conflict`).
 
 "Test" probes the location. **Initialize new** creates a repository with a generated 32-byte
-password; **Connect existing** attaches a repository with its known password (disaster recovery).
+password; **Connect existing** attaches a repository with its known password (disaster recovery,
+or a repository of a previous installation). Its backup points are read right away, so they show on
+the Restore tab without waiting for a job or maintenance run. Both connect reads (`cat config`,
+`snapshots`) run with `--no-lock`, so a lock held by another installation does not block connecting;
+if the listing fails anyway (e.g. timeout), the repository is still connected and its backup points
+appear after the next job or maintenance run. Share backup points whose share does
+not exist on this server (deleted, or from another installation) appear under **System & pools** as
+"Unknown share <path>" and are restored as a whole into the server restore folder.
 The restic repository id is stored and re-checked whenever the location or credentials change.
 
 ### Recovery kit

@@ -209,7 +209,8 @@ public sealed class BackupRestoreExecutor(
     }
 
     /// <summary>
-    /// Restores a whole system, pool or foreign backup point into a new owner-only folder below
+    /// Restores a whole system, pool or foreign backup point, or a share backup point whose share
+    /// no longer exists here, into a new owner-only folder below
     /// <see cref="ServerRestoreRoot"/>; the snapshot's absolute paths are kept below it. The
     /// admin takes the database dump (startup restore runbook) or files from there. A failed or
     /// cancelled restore removes its partial folder.
@@ -225,7 +226,7 @@ public sealed class BackupRestoreExecutor(
             var snapshot = await db.BackupSnapshots.AsNoTracking()
                                .FirstOrDefaultAsync(s => s.RepositoryId == repository.Id && s.SnapshotId == details.Request.SnapshotId, ct)
                            ?? throw new ResticException("snapshot_missing", "The backup point no longer exists.");
-            if (snapshot.Kind == BackupSnapshotKind.Share)
+            if (snapshot.Kind == BackupSnapshotKind.Share && await db.ShareDefinitions.AnyAsync(d => d.Id == snapshot.ShareId, ct))
                 throw new ResticException("request_invalid", "Share backup points are restored into their share.");
             outcome.SourceShareName = SourceLabel(snapshot, details.Request.GetUiCulture());
 
@@ -255,7 +256,7 @@ public sealed class BackupRestoreExecutor(
             run.Status = BackupRunStatus.Succeeded;
             repository.LastReachableAtUtc = time.GetUtcNow().UtcDateTime;
             report(null, 100);
-            logger.LogWarning("Backup point {Snapshot} restored into server folder {Folder}.", snapshot.SnapshotId, folder);
+            logger.LogWarning("Backup point {Snapshot} restored into server folder {Folder}.", snapshot.SnapshotId, final);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -318,12 +319,16 @@ public sealed class BackupRestoreExecutor(
 
     /// <summary>
     /// Display name of a non-share backup point in <paramref name="culture"/> (default: the
-    /// thread's UI culture): "Pool pool01", the system label or the recorded paths.
+    /// thread's UI culture): "Pool pool01", the system label, "Unknown share /path" for a share
+    /// point whose share is gone, or the recorded paths.
     /// </summary>
     internal static string SourceLabel(BackupSnapshot snapshot, CultureInfo? culture = null) => snapshot.Kind switch
     {
         BackupSnapshotKind.Pool => BackupJobExecutor.PoolSourceName(snapshot.PoolPath ?? "?", culture),
         BackupSnapshotKind.System => BackupJobExecutor.SystemSourceName(culture),
+        BackupSnapshotKind.Share => string.Format(culture ?? CultureInfo.CurrentUICulture,
+            Resources.ResourceManager.GetString("Web_Backup_Restore_UnknownShareSource", culture) ?? "Unknown share {0}",
+            SourceRoot(snapshot) ?? "?"),
         _ => string.Join(", ", Paths(snapshot)),
     };
 

@@ -101,12 +101,20 @@ public partial class BackupCatalogService
                 ? await restic.InitAsync(target, token)
                 : await restic.CatConfigAsync(target, token);
         }, ct);
+        // A connected repository brings its backup points (e.g. from a previous installation).
+        var snapshots = initialize ? [] : await TryLoadSnapshotsAsync(repository, draft.Secrets, password, ct);
 
         repository.EncryptedPassword = resolver.ProtectPassword(repository.Id, password);
         repository.EncryptedSecrets = HasSecrets(draft.Secrets) ? resolver.ProtectSecrets(repository.Id, draft.Secrets) : null;
         repository.LastReachableAtUtc = time.GetUtcNow().UtcDateTime;
 
         db.BackupRepositories.Add(repository);
+        foreach (var info in snapshots)
+        {
+            var row = new BackupSnapshot { RepositoryId = repository.Id, SnapshotId = info.Id };
+            BackupJobExecutor.ApplySnapshotInfo(row, info);
+            db.BackupSnapshots.Add(row);
+        }
         foreach (var departmentId in draft.DepartmentIds.Distinct())
             db.BackupRepositoryDepartments.Add(new BackupRepositoryDepartment { RepositoryId = repository.Id, DepartmentId = departmentId });
         run.Status = BackupRunStatus.Succeeded;
@@ -118,6 +126,31 @@ public partial class BackupCatalogService
         logger.LogInformation("Backup repository {Name} ({Backend}) {Mode} by {User}.",
             repository.Name, repository.Backend, initialize ? "initialized" : "connected", actor.User.Username);
         return repository;
+    }
+
+    /// <summary>
+    /// Reads the backup points of a just connected repository. Best effort: a locked, slow or
+    /// failing listing must not block connecting (disaster recovery); the next backup or
+    /// maintenance run refreshes the snapshot cache anyway.
+    /// </summary>
+    private async Task<IReadOnlyList<ResticSnapshotInfo>> TryLoadSnapshotsAsync(
+        BackupRepository repository, ResticBackendSecrets secrets, string password, CancellationToken ct)
+    {
+        try
+        {
+            return await WithInteractiveTimeoutAsync(async token =>
+            {
+                using var target = await resolver.ResolveAsync(repository, secrets, password, token);
+                // Lock-free: a lock held by another installation neither blocks nor stalls connecting.
+                return await restic.SnapshotsAsync(target, token, noLock: true);
+            }, ct);
+        }
+        catch (ResticException ex)
+        {
+            logger.LogWarning("Backup points of connected repository {Name} could not be read ({Code}); they appear after the next refresh.",
+                repository.Name, ex.Code);
+            return [];
+        }
     }
 
     /// <summary>

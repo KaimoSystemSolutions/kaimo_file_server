@@ -31,7 +31,7 @@ public partial class ResticBackupDatabaseTests
             CancellationToken cancellationToken = default)
         {
             Calls.Add(arguments.ToList());
-            var command = arguments.First(a => a is "unlock" or "backup" or "forget" or "prune" or "check" or "snapshots" or "copy" or "ls" or "restore");
+            var command = arguments.First(a => a is "cat" or "unlock" or "backup" or "forget" or "prune" or "check" or "snapshots" or "copy" or "ls" or "restore");
             var (exit, stdout) = script(command);
             foreach (var line in stdout)
                 onStdoutLine?.Invoke(line);

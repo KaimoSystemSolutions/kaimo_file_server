@@ -372,7 +372,9 @@ public sealed class BackupMaintenanceExecutor(
         {
             var target = await TargetAsync();
             var latest = (await db.BackupSnapshots.AsNoTracking()
-                    .Where(s => s.RepositoryId == repository.Id && s.Kind == BackupSnapshotKind.Share && s.ShareId != null)
+                    // Points of a share that is gone have no live files to compare with.
+                    .Where(s => s.RepositoryId == repository.Id && s.Kind == BackupSnapshotKind.Share && s.ShareId != null
+                                && db.ShareDefinitions.Any(d => d.Id == s.ShareId))
                     .ToListAsync(ct))
                 .GroupBy(s => s.ShareId)
                 .Select(g => g.MaxBy(s => s.TimeUtc)!)

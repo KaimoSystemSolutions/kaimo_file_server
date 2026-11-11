@@ -7124,6 +7124,9 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Backup_Source_Pool" xml:space="preserve">
     <value>Pool {0}</value>
   </data>
+  <data name="Web_Backup_Restore_UnknownShareSource" xml:space="preserve">
+    <value>Unbekannter Share {0}</value>
+  </data>
   <data name="Web_Backup_Error_database_dump_failed" xml:space="preserve">
     <value>Der Datenbank-Dump (pg_dump) ist fehlgeschlagen. Details im Protokollauszug.</value>
   </data>

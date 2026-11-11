@@ -284,14 +284,20 @@ public partial class BackupCatalogService
         });
     }
 
-    /// <summary>System, pool and foreign backup points, newest first (Global repository admins).</summary>
+    /// <summary>
+    /// System, pool and foreign backup points plus share backup points whose share no longer
+    /// exists here (deleted, or a repository connected from another installation), newest first
+    /// (Global repository admins).
+    /// </summary>
     public async Task<IReadOnlyList<BackupServerPointView>> ListServerBackupPointsAsync(UserContext actor)
     {
         var access = await GetAccessAsync(actor);
         if (!access.CanManageRepositories)
             return [];
         await using var db = await dbFactory.CreateDbContextAsync();
-        var snapshots = (await db.BackupSnapshots.AsNoTracking().Where(s => s.Kind != BackupSnapshotKind.Share).ToListAsync())
+        var snapshots = (await db.BackupSnapshots.AsNoTracking()
+                .Where(s => s.Kind != BackupSnapshotKind.Share || !db.ShareDefinitions.Any(d => d.Id == s.ShareId))
+                .ToListAsync())
             .OrderByDescending(s => s.TimeUtc).ToList();
         var repoNames = await db.BackupRepositories.AsNoTracking().ToDictionaryAsync(r => r.Id, r => r.Name);
         var jobNames = await db.BackupJobs.AsNoTracking().ToDictionaryAsync(j => j.Id, j => j.Name);
@@ -302,9 +308,10 @@ public partial class BackupCatalogService
     }
 
     /// <summary>
-    /// Queues the restore of a whole system, pool or foreign backup point into a new folder
-    /// below the server's backup folder (Global <see cref="ManagementPermission.ManageBackupRepositories"/>:
-    /// a system backup point holds the database dump with every credential).
+    /// Queues the restore of a whole system, pool or foreign backup point, or a share backup
+    /// point whose share no longer exists here, into a new folder below the server's backup folder
+    /// (Global <see cref="ManagementPermission.ManageBackupRepositories"/>: a system backup point
+    /// holds the database dump with every credential).
     /// </summary>
     public async Task<Guid> EnqueueServerRestoreAsync(UserContext actor, Guid repositoryId, string snapshotId, CancellationToken ct = default)
     {
@@ -314,7 +321,7 @@ public partial class BackupCatalogService
         var snapshot = await db.BackupSnapshots.AsNoTracking()
                            .FirstOrDefaultAsync(s => s.RepositoryId == repositoryId && s.SnapshotId == snapshotId, ct)
                        ?? throw new ResticException("snapshot_missing", "The backup point no longer exists.");
-        if (snapshot.Kind == BackupSnapshotKind.Share)
+        if (snapshot.Kind == BackupSnapshotKind.Share && await db.ShareDefinitions.AnyAsync(d => d.Id == snapshot.ShareId, ct))
             throw new ResticException("request_invalid", "Share backup points are restored into their share.");
         var source = BackupRestoreExecutor.SourceLabel(snapshot);
         var request = new BackupRestoreRequest(repositoryId, snapshotId, Guid.Empty, string.Empty, [],

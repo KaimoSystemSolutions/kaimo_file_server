@@ -65,7 +65,7 @@
                 var selected = VM.ServerSource == group.Key;
                 <button type="button" class="workspace-row @(selected ? "workspace-row--selected" : "")"
                         aria-pressed="@(selected ? "true" : "false")" disabled="@VM.IsBusy" @onclick="() => VM.SelectServerSource(group.Key)">
-                    <span class="workspace-row-icon @BackupUi.PoolIconClass">@Assets.SVG(ServerIcon(group.First().Kind), new SvgOptions(Width: 16, Height: 16))</span>
+                    <span class="workspace-row-icon @ServerIconClass(group.First().Kind)">@Assets.SVG(ServerIcon(group.First().Kind), new SvgOptions(Width: 16, Height: 16))</span>
                     <span class="workspace-row-text">
                         <strong>@group.Key</strong>
                         <small>@string.Format(R("Web_Backup_Restore_PointCount"), group.Count(), DateFmt.FormatDateTime(group.Max(p => p.TimeUtc)))</small>
@@ -182,7 +182,7 @@
         {
             <DetailHeader Title="@source" Subtitle="@R("Web_Backup_Restore_ServerSources")">
                 <Leading>
-                    <span class="detail-head-icon @BackupUi.PoolIconClass" aria-hidden="true">
+                    <span class="detail-head-icon @ServerIconClass(VM.ServerPoints.First(p => p.Source == source).Kind)" aria-hidden="true">
                         @Assets.SVG(ServerIcon(VM.ServerPoints.First(p => p.Source == source).Kind), new SvgOptions(Width: 18, Height: 18))
                     </span>
                 </Leading>
@@ -373,7 +373,15 @@
            + (point.JobName is null ? "" : " · " + point.JobName)
            + (point.FileCount > 0 ? $" · {string.Format(R("Web_Backup_Restore_PointFiles"), point.FileCount, NotificationEvents.FormatSize(point.TotalBytes))}" : "");
 
-    private static string ServerIcon(BackupSnapshotKind kind) => kind == BackupSnapshotKind.System ? "gear.svg" : "pool.svg";
+    private static string ServerIcon(BackupSnapshotKind kind) => kind switch
+    {
+        BackupSnapshotKind.System => "gear.svg",
+        BackupSnapshotKind.Share => "folder.svg", // share point whose share no longer exists here
+        _ => "pool.svg",
+    };
+
+    private static string ServerIconClass(BackupSnapshotKind kind)
+        => kind == BackupSnapshotKind.Share ? BackupUi.ShareIconClass : BackupUi.PoolIconClass;
 
     private string FolderLabel(string shareName)
         => VM.BrowseFolder.Length == 0 ? shareName : shareName + "/" + VM.BrowseFolder;

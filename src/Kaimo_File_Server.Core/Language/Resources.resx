@@ -7124,6 +7124,9 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Backup_Source_Pool" xml:space="preserve">
     <value>Pool {0}</value>
   </data>
+  <data name="Web_Backup_Restore_UnknownShareSource" xml:space="preserve">
+    <value>Unknown share {0}</value>
+  </data>
   <data name="Web_Backup_Error_database_dump_failed" xml:space="preserve">
     <value>The database dump (pg_dump) failed. Details are in the log excerpt.</value>
   </data>

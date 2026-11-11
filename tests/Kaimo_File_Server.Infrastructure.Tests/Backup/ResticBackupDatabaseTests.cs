@@ -34,14 +34,15 @@ public partial class ResticBackupDatabaseTests : DatabaseTestBase
             .ReturnsAsync(AuthorizedScopeResult.LimitedTo([]));
     }
 
-    private BackupCatalogService Catalog(bool demo = false, ICredentialVault? vault = null, IConfiguration? config = null)
+    private BackupCatalogService Catalog(bool demo = false, ICredentialVault? vault = null, IConfiguration? config = null,
+        IProcessRunner? runner = null)
     {
         config ??= new ConfigurationBuilder().Build();
         return new BackupCatalogService(
             DbFactory,
             _auth.Object,
             new ResticTargetResolver(DbFactory, vault ?? Mock.Of<ICredentialVault>(), config),
-            new ResticClient(Mock.Of<IProcessRunner>(), config),
+            new ResticClient(runner ?? Mock.Of<IProcessRunner>(), config),
             Mock.Of<IBackupRunner>(),
             new DemoModeOptions { ReadOnly = demo },
             TimeProvider.System,

@@ -102,6 +102,7 @@ public sealed partial class ResticRestoreDatabaseTests
             ["Backup:Restic:LocalRoots"] = _root,
             ["Backup:Restic:CacheDirectory"] = Path.Combine(_root, "cache"),
             ["Backup:Restic:TempDirectory"] = Path.Combine(_root, "tmp"),
+            ["Backup:Restic:RestoreDirectory"] = Path.Combine(_root, "restic-restore"),
         }).Build();
         var vault = new Mock<ICredentialVault>();
         vault.Setup(v => v.Unprotect<string>(It.IsAny<string>(), It.IsAny<CredentialContext>())).Returns("pw");

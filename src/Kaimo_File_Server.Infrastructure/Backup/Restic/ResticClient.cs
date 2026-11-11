@@ -31,11 +31,14 @@ public sealed partial class ResticClient(IProcessRunner runner, IConfiguration c
         return id ?? await CatConfigAsync(target, ct);
     }
 
-    /// <summary>Reads the repository config (also proves URL, credentials and password); returns the repository id.</summary>
+    /// <summary>
+    /// Reads the repository config (also proves URL, credentials and password); returns the repository id.
+    /// Read-only, so it takes no lock: a repository locked by another installation can still be connected.
+    /// </summary>
     public async Task<string> CatConfigAsync(ResticTarget target, CancellationToken ct)
     {
         var lines = new List<string>();
-        var result = await RunAsync(target, ["cat", "config"], lines.Add, ct, lockRetry: null);
+        var result = await RunAsync(target, [NoLockFlag, "cat", "config"], lines.Add, ct, lockRetry: null);
         ThrowOnFailure(result, "cat config");
         var json = string.Join('\n', lines);
         try
@@ -82,10 +85,14 @@ public sealed partial class ResticClient(IProcessRunner runner, IConfiguration c
         return ToResult(state, result);
     }
 
-    public async Task<IReadOnlyList<ResticSnapshotInfo>> SnapshotsAsync(ResticTarget target, CancellationToken ct)
+    /// <param name="noLock">Lists without taking a lock (and so without waiting for one), e.g. while connecting
+    /// a repository another installation may hold locked; the list may then miss a concurrent change.</param>
+    public async Task<IReadOnlyList<ResticSnapshotInfo>> SnapshotsAsync(ResticTarget target, CancellationToken ct, bool noLock = false)
     {
         var lines = new List<string>();
-        var result = await RunAsync(target, ["snapshots"], lines.Add, ct, lockRetry: "1m");
+        var result = noLock
+            ? await RunAsync(target, [NoLockFlag, "snapshots"], lines.Add, ct, lockRetry: null)
+            : await RunAsync(target, ["snapshots"], lines.Add, ct, lockRetry: "1m");
         ThrowOnFailure(result, "snapshots");
         return ParseSnapshots(string.Join('\n', lines));
     }
@@ -293,6 +300,9 @@ public sealed partial class ResticClient(IProcessRunner runner, IConfiguration c
         var result = await RunAsync(merged, ["copy"], null, ct, lockRetry: "30m");
         ThrowOnFailure(result, "copy");
     }
+
+    /// <summary>Global flag for read-only commands; placed before the command like all global flags.</summary>
+    private const string NoLockFlag = "--no-lock";
 
     // Global flags go BEFORE the command: a command may end with "--" followed by paths,
     // and anything after that separator would be taken as a path to back up.
