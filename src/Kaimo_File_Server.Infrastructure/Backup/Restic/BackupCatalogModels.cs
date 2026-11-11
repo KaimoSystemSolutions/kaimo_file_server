@@ -33,6 +33,29 @@ public sealed record BackupServerPointView(
 /// <summary>An entry of a folder inside a backup point.</summary>
 public sealed record BackupBrowseEntry(string Name, bool IsDirectory, long Size, DateTime? ModifiedUtc);
 
+public enum BackupChangeKind
+{
+    Added,
+    /// <summary>Content or type changed.</summary>
+    Modified,
+    Removed,
+}
+
+/// <summary>One changed entry of a backup point; <see cref="Path"/> is share-relative.</summary>
+public sealed record BackupChange(string Path, BackupChangeKind Kind, bool IsDirectory);
+
+/// <summary>
+/// What changed in a share backup point compared with <see cref="BaseSnapshotId"/> (null: it is
+/// the share's first backup point in its repository, so everything in it is new). The counts cover
+/// every change; <see cref="Items"/> stops at <see cref="BackupCatalogService.MaximumListedChanges"/>.
+/// </summary>
+public sealed record BackupChangeSet(
+    string? BaseSnapshotId, DateTime? BaseTimeUtc, IReadOnlyList<BackupChange> Items, int Added, int Modified, int Removed)
+{
+    public bool IsFirstPoint => BaseSnapshotId is null;
+    public bool Truncated => Items.Count < Added + Modified + Removed;
+}
+
 /// <summary>A single file or folder of a backup point, ready to be streamed (file raw, folder as ZIP).</summary>
 public sealed record BackupDownload(string FileName, bool IsDirectory, Func<Stream, CancellationToken, Task> WriteToAsync);
 

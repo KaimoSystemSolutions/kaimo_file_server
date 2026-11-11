@@ -6680,6 +6680,12 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   <data name="Web_Backup_Error_timeout" xml:space="preserve">
     <value>Der Speicherort hat nicht rechtzeitig geantwortet. Prüfe Adresse und Zugangsdaten.</value>
   </data>
+  <data name="Web_Backup_Error_changes_busy" xml:space="preserve">
+    <value>Ein anderer Vergleich von dir läuft noch (zum Beispiel in einem anderen Tab). Warte ihn ab oder brich ihn ab und versuche es dann erneut.</value>
+  </data>
+  <data name="Web_Backup_Error_changes_timeout" xml:space="preserve">
+    <value>Der Vergleich wurde nicht rechtzeitig fertig. Der Share ist eventuell sehr groß, der Server mit anderen Vergleichen ausgelastet oder der Speicherort langsam. Versuche es später erneut.</value>
+  </data>
   <data name="Web_Backup_Tab_Restore" xml:space="preserve">
     <value>Wiederherstellen</value>
   </data>
@@ -8452,5 +8458,77 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
   </data>
   <data name="Web_CloudAccess_MountGrantsHint" xml:space="preserve">
     <value>Dies sind die Berechtigungen des virtuellen Shares. Im Ordner benötigen Benutzer zusätzlich Zugriff auf den Ordner im Share; es gilt das geringere der beiden Rechte.</value>
+  </data>
+  <data name="Web_Backup_Activity_SourceFiles" xml:space="preserve">
+    <value>{0} neu, {1} geändert</value>
+  </data>
+  <data name="Web_Backup_Activity_ShowChanges" xml:space="preserve">
+    <value>Änderungen anzeigen</value>
+  </data>
+  <data name="Web_Backup_Changes_ViewSwitch" xml:space="preserve">
+    <value>Ansicht des Sicherungsstands</value>
+  </data>
+  <data name="Web_Backup_Changes_ContentView" xml:space="preserve">
+    <value>Inhalt</value>
+  </data>
+  <data name="Web_Backup_Changes_View" xml:space="preserve">
+    <value>Änderungen</value>
+  </data>
+  <data name="Web_Backup_Changes_Loading" xml:space="preserve">
+    <value>Sicherungsstände werden verglichen …</value>
+  </data>
+  <data name="Web_Backup_Changes_FirstPoint" xml:space="preserve">
+    <value>Das ist der erste Sicherungsstand dieses Shares in diesem Repository, daher ist alles darin neu. Durchsuche ihn in der Inhaltsansicht.</value>
+  </data>
+  <data name="Web_Backup_Changes_ComparedWith" xml:space="preserve">
+    <value>Verglichen mit</value>
+  </data>
+  <data name="Web_Backup_Changes_Filter" xml:space="preserve">
+    <value>Art der Änderung</value>
+  </data>
+  <data name="Web_Backup_Changes_All" xml:space="preserve">
+    <value>Alle</value>
+  </data>
+  <data name="Web_Backup_Changes_Added" xml:space="preserve">
+    <value>Neu</value>
+  </data>
+  <data name="Web_Backup_Changes_Modified" xml:space="preserve">
+    <value>Geändert</value>
+  </data>
+  <data name="Web_Backup_Changes_Removed" xml:space="preserve">
+    <value>Gelöscht</value>
+  </data>
+  <data name="Web_Backup_Changes_Search" xml:space="preserve">
+    <value>Nach Name oder Ordner filtern</value>
+  </data>
+  <data name="Web_Backup_Changes_Truncated" xml:space="preserve">
+    <value>Nur die ersten {0} Änderungen werden aufgelistet; die Zahlen umfassen alle.</value>
+  </data>
+  <data name="Web_Backup_Changes_Kind" xml:space="preserve">
+    <value>Änderung</value>
+  </data>
+  <data name="Web_Backup_Changes_None" xml:space="preserve">
+    <value>Gegenüber diesem Sicherungsstand hat sich nichts geändert.</value>
+  </data>
+  <data name="Web_Backup_Changes_NoMatch" xml:space="preserve">
+    <value>Keine Änderung passt zum Filter.</value>
+  </data>
+  <data name="Web_Backup_Changes_NoMatchTruncated" xml:space="preserve">
+    <value>Keine der ersten {0} aufgelisteten Änderungen passt zum Filter. Änderungen darüber hinaus werden nicht durchsucht.</value>
+  </data>
+  <data name="Web_Backup_Changes_ShowInBase" xml:space="preserve">
+    <value>Im älteren Sicherungsstand zeigen, bereit zum Wiederherstellen</value>
+  </data>
+  <data name="Web_Backup_Changes_ShowInPoint" xml:space="preserve">
+    <value>In diesem Sicherungsstand zeigen</value>
+  </data>
+  <data name="Web_Backup_Changes_ShowMore" xml:space="preserve">
+    <value>Mehr anzeigen (noch {0})</value>
+  </data>
+  <data name="Web_Backup_Changes_NotLoaded" xml:space="preserve">
+    <value>Der Vergleich wurde nicht abgeschlossen.</value>
+  </data>
+  <data name="Web_Backup_Changes_Retry" xml:space="preserve">
+    <value>Erneut vergleichen</value>
   </data>
 </root>

@@ -1,4 +1,6 @@
 @page "/backup"
+@using Kaimo_File_Server.Core.Domain.Backup
+@using Kaimo_File_Server.Infrastructure.Backup.Restic
 @using Kaimo_File_Server.Web.Components.Pages.Backup.Components
 @using Kaimo_File_Server.Web.Components.Shared
 @using Kaimo_File_Server.Web.Components.ViewModels.Backup
@@ -69,7 +71,8 @@ else
                 break;
             case BackupTab.Activity:
                 <BackupActivity OnOpenJob="@(VM.Access.CanManageJobs ? EventCallback.Factory.Create<Guid>(this, id => SwitchTab(BackupTab.Jobs, id)) : default)"
-                                OnOpenRepository="@(VM.Access.CanManageRepositories ? EventCallback.Factory.Create<Guid>(this, id => SwitchTab(BackupTab.Repositories, id)) : default)" />
+                                OnOpenRepository="@(VM.Access.CanManageRepositories ? EventCallback.Factory.Create<Guid>(this, id => SwitchTab(BackupTab.Repositories, id)) : default)"
+                                OnOpenChanges="@(VM.Access.CanRestore ? EventCallback.Factory.Create<(BackupRun Run, BackupSourceOutcome Source)>(this, OpenChangesAsync) : default)" />
                 break;
             default:
                 <BackupOverview OnOpenJob="id => SwitchTab(BackupTab.Jobs, id)"
@@ -115,6 +118,19 @@ else
         _selectedId = selectId;
         VM.ClearMessages();
         Nav.NavigateTo("/backup?tab=" + tab.ToString().ToLowerInvariant(), replace: true);
+    }
+
+    /// <summary>Activity → restore tab, with the source's backup point selected in the changes view.</summary>
+    private async Task OpenChangesAsync((BackupRun Run, BackupSourceOutcome Source) target)
+    {
+        // The selection lives in the view model, which the restore tab reads. Switch first, so
+        // the (possibly long) comparison shows its progress and cancel button there.
+        if (target.Source is { ShareId: { } shareId, SnapshotId: { } snapshotId }
+            && await VM.OpenChangesAsync(shareId, target.Run.RepositoryId, snapshotId))
+        {
+            SwitchTab(BackupTab.Restore);
+            await VM.ShowChangesAsync(true);
+        }
     }
 
     // A finished run changes job status and the activity list, so reload then; progress

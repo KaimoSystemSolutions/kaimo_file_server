@@ -1,0 +1,80 @@
+/* Changes view of the restore tab. The list reuses the backup browser table (.backup-browse*,
+   styled from Backup.razor.css); only its columns and the extras below are its own. */
+
+/* Same distance below the view switch as the content view's breadcrumb. */
+.backup-changes {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+
+.backup-changes-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+    .backup-changes-filters .toggle-button-group {
+        flex: 1 1 360px;
+    }
+
+.backup-changes-search {
+    flex: 1 1 200px;
+    min-width: 0;
+}
+
+.backup-changes .warning-banner {
+    margin: 0;
+}
+
+/* Kind badge, then name with its folder. Wins over the browser's responsive column sets. */
+.backup-changes .backup-browse-row.backup-changes-row {
+    grid-template-columns: 104px minmax(0, 1fr);
+}
+
+.backup-changes .backup-changes-row .backup-browse-name {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+}
+
+.backup-changes-open {
+    flex: 0 1 auto;
+}
+
+.backup-changes-folder {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.backup-changes-more {
+    display: flex;
+    justify-content: center;
+}
+
+@media (max-width: 480px) {
+    /* Four "label · count" filters on one line; they wrap as a whole rather than mid-label. */
+    .backup-changes-filters .toggle-button-group {
+        flex-wrap: wrap;
+    }
+
+    .backup-changes-filters .toggle-btn {
+        padding-inline: var(--space-1);
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .backup-changes .backup-browse-row.backup-changes-row {
+        grid-template-columns: 88px minmax(0, 1fr);
+    }
+
+    .backup-changes-folder {
+        display: none;
+    }
+}

@@ -102,10 +102,10 @@ public sealed partial class BackupCatalogService(
     /// </summary>
     public static readonly TimeSpan InteractiveTimeout = TimeSpan.FromSeconds(90);
 
-    private static async Task<T> WithInteractiveTimeoutAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken ct)
+    private static async Task<T> WithInteractiveTimeoutAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken ct, TimeSpan? limit = null)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(InteractiveTimeout);
+        timeout.CancelAfter(limit ?? InteractiveTimeout);
         try
         {
             return await action(timeout.Token);

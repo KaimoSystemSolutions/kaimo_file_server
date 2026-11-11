@@ -6680,6 +6680,12 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   <data name="Web_Backup_Error_timeout" xml:space="preserve">
     <value>The storage location did not answer in time. Check the address and the credentials.</value>
   </data>
+  <data name="Web_Backup_Error_changes_busy" xml:space="preserve">
+    <value>Another comparison of yours is still running (for example in another tab). Wait for it or cancel it, then try again.</value>
+  </data>
+  <data name="Web_Backup_Error_changes_timeout" xml:space="preserve">
+    <value>The comparison did not finish in time. The share may be very large, the server busy with other comparisons or the storage location slow. Try again later.</value>
+  </data>
   <data name="Web_Backup_Tab_Restore" xml:space="preserve">
     <value>Restore</value>
   </data>
@@ -8452,5 +8458,77 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
   </data>
   <data name="Web_CloudAccess_MountGrantsHint" xml:space="preserve">
     <value>These are the permissions of the virtual share. Inside the folder, users also need access to the folder in the share; the lower of both applies.</value>
+  </data>
+  <data name="Web_Backup_Activity_SourceFiles" xml:space="preserve">
+    <value>{0} new, {1} changed</value>
+  </data>
+  <data name="Web_Backup_Activity_ShowChanges" xml:space="preserve">
+    <value>Show changes</value>
+  </data>
+  <data name="Web_Backup_Changes_ViewSwitch" xml:space="preserve">
+    <value>View of the backup point</value>
+  </data>
+  <data name="Web_Backup_Changes_ContentView" xml:space="preserve">
+    <value>Content</value>
+  </data>
+  <data name="Web_Backup_Changes_View" xml:space="preserve">
+    <value>Changes</value>
+  </data>
+  <data name="Web_Backup_Changes_Loading" xml:space="preserve">
+    <value>Comparing backup points…</value>
+  </data>
+  <data name="Web_Backup_Changes_FirstPoint" xml:space="preserve">
+    <value>This is the first backup point of the share in this repository, so everything in it is new. Browse it in the content view.</value>
+  </data>
+  <data name="Web_Backup_Changes_ComparedWith" xml:space="preserve">
+    <value>Compared with</value>
+  </data>
+  <data name="Web_Backup_Changes_Filter" xml:space="preserve">
+    <value>Kind of change</value>
+  </data>
+  <data name="Web_Backup_Changes_All" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="Web_Backup_Changes_Added" xml:space="preserve">
+    <value>New</value>
+  </data>
+  <data name="Web_Backup_Changes_Modified" xml:space="preserve">
+    <value>Changed</value>
+  </data>
+  <data name="Web_Backup_Changes_Removed" xml:space="preserve">
+    <value>Deleted</value>
+  </data>
+  <data name="Web_Backup_Changes_Search" xml:space="preserve">
+    <value>Filter by name or folder</value>
+  </data>
+  <data name="Web_Backup_Changes_Truncated" xml:space="preserve">
+    <value>Only the first {0} changes are listed; the counts include all of them.</value>
+  </data>
+  <data name="Web_Backup_Changes_Kind" xml:space="preserve">
+    <value>Change</value>
+  </data>
+  <data name="Web_Backup_Changes_None" xml:space="preserve">
+    <value>Nothing changed compared with this backup point.</value>
+  </data>
+  <data name="Web_Backup_Changes_NoMatch" xml:space="preserve">
+    <value>No change matches the filter.</value>
+  </data>
+  <data name="Web_Backup_Changes_NoMatchTruncated" xml:space="preserve">
+    <value>None of the first {0} listed changes matches the filter. Changes beyond them are not searched.</value>
+  </data>
+  <data name="Web_Backup_Changes_ShowInBase" xml:space="preserve">
+    <value>Show in the older backup point, ready to restore</value>
+  </data>
+  <data name="Web_Backup_Changes_ShowInPoint" xml:space="preserve">
+    <value>Show in this backup point</value>
+  </data>
+  <data name="Web_Backup_Changes_ShowMore" xml:space="preserve">
+    <value>Show more ({0} remaining)</value>
+  </data>
+  <data name="Web_Backup_Changes_NotLoaded" xml:space="preserve">
+    <value>The comparison did not finish.</value>
+  </data>
+  <data name="Web_Backup_Changes_Retry" xml:space="preserve">
+    <value>Compare again</value>
   </data>
 </root>

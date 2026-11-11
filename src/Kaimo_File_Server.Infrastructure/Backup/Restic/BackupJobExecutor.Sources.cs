@@ -38,7 +38,7 @@ public partial class BackupJobExecutor
                 BuildShareExcludes(share, job.IncludeRecycleBin));
 
             var result = await RunBackupAsync(target, run, request, progress, ct);
-            return new(share.Id, share.Name, result.SnapshotId, null, result.WarningCount, result.Warnings);
+            return new(share.Id, share.Name, result.SnapshotId, null, result.WarningCount, result.Warnings, result.FilesNew, result.FilesChanged);
         }
         catch (ResticException ex)
         {
@@ -107,7 +107,7 @@ public partial class BackupJobExecutor
                 ],
                 BuildPoolExcludes(pool, shares, job.IncludeRecycleBin, IncludesVersions(job)));
             var result = await RunBackupAsync(target, run, request, progress, ct);
-            return new(null, name, result.SnapshotId, null, result.WarningCount, result.Warnings);
+            return new(null, name, result.SnapshotId, null, result.WarningCount, result.Warnings, result.FilesNew, result.FilesChanged);
         }
         catch (ResticException ex)
         {

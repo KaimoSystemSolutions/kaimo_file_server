@@ -8,14 +8,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Infrastructure.Backup.Restic;
 
-/// <summary>Per-source outcome of a backup run, stored in <see cref="BackupRun.DetailsJson"/>.</summary>
+/// <summary>
+/// Per-source outcome of a backup run, stored in <see cref="BackupRun.DetailsJson"/>. The file
+/// counts come from restic's summary (0 in runs recorded before they existed).
+/// </summary>
 public sealed record BackupSourceOutcome(
     Guid? ShareId,
     string Name,
     string? SnapshotId,
     string? ErrorCode,
     int WarningCount,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    long FilesNew = 0,
+    long FilesChanged = 0);
 
 /// <summary>
 /// Executes one queued backup run: one restic snapshot per source (so scoping, retention

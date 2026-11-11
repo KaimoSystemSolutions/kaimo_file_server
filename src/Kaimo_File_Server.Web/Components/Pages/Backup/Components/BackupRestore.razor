@@ -95,8 +95,25 @@
                         }
                     </select>
                 </label>
+                @if (VM.BackupPoint is not null)
+                {
+                    <div class="toggle-button-group" role="radiogroup" aria-label="@R("Web_Backup_Changes_ViewSwitch")">
+                        <button type="button" role="radio" aria-checked="@(!VM.ShowChanges ? "true" : "false")"
+                                class="toggle-btn @(!VM.ShowChanges ? "toggle-btn--active" : null)" disabled="@VM.IsBusy"
+                                @onclick="() => VM.ShowChangesAsync(false)">@R("Web_Backup_Changes_ContentView")</button>
+                        <button type="button" role="radio" aria-checked="@(VM.ShowChanges ? "true" : "false")"
+                                class="toggle-btn @(VM.ShowChanges ? "toggle-btn--active" : null)" disabled="@VM.IsBusy"
+                                @onclick="() => VM.ShowChangesAsync(true)">@R("Web_Backup_Changes_View")</button>
+                    </div>
+                }
             </div>
 
+            @if (VM.ShowChanges && VM.BackupPoint is not null)
+            {
+                <BackupChanges />
+            }
+            else
+            {
             <nav class="breadcrumb-bar backup-browse-path" aria-label="@R("Web_Backup_Restore_Path")">
                 <button type="button" class="backup-browse-crumb" disabled="@(VM.IsBusy || VM.BrowseFolder.Length == 0)" @onclick="() => VM.OpenFolderAsync(string.Empty)">@share.Name</button>
                 @foreach (var (name, path) in Crumbs(VM.BrowseFolder))
@@ -177,6 +194,7 @@
                     }
                 }
             </div>
+            }
         }
         else if (VM.ServerSource is { } source)
         {

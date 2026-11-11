@@ -28,6 +28,12 @@ public sealed record ResticSnapshotInfo(
     long TotalBytes);
 /// <summary>One entry of <c>restic ls --json</c>; <see cref="Path"/> is absolute inside the snapshot.</summary>
 public sealed record ResticNode(string Name, string Path, bool IsDirectory, long Size, DateTime? ModifiedUtc);
+/// <summary>
+/// One line of <c>restic diff --json</c>: <see cref="Path"/> is relative to the compared folders
+/// with a leading "/" (folders end in "/"); <see cref="Modifier"/> holds restic's change letters
+/// ("+" added, "-" removed, "M" content, "T" type, "U" metadata only).
+/// </summary>
+public sealed record ResticChange(string Path, string Modifier);
 /// <summary>Outcome of <c>restic restore</c>.</summary>
 public sealed record ResticRestoreResult(long FilesRestored, long BytesRestored);
 /// <summary>Outcome of <c>restic check</c>: <see cref="Ok"/> is false when restic found damage.</summary>

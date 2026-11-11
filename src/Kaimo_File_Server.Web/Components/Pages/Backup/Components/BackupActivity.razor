@@ -94,8 +94,16 @@
                             <span class="backup-source-state backup-source-state--@tone">
                                 @(source.ErrorCode is not null ? BackupViewModel.ErrorText(source.ErrorCode)
                                     : source.WarningCount > 0 ? string.Format(R("Web_Backup_Activity_SourceWarnings"), source.WarningCount)
-                                    : string.Format(R("Web_Backup_Activity_Snapshot"), source.SnapshotId?[..Math.Min(8, source.SnapshotId.Length)]))
+                                    : string.Format(R("Web_Backup_Activity_Snapshot"), source.SnapshotId?[..Math.Min(8, source.SnapshotId.Length)])
+                                      + (source.FilesNew + source.FilesChanged > 0
+                                          ? " · " + string.Format(R("Web_Backup_Activity_SourceFiles"), source.FilesNew, source.FilesChanged)
+                                          : ""))
                             </span>
+                            @if (CanOpenChanges(source))
+                            {
+                                <button type="button" class="btn-secondary btn-secondary--sm backup-source-changes" disabled="@VM.IsBusy"
+                                        @onclick="() => OnOpenChanges.InvokeAsync((current, source))">@R("Web_Backup_Activity_ShowChanges")</button>
+                            }
                             @if (source.Warnings.Count > 0)
                             {
                                 <details class="backup-details">
@@ -252,6 +260,14 @@
 
     /// <summary>Opens a repository on its tab; the repository tile shows no link without it.</summary>
     [Parameter] public EventCallback<Guid> OnOpenRepository { get; set; }
+
+    /// <summary>Opens the changes of a share's backup point on the restore tab; no link without it.</summary>
+    [Parameter] public EventCallback<(BackupRun Run, BackupSourceOutcome Source)> OnOpenChanges { get; set; }
+
+    // Only for shares whose backup points the viewer may browse (the server checks again).
+    private bool CanOpenChanges(BackupSourceOutcome source)
+        => OnOpenChanges.HasDelegate && source is { ErrorCode: null, SnapshotId: not null, ShareId: { } shareId }
+           && VM.RestoreShares.Any(s => s.ShareId == shareId);
 
     private Guid? _selectedId;
 

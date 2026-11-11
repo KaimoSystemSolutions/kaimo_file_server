@@ -107,6 +107,17 @@ public partial class ResticClient
         }
     }
 
+    /// <summary>A "change" line of <c>restic diff --json</c>; everything else (statistics, text) is null.</summary>
+    internal static ResticChange? ParseChange(string line)
+    {
+        using var doc = TryParse(line);
+        if (doc is null || Type(doc) != "change")
+            return null;
+        var path = GetString(doc.RootElement, "path");
+        var modifier = GetString(doc.RootElement, "modifier");
+        return string.IsNullOrEmpty(path) || string.IsNullOrEmpty(modifier) ? null : new ResticChange(path, modifier);
+    }
+
     // ── exit codes ──────────────────────────────────────────────────────
 
     /// <summary>Maps a restic exit code (and, for exit 1, known messages) to a stable error code.</summary>

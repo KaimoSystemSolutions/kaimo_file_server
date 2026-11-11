@@ -125,6 +125,24 @@ public sealed partial class ResticClient(IProcessRunner runner, IConfiguration c
     }
 
     /// <summary>
+    /// Streams the differences between two snapshot folders (<c>&lt;snapshot&gt;:&lt;folder&gt;</c>), so
+    /// paths are relative to the compared folders and anything beside them is left out.
+    /// </summary>
+    public async Task DiffAsync(
+        ResticTarget target, string baseSnapshotId, string baseFolder, string snapshotId, string folder,
+        Action<ResticChange> onChange, CancellationToken ct)
+    {
+        var result = await RunAsync(target,
+            ["diff", "--", baseSnapshotId + ":" + TrimDirectory(baseFolder), snapshotId + ":" + TrimDirectory(folder)],
+            line =>
+            {
+                if (ParseChange(line) is { } change)
+                    onChange(change);
+            }, ct, lockRetry: "10s");
+        ThrowOnFailure(result, "diff");
+    }
+
+    /// <summary>
     /// Restores entries of <paramref name="folder"/> into <paramref name="targetDirectory"/>:
     /// the named children only, or all of them when <paramref name="names"/> is empty.
     /// <c>--verify</c> reads every restored file back.

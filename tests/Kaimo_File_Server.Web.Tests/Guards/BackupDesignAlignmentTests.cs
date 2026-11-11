@@ -137,6 +137,45 @@ public class BackupDesignAlignmentTests
         Assert.DoesNotContain(used, k => !en.Contains(k) || !de.Contains(k));
     }
 
+    /// <summary>
+    /// Tab components take no parameters, so a parent re-render skips them: a result that arrives
+    /// after they rendered (e.g. the changes comparison's spinner) only shows via VM.Changed.
+    /// </summary>
+    [Fact]
+    public void BackupTabComponents_ReadingTheViewModel_ListenToItsChanges()
+    {
+        var folder = Path.Combine(FindRepoRoot(), "src/Kaimo_File_Server.Web/Components/Pages/Backup/Components");
+        var deaf = Directory.GetFiles(folder, "*.razor")
+            .Where(f => File.ReadAllText(f).Contains("@inject BackupViewModel"))
+            .Where(f => !(File.ReadAllText(f) + (File.Exists(f + ".cs") ? File.ReadAllText(f + ".cs") : "")).Contains("VM.Changed +="))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        Assert.Contains(Directory.GetFiles(folder, "*.razor"), f => f.EndsWith("BackupChanges.razor"));
+        Assert.Empty(deaf);
+    }
+
+    [Fact]
+    public void ChangesKeys_ExistInBothLanguages()
+    {
+        var used = new[] { "BackupChanges.razor", "BackupRestore.razor", "BackupActivity.razor" }
+            .SelectMany(f => Regex.Matches(
+                    File.ReadAllText(Path.Combine(FindRepoRoot(), "src/Kaimo_File_Server.Web/Components/Pages/Backup/Components", f)),
+                    "\"(Web_\\w+)\"")
+                .Select(m => m.Groups[1].Value))
+            // Kind labels are composed: "Web_Backup_Changes_" + BackupChangeKind.
+            .Concat(Enum.GetNames<Kaimo_File_Server.Infrastructure.Backup.Restic.BackupChangeKind>().Select(k => "Web_Backup_Changes_" + k))
+            .Where(k => k.StartsWith("Web_Backup_Changes_", StringComparison.Ordinal) || k.StartsWith("Web_Backup_Activity_", StringComparison.Ordinal))
+            .Where(k => !k.EndsWith('_')) // the composed prefix itself
+            .Distinct()
+            .ToList();
+        var en = Keys("Resources.resx");
+        var de = Keys("Resources.de.resx");
+
+        Assert.Contains("Web_Backup_Changes_View", used);
+        Assert.DoesNotContain(used, k => !en.Contains(k) || !de.Contains(k));
+    }
+
     [Fact]
     public void GermanBackupTexts_SayShareInsteadOfFreigabe()
     {

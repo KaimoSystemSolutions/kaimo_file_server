@@ -1,0 +1,179 @@
+@using Kaimo_File_Server.Core.Helpers
+@using Kaimo_File_Server.Infrastructure.Backup.Restic
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.ViewModels.Backup
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+@implements IDisposable
+@inject BackupViewModel VM
+@inject DateFormatService DateFmt
+
+@*
+    "Changes" view of the restore tab: what changed in the selected backup point compared with an
+    older one of the same repository. A row opens the entry in the content view, selected and
+    ready to restore (a removed entry in the older backup point).
+*@
+
+<div class="backup-changes">
+    @if (VM.IsLoadingChanges)
+    {
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <p>@R("Web_Backup_Changes_Loading")</p>
+            @* Not disabled while busy: the running comparison is what keeps the page busy. *@
+            <button type="button" class="btn-secondary btn-secondary--sm" @onclick="VM.CancelChanges">@R("Web_Common_Cancel")</button>
+        </div>
+    }
+    else if (VM.Changes is null)
+    {
+        <div class="empty-state">
+            <p>@R("Web_Backup_Changes_NotLoaded")</p>
+            <button type="button" class="btn-secondary btn-secondary--sm" disabled="@VM.IsBusy"
+                    @onclick="() => VM.RetryChangesAsync()">@R("Web_Backup_Changes_Retry")</button>
+        </div>
+    }
+    else if (VM.Changes is { IsFirstPoint: true })
+    {
+        <div class="empty-state"><p>@R("Web_Backup_Changes_FirstPoint")</p></div>
+    }
+    else if (VM.Changes is { } changes)
+    {
+        var visible = Filtered(changes);
+        <div class="workspace-form">
+            <label>
+                <span>@R("Web_Backup_Changes_ComparedWith")</span>
+                <select class="edit-input" disabled="@VM.IsBusy" value="@changes.BaseSnapshotId"
+                        @onchange="e => SelectBaseAsync(e.Value?.ToString())">
+                    @foreach (var point in VM.ChangeBaseCandidates)
+                    {
+                        <option value="@point.SnapshotId">@BaseLabel(point)</option>
+                    }
+                </select>
+            </label>
+        </div>
+
+        <div class="backup-changes-filters">
+            <div class="toggle-button-group" role="radiogroup" aria-label="@R("Web_Backup_Changes_Filter")">
+                @FilterButton(null, R("Web_Backup_Changes_All"), changes.Added + changes.Modified + changes.Removed)
+                @FilterButton(BackupChangeKind.Added, R("Web_Backup_Changes_Added"), changes.Added)
+                @FilterButton(BackupChangeKind.Modified, R("Web_Backup_Changes_Modified"), changes.Modified)
+                @FilterButton(BackupChangeKind.Removed, R("Web_Backup_Changes_Removed"), changes.Removed)
+            </div>
+            <input type="search" class="edit-input backup-changes-search" maxlength="200"
+                   placeholder="@R("Web_Backup_Changes_Search")" aria-label="@R("Web_Backup_Changes_Search")"
+                   @bind="_query" @bind:event="oninput" @bind:after="ResetPaging" />
+        </div>
+
+        @if (changes.Truncated)
+        {
+            <div class="warning-banner" role="status">@string.Format(R("Web_Backup_Changes_Truncated"), changes.Items.Count)</div>
+        }
+
+        <div class="backup-browse" role="table" aria-label="@R("Web_Backup_Changes_View")">
+            <div class="backup-browse-row backup-browse-head backup-changes-row" role="row">
+                <span role="columnheader">@R("Web_Backup_Changes_Kind")</span>
+                <span role="columnheader">@R("Web_Backup_Restore_Name")</span>
+            </div>
+            @if (visible.Count == 0)
+            {
+                <div class="empty-state">
+                    <p>@NoRowsText(changes)</p>
+                </div>
+            }
+            @foreach (var change in visible.Take(_shown))
+            {
+                var folder = ShareRelativePath.GetParent(change.Path);
+                <div class="backup-browse-row backup-changes-row" role="row">
+                    <span role="cell"><StatusBadge Tone="@Tone(change.Kind)" Label="@KindLabel(change.Kind)" /></span>
+                    <span role="cell" class="backup-browse-name">
+                        <button type="button" class="backup-browse-open backup-changes-open" disabled="@VM.IsBusy"
+                                title="@(change.Kind == BackupChangeKind.Removed ? R("Web_Backup_Changes_ShowInBase") : R("Web_Backup_Changes_ShowInPoint"))"
+                                @onclick="() => VM.ShowChangeInContentAsync(change)">
+                            @if (change.IsDirectory)
+                            {
+                                @Assets.SVG("folder.svg", new SvgOptions(Width: 16, Height: 16, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)"))
+                            }
+                            else
+                            {
+                                @Assets.SVG("file.svg", new SvgOptions(Width: 16, Height: 16))
+                            }
+                            <span>@ShareRelativePath.GetFileName(change.Path)</span>
+                        </button>
+                        @if (folder.Length > 0)
+                        {
+                            <small class="backup-changes-folder" title="@folder">@folder</small>
+                        }
+                    </span>
+                </div>
+            }
+        </div>
+
+        @if (visible.Count > _shown)
+        {
+            <div class="backup-changes-more">
+                <button type="button" class="btn-secondary btn-secondary--sm" @onclick="() => _shown += PageSize">
+                    @string.Format(R("Web_Backup_Changes_ShowMore"), visible.Count - _shown)
+                </button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    // The comparison finishes after this component rendered its spinner; it has no parameters,
+    // so only the view model's announcement re-renders it.
+    protected override void OnInitialized() => VM.Changed += Refresh;
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+    // Leaving the view (another tab) stops a comparison nobody waits for any more.
+    public void Dispose()
+    {
+        VM.Changed -= Refresh;
+        VM.CancelChanges();
+    }
+
+    /// <summary>Rows rendered at once; thousands of rows would slow every re-render of the circuit.</summary>
+    private const int PageSize = 300;
+
+    private BackupChangeKind? _kind;
+    private string _query = string.Empty;
+    private int _shown = PageSize;
+
+    private List<BackupChange> Filtered(BackupChangeSet changes)
+        => changes.Items
+            .Where(c => _kind is null || c.Kind == _kind)
+            .Where(c => _query.Length == 0 || c.Path.Contains(_query.Trim(), StringComparison.CurrentCultureIgnoreCase))
+            .ToList();
+
+    private void ResetPaging() => _shown = PageSize;
+
+    /// <summary>No row to show: nothing changed, or the filter matches none, of the listed changes only when truncated.</summary>
+    internal static string NoRowsText(BackupChangeSet changes)
+        => changes.Items.Count == 0 ? R("Web_Backup_Changes_None")
+            : changes.Truncated ? string.Format(R("Web_Backup_Changes_NoMatchTruncated"), changes.Items.Count)
+            : R("Web_Backup_Changes_NoMatch");
+
+    private async Task SelectBaseAsync(string? snapshotId)
+    {
+        if (!string.IsNullOrEmpty(snapshotId))
+            await VM.SelectChangeBaseAsync(snapshotId);
+        ResetPaging();
+    }
+
+    private RenderFragment FilterButton(BackupChangeKind? kind, string label, int count) => @<button type="button" role="radio"
+        aria-checked="@(_kind == kind ? "true" : "false")" class="toggle-btn @(_kind == kind ? "toggle-btn--active" : null)"
+        @onclick="() => { _kind = kind; ResetPaging(); }">@label · @count</button>;
+
+    private string BaseLabel(BackupPointView point)
+        => DateFmt.FormatDateTime(point.TimeUtc) + (point.JobName is null ? "" : " · " + point.JobName);
+
+    private static StatusTone Tone(BackupChangeKind kind) => kind switch
+    {
+        BackupChangeKind.Added => StatusTone.Positive,
+        BackupChangeKind.Removed => StatusTone.Negative,
+        _ => StatusTone.Warning,
+    };
+
+    private static string KindLabel(BackupChangeKind kind) => R("Web_Backup_Changes_" + kind);
+
+    private static string R(string key) => BackupViewModel.R(key);
+}

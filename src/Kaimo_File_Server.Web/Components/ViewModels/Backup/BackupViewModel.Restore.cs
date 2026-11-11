@@ -61,21 +61,53 @@ public partial class BackupViewModel
 
     public Task<bool> SelectRestoreShareAsync(Guid shareId) => RunAsync(async actor =>
     {
-        RestoreShare = RestoreShares.FirstOrDefault(s => s.ShareId == shareId);
-        ServerSource = null;
-        BackupPoints = await catalog.ListBackupPointsAsync(actor, shareId);
-        RestoreRights = await catalog.GetRestoreRightsAsync(actor, shareId);
-        BackupPoint = BackupPoints.FirstOrDefault();
-        await BrowseCoreAsync(actor, string.Empty);
+        await LoadShareAsync(actor, shareId);
+        await ShowPointAsync(actor, string.Empty);
     });
 
     public Task<bool> SelectBackupPointAsync(string key) => RunAsync(async actor =>
     {
         BackupPoint = BackupPoints.FirstOrDefault(p => PointKey(p) == key);
-        // The same folder usually exists in the neighbouring backup point; fall back to the root.
-        try { await BrowseCoreAsync(actor, BrowseFolder); }
-        catch (ResticException) { await BrowseCoreAsync(actor, string.Empty); }
+        await ShowPointAsync(actor, BrowseFolder);
     });
+
+    /// <summary>Selects a share and its newest backup point without loading a view of it.</summary>
+    private async Task LoadShareAsync(UserContext actor, Guid shareId)
+    {
+        RestoreShare = RestoreShares.FirstOrDefault(s => s.ShareId == shareId);
+        ServerSource = null;
+        BackupPoints = await catalog.ListBackupPointsAsync(actor, shareId);
+        RestoreRights = await catalog.GetRestoreRightsAsync(actor, shareId);
+        BackupPoint = BackupPoints.FirstOrDefault();
+        ClearPointViews(string.Empty);
+    }
+
+    /// <summary>Forgets what both views showed of the previous backup point.</summary>
+    private void ClearPointViews(string folder)
+    {
+        Changes = null;
+        _requestedBase = null;
+        SelectedEntries.Clear();
+        BrowseEntries = [];
+        BrowseFolder = folder;
+    }
+
+    /// <summary>
+    /// Loads the open view of a newly selected backup point; the other one loads when it opens.
+    /// Both are cleared first, so a failure never leaves the previous point's result on screen.
+    /// </summary>
+    private Task ShowPointAsync(UserContext actor, string folder)
+    {
+        ClearPointViews(folder);
+        return ShowChanges ? LoadChangesCoreAsync(actor, null) : BrowsePointAsync(actor, folder);
+    }
+
+    /// <summary>The same folder usually exists in the neighbouring backup point; falls back to the root.</summary>
+    private async Task BrowsePointAsync(UserContext actor, string folder)
+    {
+        try { await BrowseCoreAsync(actor, folder); }
+        catch (ResticException) when (folder.Length > 0) { await BrowseCoreAsync(actor, string.Empty); }
+    }
 
     public Task<bool> OpenFolderAsync(string folder) => RunAsync(actor => BrowseCoreAsync(actor, folder));
 

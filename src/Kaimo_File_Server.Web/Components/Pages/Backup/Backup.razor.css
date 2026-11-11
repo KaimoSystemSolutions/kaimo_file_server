@@ -339,6 +339,11 @@
 .backup-page ::deep .backup-source-state--warning { --source-tone: var(--warning); }
 .backup-page ::deep .backup-source-state--negative { --source-tone: var(--danger); }
 
+/* "Show changes" of a source: opens its backup point on the restore tab. */
+.backup-page ::deep .backup-source-changes {
+    margin-left: var(--space-2);
+}
+
 .backup-page ::deep .backup-details {
     flex-basis: 100%;
     color: var(--text-secondary);
