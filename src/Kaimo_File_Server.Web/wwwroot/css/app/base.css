@@ -70,6 +70,23 @@ h1, h2, h3, h4, h5, h6 {
     display: flex;
 }
 
+/* Grace period while Blazor is still reconnecting: short drops (switching apps on a phone,
+   a brief network stall) usually recover within a second and never show the dialog. The
+   overlay blocks input at once — clicks during a drop would be lost anyway — but stays
+   transparent until the delay has passed. Failed/rejected/paused states have no animation,
+   so they appear immediately. The reduced-motion override only shortens the fade, not the delay. */
+#components-reconnect-modal.components-reconnect-show,
+#components-reconnect-modal.components-reconnect-retrying {
+    cursor: progress;
+    animation: reconnect-reveal 0.2s ease-out both;
+    animation-delay: 2s;
+}
+
+@keyframes reconnect-reveal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
 .reconnect-dialog {
     display: flex;
     flex-direction: column;
