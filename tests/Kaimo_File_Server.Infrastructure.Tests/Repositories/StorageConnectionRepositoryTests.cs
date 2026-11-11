@@ -1,5 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain.Backup;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Infrastructure.Backup.Restic;
 using Kaimo_File_Server.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -129,6 +131,62 @@ public sealed class StorageConnectionRepositoryTests : DatabaseTestBase
         Assert.Equal(0, usage.VirtualShareCount);
         Assert.Equal(StorageConnectionDeleteResult.InUse, result);
         Assert.NotNull(await repository.GetAsync(connection.Id));
+    }
+
+    [Theory]
+    [InlineData(BackupBackend.Sftp)]
+    [InlineData(BackupBackend.Smb)]
+    public async Task DeleteAsync_IsBlockedWhileBackupRepositoryReferencesConnection(BackupBackend backend)
+    {
+        var repository = new StorageConnectionRepository(DbFactory);
+        var connection = NewConnection();
+        await repository.SaveAsync(connection);
+        await using (var db = NewContext())
+        {
+            db.BackupRepositories.Add(new BackupRepository
+            {
+                Name = "Offsite",
+                Backend = backend,
+                SettingsJson = new ResticRepositorySettings { Path = "kaimo", StorageConnectionId = connection.Id }.Serialize()
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var usage = await repository.GetUsageAsync(connection.Id);
+        var result = await repository.DeleteAsync(connection.Id);
+
+        Assert.Equal(1, usage.BackupRepositoryCount);
+        Assert.Equal(1, usage.TotalCount);
+        Assert.Equal(StorageConnectionDeleteResult.InUse, result);
+        Assert.NotNull(await repository.GetAsync(connection.Id));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_IgnoresBackupRepositoriesOfOtherConnections()
+    {
+        var repository = new StorageConnectionRepository(DbFactory);
+        var connection = NewConnection();
+        await repository.SaveAsync(connection);
+        await using (var db = NewContext())
+        {
+            db.BackupRepositories.AddRange(
+                new BackupRepository
+                {
+                    Name = "Other connection",
+                    Backend = BackupBackend.Sftp,
+                    SettingsJson = new ResticRepositorySettings { Path = "x", StorageConnectionId = Guid.NewGuid() }.Serialize()
+                },
+                new BackupRepository
+                {
+                    Name = "Local",
+                    Backend = BackupBackend.Local,
+                    SettingsJson = new ResticRepositorySettings { Path = "/backup" }.Serialize()
+                });
+            await db.SaveChangesAsync();
+        }
+
+        Assert.Equal(0, (await repository.GetUsageAsync(connection.Id)).BackupRepositoryCount);
+        Assert.Equal(StorageConnectionDeleteResult.Deleted, await repository.DeleteAsync(connection.Id));
     }
 
     [Fact]

@@ -3454,8 +3454,17 @@
   <data name="Web_StorageConnection_StatusNeedsReauthorization" xml:space="preserve">
     <value>Erneute Autorisierung erforderlich</value>
   </data>
+  <data name="Web_StorageConnection_DeleteBlockedBy" xml:space="preserve">
+    <value>Kann nicht gelöscht werden, solange sie noch verwendet wird. {0}</value>
+  </data>
+  <data name="Web_StorageConnection_UsedByVirtualShares" xml:space="preserve">
+    <value>Virtuelle Shares/Ordner</value>
+  </data>
+  <data name="Web_StorageConnection_UsedByBackups" xml:space="preserve">
+    <value>Backup-Repositories</value>
+  </data>
   <data name="Web_StorageConnection_DeleteInUse" xml:space="preserve">
-    <value>Die Verbindung wird noch von einer Synchronisierung oder einem virtuellen Share verwendet und kann nicht gelöscht werden.</value>
+    <value>Die Verbindung wird noch von einer Synchronisierung, einem virtuellen Share/Ordner oder einem Backup-Repository verwendet und kann nicht gelöscht werden.</value>
   </data>
   <data name="Web_StorageConnection_ManageDenied" xml:space="preserve">
     <value>Sie dürfen Speicherverbindungen in dieser Abteilung nicht verwalten.</value>

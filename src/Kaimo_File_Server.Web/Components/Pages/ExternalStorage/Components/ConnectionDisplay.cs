@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Web.Components.Shared;
 
 namespace Kaimo_File_Server.Web.Components.Pages.ExternalStorage.Components;
@@ -53,6 +54,18 @@ internal static class ConnectionDisplay
            ?? string.Format(
                Resources.ResourceManager.GetString("Web_ExternalStorage_ErrorCode_Unknown")
                ?? "Attention required ({0})", code);
+
+    /// <summary>Why the connection cannot be deleted (every blocking consumer with its count), or null when it can.</summary>
+    public static string? DeleteBlockedReason(StorageConnectionUsage usage)
+    {
+        if (usage.TotalCount == 0)
+            return null;
+        var parts = new List<string>(3);
+        if (usage.SyncCount > 0) parts.Add($"{R("Web_ExternalStorage_Tab_Syncs")}: {usage.SyncCount}");
+        if (usage.VirtualShareCount > 0) parts.Add($"{R("Web_StorageConnection_UsedByVirtualShares")}: {usage.VirtualShareCount}");
+        if (usage.BackupRepositoryCount > 0) parts.Add($"{R("Web_StorageConnection_UsedByBackups")}: {usage.BackupRepositoryCount}");
+        return string.Format(R("Web_StorageConnection_DeleteBlockedBy"), string.Join(", ", parts));
+    }
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 }

@@ -3,9 +3,9 @@ using Kaimo_File_Server.Core.Domain;
 namespace Kaimo_File_Server.Core.Repositories;
 
 /// <summary>Counts durable consumers that currently reference a connection.</summary>
-public sealed record StorageConnectionUsage(int SyncCount, int VirtualShareCount)
+public sealed record StorageConnectionUsage(int SyncCount, int VirtualShareCount, int BackupRepositoryCount = 0)
 {
-    public int TotalCount => checked(SyncCount + VirtualShareCount);
+    public int TotalCount => checked(SyncCount + VirtualShareCount + BackupRepositoryCount);
 }
 
 public enum StorageConnectionDeleteResult

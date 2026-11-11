@@ -162,7 +162,7 @@ else
                                 }
                                 <MenuItem Icon="trash.svg" Label="@R("Web_Action_Delete")" Danger
                                           Disabled="@(_busy || usage.TotalCount > 0)"
-                                          Tooltip="@(usage.TotalCount > 0 ? R("Web_StorageConnection_DeleteInUse") : null)"
+                                          Tooltip="@ConnectionDisplay.DeleteBlockedReason(usage)"
                                           OnClick="() => _confirmDelete = true" />
                             }
                         </MoreActions>

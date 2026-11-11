@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Infrastructure.Backup.Restic;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -104,7 +105,23 @@ public sealed class StorageConnectionRepository(IDbContextFactory<ApplicationDbC
             .CountAsync(share => share.ConnectionId == id, cancellationToken);
         var syncCount = await db.SyncDefinitions.AsNoTracking()
             .CountAsync(sync => sync.ConnectionId == id, cancellationToken);
-        return new StorageConnectionUsage(syncCount, virtualShareCount);
+        var backupCount = await CountBackupRepositoriesAsync(db, id, cancellationToken);
+        return new StorageConnectionUsage(syncCount, virtualShareCount, backupCount);
+    }
+
+    // Backup repositories reference their SFTP/SMB connection only inside SettingsJson,
+    // so there is no foreign key; the handful of repositories is parsed in memory.
+    // ponytail: no FK -> a repository saved between this check and the delete is not caught;
+    // add a ConnectionId column with a restrictive FK if that race ever matters.
+    private static async Task<int> CountBackupRepositoriesAsync(
+        ApplicationDbContext db,
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var settings = await db.BackupRepositories.AsNoTracking()
+            .Select(repository => repository.SettingsJson)
+            .ToListAsync(cancellationToken);
+        return settings.Count(json => ResticRepositorySettings.Parse(json).StorageConnectionId == id);
     }
 
     public async Task<bool> TryUpdateCredentialAsync(
@@ -142,7 +159,8 @@ public sealed class StorageConnectionRepository(IDbContextFactory<ApplicationDbC
         if (await db.CloudAccessShares.AsNoTracking()
                 .AnyAsync(share => share.ConnectionId == id, cancellationToken) ||
             await db.SyncDefinitions.AsNoTracking()
-                .AnyAsync(sync => sync.ConnectionId == id, cancellationToken))
+                .AnyAsync(sync => sync.ConnectionId == id, cancellationToken) ||
+            await CountBackupRepositoriesAsync(db, id, cancellationToken) > 0)
             return StorageConnectionDeleteResult.InUse;
 
         db.StorageConnections.Remove(connection);
