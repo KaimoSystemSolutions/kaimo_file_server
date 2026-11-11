@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Domain.Notifications;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Infrastructure.Persistence;
@@ -132,9 +134,52 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             await db.ScopedRoleAssignments.Where(a => a.PrincipalId == id).ExecuteDeleteAsync();
             await db.CloudAccessGrants.Where(g => g.PrincipalId == id).ExecuteDeleteAsync();
 
+            // File ACL entries and public links (which run under their creator's identity)
+            // only ever served this account and can never apply to anyone else.
+            await db.AccessEntries.Where(e => e.PrincipalId == id).ExecuteDeleteAsync();
+            await db.ShareLinks.Where(l => l.CreatedByUserId == id).ExecuteDeleteAsync();
+
+            // Syncs are shared configuration and stay. Their FKs to the user would block the
+            // delete; without an execution user the scheduler skips them until an admin saves
+            // the schedule again (which binds it to that admin).
+            await db.SyncDefinitions.Where(d => d.RunAsUserId == id)
+                .ExecuteUpdateAsync(s => s.SetProperty(d => d.RunAsUserId, (Guid?)null));
+            await db.SyncDefinitions.Where(d => d.CreatedByUserId == id)
+                .ExecuteUpdateAsync(s => s.SetProperty(d => d.CreatedByUserId, (Guid?)null));
+
+            await PruneFromMailRulesAsync(db, id);
+            await PruneFromSettingAsync<SecondFactorPolicy>(db, SecondFactorPolicy.ConfigKey,
+                p => p.UserIds.Remove(id));
+            await PruneFromSettingAsync<AccessRestrictionSettings>(db, AccessRestrictionSettings.ConfigKey,
+                s => s.Rules.Aggregate(false, (changed, r) => r.UserIds.Remove(id) | changed));
+
             db.Users.Remove(user);
             await db.SaveChangesAsync();
             await tx.CommitAsync();
+        }
+
+        private static async Task PruneFromMailRulesAsync(ApplicationDbContext db, Guid id)
+        {
+            var value = id.ToString();
+            var rules = await db.MailRules.Where(r => r.RecipientsJson.Contains(value)).ToListAsync();
+            foreach (var rule in rules)
+                rule.SetRecipients(rule.GetRecipients()
+                    .Where(r => !(r.Kind == RecipientKind.User && string.Equals(r.Value, value, StringComparison.OrdinalIgnoreCase))));
+        }
+
+        /// <summary>
+        /// Removes the user from a JSON policy in <c>ConfigSettings</c>. Written through the
+        /// tracked row (same default serializer as <c>ConfigRepository</c>); in-memory caches may
+        /// hold the dead id until they expire, which is harmless since no account can reuse it.
+        /// </summary>
+        private static async Task PruneFromSettingAsync<T>(ApplicationDbContext db, string key, Func<T, bool> remove)
+        {
+            var setting = await db.ConfigSettings.FirstOrDefaultAsync(s => s.Key == key);
+            if (setting is null) return;
+            var value = JsonSerializer.Deserialize<T>(setting.Value);
+            if (value is null || !remove(value)) return;
+            setting.Value = JsonSerializer.Serialize(value);
+            setting.UpdatedAt = DateTime.UtcNow;
         }
 
         // --------------------------------------------
