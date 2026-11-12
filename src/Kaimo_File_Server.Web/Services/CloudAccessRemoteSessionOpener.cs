@@ -2,7 +2,8 @@ using System.Security.Cryptography;
 using System.Text;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.ExternalStorage;
+using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 
 namespace Kaimo_File_Server.Web.Services;

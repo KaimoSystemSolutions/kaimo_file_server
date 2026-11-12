@@ -1,9 +1,10 @@
 using Grpc.Core;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Repositories.Samba;
+using Kaimo_File_Server.Core.Repositories.Shares;
+using Kaimo_File_Server.Core.Security.Authentication;
+using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.SmbBridge.Grpc;
 

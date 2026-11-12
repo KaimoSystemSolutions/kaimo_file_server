@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Shares;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace Kaimo_File_Server.Web.Services;

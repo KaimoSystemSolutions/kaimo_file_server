@@ -96,7 +96,7 @@ public sealed partial class OneDriveConnectionTests
         using var http = new HttpClient(handler);
         await using var connection = new OneDriveConnection(CreateData(), http);
 
-        var exception = await Assert.ThrowsAsync<Kaimo_File_Server.Core.Services.ProviderRequestException>(
+        var exception = await Assert.ThrowsAsync<Kaimo_File_Server.Core.Services.ExternalStorage.ProviderRequestException>(
             () => connection.GetAccountInfoAsync());
 
         Assert.Equal("invalid_grant", exception.ErrorCode);

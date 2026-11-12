@@ -1,5 +1,5 @@
-﻿using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
+﻿using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 

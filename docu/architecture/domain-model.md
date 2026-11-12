@@ -1,7 +1,7 @@
 # Domain Model
 
 This document describes the core entities and their relationships. Entities live in
-`src/Kaimo_File_Server.Core/Domain/` and `src/Kaimo_File_Server.Core/Security/`; their table
+`src/Kaimo_File_Server.Core/Domain/` and `src/Kaimo_File_Server.Core/Security/` (`Acl/`, `Management/`); their table
 mappings are in `src/Kaimo_File_Server.Infrastructure/Persistence/ApplicationDbContext.cs`.
 
 Related: [Storage and persistence](storage-and-persistence.md) · [Security model](security-model.md)
@@ -66,7 +66,7 @@ for the whole system.
   memberships).
 
 All writes of scoped role assignments go through `RoleAssignmentService`
-(`src/Kaimo_File_Server.Core/Services/`), which also applies the no-elevation gate, the Admins mirror
+(`src/Kaimo_File_Server.Core/Services/Management/`), which also applies the no-elevation gate, the Admins mirror
 and the last-admin guard. The user, role and department pages share it.
 
 ## Sharing and external storage

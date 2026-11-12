@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using Kaimo_File_Server.Core.Domain.Identity;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Authentication;
+using Kaimo_File_Server.Core.Security.Demo;
 using Kaimo_File_Server.Core.Services.Notifications;
 using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Controllers.WebDav;
@@ -247,7 +249,7 @@ public sealed class SecurityMonitorFlushService(
             if (pruned > 0)
                 logger.LogInformation("Security event retention pruned {Count} entries.", pruned);
         }
-        catch (Core.Security.ReadOnlyDemoException)
+        catch (Core.Security.Demo.ReadOnlyDemoException)
         {
             // Read-only demo: nothing is recorded, so there is nothing to prune.
         }

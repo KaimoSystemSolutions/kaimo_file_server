@@ -1,4 +1,5 @@
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.ClientSync;
+using Kaimo_File_Server.Core.Repositories.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -59,7 +60,7 @@ public sealed class ClientSyncRetentionService(
             {
                 return;
             }
-            catch (Core.Security.ReadOnlyDemoException)
+            catch (Core.Security.Demo.ReadOnlyDemoException)
             {
                 // Read-only demo: pruning is a write, so this service has nothing to do.
                 return;

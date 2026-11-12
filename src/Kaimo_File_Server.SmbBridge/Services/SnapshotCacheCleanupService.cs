@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Shares;
 using Microsoft.Extensions.Options;
 
 namespace Kaimo_File_Server.SmbBridge.Services;

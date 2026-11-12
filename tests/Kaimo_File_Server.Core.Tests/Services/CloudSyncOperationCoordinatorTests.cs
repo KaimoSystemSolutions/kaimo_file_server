@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.CloudSync;
 using Xunit;
 
 namespace Kaimo_File_Server.Core.Tests.Services;

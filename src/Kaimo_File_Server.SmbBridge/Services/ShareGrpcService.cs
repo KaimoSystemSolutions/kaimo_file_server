@@ -1,8 +1,9 @@
 ﻿using Grpc.Core;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Repositories.Shares;
+using Kaimo_File_Server.Core.Security.Management;
+using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.SmbBridge.Grpc;
 
 namespace Kaimo_File_Server.SmbBridge.Services;

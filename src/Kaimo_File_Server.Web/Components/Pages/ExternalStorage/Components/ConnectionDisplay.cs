@@ -1,6 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Language;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.ExternalStorage;
 using Kaimo_File_Server.Web.Components.Shared;
 
 namespace Kaimo_File_Server.Web.Components.Pages.ExternalStorage.Components;

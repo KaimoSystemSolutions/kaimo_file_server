@@ -1,7 +1,7 @@
 using System;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.ClientSync;
-using Kaimo_File_Server.Core.Services.Sync;
+using Kaimo_File_Server.Core.Services.ClientSync;
 using Kaimo_File_Server.Web.Controllers.Api;
 using Kaimo_File_Server.Web.Services.Api;
 using Xunit;

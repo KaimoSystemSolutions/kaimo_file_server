@@ -3,10 +3,11 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Repositories.Files;
+using Kaimo_File_Server.Core.Security.Demo;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Kaimo_File_Server.Core.Services.Search;
 
 namespace Kaimo_File_Server.Search;
 

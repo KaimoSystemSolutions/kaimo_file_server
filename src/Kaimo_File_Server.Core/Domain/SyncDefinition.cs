@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Core.Services.CloudSync;
 
 namespace Kaimo_File_Server.Core.Domain;
 
@@ -98,7 +98,7 @@ public sealed class SyncDefinitionRuntime
     public string? LastRunFailures { get; set; }
 
     /// <summary>
-    /// Serialized <see cref="Kaimo_File_Server.Core.Services.DataServices.SyncManifest"/>
+    /// Serialized <see cref="Kaimo_File_Server.Core.Services.CloudSync.SyncManifest"/>
     /// captured after the last successful two-way run. It lets the next run tell a
     /// newly created item apart from one deleted on the opposite endpoint. Null
     /// until a delete-propagating sync has completed at least once.

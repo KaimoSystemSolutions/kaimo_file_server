@@ -1,5 +1,5 @@
 using Kaimo_File_Server.Core.Logging;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Credentials;
 using Kaimo_File_Server.Infrastructure.Backup;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Infrastructure.Services;

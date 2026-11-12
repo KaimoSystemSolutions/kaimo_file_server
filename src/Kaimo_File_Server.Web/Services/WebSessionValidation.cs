@@ -1,7 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Kaimo_File_Server.Core.Domain.Identity;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 

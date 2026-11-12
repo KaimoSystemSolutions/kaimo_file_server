@@ -1,0 +1,57 @@
+using Kaimo_File_Server.Core.Domain;
+
+namespace Kaimo_File_Server.Core.Repositories.Shares;
+
+/// <summary>
+/// Persistence for anonymous public download and upload links (<see cref="ShareLink"/>).
+/// </summary>
+public interface IShareLinkRepository
+{
+    Task<ShareLink> CreateAsync(ShareLink link);
+    Task UpdateAsync(ShareLink link);
+    Task DeleteAsync(Guid id);
+    Task<ShareLink?> GetByIdAsync(Guid id);
+    /// <summary>
+    /// Resolves a link by its presented plain token (matched via <see cref="ShareLink.TokenHash"/>).
+    /// The returned link carries the presented token in <see cref="ShareLink.Token"/>.
+    /// </summary>
+    Task<ShareLink?> GetByTokenAsync(string token);
+
+    /// <summary>Up to <paramref name="maxCount"/> links still holding a plain-text <see cref="ShareLink.LegacyToken"/>.</summary>
+    Task<List<ShareLink>> ListWithLegacyTokenAsync(int maxCount);
+
+    /// <summary>
+    /// Replaces a link's plain-text legacy token by its hash and encrypted form, only if the
+    /// row still holds exactly <paramref name="legacyToken"/>. Returns whether it was replaced.
+    /// </summary>
+    Task<bool> TryProtectLegacyTokenAsync(Guid id, string legacyToken, string protectedToken);
+
+    /// <summary>All links whose target share is in <paramref name="shareIds"/>, newest first.</summary>
+    Task<List<ShareLink>> ListForSharesAsync(IEnumerable<Guid> shareIds);
+
+    /// <summary>Every link, newest first (for unrestricted/global admins).</summary>
+    Task<List<ShareLink>> ListAllAsync();
+
+    /// <summary>
+    /// Atomically records one download access against the link identified by <paramref name="token"/>,
+    /// but only while it is enabled, within its time window, and below its access-count cap.
+    /// Returns the (post-increment) link when access was granted, or null when the link is
+    /// missing, inactive, or exhausted. Race-free under concurrent downloads.
+    /// </summary>
+    Task<ShareLink?> TryConsumeAccessAsync(string token);
+
+    /// <summary>
+    /// Atomically reserves one file slot and <paramref name="bytes"/> of quota on the upload link
+    /// identified by <paramref name="token"/>, but only while it is an enabled upload link within
+    /// its time window, below its file-count cap and with enough byte quota left. Returns the
+    /// (post-reservation) link, or null when the upload is refused. Race-free under concurrent
+    /// uploads.
+    /// </summary>
+    Task<ShareLink?> TryReserveUploadAsync(string token, long bytes);
+
+    /// <summary>
+    /// Gives back a reservation made by <see cref="TryReserveUploadAsync"/> whose upload failed or
+    /// was cancelled (one file slot and <paramref name="bytes"/>; never drops below zero).
+    /// </summary>
+    Task ReleaseUploadAsync(Guid id, long bytes);
+}

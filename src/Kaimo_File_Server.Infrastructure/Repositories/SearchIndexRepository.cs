@@ -1,7 +1,8 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Files;
+using Kaimo_File_Server.Core.Services.Search;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Search;
 using Microsoft.EntityFrameworkCore;

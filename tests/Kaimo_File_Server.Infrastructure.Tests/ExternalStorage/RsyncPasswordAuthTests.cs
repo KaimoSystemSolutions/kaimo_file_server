@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Security.Credentials;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Microsoft.Extensions.Configuration;

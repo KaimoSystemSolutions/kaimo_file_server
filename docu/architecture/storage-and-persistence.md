@@ -122,7 +122,7 @@ root always stays. Links are never followed and other mounted file systems are s
 
 ## File versions
 
-Implemented by `FileVersionService` (`src/Kaimo_File_Server.Core/Services/File/FileVersionService.cs`):
+Implemented by `FileVersionService` (`src/Kaimo_File_Server.Core/Services/Versioning/FileVersionService.cs`):
 
 - **Location.** `PoolVersionStorageLocator` places blobs in `<pool>/.kaimo-versions`, in the same pool
   as the share and outside every share folder. A share that is itself a pool root has no version

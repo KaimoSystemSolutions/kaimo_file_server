@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Web.Helpers;
 using Microsoft.Extensions.Logging;
@@ -36,7 +36,7 @@ public sealed class PublicUploadService(
     IFileServiceFactory fileServices,
     ShareLinkService shareLinks,
     ILogger<PublicUploadService> logger,
-    Core.Security.DemoModeOptions? demo = null,
+    Core.Security.Demo.DemoModeOptions? demo = null,
     Core.Services.Notifications.INotificationPublisher? notifications = null)
 {
     // Target paths currently being written by any visitor, so two parallel uploads of the same

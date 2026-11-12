@@ -1,6 +1,8 @@
 using Kaimo_File_Server.Core.Domain.Identity;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Repositories.Shares;
+using Kaimo_File_Server.Core.Security.Acl;
+using Kaimo_File_Server.Core.Security.Authentication;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Security;
 using Kaimo_File_Server.Infrastructure.Services;

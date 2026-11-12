@@ -5,8 +5,7 @@ using Google.Apis.Drive.v3;
 using Google.Apis.Http;
 using Google.Apis.Services;
 using Kaimo_File_Server.Core.Domain.Identity;
-using Kaimo_File_Server.Core.Services.DataServices;
-using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Services.CloudSync;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
 

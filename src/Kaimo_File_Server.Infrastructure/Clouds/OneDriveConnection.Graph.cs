@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
 

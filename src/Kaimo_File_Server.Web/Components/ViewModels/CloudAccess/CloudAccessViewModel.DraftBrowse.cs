@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Security.Credentials;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 

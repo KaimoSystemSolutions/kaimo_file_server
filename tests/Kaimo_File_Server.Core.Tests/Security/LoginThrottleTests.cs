@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Authentication;
 using Xunit;
 
 namespace Kaimo_File_Server.Core.Tests.Security;

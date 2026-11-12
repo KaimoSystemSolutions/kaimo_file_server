@@ -2,6 +2,7 @@ using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Core.Search;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Services.Search;
 
 namespace Kaimo_File_Server.Search;
 

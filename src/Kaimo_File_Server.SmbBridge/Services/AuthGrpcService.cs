@@ -2,7 +2,7 @@ using Google.Protobuf;
 using Grpc.Core;
 using System.Security.Cryptography;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Authentication;
 using Kaimo_File_Server.SmbBridge.Grpc;
 using Kaimo_File_Server.SmbBridge.Security;
 

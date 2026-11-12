@@ -1,7 +1,9 @@
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Repositories.Shares;
+using Kaimo_File_Server.Core.Services.Search;
 using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.ViewModels;

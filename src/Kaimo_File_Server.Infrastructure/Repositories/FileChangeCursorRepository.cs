@@ -1,5 +1,5 @@
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Services.Sync;
+using Kaimo_File_Server.Core.Repositories.ClientSync;
+using Kaimo_File_Server.Core.Services.ClientSync;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 

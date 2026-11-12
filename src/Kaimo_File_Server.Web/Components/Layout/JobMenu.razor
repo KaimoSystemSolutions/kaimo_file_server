@@ -1,7 +1,7 @@
 @using System.Globalization
 @using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Services.Search
 @using Kaimo_File_Server.Infrastructure.Clouds
-@using Kaimo_File_Server.Search
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Kaimo_File_Server.Web.Services
 @implements IDisposable
@@ -9,7 +9,7 @@
 @inject ICloudSyncJobRunner SyncJobRunner
 @inject Kaimo_File_Server.Infrastructure.Backup.Restic.IBackupRunner BackupRunner
 @inject Kaimo_File_Server.Infrastructure.Backup.Restic.BackupCatalogService BackupCatalog
-@inject Kaimo_File_Server.Core.Repositories.IUserContextFactory UserContexts
+@inject Kaimo_File_Server.Core.Repositories.Identity.IUserContextFactory UserContexts
 @inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthState
 @inject ISearchAdminService SearchAdmin
 @inject DateFormatService DateFmt

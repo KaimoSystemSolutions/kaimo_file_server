@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using System.Text;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Web.Controllers.WebDav;
 using Kaimo_File_Server.Web.Tests.Services;
 using Microsoft.AspNetCore.Http;

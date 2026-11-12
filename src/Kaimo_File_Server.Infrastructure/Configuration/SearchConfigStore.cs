@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Search;
+using Kaimo_File_Server.Core.Services.Search;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Kaimo_File_Server.Infrastructure.Configuration;

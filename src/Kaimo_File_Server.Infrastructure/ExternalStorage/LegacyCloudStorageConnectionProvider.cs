@@ -1,7 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Services;
-using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Core.Repositories.ExternalStorage;
+using Kaimo_File_Server.Core.Security.Credentials;
+using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Clouds;
 
@@ -199,7 +199,7 @@ internal sealed class LegacyCloudRemoteFileStore(
                     : 1,
                 cancellationToken);
         }
-        catch (Core.Security.ReadOnlyDemoException)
+        catch (Core.Security.Demo.ReadOnlyDemoException)
         {
             // Read-only demo: the rotated grant stays in memory for this session only,
             // so browsing keeps working after an access-token refresh.

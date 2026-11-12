@@ -1,5 +1,5 @@
 using Kaimo_File_Server.Core.Domain.Identity;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Identity;
 
 namespace Kaimo_File_Server.Web.Services;
 

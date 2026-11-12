@@ -1,6 +1,7 @@
 using System.Net;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Security.Authentication;
+using Kaimo_File_Server.Core.Security.Credentials;
 using Kaimo_File_Server.Infrastructure.Configuration;
 
 namespace Kaimo_File_Server.Infrastructure.Services;

@@ -1,15 +1,10 @@
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Logging;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
-using Kaimo_File_Server.Core.Services;
-using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Backup;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Microsoft.AspNetCore.Components.Authorization;
 using Kaimo_File_Server.Core.Language;
-using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Controllers.WebDav;
 using Kaimo_File_Server.Web.DynamicHelpers;
 using Kaimo_File_Server.Web.Middleware;

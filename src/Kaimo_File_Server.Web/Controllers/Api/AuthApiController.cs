@@ -1,8 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 using Kaimo_File_Server.Core.Domain.ClientSync;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Repositories.ClientSync;
+using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Security.Authentication;
 using Kaimo_File_Server.Web.Services.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

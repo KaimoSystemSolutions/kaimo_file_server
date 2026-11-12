@@ -1,8 +1,7 @@
 using System.IO.Compression;
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Infrastructure.Storage;
-using Kaimo_File_Server.Search;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;

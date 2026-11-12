@@ -34,6 +34,4 @@ namespace Kaimo_File_Server.Core.Services.File
 
         void MarkDeleteOnClose();
     }
-
-    public sealed record FileOpenResult(IFileSession Session, FileOpenStatus Status);
 }

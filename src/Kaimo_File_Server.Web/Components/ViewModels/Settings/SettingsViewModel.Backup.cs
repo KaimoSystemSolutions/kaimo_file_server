@@ -59,7 +59,7 @@ public partial class SettingsViewModel
             SuccessMessage = R("Web_Settings_Backup_Deleted");
             return true;
         }
-        catch (Kaimo_File_Server.Core.Security.ReadOnlyDemoException)
+        catch (Kaimo_File_Server.Core.Security.Demo.ReadOnlyDemoException)
         {
             ErrorMessage = R("Web_Demo_ReadOnlyNotice");
             return false;
@@ -129,7 +129,7 @@ public partial class SettingsViewModel
             SuccessMessage = R("Web_Settings_Backup_Created");
             return true;
         }
-        catch (Kaimo_File_Server.Core.Security.ReadOnlyDemoException)
+        catch (Kaimo_File_Server.Core.Security.Demo.ReadOnlyDemoException)
         {
             ErrorMessage = R("Web_Demo_ReadOnlyNotice");
             return false;

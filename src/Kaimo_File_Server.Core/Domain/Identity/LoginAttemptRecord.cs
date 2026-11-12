@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Authentication;
 
 namespace Kaimo_File_Server.Core.Domain.Identity;
 

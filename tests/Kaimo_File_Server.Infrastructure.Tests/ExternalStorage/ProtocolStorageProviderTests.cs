@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Security.Credentials;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Web.Components.ViewModels;
@@ -34,7 +34,7 @@ public sealed class ProtocolStorageProviderTests : IDisposable
         var provider = new LegacyCloudStorageConnectionProvider(
             "onedrive", "Microsoft OneDrive", StorageProviderCapabilities.None,
             new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.DeviceCode },
-            Mock.Of<ICredentialVault>(MockBehavior.Strict), Mock.Of<Core.Repositories.IStorageConnectionRepository>(),
+            Mock.Of<ICredentialVault>(MockBehavior.Strict), Mock.Of<Core.Repositories.ExternalStorage.IStorageConnectionRepository>(),
             factory.Object);
 
         await provider.RevokeAsync(connection);

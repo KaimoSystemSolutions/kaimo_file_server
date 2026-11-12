@@ -1,15 +1,27 @@
-﻿using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
+﻿using Kaimo_File_Server.Core.Repositories.ClientSync;
+using Kaimo_File_Server.Core.Repositories.ExternalStorage;
+using Kaimo_File_Server.Core.Repositories.Files;
+using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Repositories.Notifications;
+using Kaimo_File_Server.Core.Repositories.Samba;
+using Kaimo_File_Server.Core.Repositories.Shares;
+using Kaimo_File_Server.Core.Security.Acl;
+using Kaimo_File_Server.Core.Security.Authentication;
+using Kaimo_File_Server.Core.Security.Credentials;
+using Kaimo_File_Server.Core.Security.Demo;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Core.Services.DataServices;
-using Kaimo_File_Server.Core.Services.File;
-using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
+using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Services.Management;
+using Kaimo_File_Server.Core.Services.Search;
+using Kaimo_File_Server.Core.Services.Versioning;
+using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Infrastructure.Repositories;
 using Kaimo_File_Server.Infrastructure.Services;
-using Kaimo_File_Server.Search;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -77,7 +89,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IClientRequestReceiptRepository, ClientRequestReceiptRepository>();
             services.AddScoped<IFileChangeCursorRepository, FileChangeCursorRepository>();
             services.AddScoped<IFileChangeLogRepository, FileChangeLogRepository>();
-            services.AddScoped<Core.Services.Sync.ISyncQueryService, Core.Services.Sync.SyncQueryService>();
+            services.AddScoped<Core.Services.ClientSync.ISyncQueryService, Core.Services.ClientSync.SyncQueryService>();
 
             // -- Services (infrastructure-level) --
             services.AddScoped<IDepartmentPermissionService, DepartmentPermissionService>();

@@ -1,7 +1,6 @@
 using Elastic.Clients.Elasticsearch;
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Search;
+using Kaimo_File_Server.Core.Repositories.Shares;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;

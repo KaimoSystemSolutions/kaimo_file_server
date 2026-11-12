@@ -1,5 +1,6 @@
 using Elastic.Clients.Elasticsearch;
 using Elastic.Transport;
+using Kaimo_File_Server.Core.Services.Search;
 
 namespace Kaimo_File_Server.Search;
 

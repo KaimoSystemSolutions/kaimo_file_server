@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Services.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Kaimo_File_Server.Infrastructure.Services
@@ -15,7 +16,7 @@ namespace Kaimo_File_Server.Infrastructure.Services
     ///
     /// This adapter therefore opens a fresh DI scope for every call, resolves the
     /// scoped service inside it, and disposes the scope once the operation
-    /// completes — exactly the pattern <see cref="Core.Security.AclService"/> uses.
+    /// completes — exactly the pattern <see cref="Core.Security.Acl.AclService"/> uses.
     /// Every returned value (streams own their memory or temporary file; lists are
     /// materialised) is safe to use after the scope is gone.
     /// </summary>

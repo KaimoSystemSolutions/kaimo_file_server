@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Credentials;
 using System.Text;
 
 namespace Kaimo_File_Server.Infrastructure

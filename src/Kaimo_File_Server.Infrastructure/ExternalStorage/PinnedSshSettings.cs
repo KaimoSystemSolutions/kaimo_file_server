@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Security.Credentials;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 
 namespace Kaimo_File_Server.Infrastructure.ExternalStorage;

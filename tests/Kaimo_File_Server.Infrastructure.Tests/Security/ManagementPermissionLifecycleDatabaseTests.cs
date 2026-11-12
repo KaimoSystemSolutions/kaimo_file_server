@@ -1,5 +1,5 @@
 using Kaimo_File_Server.Core.Domain.Identity;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Management;
 using Xunit;
 
 namespace Kaimo_File_Server.Infrastructure.Tests.Security;
@@ -8,7 +8,7 @@ namespace Kaimo_File_Server.Infrastructure.Tests.Security;
 /// End-to-end lifecycle tests for MANAGEMENT permissions (delegated administration),
 /// mirroring the file-ACL lifecycle suite. They mutate the sources of management
 /// authority — scoped role assignments and role permission bitmasks — and then ask the
-/// REAL <see cref="Core.Services.ManagementAuthService"/> over the real database whether
+/// REAL <see cref="Core.Services.Management.ManagementAuthService"/> over the real database whether
 /// the delegated right actually changed.
 ///
 /// Protects the delegation model against silent regressions: "we removed the delegation,

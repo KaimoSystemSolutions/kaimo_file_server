@@ -1,6 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Backup;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Backup.Restic;
 using Kaimo_File_Server.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;

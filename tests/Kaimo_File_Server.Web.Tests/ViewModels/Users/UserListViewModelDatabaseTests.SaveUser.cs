@@ -1,9 +1,8 @@
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Security.Authentication;
+using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Web.Components.ViewModels;

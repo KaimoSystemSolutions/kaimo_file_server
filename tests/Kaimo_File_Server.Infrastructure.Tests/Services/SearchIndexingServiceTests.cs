@@ -1,7 +1,7 @@
 using Kaimo_File_Server.Core.Domain.ClientSync;
+using Kaimo_File_Server.Core.Services.Search;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Services;
-using Kaimo_File_Server.Search;
 using Moq;
 using Xunit;
 

@@ -1,6 +1,6 @@
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Acl;
 using Microsoft.EntityFrameworkCore;
 
 namespace Kaimo_File_Server.Infrastructure.Persistence;

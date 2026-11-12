@@ -1,5 +1,5 @@
 using Grpc.Core;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Authentication;
 using Kaimo_File_Server.SmbBridge.Grpc;
 using Kaimo_File_Server.SmbBridge.Security;
 using Kaimo_File_Server.SmbBridge.Services;

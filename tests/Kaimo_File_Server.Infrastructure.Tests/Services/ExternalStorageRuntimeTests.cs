@@ -1,7 +1,8 @@
 using System.Net;
 using System.Text.Json;
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Security.Credentials;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Repositories;
 using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Services;

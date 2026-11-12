@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Acl;
 
 namespace Kaimo_File_Server.Core.Domain
 {

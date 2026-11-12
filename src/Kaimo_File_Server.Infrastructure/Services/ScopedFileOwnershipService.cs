@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Files;
 using Kaimo_File_Server.Core.Services.File;
 using Microsoft.Extensions.DependencyInjection;
 

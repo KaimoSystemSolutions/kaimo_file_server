@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Security.Credentials;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace Kaimo_File_Server.Web.Services;

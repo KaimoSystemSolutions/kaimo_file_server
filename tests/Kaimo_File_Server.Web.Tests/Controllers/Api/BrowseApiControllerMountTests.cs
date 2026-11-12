@@ -2,10 +2,11 @@ using System.Security.Claims;
 using System.Text;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.ClientSync;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
-using Kaimo_File_Server.Core.Services;
-using Kaimo_File_Server.Core.Services.Sync;
+using Kaimo_File_Server.Core.Repositories.ClientSync;
+using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Repositories.Shares;
+using Kaimo_File_Server.Core.Services.ClientSync;
+using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Web.Controllers.Api;
 using Kaimo_File_Server.Web.Tests.Services;
 using Microsoft.AspNetCore.Http;
@@ -13,7 +14,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
-using Kaimo_File_Server.Search;
+using Kaimo_File_Server.Core.Services.Search;
 
 namespace Kaimo_File_Server.Web.Tests.Controllers.Api;
 

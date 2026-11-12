@@ -376,7 +376,7 @@ public sealed class SmbTreeListingTests
     {
         _results[Tree("")] = new(0, Lines(
             Entry("sub", "D", 0), "", "\\sub", Entry("b.txt", "A", 1), "", Summary, Pwd));
-        Core.Services.DataServices.ICloudConnection adapter = new RemoteFileStoreSyncAdapter("SMB", _store);
+        Core.Services.CloudSync.ICloudConnection adapter = new RemoteFileStoreSyncAdapter("SMB", _store);
 
         var tree = await adapter.TryListTreeAsync("/Team");
 

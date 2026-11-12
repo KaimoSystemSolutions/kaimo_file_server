@@ -52,7 +52,7 @@ Common rules:
 - **Passwords** are hashed with BCrypt (`src/Kaimo_File_Server.Infrastructure/PasswordService.cs`).
   Empty passwords are rejected; failed and successful checks take comparable time so usernames
   cannot be enumerated.
-- **Lockout.** `LoginThrottle` (`src/Kaimo_File_Server.Core/Security/LoginThrottle.cs`) locks a key
+- **Lockout.** `LoginThrottle` (`src/Kaimo_File_Server.Core/Security/Authentication/LoginThrottle.cs`) locks a key
   after consecutive failures. `CredentialLoginService` charges every attempt against three keys
   (values in `LoginProtectionSettings`, editable under Settings → Login protection):
   - the client address across all user names (`security.login.ipMaxAttempts` 15,
@@ -230,7 +230,7 @@ with the password alone (a deliberate decision, documented as residual risk in t
 
 ## File authorization (ACL)
 
-`AclService` (`src/Kaimo_File_Server.Core/Security/AclService.cs`) evaluates access in this order:
+`AclService` (`src/Kaimo_File_Server.Core/Security/Acl/AclService.cs`) evaluates access in this order:
 
 0. **Depth precedence (NTFS-like):** only the entries from the deepest folder level that has an
    entry for any of the user's principals (user, groups, roles) covering the requested permission
@@ -246,7 +246,7 @@ with the password alone (a deliberate decision, documented as residual risk in t
 4. Otherwise access is denied.
 
 - **Permissions** are an NTFS-like `long` bitmask (`FilePermission` in
-  `src/Kaimo_File_Server.Core/Security/FilePermissions.cs`): `TraverseExecute`, `ListReadData`,
+  `src/Kaimo_File_Server.Core/Security/FilePermission.cs`): `TraverseExecute`, `ListReadData`,
   `ReadAttributes`, `ReadExtAttributes`, `ReadPermissions`, `CreateWriteData`, `CreateAppendData`,
   `WriteAttributes`, `WriteExtAttributes`, `DeleteSubItems`, `Delete`, `ChangePermissions`,
   `TakeOwnership`, with the aggregates `ReadAll`, `WriteAll`, `AdminAll`, `FullControl`.
@@ -259,13 +259,13 @@ with the password alone (a deliberate decision, documented as residual risk in t
 
 ## Administrative authorization
 
-- `ManagementPermission` (`src/Kaimo_File_Server.Core/Security/ManagementPermission.cs`) is a `long`
+- `ManagementPermission` (`src/Kaimo_File_Server.Core/Security/Management/ManagementPermission.cs`) is a `long`
   flags enum covering users, groups, roles, departments, shares, ACLs, home folders, share and upload
   links, system settings, data services, certificates, logs, backups, security monitor, mail,
   syncs, Cloud Access, connections and client devices.
 - Roles carry a `ManagementPermission` set and are assigned through `ScopedRoleAssignment` with scope
   `Global`, `Department` or `Share`. `ManagementAuthService` and `DepartmentPermissionService`
-  (`src/Kaimo_File_Server.Core/Services/`) resolve the effective permission for a scope.
+  (`src/Kaimo_File_Server.Core/Services/Management/`) resolve the effective permission for a scope.
 - The UI has no separate "Global" scope: assigning a role in the Global department stores
   `ScopeType.Global` (see [domain model](domain-model.md#the-global-department)). A department
   scope covers that department and its descendants; Global covers everything. Permissions of all

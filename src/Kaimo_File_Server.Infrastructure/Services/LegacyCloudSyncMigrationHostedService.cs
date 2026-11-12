@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Services.CloudSync;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 

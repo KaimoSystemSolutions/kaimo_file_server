@@ -1,7 +1,7 @@
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Repositories.ClientSync;
+using Kaimo_File_Server.Core.Security.Demo;
+using Kaimo_File_Server.Core.Services.Search;
 using Kaimo_File_Server.Infrastructure.Services;
-using Kaimo_File_Server.Search;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;

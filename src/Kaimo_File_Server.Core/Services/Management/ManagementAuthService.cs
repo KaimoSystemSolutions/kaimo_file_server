@@ -1,0 +1,440 @@
+﻿using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Repositories.Shares;
+using Kaimo_File_Server.Core.Security.Management;
+
+namespace Kaimo_File_Server.Core.Services.Management;
+
+/// <summary>
+/// Unified management authorization service.
+///
+/// Authority has a SINGLE source: SCOPED role assignments
+/// (ScopedRoleAssignment table), each explicitly scoped to Global,
+/// Department, or Share. A principal may be the user itself or one of
+/// the groups it belongs to; both are resolved into the same pipeline.
+///
+/// (There is no separate "direct" User → Role path anymore — a globally
+/// held role is simply a ScopedRoleAssignment with ScopeType.Global.)
+///
+/// Group and Share now carry a direct DepartmentId FK,
+/// so scope checks load the entity and compare DepartmentId
+/// against the scoped department (+ its descendants).
+/// </summary>
+public partial class ManagementAuthService : IManagementAuthService
+{
+    private readonly IScopedRoleAssignmentRepository _assignmentRepo;
+    private readonly IDepartmentRepository _departmentRepo;
+    private readonly IRoleRepository _roleRepo;
+    private readonly IGroupRepository _groupRepo;
+    private readonly IShareRepository _shareRepo;
+    private readonly IUserRepository _userRepo;
+
+    public ManagementAuthService(
+        IScopedRoleAssignmentRepository assignmentRepo,
+        IDepartmentRepository departmentRepo,
+        IRoleRepository roleRepo,
+        IGroupRepository groupRepo,
+        IShareRepository shareRepo,
+        IUserRepository userRepo)
+    {
+        _assignmentRepo = assignmentRepo;
+        _departmentRepo = departmentRepo;
+        _roleRepo = roleRepo;
+        _groupRepo = groupRepo;
+        _shareRepo = shareRepo;
+        _userRepo = userRepo;
+    }
+
+    // -- Group Management --
+
+    public async Task<bool> CanManageGroupAsync(
+        UserContext actor, Guid groupId, ManagementPermission required)
+    {
+        // Load group once to read its DepartmentId (direct FK)
+        var group = await _groupRepo.GetByIdAsync(groupId);
+        if (group == null) return false;
+
+        return await AnyGrantAsync(actor, required, assignment =>
+            assignment.ScopeType == ScopeType.Department
+                ? IsDepartmentInScopeAsync(group.DepartmentId, assignment.ScopeId)
+                : Task.FromResult(false));
+    }
+
+    // -- Share Management --
+
+    public async Task<bool> CanManageShareAsync(
+        UserContext actor, Guid shareId, ManagementPermission required)
+    {
+        // Load share once to read its DepartmentId (direct FK)
+        var share = await GetShareAsync(shareId);
+        if (share == null) return false;
+
+        return await AnyGrantAsync(actor, required, assignment => assignment.ScopeType switch
+        {
+            ScopeType.Department => IsDepartmentInScopeAsync(share.DepartmentId, assignment.ScopeId),
+            ScopeType.Share => Task.FromResult(assignment.ScopeId == shareId),
+            _ => Task.FromResult(false)
+        });
+    }
+    
+    // -- Department Management --
+
+    public Task<bool> CanManageDepartmentAsync(
+        UserContext actor, Guid departmentId, ManagementPermission required)
+        => AnyGrantAsync(actor, required, assignment =>
+            assignment.ScopeType == ScopeType.Department
+                ? IsDepartmentInScopeAsync(departmentId, assignment.ScopeId)
+                : Task.FromResult(false));
+
+    // -- Generic Checks --
+
+    public async Task<bool> HasAnyPermissionAsync(
+        UserContext actor, ManagementPermission required)
+    {
+        var assignments = await GetEffectiveAssignmentsAsync(actor);
+        // "Any" semantics: a single overlapping bit is enough. When the caller
+        // passes a combined flag (e.g. CreateGroups | ManageGroupMembers), the
+        // actor only needs ONE of those permissions — not all of them.
+        return assignments.Any(a => HasAnyOverlap(a.Role, required));
+    }
+
+    public async Task<bool> HasGlobalPermissionAsync(
+        UserContext actor, ManagementPermission required)
+    {
+        var assignments = await GetEffectiveAssignmentsAsync(actor);
+        return assignments.Any(a =>
+            HasPermission(a.Role, required) &&
+            a.Assignment.ScopeType == ScopeType.Global);
+    }
+
+    public Task<AuthorizedScopeResult> GetAuthorizedDepartmentIdsAsync(
+        UserContext actor, ManagementPermission required)
+        => GetAuthorizedDepartmentIdsCoreAsync(actor, role => HasPermission(role, required));
+
+    public Task<AuthorizedScopeResult> GetAuthorizedDepartmentIdsAnyAsync(
+        UserContext actor, ManagementPermission anyOf)
+        => GetAuthorizedDepartmentIdsCoreAsync(actor, role => HasAnyOverlap(role, anyOf));
+
+    /// <summary>
+    /// Shared scope-resolution for departments. <paramref name="roleMatches"/> decides
+    /// whether a role qualifies (ALL-bits vs ANY-bit), the scope walk is identical.
+    /// </summary>
+    private async Task<AuthorizedScopeResult> GetAuthorizedDepartmentIdsCoreAsync(
+        UserContext actor, Func<Role, bool> roleMatches)
+    {
+        using var scope = BeginEvaluationScope();
+        var assignments = await GetEffectiveAssignmentsAsync(actor);
+        var result = new HashSet<Guid>();
+
+        foreach (var (assignment, role) in assignments)
+        {
+            if (!roleMatches(role))
+                continue;
+
+            if (assignment.ScopeType == ScopeType.Global)
+                return AuthorizedScopeResult.Unrestricted();
+
+            if (assignment.ScopeType == ScopeType.Department)
+            {
+                result.Add(assignment.ScopeId);
+
+                var descendants = await GetDescendantIdsAsync(assignment.ScopeId);
+                foreach (var id in descendants)
+                    result.Add(id);
+            }
+        }
+
+        return result.Count > 0
+            ? AuthorizedScopeResult.LimitedTo(result.ToList())
+            : AuthorizedScopeResult.None();
+    }
+
+    public Task<AuthorizedScopeResult> GetAuthorizedShareIdsAsync(
+        UserContext actor, ManagementPermission required)
+        => GetAuthorizedShareIdsCoreAsync(actor, role => HasPermission(role, required));
+
+    public Task<AuthorizedScopeResult> GetAuthorizedShareIdsAnyAsync(
+        UserContext actor, ManagementPermission anyOf)
+        => GetAuthorizedShareIdsCoreAsync(actor, role => HasAnyOverlap(role, anyOf));
+
+    /// <summary>
+    /// Shared scope-resolution for shares. <paramref name="roleMatches"/> decides
+    /// whether a role qualifies (ALL-bits vs ANY-bit), the scope walk is identical.
+    /// </summary>
+    private async Task<AuthorizedScopeResult> GetAuthorizedShareIdsCoreAsync(
+        UserContext actor, Func<Role, bool> roleMatches)
+    {
+        using var scope = BeginEvaluationScope();
+        var assignments = await GetEffectiveAssignmentsAsync(actor);
+        var result = new HashSet<Guid>();
+
+        foreach (var (assignment, role) in assignments)
+        {
+            if (!roleMatches(role))
+                continue;
+
+            if (assignment.ScopeType == ScopeType.Global)
+                return AuthorizedScopeResult.Unrestricted();
+
+            if (assignment.ScopeType == ScopeType.Share)
+            {
+                result.Add(assignment.ScopeId);
+            }
+
+            if (assignment.ScopeType == ScopeType.Department)
+            {
+                // Get shares directly belonging to this department
+                var shares = await GetDepartmentSharesAsync(assignment.ScopeId);
+                foreach (var s in shares) result.Add(s.Id);
+
+                // And shares in descendant departments
+                var descendants = await GetDescendantIdsAsync(assignment.ScopeId);
+                foreach (var descId in descendants)
+                {
+                    var descShares = await GetDepartmentSharesAsync(descId);
+                    foreach (var s in descShares) result.Add(s.Id);
+                }
+            }
+        }
+
+        return result.Count > 0
+            ? AuthorizedScopeResult.LimitedTo(result.ToList())
+            : AuthorizedScopeResult.None();
+    }
+
+    // -- Delegation / no-privilege-elevation --
+
+    public async Task<ManagementPermission> GetEffectivePermissionsAtAsync(
+        UserContext actor, ScopeType targetScopeType, Guid targetScopeId)
+    {
+        var assignments = await GetEffectiveAssignmentsAsync(actor);
+        return await EffectivePermissionsAtAsync(assignments, targetScopeType, targetScopeId);
+    }
+
+    private async Task<ManagementPermission> EffectivePermissionsAtAsync(
+        List<(ScopedRoleAssignment Assignment, Role Role)> assignments,
+        ScopeType targetScopeType, Guid targetScopeId)
+    {
+        var effective = ManagementPermission.None;
+
+        foreach (var (assignment, role) in assignments)
+        {
+            if (await CoversAsync(assignment, targetScopeType, targetScopeId))
+                effective |= role.ManagementPermissions;
+        }
+
+        return effective;
+    }
+
+    public async Task<bool> CanAssignRoleAsync(
+        UserContext actor, ManagementPermission rolePermissions,
+        ScopeType targetScopeType, Guid targetScopeId)
+    {
+        using var scope = BeginEvaluationScope();
+        var effective = await GetEffectivePermissionsAtAsync(
+            actor, targetScopeType, targetScopeId);
+
+        // Must hold the delegation right AT the target scope ...
+        if ((effective & ManagementPermission.AssignRoles) == 0)
+            return false;
+
+        // ... and may not grant a single bit the actor does not itself hold there.
+        // Subset check: no bit of the role falls outside the actor's effective set.
+        if ((rolePermissions & ~effective) != ManagementPermission.None)
+            return false;
+
+        // Sensitive bits are passed on only by actors holding them system-wide: a department-
+        // scoped holder may use them but never delegate them, not even within its department.
+        var sensitive = rolePermissions & GlobalDelegationOnly;
+        if (sensitive == ManagementPermission.None || targetScopeType == ScopeType.Global)
+            return true;
+        var global = await GetEffectivePermissionsAtAsync(actor, ScopeType.Global, Guid.Empty);
+        return (sensitive & ~global) == ManagementPermission.None;
+    }
+
+    /// <summary>
+    /// Permissions that only system-wide holders may delegate (see <see cref="CanAssignRoleAsync"/>).
+    /// Role definitions are global, so editing them already requires the bits globally.
+    /// </summary>
+    public const ManagementPermission GlobalDelegationOnly = ManagementPermission.AccessHomeContents;
+
+    /// <summary>
+    /// Whether an actor's <paramref name="assignment"/> authority reaches a target scope.
+    ///   • Global covers every target.
+    ///   • A Department assignment covers that department (+ descendants) and any share
+    ///     whose department lies within it.
+    ///   • A Share assignment covers only that exact share.
+    /// A narrower scope never covers a broader one (a share can't cover its department,
+    /// and nothing but Global covers a Global target).
+    /// </summary>
+    private async Task<bool> CoversAsync(
+        ScopedRoleAssignment assignment, ScopeType targetType, Guid targetId)
+    {
+        if (assignment.ScopeType == ScopeType.Global)
+            return true;
+
+        switch (targetType)
+        {
+            case ScopeType.Global:
+                // Only a Global assignment (handled above) covers a Global target.
+                return false;
+
+            case ScopeType.Department:
+                return assignment.ScopeType == ScopeType.Department
+                    && await IsDepartmentInScopeAsync(targetId, assignment.ScopeId);
+
+            case ScopeType.Share:
+                if (assignment.ScopeType == ScopeType.Share)
+                    return assignment.ScopeId == targetId;
+                if (assignment.ScopeType == ScopeType.Department)
+                {
+                    var share = await GetShareAsync(targetId);
+                    return share != null
+                        && await IsDepartmentInScopeAsync(share.DepartmentId, assignment.ScopeId);
+                }
+                return false;
+
+            default:
+                return false;
+        }
+    }
+
+    // -- Internals --
+
+    /// <summary>
+    /// ALL-bits check: the role must hold every bit in <paramref name="required"/>.
+    /// Used where a combined flag expresses a conjunction, e.g.
+    /// <see cref="ManagementPermission.FullAdmin"/> for the global-admin check.
+    /// </summary>
+    private static bool HasPermission(Role role, ManagementPermission required)
+    {
+        return (role.ManagementPermissions & required) == required;
+    }
+
+    /// <summary>
+    /// ANY-bit check: the role holds at least one bit of <paramref name="required"/>.
+    /// Used for "can the actor do any of these things" gates, where a combined
+    /// flag expresses a disjunction (e.g. CreateGroups | ManageGroupMembers).
+    /// For single-bit arguments this is identical to <see cref="HasPermission"/>.
+    /// </summary>
+    private static bool HasAnyOverlap(Role role, ManagementPermission required)
+    {
+        return (role.ManagementPermissions & required) != 0;
+    }
+
+    /// <summary>
+    /// Shared evaluation for all "can the actor do X here?" checks. Walks the actor's
+    /// effective assignments, keeps only those whose role holds every bit of
+    /// <paramref name="required"/>, then grants if any is Global-scoped or if
+    /// <paramref name="scopeGrants"/> accepts its (non-global) scope. Centralises the
+    /// permission filter and the Global short-circuit so each caller only supplies the
+    /// resource-specific scope rule.
+    /// </summary>
+    private async Task<bool> AnyGrantAsync(
+        UserContext actor, ManagementPermission required,
+        Func<ScopedRoleAssignment, Task<bool>> scopeGrants)
+    {
+        var assignments = await GetEffectiveAssignmentsAsync(actor);
+
+        foreach (var (assignment, role) in assignments)
+        {
+            if (!HasPermission(role, required))
+                continue;
+
+            if (assignment.ScopeType == ScopeType.Global)
+                return true;
+
+            if (await scopeGrants(assignment))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Checks if <paramref name="entityDepartmentId"/> is the same as
+    /// <paramref name="scopeDepartmentId"/> or one of its descendants.
+    ///
+    /// Used for Group and Share scope checks: both now carry a direct
+    /// DepartmentId FK, so instead of the old M:N lookup we just compare
+    /// the entity's department against the scope hierarchy.
+    /// </summary>
+    private async Task<bool> IsDepartmentInScopeAsync(
+        Guid entityDepartmentId, Guid scopeDepartmentId)
+    {
+        if (entityDepartmentId == scopeDepartmentId)
+            return true;
+
+        var descendants = await GetDescendantIdsAsync(scopeDepartmentId);
+        return descendants.Contains(entityDepartmentId);
+    }
+
+    /// <summary>
+    /// The ENABLED users who hold a global role matching <paramref name="roleMatches"/>,
+    /// either directly or inherited through group membership. Shared by the last-admin
+    /// guards (<c>UserListViewModel</c>) and the mail-notification recipient resolver.
+    /// Static on purpose: callers that receive a mocked <see cref="IManagementAuthService"/>
+    /// (tests) still get the real lookup against their repositories.
+    /// </summary>
+    public static async Task<HashSet<Guid>> GetGlobalPermissionHolderUserIdsAsync(
+        IScopedRoleAssignmentRepository assignmentRepo,
+        IRoleRepository roleRepo,
+        IUserRepository userRepo,
+        IGroupRepository groupRepo,
+        Func<Role, bool> roleMatches,
+        Guid? excludeAssignmentId = null)
+    {
+        var globalAssignments = await assignmentRepo.GetByScopeAsync(ScopeType.Global, Guid.Empty);
+        var roles = (await roleRepo.GetAllAsync()).ToDictionary(r => r.Id);
+        var users = (await userRepo.GetAllAsync()).ToDictionary(u => u.Id);
+        var groupIds = (await groupRepo.GetAllAsync()).Select(g => g.Id).ToHashSet();
+
+        var matching = globalAssignments.Where(a => a.Id != excludeAssignmentId
+            && roles.TryGetValue(a.RoleId, out var role) && roleMatches(role));
+        return await ExpandToEnabledUserIdsAsync(matching, users, groupIds, groupRepo);
+    }
+
+    /// <summary>
+    /// The ENABLED users who hold a role matching <paramref name="roleMatches"/> at ANY scope
+    /// (Global, department or share), directly or through a group. Used where the transport needs
+    /// to admit every potential holder up front (the SMB allow list of the home-folder share);
+    /// the scope itself is still enforced per path by the ACL service.
+    /// </summary>
+    public static async Task<HashSet<Guid>> GetPermissionHolderUserIdsAsync(
+        IScopedRoleAssignmentRepository assignmentRepo,
+        IRoleRepository roleRepo,
+        IUserRepository userRepo,
+        IGroupRepository groupRepo,
+        Func<Role, bool> roleMatches)
+    {
+        var matching = new List<ScopedRoleAssignment>();
+        foreach (var role in (await roleRepo.GetAllAsync()).Where(roleMatches))
+            matching.AddRange(await assignmentRepo.GetByRoleAsync(role.Id));
+        if (matching.Count == 0)
+            return [];
+
+        var users = (await userRepo.GetAllAsync()).ToDictionary(u => u.Id);
+        var groupIds = (await groupRepo.GetAllAsync()).Select(g => g.Id).ToHashSet();
+        return await ExpandToEnabledUserIdsAsync(matching, users, groupIds, groupRepo);
+    }
+
+    private static async Task<HashSet<Guid>> ExpandToEnabledUserIdsAsync(
+        IEnumerable<ScopedRoleAssignment> assignments, Dictionary<Guid, User> users,
+        HashSet<Guid> groupIds, IGroupRepository groupRepo)
+    {
+        var holders = new HashSet<Guid>();
+        foreach (var a in assignments)
+        {
+            if (users.TryGetValue(a.PrincipalId, out var user))
+            {
+                if (user.IsEnabled) holders.Add(user.Id);
+            }
+            else if (groupIds.Contains(a.PrincipalId))
+            {
+                foreach (var member in await groupRepo.GetMembersAsync(a.PrincipalId))
+                    if (member.IsEnabled) holders.Add(member.Id);
+            }
+        }
+        return holders;
+    }
+}

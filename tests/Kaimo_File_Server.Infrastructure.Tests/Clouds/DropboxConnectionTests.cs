@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Clouds;
 using Xunit;
 

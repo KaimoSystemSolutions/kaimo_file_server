@@ -1,5 +1,5 @@
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Repositories.Shares;
+using Kaimo_File_Server.Core.Services.Versioning;
 
 namespace Kaimo_File_Server.Infrastructure.Services;
 

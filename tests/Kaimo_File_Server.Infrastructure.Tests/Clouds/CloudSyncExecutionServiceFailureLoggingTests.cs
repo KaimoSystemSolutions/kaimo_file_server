@@ -1,8 +1,9 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Services;
-using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Core.Repositories.ExternalStorage;
+using Kaimo_File_Server.Core.Repositories.Shares;
+using Kaimo_File_Server.Core.Security.Credentials;
+using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Clouds;

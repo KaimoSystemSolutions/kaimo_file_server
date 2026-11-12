@@ -1,7 +1,7 @@
-﻿using Kaimo_File_Server.Core.Repositories;
+﻿using Kaimo_File_Server.Core.Repositories.Shares;
+using Kaimo_File_Server.Core.Services.Search;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;
-using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Middleware;
 using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Web.Services.Https;
@@ -25,11 +25,11 @@ internal static class StartupTasks
                 "data, so a copy of that volume or its backups can decrypt all stored external-storage credentials. " +
                 "Move it to a separate secret and set DataProtection:CertificatePath (see the deployment README).");
 
-        if (Kaimo_File_Server.Core.Security.SecondFactorPolicy.DisabledByEnvironment)
+        if (Kaimo_File_Server.Core.Security.Authentication.SecondFactorPolicy.DisabledByEnvironment)
             preflightLogger.LogWarning(
                 "{Variable}=true: the web login asks nobody for a second factor. This is a break-glass switch; " +
                 "remove it as soon as the locked-out administrator has signed in and reset the second factor.",
-                Kaimo_File_Server.Core.Security.SecondFactorPolicy.DisableEnvironmentVariable);
+                Kaimo_File_Server.Core.Security.Authentication.SecondFactorPolicy.DisableEnvironmentVariable);
 
         if (app.Environment.IsDevelopment())
             preflightLogger.LogInformation("Skipping writable-directory preflight in Development.");

@@ -2,9 +2,9 @@
 using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Security;
-using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Core.Security.Management;
+using Kaimo_File_Server.Core.Services.Management;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 

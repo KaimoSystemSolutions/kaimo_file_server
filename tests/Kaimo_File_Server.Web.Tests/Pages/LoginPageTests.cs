@@ -1,6 +1,6 @@
 using System.Globalization;
 using Bunit;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Authentication;
 using Kaimo_File_Server.Web.Components.Pages.Auth;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;

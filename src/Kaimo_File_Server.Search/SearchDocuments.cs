@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Shares;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Kaimo_File_Server.Search;

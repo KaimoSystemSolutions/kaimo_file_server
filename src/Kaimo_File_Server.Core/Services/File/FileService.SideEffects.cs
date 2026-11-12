@@ -2,6 +2,7 @@
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Logging;
 using Microsoft.Extensions.Logging;
+using Kaimo_File_Server.Core.Services.CloudSync;
 
 namespace Kaimo_File_Server.Core.Services.File;
 

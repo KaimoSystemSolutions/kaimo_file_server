@@ -1,5 +1,5 @@
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;

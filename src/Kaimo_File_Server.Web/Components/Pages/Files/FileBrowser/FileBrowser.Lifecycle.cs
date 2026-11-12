@@ -436,10 +436,10 @@ public partial class FileBrowser
         => VM.ShareRelativeOf(dir);
 
     /// <summary>Emblem icon for a sync's transfer direction.</summary>
-    private static string SyncIcon(Core.Services.DataServices.SyncMode mode) => mode switch
+    private static string SyncIcon(Core.Services.CloudSync.SyncMode mode) => mode switch
     {
-        Core.Services.DataServices.SyncMode.Pull => "sync-pull.svg",
-        Core.Services.DataServices.SyncMode.Push => "sync-push.svg",
+        Core.Services.CloudSync.SyncMode.Pull => "sync-pull.svg",
+        Core.Services.CloudSync.SyncMode.Push => "sync-push.svg",
         _ => "sync-twoway.svg"
     };
 

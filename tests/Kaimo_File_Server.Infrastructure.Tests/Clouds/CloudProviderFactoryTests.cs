@@ -1,6 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Security;
-using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Core.Security.Management;
+using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Infrastructure.Clouds;
 using Xunit;
 

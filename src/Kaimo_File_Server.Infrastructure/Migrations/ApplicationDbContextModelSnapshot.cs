@@ -1867,7 +1867,7 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.ToTable("sync_definition_runtimes", (string)null);
                 });
 
-            modelBuilder.Entity("Kaimo_File_Server.Core.Security.AccessEntry", b =>
+            modelBuilder.Entity("Kaimo_File_Server.Core.Security.Acl.AccessEntry", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1895,7 +1895,7 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.ToTable("access_entries", (string)null);
                 });
 
-            modelBuilder.Entity("Kaimo_File_Server.Core.Security.ScopedRoleAssignment", b =>
+            modelBuilder.Entity("Kaimo_File_Server.Core.Security.Management.ScopedRoleAssignment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2343,7 +2343,7 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Kaimo_File_Server.Core.Security.AccessEntry", b =>
+            modelBuilder.Entity("Kaimo_File_Server.Core.Security.Acl.AccessEntry", b =>
                 {
                     b.HasOne("Kaimo_File_Server.Core.Domain.FileMetadata", null)
                         .WithMany("Acl")

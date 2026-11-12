@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Credentials;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 

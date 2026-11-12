@@ -1,12 +1,15 @@
 ﻿using Grpc.Core;
-using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Logging;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Repositories.Samba;
+using Kaimo_File_Server.Core.Repositories.Shares;
+using Kaimo_File_Server.Core.Security.Acl;
+using Kaimo_File_Server.Core.Security.Authentication;
 using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Infrastructure.Logging;
 using Kaimo_File_Server.SmbBridge.Grpc;
 using Kaimo_File_Server.SmbBridge.Security;
 using Kaimo_File_Server.SmbBridge.Services;
-using Kaimo_File_Server.Infrastructure.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -106,7 +109,7 @@ public sealed class BridgeRpcCancellationTests
             .Build();
         var sut = new SnapshotGrpcService(
             Mock.Of<IShareRepository>(), auth.Object, Mock.Of<IAclService>(),
-            Mock.Of<Core.Services.File.IFileVersionService>(),
+            Mock.Of<Core.Services.Versioning.IFileVersionService>(),
             Mock.Of<Core.Services.File.IFileServiceFactory>(),
             new SnapshotCacheLeaseManager(),
             new SnapshotMaterializationLimiter(configuration), configuration,

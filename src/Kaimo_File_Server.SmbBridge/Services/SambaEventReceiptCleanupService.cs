@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Samba;
 
 namespace Kaimo_File_Server.SmbBridge.Services;
 
@@ -31,7 +31,7 @@ public sealed class SambaEventReceiptCleanupService(
             {
                 return;
             }
-            catch (Core.Security.ReadOnlyDemoException)
+            catch (Core.Security.Demo.ReadOnlyDemoException)
             {
                 // Read-only demo: pruning is a write, so this service has nothing to do.
                 return;

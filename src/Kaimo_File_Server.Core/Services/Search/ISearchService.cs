@@ -1,0 +1,46 @@
+using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Search;
+
+namespace Kaimo_File_Server.Core.Services.Search;
+
+public interface ISearchService
+{
+    Task onFileCreated(string absolutePath, Task<Stream> fileData, CancellationToken ct = default);
+    Task onFileDeleted(string absolutePath);
+
+    Task onDirectoryCreated(string absolutePath);
+    Task onDirectoryDeleted(string absolutePath);
+
+    /// <summary>
+    /// Updates the index after a file has been renamed/moved. The stable id of a
+    /// document is derived from its absolute path, so the document is re-indexed
+    /// under the new id and the old entry is removed.
+    /// </summary>
+    Task onFileRenamed(string oldAbsolutePath, string newAbsolutePath);
+
+    /// <summary>
+    /// Updates the index after a directory has been renamed/moved. Every indexed
+    /// document below the old path gets its paths/id rewritten to the new location.
+    /// </summary>
+    Task onDirectoryRenamed(string oldAbsolutePath, string newAbsolutePath);
+
+    /// <summary>
+    /// Searches the index and returns ONLY the documents the given user is allowed
+    /// to read (ListReadData). The ACL check is mandatory and performed before any
+    /// result leaves the service — never expose raw hits to the UI.
+    ///
+    /// Optionally scoped: when <paramref name="shareName"/> is set, only hits in that
+    /// share are considered; when <paramref name="pathPrefix"/> is also set (a
+    /// share-relative folder path), only that folder and everything below it. Both
+    /// null (the default) keeps the original global-across-all-shares behavior.
+    ///
+    /// Recycle-bin contents are indexed but only returned when
+    /// <paramref name="includeRecycleBin"/> is set (or the scope itself lies inside a recycle bin).
+    /// </summary>
+    Task<List<FileDocument>> SearchAsync(
+        string searchText, UserContext user,
+        string? shareName = null, string? pathPrefix = null,
+        CancellationToken ct = default, bool includeRecycleBin = false);
+
+    Task InitializeAsync(CancellationToken ct = default);
+}

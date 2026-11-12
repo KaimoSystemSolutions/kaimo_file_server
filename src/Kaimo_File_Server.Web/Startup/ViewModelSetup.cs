@@ -1,7 +1,11 @@
-﻿using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
-using Kaimo_File_Server.Core.Services;
+﻿using Kaimo_File_Server.Core.Repositories.Files;
+using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Repositories.Shares;
+using Kaimo_File_Server.Core.Security.Acl;
+using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Services.Management;
+using Kaimo_File_Server.Core.Services.Versioning;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;

@@ -5,7 +5,7 @@ namespace Kaimo_File_Server.Core.Domain.Identity
 {
     /// <summary>
     /// A named collection of users.
-    /// Groups are referenced in ACLs (<see cref="Security.AccessEntry"/>)
+    /// Groups are referenced in ACLs (<see cref="Security.Acl.AccessEntry"/>)
     /// and share-level access (<see cref="ShareAccessEntry"/>) to grant
     /// permissions to multiple users at once.
     ///

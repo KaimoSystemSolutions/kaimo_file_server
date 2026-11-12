@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Kaimo_File_Server.Core.Domain.Identity;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.ClientSync;
+using Kaimo_File_Server.Core.Repositories.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace Kaimo_File_Server.Web.Services;

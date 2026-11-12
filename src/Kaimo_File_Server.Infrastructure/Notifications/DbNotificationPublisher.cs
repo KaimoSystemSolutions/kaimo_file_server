@@ -1,6 +1,6 @@
 using Kaimo_File_Server.Core.Domain.Notifications;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Repositories.Notifications;
+using Kaimo_File_Server.Core.Security.Demo;
 using Kaimo_File_Server.Core.Services.Notifications;
 using Microsoft.Extensions.Logging;
 

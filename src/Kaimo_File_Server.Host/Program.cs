@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Core.Services.Search;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;

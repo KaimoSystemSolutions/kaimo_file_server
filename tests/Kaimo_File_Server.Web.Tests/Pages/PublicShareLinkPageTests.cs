@@ -1,7 +1,7 @@
 using System.Globalization;
 using Bunit;
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Demo;
 using Kaimo_File_Server.Web.Components.Pages.PublicShare;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Forms;

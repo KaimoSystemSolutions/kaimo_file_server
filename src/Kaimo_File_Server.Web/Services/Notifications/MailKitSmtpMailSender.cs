@@ -1,6 +1,6 @@
 using System.Net.Sockets;
 using Kaimo_File_Server.Core.Language;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Security.Credentials;
 using Kaimo_File_Server.Infrastructure.Notifications;
 using MailKit;
 using MailKit.Net.Smtp;

@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Web.Helpers;
 using Kaimo_File_Server.Web.Services;
 
@@ -108,14 +108,14 @@ public interface IFileBrowserViewModel
 
     /// <summary>
     /// True when the current user may create/manage public share links on the loaded share
-    /// (scoped <see cref="Kaimo_File_Server.Core.Security.ManagementPermission.ManageShareLinks"/>).
+    /// (scoped <see cref="Kaimo_File_Server.Core.Security.Management.ManagementPermission.ManageShareLinks"/>).
     /// Gates the "share" context-menu action. Backends that do not offer links keep the default.
     /// </summary>
     bool CanManageShareLinks => false;
 
     /// <summary>
     /// True when the current user may create/manage public upload links on the loaded share
-    /// (scoped <see cref="Kaimo_File_Server.Core.Security.ManagementPermission.ManageUploadLinks"/>).
+    /// (scoped <see cref="Kaimo_File_Server.Core.Security.Management.ManagementPermission.ManageUploadLinks"/>).
     /// </summary>
     bool CanManageUploadLinks => false;
 

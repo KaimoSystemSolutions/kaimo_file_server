@@ -1,5 +1,5 @@
+using Kaimo_File_Server.Core.Services.Search;
 using Kaimo_File_Server.Infrastructure.Configuration;
-using Kaimo_File_Server.Search;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;

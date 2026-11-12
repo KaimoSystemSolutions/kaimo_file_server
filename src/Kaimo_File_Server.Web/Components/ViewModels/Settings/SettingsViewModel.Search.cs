@@ -1,6 +1,5 @@
 using Kaimo_File_Server.Core.Language;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Search;
+using Kaimo_File_Server.Core.Services.Search;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 

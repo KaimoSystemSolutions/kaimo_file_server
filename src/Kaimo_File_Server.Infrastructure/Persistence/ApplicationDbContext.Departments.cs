@@ -1,5 +1,5 @@
 ﻿using Kaimo_File_Server.Core.Domain.Department;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Management;
 using Microsoft.EntityFrameworkCore;
 
 namespace Kaimo_File_Server.Infrastructure.Persistence;

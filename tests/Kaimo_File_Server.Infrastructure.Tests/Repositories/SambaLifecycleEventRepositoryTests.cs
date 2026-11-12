@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Samba;
 using Kaimo_File_Server.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Xunit;

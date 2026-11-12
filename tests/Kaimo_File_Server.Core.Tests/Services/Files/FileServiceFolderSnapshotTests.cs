@@ -1,9 +1,11 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Acl;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Services.Search;
+using Kaimo_File_Server.Core.Services.Versioning;
 using Kaimo_File_Server.Core.Storage;
-using Kaimo_File_Server.Search;
 using Moq;
 using Xunit;
 

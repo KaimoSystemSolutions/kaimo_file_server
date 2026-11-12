@@ -1,5 +1,5 @@
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Core.Services.CloudSync;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
 

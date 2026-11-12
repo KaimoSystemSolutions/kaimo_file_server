@@ -1,7 +1,6 @@
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Infrastructure.Services;
@@ -133,7 +132,7 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
             if (share != null)
             {
                 var shareAssignments = await db.ScopedRoleAssignments
-                    .Where(a => a.ScopeType == Kaimo_File_Server.Core.Security.ScopeType.Share
+                    .Where(a => a.ScopeType == Kaimo_File_Server.Core.Security.Management.ScopeType.Share
                                 && a.ScopeId == id)
                     .ToListAsync();
                 db.ScopedRoleAssignments.RemoveRange(shareAssignments);

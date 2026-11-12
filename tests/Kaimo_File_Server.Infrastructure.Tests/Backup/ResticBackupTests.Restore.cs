@@ -105,28 +105,28 @@ public partial class ResticBackupTests
     /// <summary>Records which file contents were kept as a version before being overwritten.</summary>
     private sealed class CountingVersions
     {
-        private readonly Moq.Mock<Kaimo_File_Server.Core.Services.File.IFileVersionService> _mock = new();
+        private readonly Moq.Mock<Kaimo_File_Server.Core.Services.Versioning.IFileVersionService> _mock = new();
 
         public CountingVersions()
             => _mock.Setup(v => v.CaptureVersionAsync(Moq.It.IsAny<Guid>(), Moq.It.IsAny<string>(), Moq.It.IsAny<Stream>(), Moq.It.IsAny<string?>()))
                 .Returns<Guid, string, Stream, string?>(async (_, path, content, _) =>
                 {
                     if (SkipWith is { } skipped)
-                        return new Kaimo_File_Server.Core.Services.File.VersionCaptureResult(skipped);
+                        return new Kaimo_File_Server.Core.Services.Versioning.VersionCaptureResult(skipped);
                     using var reader = new StreamReader(content, leaveOpen: true);
                     var text = await reader.ReadToEndAsync();
                     Created.Add((path, text));
-                    return new Kaimo_File_Server.Core.Services.File.VersionCaptureResult(
-                        Kaimo_File_Server.Core.Services.File.VersionCaptureOutcome.Created,
+                    return new Kaimo_File_Server.Core.Services.Versioning.VersionCaptureResult(
+                        Kaimo_File_Server.Core.Services.Versioning.VersionCaptureOutcome.Created,
                         new FileVersion(Guid.NewGuid(), path, DateTime.UtcNow, "hash", "blob", text.Length, null, 1));
                 });
 
         public List<(string Path, string Content)> Created { get; } = [];
 
         /// <summary>When set, every capture is refused with this outcome (e.g. a full pool).</summary>
-        public Kaimo_File_Server.Core.Services.File.VersionCaptureOutcome? SkipWith { get; set; }
+        public Kaimo_File_Server.Core.Services.Versioning.VersionCaptureOutcome? SkipWith { get; set; }
 
-        public Kaimo_File_Server.Core.Services.File.IFileVersionService Service => _mock.Object;
+        public Kaimo_File_Server.Core.Services.Versioning.IFileVersionService Service => _mock.Object;
     }
 
     /// <summary>Staging with docs/{a.txt,new.txt,sub/b.txt}; share with docs/{a.txt,extra.txt,sub/b.txt}.</summary>
@@ -183,7 +183,7 @@ public partial class ResticBackupTests
         {
             var versions = new CountingVersions
             {
-                SkipWith = Kaimo_File_Server.Core.Services.File.VersionCaptureOutcome.LowSpace,
+                SkipWith = Kaimo_File_Server.Core.Services.Versioning.VersionCaptureOutcome.LowSpace,
             };
             var outcome = new BackupRestoreOutcome();
             var merge = new RestoreMerge(share, Guid.NewGuid(), BackupRestoreConflict.Overwrite, versions.Service, "u1", " (restored)", outcome);
@@ -203,10 +203,10 @@ public partial class ResticBackupTests
     }
 
     [Theory]
-    [InlineData(Kaimo_File_Server.Core.Services.File.VersionCaptureOutcome.NoPool)]
-    [InlineData(Kaimo_File_Server.Core.Services.File.VersionCaptureOutcome.Disabled)]
+    [InlineData(Kaimo_File_Server.Core.Services.Versioning.VersionCaptureOutcome.NoPool)]
+    [InlineData(Kaimo_File_Server.Core.Services.Versioning.VersionCaptureOutcome.Disabled)]
     public async Task Merge_Overwrite_WhenShareIsNotVersionedAtAll_OverwritesAsChosen(
-        Kaimo_File_Server.Core.Services.File.VersionCaptureOutcome outcomeOfCapture)
+        Kaimo_File_Server.Core.Services.Versioning.VersionCaptureOutcome outcomeOfCapture)
     {
         // Without versioning for the share there is no history to protect; the admin's
         // explicit "Overwrite" choice applies as it did before versioning policies existed.

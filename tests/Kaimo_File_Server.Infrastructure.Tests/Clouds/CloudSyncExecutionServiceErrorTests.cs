@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
-using Kaimo_File_Server.Core.Services;
-using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Clouds;
 using Xunit;

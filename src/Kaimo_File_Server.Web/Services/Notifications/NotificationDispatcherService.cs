@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Kaimo_File_Server.Core.Domain.Notifications;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Repositories.Notifications;
+using Kaimo_File_Server.Core.Security.Demo;
 using Kaimo_File_Server.Core.Services.Notifications;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Infrastructure.Notifications;

@@ -1,7 +1,7 @@
 ﻿using System.Security.Claims;
 using System.Threading.RateLimiting;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Security.Authentication;
 using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Controllers.Api;
 using Kaimo_File_Server.Web.Controllers.WebDav;

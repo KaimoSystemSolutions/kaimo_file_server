@@ -1,5 +1,5 @@
 using System.Text;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Credentials;
 using Xunit;
 
 namespace Kaimo_File_Server.Core.Tests.Security;

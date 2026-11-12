@@ -2,7 +2,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Domain.Notifications;
 using Kaimo_File_Server.Core.Language;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Core.Services.Notifications;
 using Kaimo_File_Server.Infrastructure.Notifications;
 using Kaimo_File_Server.Web.Components.Shared;

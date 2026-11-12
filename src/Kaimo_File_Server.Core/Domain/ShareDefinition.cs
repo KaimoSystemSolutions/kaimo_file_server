@@ -2,8 +2,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Services.DataServices;
-using Kaimo_File_Server.Infrastructure.Clouds;
+using Kaimo_File_Server.Core.Services.CloudSync;
 
 namespace Kaimo_File_Server.Core.Domain
 {

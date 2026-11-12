@@ -1,0 +1,93 @@
+using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Services.CloudSync;
+
+namespace Kaimo_File_Server.Core.Repositories.ExternalStorage;
+
+/// <summary>Configuration and narrow runtime persistence for cloud syncs.</summary>
+public interface ISyncDefinitionRepository
+{
+    /// <summary>Returns every durable sync together with its optional runtime state.</summary>
+    Task<List<SyncDefinitionAdminEntry>> GetAllAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<SyncDefinition?> GetAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    Task<SyncDefinition?> GetBySharePathAsync(
+        Guid shareId,
+        string localPath,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns every enabled sync definition whose local root lives in the given
+    /// share. Used to decide whether a share-relative path lies inside a synced
+    /// folder (e.g. to warn or restrict ACL editing there).
+    /// </summary>
+    Task<IReadOnlyList<SyncDefinition>> GetEnabledByShareAsync(
+        Guid shareId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates or updates a first-class sync configuration. Provider credentials
+    /// and mutable run state are never accepted by this operation.
+    /// </summary>
+    Task SaveAsync(
+        SyncDefinition definition,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes a native first-class definition. Imported definitions are retained
+    /// as disabled cutover tombstones so the compatibility importer cannot recreate them.
+    /// </summary>
+    Task<bool> DeleteAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    Task<List<SyncDefinitionScheduleEntry>> GetEnabledScheduledAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records a successful run. <paramref name="failures"/> carries the per-item
+    /// failures the run collected without aborting (empty or null clears any
+    /// previous failure summary, so a clean run shows no stale errors).
+    /// </summary>
+    Task MarkCompletedAsync(
+        Guid syncDefinitionId,
+        DateTime completedAtUtc,
+        IReadOnlyList<SyncFailure>? failures = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the serialized last-sync manifest for a definition, or <c>null</c>
+    /// when no delete-propagating run has completed yet.
+    /// </summary>
+    Task<string?> GetManifestAsync(
+        Guid syncDefinitionId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Persists (or clears, with <c>null</c>) the last-sync manifest recorded
+    /// after a successful two-way run with delete propagation enabled.
+    /// </summary>
+    Task SaveManifestAsync(
+        Guid syncDefinitionId,
+        string? manifestJson,
+        CancellationToken cancellationToken = default);
+
+    Task MarkFailedAsync(
+        Guid syncDefinitionId,
+        DateTime failedAtUtc,
+        string errorCode,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>Administration projection that keeps configuration and run state separate.</summary>
+public sealed record SyncDefinitionAdminEntry(
+    SyncDefinition Definition,
+    SyncDefinitionRuntime? Runtime);
+
+/// <summary>Scheduler projection containing configuration and its last success.</summary>
+public sealed record SyncDefinitionScheduleEntry(
+    SyncDefinition Definition,
+    DateTime? LastSuccessfulRunAtUtc);

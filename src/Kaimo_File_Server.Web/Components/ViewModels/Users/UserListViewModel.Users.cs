@@ -1,9 +1,11 @@
 ﻿using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Security;
-using Kaimo_File_Server.Core.Services.Notifications;
 using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Core.Security.Authentication;
+using Kaimo_File_Server.Core.Security.Credentials;
+using Kaimo_File_Server.Core.Security.Management;
+using Kaimo_File_Server.Core.Services.Notifications;
 using Kaimo_File_Server.Web.Controllers.WebDav;
 using Kaimo_File_Server.Web.Services;
 

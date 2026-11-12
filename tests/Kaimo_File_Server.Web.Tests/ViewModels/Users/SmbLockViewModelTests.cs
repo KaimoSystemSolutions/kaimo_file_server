@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using Kaimo_File_Server.Core.Domain.Identity;
-using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Core.Security;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Security.Authentication;
+using Kaimo_File_Server.Core.Security.Management;
+using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Infrastructure.Repositories;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Microsoft.AspNetCore.Components.Authorization;

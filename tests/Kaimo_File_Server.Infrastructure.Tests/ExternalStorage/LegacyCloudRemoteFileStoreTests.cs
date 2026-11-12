@@ -1,7 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Services;
-using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Core.Repositories.ExternalStorage;
+using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.DataProtection;

@@ -1,5 +1,5 @@
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Security.Credentials;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

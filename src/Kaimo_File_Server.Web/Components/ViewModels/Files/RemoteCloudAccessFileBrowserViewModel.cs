@@ -1,8 +1,9 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Repositories.ExternalStorage;
+using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Web.Helpers;
 using Kaimo_File_Server.Web.Services;

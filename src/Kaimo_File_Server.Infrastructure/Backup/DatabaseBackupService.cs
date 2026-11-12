@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Security.Demo;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Npgsql;

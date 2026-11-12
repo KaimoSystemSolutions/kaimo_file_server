@@ -1,6 +1,7 @@
 using Elastic.Clients.Elasticsearch;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Kaimo_File_Server.Core.Services.Search;
 
 namespace Kaimo_File_Server.Search;
 

@@ -1,9 +1,8 @@
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
-using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
-using Kaimo_File_Server.Infrastructure.Clouds;
 using Xunit;
 
 namespace Kaimo_File_Server.Core.Tests.Services.DataServices;
