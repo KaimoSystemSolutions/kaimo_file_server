@@ -1,9 +1,10 @@
 ﻿using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
-using Kaimo_File_Server.Infrastructure.Clouds;
-using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Services.Https;
 using Microsoft.AspNetCore.DataProtection;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.CloudSync;
+using Kaimo_File_Server.Infrastructure.Services.Files;
+using Kaimo_File_Server.Infrastructure.Services.Versioning;
 
 namespace Kaimo_File_Server.Web.Startup;
 

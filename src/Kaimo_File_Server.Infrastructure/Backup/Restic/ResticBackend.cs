@@ -4,7 +4,8 @@ using System.Text.RegularExpressions;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Backup;
 using Kaimo_File_Server.Core.Security.Credentials;
-using Kaimo_File_Server.Infrastructure.ExternalStorage;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Protocols;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Ssh;
 
 namespace Kaimo_File_Server.Infrastructure.Backup.Restic;
 

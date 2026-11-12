@@ -3,7 +3,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Core.Services.File;
-using Kaimo_File_Server.Infrastructure.ExternalStorage;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Protocols;
 
 namespace Kaimo_File_Server.Web.Services;
 

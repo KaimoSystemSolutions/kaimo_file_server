@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
-using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Web.Components.Shared;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
@@ -10,6 +9,8 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.JSInterop;
 using static Kaimo_File_Server.Web.Components.Pages.ExternalStorage.Components.ConnectionDisplay;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Protocols;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Ssh;
 
 namespace Kaimo_File_Server.Web.Components.Pages.ExternalStorage.Components;
 

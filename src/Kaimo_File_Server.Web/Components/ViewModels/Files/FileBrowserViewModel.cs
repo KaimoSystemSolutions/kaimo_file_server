@@ -7,7 +7,6 @@ using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Core.Security.Demo;
 using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Core.Services.Management;
-using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +14,7 @@ using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Services.Search;
 using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.CloudSync;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 

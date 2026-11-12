@@ -39,8 +39,8 @@ internal static class StartupTasks
 
         // A crash skips session cleanup and would leave SSH keys or passwords on disk.
         // Runs before background services start, so no session is using these entries yet.
-        Kaimo_File_Server.Infrastructure.ExternalStorage.ProtocolTemporaryFile.DeleteOrphans(
-            [Path.GetTempPath(), app.Configuration[Kaimo_File_Server.Infrastructure.ExternalStorage.ProtocolTemporaryFile.TempDirectoryKey]],
+        Kaimo_File_Server.Infrastructure.ExternalStorage.Protocols.ProtocolTemporaryFile.DeleteOrphans(
+            [Path.GetTempPath(), app.Configuration[Kaimo_File_Server.Infrastructure.ExternalStorage.Protocols.ProtocolTemporaryFile.TempDirectoryKey]],
             preflightLogger);
 
         // The Host process owns the schema (migrations + seeding). Web must not migrate;

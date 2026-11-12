@@ -9,6 +9,10 @@ using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Moq;
 using Xunit;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Cloud;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Protocols;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Smb;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Ssh;
 
 namespace Kaimo_File_Server.Infrastructure.Tests.ExternalStorage;
 
@@ -30,7 +34,7 @@ public sealed class ProtocolStorageProviderTests : IDisposable
             AuthorizationMode = StorageAuthorizationMode.DeviceCode,
             State = StorageConnectionState.PendingAuthorization
         };
-        var factory = new Mock<Kaimo_File_Server.Infrastructure.Clouds.ICloudProviderFactory>();
+        var factory = new Mock<Kaimo_File_Server.Infrastructure.ExternalStorage.Cloud.ICloudProviderFactory>();
         var provider = new LegacyCloudStorageConnectionProvider(
             "onedrive", "Microsoft OneDrive", StorageProviderCapabilities.None,
             new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.DeviceCode },

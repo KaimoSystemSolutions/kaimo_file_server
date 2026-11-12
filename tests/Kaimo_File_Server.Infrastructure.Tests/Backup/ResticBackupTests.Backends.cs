@@ -4,8 +4,8 @@ using Kaimo_File_Server.Core.Domain.Backup;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Infrastructure.Backup;
 using Kaimo_File_Server.Infrastructure.Backup.Restic;
-using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Microsoft.Extensions.Configuration;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Protocols;
 
 namespace Kaimo_File_Server.Infrastructure.Tests.Backup;
 

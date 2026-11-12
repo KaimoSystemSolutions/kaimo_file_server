@@ -62,7 +62,7 @@ public partial class BackupJobExecutor
         foreach (var share in shares)
             excludes.AddRange(BuildShareExcludes(share, includeRecycleBin).Where(e => !excludes.Contains(e)));
         if (includeVersions)
-            excludes.Add("!" + root + "/" + ResticClient.EscapePattern(Services.PoolVersionStorageLocator.FolderName));
+            excludes.Add("!" + root + "/" + ResticClient.EscapePattern(Services.Versioning.PoolVersionStorageLocator.FolderName));
         return excludes;
     }
 

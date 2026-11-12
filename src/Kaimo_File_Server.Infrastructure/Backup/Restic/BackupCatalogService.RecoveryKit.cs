@@ -47,13 +47,13 @@ public partial class BackupCatalogService
             {
                 try
                 {
-                    var ssh = ExternalStorage.PinnedSshSettings.ParseAndValidate(connection, connection.ProviderId, requireKnownHosts: false);
+                    var ssh = ExternalStorage.Ssh.PinnedSshSettings.ParseAndValidate(connection, connection.ProviderId, requireKnownHosts: false);
                     parameters.AppendLine($"SSH {ssh.Username}@{ssh.Host}:{ssh.Port} — host key {ssh.ExpectedHostKeySha256}");
                     // A password connection prompts for the SSH password interactively.
                     var identity = connection.AuthorizationMode == Core.Domain.StorageAuthorizationMode.UsernamePassword ? "" : "-i <ssh key> ";
                     parameters.AppendLine($"-o sftp.command=\"ssh {identity}-p {ssh.Port} {ssh.Username}@{ssh.Host} -s sftp\"");
                 }
-                catch (ExternalStorage.ProtocolConfigurationException) { }
+                catch (ExternalStorage.Protocols.ProtocolConfigurationException) { }
             }
         }
         if (repository.Backend == BackupBackend.Smb && settings.StorageConnectionId is { } smbConnectionId)

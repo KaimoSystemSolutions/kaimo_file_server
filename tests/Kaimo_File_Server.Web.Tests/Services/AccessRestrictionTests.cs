@@ -6,12 +6,12 @@ using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Core.Security.Authentication;
 using Kaimo_File_Server.Core.Security.Credentials;
 using Kaimo_File_Server.Infrastructure.Configuration;
-using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Moq;
 using Xunit;
+using Kaimo_File_Server.Infrastructure.Services.Identity;
 
 namespace Kaimo_File_Server.Web.Tests.Services;
 

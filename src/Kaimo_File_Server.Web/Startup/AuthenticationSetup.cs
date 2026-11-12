@@ -2,7 +2,6 @@
 using System.Threading.RateLimiting;
 using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Core.Security.Authentication;
-using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Controllers.Api;
 using Kaimo_File_Server.Web.Controllers.WebDav;
 using Kaimo_File_Server.Web.Services;
@@ -10,6 +9,7 @@ using Kaimo_File_Server.Web.Services.Api;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
+using Kaimo_File_Server.Infrastructure.Services.Identity;
 
 namespace Kaimo_File_Server.Web.Startup;
 
@@ -128,7 +128,7 @@ internal static class AuthenticationSetup
             sp.GetRequiredService<IHttpContextAccessor>(),
             sp.GetRequiredService<Kaimo_File_Server.Core.Services.Notifications.INotificationPublisher>(),
             sp.GetRequiredService<IUserRepository>(),
-            sp.GetService<Kaimo_File_Server.Infrastructure.Services.SecondFactorPolicyService>()));
+            sp.GetService<Kaimo_File_Server.Infrastructure.Services.Identity.SecondFactorPolicyService>()));
 
         // Issues/rotates client-API access + refresh tokens.
         builder.Services.AddScoped<ApiTokenService>();

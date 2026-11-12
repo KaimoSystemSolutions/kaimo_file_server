@@ -25,8 +25,9 @@ The Web image installs `smbclient`, `rsync` and `openssh-client` for the helper-
 
 ## Cloud providers
 
-The cloud providers are implemented as `ICloudConnection` / `ICloudProvider` classes in
-`src/Kaimo_File_Server.Infrastructure/Clouds/` and exposed through `LegacyCloudStorageConnectionProvider`
+The cloud providers are implemented as `ICloudConnection` classes in
+`src/Kaimo_File_Server.Infrastructure/ExternalStorage/{Dropbox,GoogleDrive,OneDrive}/`, registered as
+`ICloudProvider` in `ExternalStorage/Cloud/CloudProviders.cs`, and exposed through `LegacyCloudStorageConnectionProvider`
 adapters, which bind them to `StorageConnection` and the credential vault.
 
 ### Microsoft OneDrive
@@ -70,7 +71,8 @@ adapters, which bind them to `StorageConnection` and the credential vault.
 
 ## Protocol providers
 
-Protocol providers live in `src/Kaimo_File_Server.Infrastructure/ExternalStorage/`. Non-secret
+Protocol providers live in `src/Kaimo_File_Server.Infrastructure/ExternalStorage/{Smb,WebDav,Ssh}/`,
+with the shared CLI runner and settings in `ExternalStorage/Protocols/`. Non-secret
 settings are stored in `StorageConnection.SettingsJson`; passwords and private keys in the protected
 credential payload.
 

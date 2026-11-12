@@ -3,7 +3,6 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Services.CloudSync
 @using Kaimo_File_Server.Core.Services.ExternalStorage
-@using Kaimo_File_Server.Infrastructure.Clouds
 @using Kaimo_File_Server.Web.Components.Pages.CloudSync.Components
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
@@ -11,6 +10,7 @@
 @using System.Globalization
 @using System.Text.Json
 @using static Kaimo_File_Server.Web.Components.Pages.ExternalStorage.Components.ConnectionDisplay
+@using Kaimo_File_Server.Infrastructure.ExternalStorage.CloudSync
 @implements IAsyncDisposable
 @inject ExternalStorageSyncViewModel VM
 @inject ICloudSyncJobRunner SyncJobRunner

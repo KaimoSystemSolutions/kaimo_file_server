@@ -1,0 +1,43 @@
+using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Services.CloudSync;
+
+namespace Kaimo_File_Server.Infrastructure.ExternalStorage.Cloud;
+
+/// <summary>
+/// Extension point for a cloud provider. Adding another service only requires a
+/// provider implementation and one DI registration; consumers never need a new
+/// provider-specific switch statement.
+/// </summary>
+public interface ICloudProvider
+{
+    /// <summary>Stable identifier persisted in <see cref="SyncedFolder.Provider"/>.</summary>
+    string Id { get; }
+
+    /// <summary>Human-readable name shown in the administration UI.</summary>
+    string DisplayName { get; }
+
+    /// <summary>Application endpoint that starts this provider's authorization flow.</summary>
+    string AuthorizationEndpoint { get; }
+
+    /// <summary>
+    /// Creates an authenticated provider connection from persisted folder data.
+    /// Provider-specific credentials remain behind the neutral connection contract.
+    /// </summary>
+    ICloudConnection CreateConnection(Guid shareId, SyncedFolder folder);
+}
+
+/// <summary>
+/// Resolves registered providers and caches live connections by immutable
+/// credential identity rather than mutable synchronization settings.
+/// </summary>
+public interface ICloudProviderFactory
+{
+    /// <summary>All provider registrations available to the UI.</summary>
+    IReadOnlyCollection<ICloudProvider> Providers { get; }
+
+    /// <summary>Returns a cached connection or creates it from persisted credentials.</summary>
+    ICloudConnection CreateOrLoad(Guid shareId, SyncedFolder folder);
+
+    /// <summary>Removes and disposes the matching authenticated connection.</summary>
+    Task DisposeConnectionAsync(Guid shareId, SyncedFolder folder);
+}

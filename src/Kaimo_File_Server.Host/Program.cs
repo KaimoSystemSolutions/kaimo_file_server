@@ -51,7 +51,7 @@ builder.Services.AddHostedService<Kaimo_File_Server.Host.DataServiceReconciler>(
 builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Backup.DatabaseBackupSchedulerService>();
 
 // -- Version blobs: drain the former app-data store into the pools, follow moved shares --
-builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.VersionStorageReconcilerService>();
+builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.Versioning.VersionStorageReconcilerService>();
 
 
 

@@ -6,7 +6,6 @@ using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Security.Authentication;
 using Kaimo_File_Server.Core.Services.Notifications;
 using Kaimo_File_Server.Infrastructure.Configuration;
-using Kaimo_File_Server.Infrastructure.Repositories;
 using Kaimo_File_Server.SmbBridge.Grpc;
 using Kaimo_File_Server.SmbBridge.Security;
 using Kaimo_File_Server.SmbBridge.Services;
@@ -14,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using Kaimo_File_Server.Infrastructure.Repositories.Identity;
 
 namespace Kaimo_File_Server.SmbBridge.Tests.Services;
 

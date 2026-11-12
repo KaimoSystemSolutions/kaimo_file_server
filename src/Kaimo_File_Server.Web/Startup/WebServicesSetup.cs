@@ -4,10 +4,12 @@ using Kaimo_File_Server.Core.Security.Credentials;
 using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure;
-using Kaimo_File_Server.Infrastructure.Clouds;
-using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Cloud;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.CloudSync;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Ssh;
+using Kaimo_File_Server.Infrastructure.Services.Files;
 
 namespace Kaimo_File_Server.Web.Startup;
 
@@ -89,7 +91,7 @@ internal static class WebServicesSetup
         builder.Services.AddScoped<ICloudSyncExecutionService, CloudSyncExecutionService>();
         builder.Services.AddHostedService<LegacyCloudSyncMigrationHostedService>();
         // Removes managed SSH known_hosts files of connections that no longer exist.
-        builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.ExternalStorage.ManagedKnownHostsCleanupHostedService>();
+        builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.ExternalStorage.Ssh.ManagedKnownHostsCleanupHostedService>();
         // Prunes the append-only client-sync tables (change log, request receipts, expired refresh tokens)
         // so they cannot grow without bound.
         builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.ClientSyncRetentionService>();
@@ -97,8 +99,8 @@ internal static class WebServicesSetup
         // ES. Single-owner: registered only here (the web host), never in the SMB/host processes.
         builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.SearchIndexingService>();
         // Enforces recycle-bin retention and size limits for every transport. Single-owner like the indexer.
-        builder.Services.AddScoped<Kaimo_File_Server.Infrastructure.Services.RecycleBinJanitor>();
-        builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.RecycleBinJanitorService>();
+        builder.Services.AddScoped<Kaimo_File_Server.Infrastructure.Services.Files.RecycleBinJanitor>();
+        builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.Files.RecycleBinJanitorService>();
         // Turns outbox notification events into mails and sends them. Single-owner like the indexer:
         // every process publishes, only the web host (which can decrypt the SMTP password) dispatches.
         builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Notifications.ISmtpMailSender,

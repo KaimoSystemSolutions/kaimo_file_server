@@ -8,7 +8,6 @@ using Kaimo_File_Server.Core.Repositories.ClientSync;
 using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Core.Security.Authentication;
 using Kaimo_File_Server.Infrastructure.Configuration;
-using Kaimo_File_Server.Infrastructure.Repositories;
 using Kaimo_File_Server.Web.Controllers.WebDav;
 using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Web.Services.Api;
@@ -22,6 +21,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
+using Kaimo_File_Server.Infrastructure.Repositories.Identity;
 
 namespace Kaimo_File_Server.Web.Tests.Services;
 

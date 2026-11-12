@@ -24,7 +24,7 @@ Related: [Security model](../architecture/security-model.md) ·
 - The name `users` is used because `[homes]` is a reserved Samba section with special semantics.
 - The names `users` and `user` are reserved and rejected for other shares.
 - Provisioning is idempotent (`HomeDirectoryService`,
-  `src/Kaimo_File_Server.Infrastructure/Services/HomeDirectoryService.cs`): for all users on every
+  `src/Kaimo_File_Server.Infrastructure/Services/Files/HomeDirectoryService.cs`): for all users on every
   Host start (after the share is initialized), when a user is created, and lazily when a user first
   accesses their home.
 

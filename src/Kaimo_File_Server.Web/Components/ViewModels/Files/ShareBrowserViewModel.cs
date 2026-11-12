@@ -14,7 +14,7 @@ using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Kaimo_File_Server.Core.Language;
-using Kaimo_File_Server.Infrastructure.Services;
+using Kaimo_File_Server.Infrastructure.Services.Files;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 

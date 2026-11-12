@@ -10,8 +10,8 @@ using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Services.Management;
-using Kaimo_File_Server.Infrastructure.Clouds;
 using Microsoft.AspNetCore.Components.Authorization;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.CloudSync;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 

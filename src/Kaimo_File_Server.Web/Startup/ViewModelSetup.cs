@@ -63,10 +63,10 @@ internal static class ViewModelSetup
 
         // Share pool moves (share management and home folders). The search index is not written
         // from here: indexing is owned by SearchIndexingService.
-        builder.Services.AddScoped(sp => new Kaimo_File_Server.Infrastructure.Services.SharePoolMoveService(
+        builder.Services.AddScoped(sp => new Kaimo_File_Server.Infrastructure.Services.Pools.SharePoolMoveService(
             sp.GetRequiredService<IShareRepository>(),
             sp.GetRequiredService<ShareLockManager>(),
-            sp.GetRequiredService<ILogger<Kaimo_File_Server.Infrastructure.Services.SharePoolMoveService>>(),
+            sp.GetRequiredService<ILogger<Kaimo_File_Server.Infrastructure.Services.Pools.SharePoolMoveService>>(),
             searchService: null,
             sp.GetRequiredService<ICloudSyncOperationCoordinator>()));
 
@@ -90,6 +90,6 @@ internal static class ViewModelSetup
                     sp.GetRequiredService<ICloudSyncOperationCoordinator>(),
                 config: sp.GetRequiredService<IConfigRepository>(),
                 departmentRepo: sp.GetRequiredService<IDepartmentRepository>(),
-                poolMove: sp.GetRequiredService<Kaimo_File_Server.Infrastructure.Services.SharePoolMoveService>()));
+                poolMove: sp.GetRequiredService<Kaimo_File_Server.Infrastructure.Services.Pools.SharePoolMoveService>()));
     }
 }

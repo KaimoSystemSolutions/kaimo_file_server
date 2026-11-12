@@ -9,7 +9,6 @@ using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Core.Services.Search;
 using Kaimo_File_Server.Infrastructure.Configuration;
-using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Web.Services.Https;
@@ -20,6 +19,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 using Kaimo_File_Server.Web.Tests.Services;
+using Kaimo_File_Server.Infrastructure.Services.Files;
+using Kaimo_File_Server.Infrastructure.Services.Pools;
 
 namespace Kaimo_File_Server.Web.Tests.ViewModels.Settings;
 

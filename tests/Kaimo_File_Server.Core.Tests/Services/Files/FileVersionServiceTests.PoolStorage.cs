@@ -94,7 +94,7 @@ public partial class FileVersionServiceTests
     {
         var pool1 = Path.Combine(_testRoot, "storage", "pool01");
         var pool2 = Path.Combine(_testRoot, "storage", "pool02");
-        var locator = new Kaimo_File_Server.Infrastructure.Services.PoolVersionStorageLocator(
+        var locator = new Kaimo_File_Server.Infrastructure.Services.Versioning.PoolVersionStorageLocator(
             Mock.Of<IShareRepository>(), [pool1, pool2]);
 
         Assert.Equal(Path.Combine(pool2, ".kaimo-versions"),

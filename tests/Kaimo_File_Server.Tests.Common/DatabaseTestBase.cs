@@ -8,12 +8,15 @@ using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Core.Security.Acl;
 using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Infrastructure.Persistence;
-using Kaimo_File_Server.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using Kaimo_File_Server.Infrastructure.Repositories.ExternalStorage;
+using Kaimo_File_Server.Infrastructure.Repositories.Files;
+using Kaimo_File_Server.Infrastructure.Repositories.Identity;
+using Kaimo_File_Server.Infrastructure.Repositories.Shares;
 
 namespace Kaimo_File_Server.Tests.Common;
 

@@ -8,7 +8,6 @@ using Kaimo_File_Server.Core.Security.Acl;
 using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Core.Services.Search;
-using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.Shared;
 using Kaimo_File_Server.Web.Services;
@@ -17,6 +16,8 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
+using Kaimo_File_Server.Infrastructure.Services.Files;
+using Kaimo_File_Server.Infrastructure.Services.Identity;
 
 namespace Kaimo_File_Server.Web.Components.Search;
 

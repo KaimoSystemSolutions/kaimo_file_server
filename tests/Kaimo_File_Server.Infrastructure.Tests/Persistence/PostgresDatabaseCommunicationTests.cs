@@ -4,12 +4,15 @@ using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Domain.Notifications;
 using Kaimo_File_Server.Core.Services.Notifications;
-using Kaimo_File_Server.Infrastructure.Repositories;
-using Kaimo_File_Server.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql;
 using Xunit;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.CloudSync;
+using Kaimo_File_Server.Infrastructure.Repositories.ClientSync;
+using Kaimo_File_Server.Infrastructure.Repositories.Files;
+using Kaimo_File_Server.Infrastructure.Repositories.Notifications;
+using Kaimo_File_Server.Infrastructure.Repositories.Samba;
 
 namespace Kaimo_File_Server.Infrastructure.Tests.Persistence;
 

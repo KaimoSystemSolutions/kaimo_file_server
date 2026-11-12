@@ -1,12 +1,12 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Security.Credentials;
 using Kaimo_File_Server.Core.Services.CloudSync;
-using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.CloudSync;
 
 namespace Kaimo_File_Server.Web.Tests.Services;
 

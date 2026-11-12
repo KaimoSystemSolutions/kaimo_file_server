@@ -7,11 +7,12 @@ using Kaimo_File_Server.Core.Security.Credentials;
 using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Core.Services.File;
-using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Moq;
 using Xunit;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Cloud;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.CloudSync;
 
 namespace Kaimo_File_Server.Web.Tests.Services;
 

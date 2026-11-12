@@ -1,0 +1,451 @@
+using Google.Apis.Auth.OAuth2;
+using Google.Apis.Auth.OAuth2.Flows;
+using Google.Apis.Auth.OAuth2.Responses;
+using Google.Apis.Drive.v3;
+using Google.Apis.Http;
+using Google.Apis.Services;
+using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Services.CloudSync;
+
+namespace Kaimo_File_Server.Infrastructure.ExternalStorage.GoogleDrive;
+
+public class GoogleDriveConnection : ICloudConnection
+{
+    private readonly DriveService _service;
+    private readonly string? _refreshToken;
+    private readonly GoogleDriveScopeProfile _scopeProfile;
+
+    public DriveService Service => _service;
+
+    public GoogleDriveConnection(
+        Guid shareId,
+        Dictionary<string, string> data,
+        GoogleIdentityConfiguration identity)
+    {
+        var scopeProfile = data.TryGetValue("scopeProfile", out var profileValue)
+            ? GoogleIdentityConfiguration.ParseScopeProfile(profileValue)
+            : identity.DefaultScopeProfile;
+        _scopeProfile = scopeProfile;
+        var scopes = data.TryGetValue("scope", out var scopeString)
+            ? scopeString.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            : GoogleIdentityConfiguration.GetScopes(scopeProfile).ToArray();
+
+        if (!identity.DelegatedOAuthEnabled)
+            throw new InvalidOperationException("Google delegated OAuth is not configured.");
+        if (!data.TryGetValue("refreshToken", out var refreshToken)
+            || string.IsNullOrWhiteSpace(refreshToken))
+            throw new InvalidOperationException("Google Drive refresh token is missing.");
+
+        _refreshToken = refreshToken;
+        IConfigurableHttpClientInitializer credential = new UserCredential(
+            new GoogleAuthorizationCodeFlow(
+                new GoogleAuthorizationCodeFlow.Initializer
+                {
+                    ClientSecrets = new ClientSecrets
+                    {
+                        ClientId = identity.ClientId,
+                        ClientSecret = identity.ClientSecret
+                    },
+                    Scopes = scopes
+                }),
+            // Package 5 replaces this legacy share key with a stable
+            // StorageConnection ID when sync definitions are migrated.
+            "share-" + shareId,
+            new TokenResponse { RefreshToken = refreshToken });
+
+        _service = new DriveService(
+            new BaseClientService.Initializer
+            {
+                HttpClientInitializer = credential,
+                ApplicationName = "Kaimo_File_Server"
+            });
+    }
+
+    public static async Task RevokeTokenAsync(string refreshToken)
+    {
+        using var http = new HttpClient();
+
+        var response = await http.PostAsync(
+            "https://oauth2.googleapis.com/revoke",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["token"] = refreshToken
+            }));
+
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task Dispose()
+    {
+        if (_refreshToken is not null)
+            await RevokeTokenAsync(_refreshToken);
+        Service.Dispose();
+    }
+
+    public string ServiceName => "Google";
+
+    public async Task<CloudAccountInfo?> GetAccountInfoAsync()
+    {
+        var request = _service.About.Get();
+        request.Fields = "user(displayName,emailAddress,photoLink)";
+        var about = await request.ExecuteAsync();
+
+        return about.User is null
+            ? null
+            : new CloudAccountInfo(
+                about.User.DisplayName,
+                about.User.EmailAddress,
+                about.User.PhotoLink);
+    }
+
+    public async Task<string> GetAccountEmailAsync()
+    {
+        var request = _service.About.Get();
+        request.Fields = "user(emailAddress)";
+
+        var about = await request.ExecuteAsync();
+
+        if (string.IsNullOrEmpty(about.User?.EmailAddress))
+            throw new InvalidOperationException("Could not retrieve Google account email.");
+
+        return about.User.EmailAddress;
+    }
+
+    public async Task<string> GetProfilePictureUrlAsync()
+    {
+        var request = _service.About.Get();
+        request.Fields = "user(photoLink)";
+
+        var about = await request.ExecuteAsync();
+
+        if (string.IsNullOrEmpty(about.User?.PhotoLink))
+            throw new InvalidOperationException("Could not retrieve Google account profile picture.");
+
+        return about.User.PhotoLink;
+    }
+
+    /// <inheritdoc />
+    public Task UploadAsync(
+        string path,
+        Stream data,
+        DateTime modifiedTime,
+        CancellationToken cancellationToken = default)
+        => UploadAsync(path, data, modifiedTime, createdTime: null, cancellationToken);
+
+    /// <inheritdoc />
+    /// <remarks>Drive accepts <c>createdTime</c> only when a file is created; an update keeps it.</remarks>
+    public async Task UploadAsync(
+        string path,
+        Stream data,
+        DateTime modifiedTime,
+        DateTime? createdTime,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureWritable();
+        path = path.Replace('\\', '/').Trim('/');
+
+        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length == 0)
+            throw new ArgumentException("Invalid path.", nameof(path));
+
+        string fileName = parts[^1];
+
+        string parentId = "root";
+
+        // Create/find all parent folders
+        for (int i = 0; i < parts.Length - 1; i++)
+        {
+            parentId = await GetOrCreateFolderAsync(parts[i], parentId, cancellationToken);
+        }
+
+        // Check if file already exists
+        string? existingFileId = await FindFileIdAsync(
+            fileName,
+            parentId,
+            cancellationToken);
+
+        var file = new Google.Apis.Drive.v3.Data.File
+        {
+            Name = fileName
+        };
+
+        file.ModifiedTimeDateTimeOffset = modifiedTime;
+
+        if (existingFileId != null)
+        {
+            // Overwrite existing file
+            var request = _service.Files.Update(
+                file,
+                existingFileId,
+                data,
+                "application/octet-stream");
+
+            request.Fields = "id";
+
+            await request.UploadAsync(cancellationToken);
+        }
+        else
+        {
+            // Create new file
+            file.Parents = new[] { parentId };
+            if (createdTime is { } created)
+                file.CreatedTimeDateTimeOffset = created.ToUniversalTime();
+
+            var request = _service.Files.Create(
+                file,
+                data,
+                "application/octet-stream");
+
+            request.Fields = "id";
+
+            await request.UploadAsync(cancellationToken);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task DownloadAsync(
+        string path,
+        Stream target,
+        CancellationToken cancellationToken = default)
+    {
+        var fileId = await FindFileByPathAsync(path, cancellationToken);
+
+        if (fileId == null)
+            throw new FileNotFoundException(path);
+
+        var request = _service.Files.Get(fileId);
+
+        await request.DownloadAsync(target, cancellationToken);
+    }
+    
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<CloudItemMeta>> ListAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        string? parentId = await FindFolderByPathAsync(path, cancellationToken);
+
+        if (parentId == null)
+            return [];
+
+        var request = _service.Files.List();
+        request.Q = $"'{parentId}' in parents and trashed = false";
+        request.Fields = "files(id,name,mimeType,modifiedTime,createdTime,size)";
+
+        var result = await request.ExecuteAsync(cancellationToken);
+
+        return result.Files.Select(f => new CloudItemMeta(
+            IsDirectory: f.MimeType == "application/vnd.google-apps.folder",
+            Name: f.Name,
+            Path: path.TrimEnd('/') + "/" + f.Name,
+            ModifiedAt: f.ModifiedTimeDateTimeOffset?.UtcDateTime ?? DateTime.MinValue,
+            Size: f.Size ?? 0,
+            CreatedAt: ParseCreatedAt(f.CreatedTimeDateTimeOffset,
+                f.ModifiedTimeDateTimeOffset?.UtcDateTime ?? DateTime.MinValue)
+        )).ToList();
+    }
+
+    /// <summary>
+    /// Drive's <c>createdTime</c>, unless it is after the modification time: Drive records the first
+    /// upload as creation time when the uploader sets none, so a later value is that upload, not the
+    /// file's creation. The sync then falls back to the modification time.
+    /// </summary>
+    internal static DateTime? ParseCreatedAt(DateTimeOffset? created, DateTime modifiedUtc)
+        => created?.UtcDateTime is { } utc && utc <= modifiedUtc ? utc : null;
+
+    /// <inheritdoc />
+    public async Task<long> GetDirectorySizeAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        long totalSize = 0;
+
+        foreach (var item in await ListAsync(path, cancellationToken))
+            if (item.IsDirectory)
+                totalSize += await GetDirectorySizeAsync(item.Path, cancellationToken);
+            else
+                totalSize += item.Size;
+        
+        return totalSize;
+    }
+    
+    /// <summary>
+    /// Resolves an existing child folder or creates it under the supplied
+    /// parent. Every Google API request receives the active job token.
+    /// </summary>
+    private async Task<string> GetOrCreateFolderAsync(
+        string name,
+        string parentId,
+        CancellationToken cancellationToken)
+    {
+        var list = _service.Files.List();
+        list.Q =
+            $"mimeType='application/vnd.google-apps.folder' and " +
+            $"name='{name.Replace("'", "\\'")}' and " +
+            $"'{parentId}' in parents and trashed=false";
+
+        list.Fields = "files(id)";
+
+        var existing = await list.ExecuteAsync(cancellationToken);
+
+        if (existing.Files.Count > 0)
+            return existing.Files[0].Id;
+
+        var folder = new Google.Apis.Drive.v3.Data.File
+        {
+            Name = name,
+            MimeType = "application/vnd.google-apps.folder",
+            Parents = new[] { parentId }
+        };
+
+        var create = _service.Files.Create(folder);
+        create.Fields = "id";
+
+        var created = await create.ExecuteAsync(cancellationToken);
+
+        return created.Id;
+    }
+    
+    /// <inheritdoc />
+    public async Task CreateDirectoryAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureWritable();
+        path = path.Replace('\\', '/').Trim('/');
+
+        if (string.IsNullOrEmpty(path))
+            return;
+
+        string parentId = "root";
+
+        foreach (var part in path.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            parentId = await GetOrCreateFolderAsync(part, parentId, cancellationToken);
+        }
+    }
+    
+
+    /// <inheritdoc />
+    public async Task DeleteAsync(
+        string path,
+        bool isDirectory,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureWritable();
+
+        // Resolve the id for the item's own kind; a Drive delete of a folder id
+        // removes the whole subtree, matching the recursive local delete.
+        string? id = isDirectory
+            ? await FindFolderByPathAsync(path, cancellationToken)
+            : await FindFileByPathAsync(path, cancellationToken);
+
+        // Already gone (e.g. removed by a prior partial run): nothing to do.
+        if (id is null || id == "root")
+            return;
+
+        await _service.Files.Delete(id).ExecuteAsync(cancellationToken);
+    }
+
+    /// <summary>Walks a provider path segment by segment and returns its folder id.</summary>
+    private async Task<string?> FindFolderByPathAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        path = path.Replace('\\', '/').Trim('/');
+
+        if (string.IsNullOrEmpty(path))
+            return "root";
+
+        string parent = "root";
+
+        foreach (var part in path.Split('/'))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var list = _service.Files.List();
+
+            list.Q =
+                $"mimeType='application/vnd.google-apps.folder' and " +
+                $"name='{part.Replace("'", "\\'")}' and " +
+                $"'{parent}' in parents and trashed=false";
+
+            list.Fields = "files(id)";
+
+            var result = await list.ExecuteAsync(cancellationToken);
+
+            if (result.Files.Count == 0)
+                return null;
+
+            parent = result.Files[0].Id;
+        }
+
+        return parent;
+    }
+
+    /// <summary>Resolves a file id after locating each parent folder in order.</summary>
+    private async Task<string?> FindFileByPathAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        path = path.Replace('\\', '/').Trim('/');
+
+        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length == 0)
+            return null;
+
+        var parent = "root";
+
+        for (int i = 0; i < parts.Length - 1; i++)
+        {
+            var folder = await FindFolderByPathAsync(
+                string.Join("/", parts.Take(i + 1)),
+                cancellationToken);
+
+            if (folder == null)
+                return null;
+
+            parent = folder;
+        }
+
+        var request = _service.Files.List();
+
+        request.Q =
+            $"name='{parts[^1].Replace("'", "\\'")}' and " +
+            $"'{parent}' in parents and trashed=false";
+
+        request.Fields = "files(id)";
+
+        var result = await request.ExecuteAsync(cancellationToken);
+
+        return result.Files.FirstOrDefault()?.Id;
+    }
+    
+    /// <summary>Finds a named, non-trashed file directly below a known parent.</summary>
+    private async Task<string?> FindFileIdAsync(
+        string fileName,
+        string parentId,
+        CancellationToken cancellationToken)
+    {
+        var request = _service.Files.List();
+
+        request.Q = 
+            $"'{parentId}' in parents " +
+            $"and name = '{fileName.Replace("'", "\\'")}' " +
+            $"and trashed = false";
+
+        request.Fields = "files(id, name)";
+
+        var result = await request.ExecuteAsync(cancellationToken);
+
+        return result.Files.FirstOrDefault()?.Id;
+    }
+
+    private void EnsureWritable()
+    {
+        if (_scopeProfile == GoogleDriveScopeProfile.ReadOnly)
+            throw new InvalidOperationException(
+                "The Google Drive connection uses a read-only scope profile.");
+    }
+}

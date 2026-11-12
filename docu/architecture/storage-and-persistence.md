@@ -57,9 +57,9 @@ Tables by area:
 - Every directory directly under `Storage:RootPath` (default `/data/storage`) is a **pool**. Each pool
   is a separate bind mount (`/data/storage/pool01`, `/data/storage/pool02`, …).
 - A **share** (`ShareDefinition`) is a directory inside a pool. `ShareDefinition.Path` is its absolute
-  path; all share I/O resolves through it (`src/Kaimo_File_Server.Infrastructure/Services/FileServiceFactory.cs`).
+  path; all share I/O resolves through it (`src/Kaimo_File_Server.Infrastructure/Services/Files/FileServiceFactory.cs`).
 - A share can be moved to another pool (share management, and Home folders → Settings for the
-  `users` share). `SharePoolMoveService` (`src/Kaimo_File_Server.Infrastructure/Services/SharePoolMoveService.cs`)
+  `users` share). `SharePoolMoveService` (`src/Kaimo_File_Server.Infrastructure/Services/Pools/SharePoolMoveService.cs`)
   disables the share for the duration of the move (SMB drops it within one share sync and closes its
   sessions; every other transport refuses a disabled share), renames the folder or, across file
   systems, copies it into a space-reserved staging folder that is published atomically, updates

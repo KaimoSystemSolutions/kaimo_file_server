@@ -9,7 +9,6 @@ using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Core.Services.Search;
-using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
@@ -18,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.CloudSync;
 
 namespace Kaimo_File_Server.Web.Tests.ViewModels.Files;
 

@@ -1,12 +1,14 @@
 using System.Security.Cryptography;
 using Kaimo_File_Server.Core.Domain.Backup;
 using Kaimo_File_Server.Core.Security.Credentials;
-using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Protocols;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Smb;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Ssh;
 
 namespace Kaimo_File_Server.Infrastructure.Backup.Restic;
 

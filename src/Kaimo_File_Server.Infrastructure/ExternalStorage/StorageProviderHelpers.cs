@@ -1,6 +1,7 @@
 using System.Net;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Protocols;
 
 namespace Kaimo_File_Server.Infrastructure.ExternalStorage;
 

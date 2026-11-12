@@ -5,8 +5,6 @@ using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Core.Services.Notifications;
 using Kaimo_File_Server.Infrastructure.Configuration;
-using Kaimo_File_Server.Infrastructure.Repositories;
-using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Web.Services.SecondFactor;
@@ -16,6 +14,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using Kaimo_File_Server.Infrastructure.Repositories.Identity;
+using Kaimo_File_Server.Infrastructure.Services.Identity;
 
 namespace Kaimo_File_Server.Web.Tests.ViewModels.Users;
 

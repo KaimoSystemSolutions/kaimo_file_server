@@ -24,7 +24,7 @@ Performed once by the owner of the Dropbox app:
 
 - **Per installation:** `ExternalStorage__Dropbox__AppKey=<app key>`.
 - **Shipped default:** `DropboxOAuthDefaults.DefaultAppKey` in
-  `src/Kaimo_File_Server.Infrastructure/Clouds/DropboxConnection.cs`.
+  `src/Kaimo_File_Server.Infrastructure/ExternalStorage/Dropbox/DropboxIdentityConfiguration.cs`.
 
 The environment variable takes precedence. Without either, Dropbox connections cannot be authorized;
 other providers are unaffected.

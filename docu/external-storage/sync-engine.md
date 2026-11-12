@@ -52,7 +52,7 @@ flowchart LR
    continues from the state already transferred. A sync whose heartbeat failed for longer than the
    lease lifetime (e.g. its process lost the database) may be taken over after expiry; it then stops
    the same way instead of overlapping with the new owner.
-4. **Execution.** `CloudSyncExecutionService` (`src/Kaimo_File_Server.Infrastructure/Clouds/`) loads
+4. **Execution.** `CloudSyncExecutionService` (`src/Kaimo_File_Server.Infrastructure/ExternalStorage/CloudSync/`) loads
    the definition, decrypts the connection grant, opens a provider session and runs the transfer as
    `RunAsUserId`. Browse-capable providers go through the generic engine
    (`ICloudConnection.SyncAsync`, with `RemoteFileStoreSyncAdapter` for protocol providers); rsync

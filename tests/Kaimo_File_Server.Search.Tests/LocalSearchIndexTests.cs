@@ -1,8 +1,8 @@
 using System.Text;
 using Kaimo_File_Server.Core.Services.Search;
-using Kaimo_File_Server.Infrastructure.Repositories;
 using Npgsql;
 using Xunit;
+using Kaimo_File_Server.Infrastructure.Repositories.Files;
 
 namespace Kaimo_File_Server.Search.Tests;
 

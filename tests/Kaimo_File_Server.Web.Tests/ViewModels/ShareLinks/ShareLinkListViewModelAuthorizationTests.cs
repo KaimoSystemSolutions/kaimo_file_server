@@ -6,8 +6,6 @@ using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;
-using Kaimo_File_Server.Infrastructure.Repositories;
-using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +13,8 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using Kaimo_File_Server.Infrastructure.Repositories.Shares;
+using Kaimo_File_Server.Infrastructure.Services.Identity;
 
 namespace Kaimo_File_Server.Web.Tests.ViewModels.ShareLinks;
 

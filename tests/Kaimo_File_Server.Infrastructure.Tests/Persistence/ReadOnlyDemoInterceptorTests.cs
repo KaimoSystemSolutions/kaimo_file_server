@@ -1,9 +1,9 @@
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Security.Demo;
 using Kaimo_File_Server.Infrastructure.Persistence;
-using Kaimo_File_Server.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Kaimo_File_Server.Infrastructure.Repositories.Identity;
 
 namespace Kaimo_File_Server.Infrastructure.Tests.Persistence;
 

@@ -3,10 +3,10 @@ using Kaimo_File_Server.Core.Repositories.ClientSync;
 using Kaimo_File_Server.Core.Repositories.Files;
 using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Core.Services.Versioning;
-using Kaimo_File_Server.Infrastructure.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using Kaimo_File_Server.Infrastructure.Services.Files;
 
 namespace Kaimo_File_Server.Web.Tests.ViewModels.Users;
 

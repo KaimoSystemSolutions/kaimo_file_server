@@ -17,16 +17,34 @@ using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Core.Services.Search;
 using Kaimo_File_Server.Core.Services.Versioning;
-using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Persistence;
-using Kaimo_File_Server.Infrastructure.Repositories;
 using Kaimo_File_Server.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Cloud;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.CloudSync;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Dropbox;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.GoogleDrive;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.OneDrive;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Protocols;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Smb;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.Ssh;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.WebDav;
+using Kaimo_File_Server.Infrastructure.Repositories.ClientSync;
+using Kaimo_File_Server.Infrastructure.Repositories.ExternalStorage;
+using Kaimo_File_Server.Infrastructure.Repositories.Files;
+using Kaimo_File_Server.Infrastructure.Repositories.Identity;
+using Kaimo_File_Server.Infrastructure.Repositories.Notifications;
+using Kaimo_File_Server.Infrastructure.Repositories.Samba;
+using Kaimo_File_Server.Infrastructure.Repositories.Shares;
+using Kaimo_File_Server.Infrastructure.Services.Files;
+using Kaimo_File_Server.Infrastructure.Services.Identity;
+using Kaimo_File_Server.Infrastructure.Services.Pools;
+using Kaimo_File_Server.Infrastructure.Services.Versioning;
 
 namespace Kaimo_File_Server.Infrastructure
 {
