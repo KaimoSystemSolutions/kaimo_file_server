@@ -166,6 +166,10 @@ public sealed class RsyncPasswordAuthTests : IDisposable
     {
         var password = new ProcessStartInfo("ssh");
         var key = new ProcessStartInfo("ssh");
+        // ProcessStartInfo.Environment inherits the caller's environment; desktop sessions
+        // (e.g. KDE) export SSH_ASKPASS_REQUIRE, so start from a clean slate to test only our writes.
+        key.Environment.Remove("SSH_ASKPASS");
+        key.Environment.Remove("SSH_ASKPASS_REQUIRE");
 
         RsyncProcessRunner.ApplyAskpass(password, "/tmp/x/askpass");
         RsyncProcessRunner.ApplyAskpass(key, null);
