@@ -315,7 +315,7 @@ public partial class ResticBackupDatabaseTests
     [Fact]
     public async Task Rclone_TokenRefreshedDuringARun_IsStoredBack_ButNeverFromProbedSecrets()
     {
-        var vault = new Web.Services.DataProtectionCredentialVault(
+        var vault = new Web.Services.Credentials.DataProtectionCredentialVault(
             Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("KaimoRcloneTests"));
         var tempRoot = Path.Combine(Path.GetTempPath(), "kaimo-rclone-" + Guid.NewGuid().ToString("N"));
         var config = new ConfigurationBuilder()

@@ -77,7 +77,7 @@ share.
 
 ## Credential vault
 
-`ICredentialVault` (`src/Kaimo_File_Server.Web/Services/DataProtectionCredentialVault.cs`) protects
+`ICredentialVault` (`src/Kaimo_File_Server.Web/Services/Credentials/DataProtectionCredentialVault.cs`) protects
 connection grants with ASP.NET Core Data Protection. The protector purpose binds ciphertext to the
 **connection ID, provider ID, credential kind and format version**, so ciphertext copied to another
 connection does not decrypt. Payloads written in an older envelope version remain readable and are

@@ -380,4 +380,4 @@ FodyWeavers.xsd
 /src/samba-vfs/coverage-out/
 
 # TypeScript output: generated at build time from src/Kaimo_File_Server.Web/Scripts/*.ts.
-src/Kaimo_File_Server.Web/wwwroot/js/*.js
+src/Kaimo_File_Server.Web/wwwroot/js/**/*.js

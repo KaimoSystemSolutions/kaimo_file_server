@@ -12,7 +12,7 @@ using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Infrastructure.Backup;
 using Kaimo_File_Server.Infrastructure.Backup.Restic;
 using Kaimo_File_Server.Web.Controllers;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Downloads;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

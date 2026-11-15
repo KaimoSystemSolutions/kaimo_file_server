@@ -4,7 +4,7 @@ using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Web.Controllers.Api;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.CloudAccess;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

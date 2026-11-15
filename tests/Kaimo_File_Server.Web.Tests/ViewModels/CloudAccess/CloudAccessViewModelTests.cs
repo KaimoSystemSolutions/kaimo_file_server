@@ -12,7 +12,7 @@ using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Web.Components.ViewModels;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.ExternalStorage;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;

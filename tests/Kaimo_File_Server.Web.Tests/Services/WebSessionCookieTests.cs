@@ -3,7 +3,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Web.Controllers;
 using Kaimo_File_Server.Web.Controllers.WebDav;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

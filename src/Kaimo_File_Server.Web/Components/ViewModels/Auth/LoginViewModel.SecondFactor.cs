@@ -1,7 +1,7 @@
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Security.Authentication;
-using Kaimo_File_Server.Web.Services.SecondFactor;
+using Kaimo_File_Server.Web.Services.Auth;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 

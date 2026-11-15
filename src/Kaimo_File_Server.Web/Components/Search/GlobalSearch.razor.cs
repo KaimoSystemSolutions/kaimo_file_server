@@ -10,7 +10,7 @@ using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Core.Services.Search;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.Shared;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Files;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Routing;

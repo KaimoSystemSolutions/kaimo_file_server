@@ -10,7 +10,7 @@ using Kaimo_File_Server.Core.Services.Notifications;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Infrastructure.Notifications;
 using Kaimo_File_Server.Web.Components.Shared;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 using Kaimo_File_Server.Web.Services.Notifications;
 using Microsoft.AspNetCore.Components.Authorization;
 

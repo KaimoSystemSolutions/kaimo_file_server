@@ -89,7 +89,7 @@ the legacy share-link addresses and the mail layout's public URL.
 
 ### Upload links
 
-Upload links implement a drop box (`src/Kaimo_File_Server.Web/Services/PublicUploadService.cs`):
+Upload links implement a drop box (`src/Kaimo_File_Server.Web/Services/ShareLinks/PublicUploadService.cs`):
 
 1. The file name is stripped of any path, validated, and checked against `AllowedExtensions`.
 2. The claimed size is checked against `MaxFileSizeBytes` and the global ceiling.

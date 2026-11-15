@@ -1,4 +1,4 @@
-﻿using Kaimo_File_Server.Web.Services;
+﻿using Kaimo_File_Server.Web.Services.Credentials;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace Kaimo_File_Server.Web.Startup;

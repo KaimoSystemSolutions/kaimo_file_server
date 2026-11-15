@@ -37,7 +37,7 @@ Defined in `src/Kaimo_File_Server.Core/Domain/CloudAccessShare.cs`.
 
 ## Authorization
 
-`CloudAccessAuthorizationService` (`src/Kaimo_File_Server.Web/Services/CloudAccessAuthorizationService.cs`)
+`CloudAccessAuthorizationService` (`src/Kaimo_File_Server.Web/Services/CloudAccess/CloudAccessAuthorizationService.cs`)
 returns the actor's highest access level on a share: holders of `ManageCloudAccess` for the share's
 department implicitly have `Write`; everyone else gets the highest level among their direct and
 group grants, or no access. The check runs on **every** list, read, write and download operation,
@@ -55,7 +55,7 @@ capability layer.
 
 ### Metadata cache
 
-`CloudAccessDirectoryCache` (`src/Kaimo_File_Server.Web/Services/CloudAccessDirectoryCache.cs`) is a
+`CloudAccessDirectoryCache` (`src/Kaimo_File_Server.Web/Services/CloudAccess/CloudAccessDirectoryCache.cs`) is a
 process-local cache of directory listings only — never file content, tokens or authorization
 decisions:
 
@@ -66,7 +66,7 @@ decisions:
 
 ### Cross-share transfers
 
-`CrossShareTransferService` (`src/Kaimo_File_Server.Web/Services/CrossShareTransferService.cs`) copies
+`CrossShareTransferService` (`src/Kaimo_File_Server.Web/Services/Files/CrossShareTransferService.cs`) copies
 items between local and virtual shares, and `CloudToLocalTransferService` copies remote content into
 local shares:
 

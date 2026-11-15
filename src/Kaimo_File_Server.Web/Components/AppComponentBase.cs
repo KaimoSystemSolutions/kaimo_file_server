@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Components;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 
 namespace Kaimo_File_Server.Web.Components;
 

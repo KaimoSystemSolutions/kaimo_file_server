@@ -1,6 +1,6 @@
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Web.Controllers;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Downloads;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Xunit;

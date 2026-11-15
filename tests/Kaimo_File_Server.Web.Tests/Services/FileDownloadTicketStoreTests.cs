@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Downloads;
 using Xunit;
 
 namespace Kaimo_File_Server.Web.Tests.Services;

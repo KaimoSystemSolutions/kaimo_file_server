@@ -15,6 +15,8 @@ using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Downloads;
+using Kaimo_File_Server.Web.Services.ShareLinks;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;

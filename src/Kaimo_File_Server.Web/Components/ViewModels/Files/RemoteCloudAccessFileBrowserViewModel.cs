@@ -6,7 +6,8 @@ using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Web.Helpers;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.CloudAccess;
+using Kaimo_File_Server.Web.Services.Downloads;
 using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;

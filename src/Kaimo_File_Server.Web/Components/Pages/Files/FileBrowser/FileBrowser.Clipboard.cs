@@ -1,6 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Web.Components.ViewModels;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 
 namespace Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser;
 

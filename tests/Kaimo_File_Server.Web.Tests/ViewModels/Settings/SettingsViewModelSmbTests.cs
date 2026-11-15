@@ -10,7 +10,8 @@ using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Core.Services.Search;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Web.Components.ViewModels;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.CloudAccess;
+using Kaimo_File_Server.Web.Services.Ui;
 using Kaimo_File_Server.Web.Services.Https;
 using Bunit;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -623,7 +624,7 @@ public partial class SettingsViewModelSmbTests
                 CloudAccessSettings.Object,
                 Mock.Of<Kaimo_File_Server.Infrastructure.Backup.IBackupSettingsStore>(),
                 Mock.Of<Kaimo_File_Server.Infrastructure.Backup.IDatabaseBackupService>(),
-                new Kaimo_File_Server.Web.Services.BackupDownloadTokenService(
+                new Kaimo_File_Server.Web.Services.Downloads.BackupDownloadTokenService(
                     Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("KaimoTests")),
                 NullLogger<SettingsViewModel>.Instance,
                 poolUsage: poolUsage,

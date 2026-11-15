@@ -46,7 +46,7 @@
 	  <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
 	  <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
 	  <PackageReference Include="QRCoder" />
-	  <!-- Compiles Scripts/*.ts to wwwroot/js during build (settings in tsconfig.json). -->
+	  <!-- Compiles Scripts/**/*.ts to wwwroot/js during build (settings in tsconfig.json). -->
 	  <PackageReference Include="Microsoft.TypeScript.MSBuild" />
 	</ItemGroup>
 
@@ -59,8 +59,8 @@
 	        BeforeTargets="ResolveProjectStaticWebAssets"
 	        DependsOnTargets="SetTscExecutable;RunTscCompile">
 		<ItemGroup>
-			<Content Remove="wwwroot\js\*.js" />
-			<Content Include="wwwroot\js\*.js" />
+			<Content Remove="wwwroot\js\**\*.js" />
+			<Content Include="wwwroot\js\**\*.js" />
 		</ItemGroup>
 	</Target>
 

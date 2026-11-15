@@ -33,14 +33,14 @@ jobs:
       - name: Build
         run: dotnet build Kaimo_File_Server.slnx --no-restore --configuration Release
 
-      # wwwroot/js is generated from Scripts/*.ts and not checked in, so only a clean
+      # wwwroot/js is generated from Scripts/**/*.ts and not checked in, so only a clean
       # checkout shows whether the published web app actually ships the scripts
       # (theme, session handoff/login). Same check as in the Web Dockerfile.
       - name: Verify web scripts are published
         run: |
           dotnet publish src/Kaimo_File_Server.Web/Kaimo_File_Server.Web.csproj --no-build --configuration Release -o publish-web
-          grep -q '"Route":"js/session.js"' publish-web/Kaimo_File_Server.Web.staticwebassets.endpoints.json
-          test -f publish-web/wwwroot/js/themeInit.js
+          grep -q '"Route":"js/core/session.js"' publish-web/Kaimo_File_Server.Web.staticwebassets.endpoints.json
+          test -f publish-web/wwwroot/js/core/themeInit.js
 
       - name: Test
         # Runs every test project in tests/ (Core, Infrastructure, Search, SmbBridge, Web; the

@@ -1,5 +1,5 @@
 using Kaimo_File_Server.Core.Language;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 using Xunit;
 
 namespace Kaimo_File_Server.Web.Tests.ViewModels.Settings;

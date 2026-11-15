@@ -1,7 +1,7 @@
 using Bunit;
 using Kaimo_File_Server.Web.Components.Pages.CloudSync.Components;
 using Kaimo_File_Server.Web.Components.ViewModels;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 using Kaimo_File_Server.Web.Tests.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;

@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.ShareLinks;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
 

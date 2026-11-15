@@ -1,5 +1,5 @@
 {
-  // Browser scripts: Scripts/*.ts compile 1:1 to wwwroot/js/*.js (loaded as classic <script> tags
+  // Browser scripts: Scripts/<folder>/*.ts compile 1:1 to wwwroot/js/<folder>/*.js (loaded as classic <script> tags
   // from App.razor). No import/export, so every file stays a plain script exposing its API on window.
   "compilerOptions": {
     "target": "ES2022",

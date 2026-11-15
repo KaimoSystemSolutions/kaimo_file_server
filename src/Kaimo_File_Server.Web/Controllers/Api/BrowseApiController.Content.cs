@@ -2,7 +2,7 @@
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.CloudAccess;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 

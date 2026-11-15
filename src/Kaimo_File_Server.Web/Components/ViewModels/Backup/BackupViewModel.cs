@@ -6,7 +6,7 @@ using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Core.Security.Demo;
 using Kaimo_File_Server.Infrastructure.Backup.Restic;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Downloads;
 using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels.Backup;

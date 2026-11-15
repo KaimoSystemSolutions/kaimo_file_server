@@ -11,7 +11,7 @@ using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Infrastructure.Storage;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.CloudAccess;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Caching.Memory;
 using Moq;

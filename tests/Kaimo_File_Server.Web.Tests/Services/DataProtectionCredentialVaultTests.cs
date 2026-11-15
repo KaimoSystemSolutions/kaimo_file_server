@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Kaimo_File_Server.Core.Security.Credentials;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Credentials;
 using Microsoft.AspNetCore.DataProtection;
 using Xunit;
 

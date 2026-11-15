@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Services.File;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Downloads;
+using Kaimo_File_Server.Web.Services.ShareLinks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;

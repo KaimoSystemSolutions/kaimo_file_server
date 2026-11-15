@@ -2,7 +2,7 @@ using Bunit;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Web.Components.Shared;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;

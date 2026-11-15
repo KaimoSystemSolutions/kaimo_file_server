@@ -2,7 +2,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Infrastructure.Configuration;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Security;
 using Moq;
 using Xunit;
 

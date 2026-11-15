@@ -11,7 +11,7 @@ using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Web.Components.Pages.Users.Components;
 using Kaimo_File_Server.Web.Components.ViewModels;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;

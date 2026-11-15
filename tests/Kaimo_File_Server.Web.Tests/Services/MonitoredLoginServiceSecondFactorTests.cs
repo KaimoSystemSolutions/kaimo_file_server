@@ -2,7 +2,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Security.Authentication;
 using Kaimo_File_Server.Infrastructure.Configuration;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Moq;

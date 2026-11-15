@@ -6,7 +6,7 @@ using Kaimo_File_Server.Core.Security.Demo;
 using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Infrastructure.Notifications;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 using Kaimo_File_Server.Web.Services.Notifications;
 using Microsoft.AspNetCore.Components.Authorization;
 

@@ -4,7 +4,7 @@ using Kaimo_File_Server.Core.Security.Demo;
 using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Infrastructure.Backup.Restic;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Downloads;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 

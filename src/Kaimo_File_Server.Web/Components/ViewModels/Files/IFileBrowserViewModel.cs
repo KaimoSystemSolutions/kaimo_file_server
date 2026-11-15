@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Web.Helpers;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.CloudAccess;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 

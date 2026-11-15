@@ -1,6 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Language;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 using Microsoft.AspNetCore.Components.Web;
 
 namespace Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser;

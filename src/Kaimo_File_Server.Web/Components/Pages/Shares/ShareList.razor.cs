@@ -1,5 +1,5 @@
 using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 using Microsoft.AspNetCore.Components;
 
 namespace Kaimo_File_Server.Web.Components.Pages.Shares;

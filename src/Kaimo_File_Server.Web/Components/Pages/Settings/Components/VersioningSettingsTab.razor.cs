@@ -1,6 +1,6 @@
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Services.Versioning;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Kaimo_File_Server.Infrastructure.Services.Versioning;

@@ -1,6 +1,6 @@
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Web.Middleware;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 

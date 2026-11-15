@@ -26,7 +26,7 @@ public partial class ResticBackupDatabaseTests
     private (ResticTargetResolver Resolver, ICredentialVault Vault, string TempRoot) SmbResolver(
         ProtocolCommandResult? probe = null, List<IReadOnlyList<string>>? probeCalls = null)
     {
-        var vault = new Web.Services.DataProtectionCredentialVault(
+        var vault = new Web.Services.Credentials.DataProtectionCredentialVault(
             Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("KaimoSmbTests"));
         var tempRoot = Path.Combine(Path.GetTempPath(), "kaimo-smb-" + Guid.NewGuid().ToString("N"));
         var config = new ConfigurationBuilder()

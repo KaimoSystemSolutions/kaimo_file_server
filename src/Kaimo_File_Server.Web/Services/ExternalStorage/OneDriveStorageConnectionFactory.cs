@@ -1,0 +1,85 @@
+using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Repositories.ExternalStorage;
+using Kaimo_File_Server.Core.Security.Credentials;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
+using Kaimo_File_Server.Infrastructure.ExternalStorage.OneDrive;
+
+namespace Kaimo_File_Server.Web.Services.ExternalStorage;
+
+/// <summary>
+/// Opens OneDrive clients whose refresh-token exchange, reload, rotation write,
+/// and acknowledgement are one distributed critical section.
+/// </summary>
+public sealed class OneDriveStorageConnectionFactory(
+    IStorageConnectionRepository connections,
+    ICredentialVault credentialVault,
+    IStorageConnectionCredentialLeaseManager leases,
+    IHttpClientFactory httpClientFactory,
+    MicrosoftIdentityConfiguration? identity = null)
+{
+    private static readonly TimeSpan AcquisitionTimeout = TimeSpan.FromSeconds(30);
+
+    public OneDriveConnection Create(StorageConnection record, string clientName = "CloudAccessOneDrive")
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        var credentials = credentialVault.UnprotectConnectionCredentials(record);
+        return new OneDriveConnection(
+            credentials,
+            httpClientFactory.CreateClient(clientName),
+            cancellationToken => AcquireAsync(record.Id, cancellationToken),
+            cancellationToken => ReloadAsync(record.Id, cancellationToken),
+            (rotated, cancellationToken) => PersistAsync(record.Id, rotated, cancellationToken),
+            ResolveIdentity());
+    }
+
+    /// <summary>
+    /// Opens a short-lived connection while authorization is being verified.
+    /// The grant has not been persisted yet, so refresh coordination is not
+    /// applicable until the storage connection is saved.
+    /// </summary>
+    public OneDriveConnection CreatePending(Dictionary<string, string> credentials,
+        string clientName = "CloudAccessOneDrive")
+        => new(credentials, httpClientFactory.CreateClient(clientName), identity: ResolveIdentity());
+
+    private MicrosoftIdentityConfiguration ResolveIdentity()
+        => identity ?? MicrosoftIdentityConfiguration.Create(
+            OneDriveOAuthDefaults.ClientId, OneDriveOAuthDefaults.Authority);
+
+    private async Task<IAsyncDisposable?> AcquireAsync(Guid connectionId, CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.Add(AcquisitionTimeout);
+        do
+        {
+            var lease = await leases.TryAcquireAsync(connectionId, cancellationToken);
+            if (lease is not null) return lease;
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
+        } while (DateTimeOffset.UtcNow < deadline);
+        return null;
+    }
+
+    private async Task<Dictionary<string, string>> ReloadAsync(
+        Guid connectionId,
+        CancellationToken cancellationToken)
+    {
+        var latest = await connections.GetAsync(connectionId, cancellationToken)
+                     ?? throw new InvalidOperationException("Storage connection no longer exists.");
+        return credentialVault.UnprotectConnectionCredentials(latest);
+    }
+
+    private async Task PersistAsync(
+        Guid connectionId,
+        Dictionary<string, string> rotatedCredentials,
+        CancellationToken cancellationToken)
+    {
+        var latest = await connections.GetAsync(connectionId, cancellationToken)
+                     ?? throw new InvalidOperationException("Storage connection no longer exists.");
+        await connections.UpdateRuntimeAsync(
+            connectionId,
+            credentialVault.ProtectConnectionCredentials(latest, rotatedCredentials),
+            null,
+            null,
+            StorageConnectionState.Ready,
+            null,
+            cancellationToken);
+    }
+}

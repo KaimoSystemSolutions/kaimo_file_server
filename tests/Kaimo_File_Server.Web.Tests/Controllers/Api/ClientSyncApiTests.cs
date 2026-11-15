@@ -3,7 +3,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Services.ClientSync;
 using Kaimo_File_Server.Web.Controllers.Api;
-using Kaimo_File_Server.Web.Services.Api;
+using Kaimo_File_Server.Web.Services.Auth;
 using Xunit;
 
 namespace Kaimo_File_Server.Web.Tests.Controllers.Api;

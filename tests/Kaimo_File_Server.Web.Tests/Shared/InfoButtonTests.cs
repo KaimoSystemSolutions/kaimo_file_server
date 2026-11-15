@@ -1,6 +1,6 @@
 using Bunit;
 using Kaimo_File_Server.Web.Components.Shared;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;

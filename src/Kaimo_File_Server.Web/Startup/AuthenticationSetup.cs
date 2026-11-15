@@ -4,8 +4,8 @@ using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Core.Security.Authentication;
 using Kaimo_File_Server.Web.Controllers.Api;
 using Kaimo_File_Server.Web.Controllers.WebDav;
-using Kaimo_File_Server.Web.Services;
-using Kaimo_File_Server.Web.Services.Api;
+using Kaimo_File_Server.Web.Services.Security;
+using Kaimo_File_Server.Web.Services.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
@@ -134,7 +134,7 @@ internal static class AuthenticationSetup
         builder.Services.AddScoped<ApiTokenService>();
 
         // TOTP second factor of the web login (enrollment, code checks, admin reset).
-        builder.Services.AddScoped<Services.SecondFactor.SecondFactorService>();
+        builder.Services.AddScoped<SecondFactorService>();
 
         builder.Services.AddRateLimiter(ConfigureRateLimiter);
 

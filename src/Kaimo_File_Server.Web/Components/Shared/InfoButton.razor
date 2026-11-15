@@ -40,7 +40,7 @@
         @Assets.SVG("info.svg", new SvgOptions(Width: IconSize, Height: IconSize, StrokeWidth: 2f,
             Style: "stroke-linecap:round;stroke-linejoin:round"))
     </span>
-    @* Positioned (position: fixed) by infoPopover.js when the trigger is hovered or focused. *@
+    @* Positioned (position: fixed) by popover.js when the trigger is hovered or focused. *@
     <span id="@_id" class="info-btn__tip" role="tooltip">
         @if (!string.IsNullOrEmpty(Title))
         {
@@ -89,7 +89,7 @@
     private void Toggle() => _open = !_open;
     private void Close() => _open = false;
 
-    // Keyboard parity with a native button (Space is kept from scrolling by infoPopover.js).
+    // Keyboard parity with a native button (Space is kept from scrolling by popover.js).
     private void OnKeyDown(KeyboardEventArgs e)
     {
         if (e.Key is "Enter" or " ") { Toggle(); }

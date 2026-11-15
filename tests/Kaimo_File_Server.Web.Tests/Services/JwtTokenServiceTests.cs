@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Auth;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;

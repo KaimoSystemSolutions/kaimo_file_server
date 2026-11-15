@@ -10,7 +10,8 @@ using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Web.DynamicHelpers;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.CloudAccess;
+using Kaimo_File_Server.Web.Services.ExternalStorage;
 using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;

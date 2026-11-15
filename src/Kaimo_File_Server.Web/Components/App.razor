@@ -10,7 +10,7 @@
     <HeadOutlet @rendermode="new InteractiveServerRenderMode(prerender: false)" />
 
     @* Theme and accent are set immediately to prevent flash (external file: the CSP forbids inline script) *@
-    <script src="js/themeInit.js"></script>
+    <script src="js/core/themeInit.js"></script>
 </head>
 <body>
     @* Custom, theme-aware reconnect dialog. Because an element with this id exists,
@@ -36,23 +36,22 @@
     <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)"
             ClientAddress="@HttpContext?.Connection.RemoteIpAddress?.ToString()"
             ClientHost="@HttpContext?.Request.Host.Host" />
-    <script src="js/session.js"></script>
-    <script src="js/noAutofill.js"></script>
-    <script src="js/globalSearch.js"></script>
+    <script src="js/core/session.js"></script>
+    <script src="js/core/noAutofill.js"></script>
+    <script src="js/ui/globalSearch.js"></script>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
-    <script src="js/columnResize.js"></script>
-    <script src="js/contextMenu.js"></script>
-    <script src="js/smoothResize.js"></script>
-    <script src="js/infoPopover.js"></script>
+    <script src="js/files/columnResize.js"></script>
+    <script src="js/ui/smoothResize.js"></script>
+    <script src="js/ui/popover.js"></script>
     <script src="lib/mammoth/mammoth.browser.min.js"></script>
-    <script src="js/filePreview.js"></script>
-    <script src="js/fileUpload.js?v=2"></script>
-    <script src="js/fileMarquee.js?v=4"></script>
-    <script src="js/internalDragDrop.js"></script>
-    <script src="js/avatarCrop.js"></script>
-    <script src="js/cloudAuthorize.js"></script>
-    <script src="js/mailTemplateEditor.js"></script>
-    <script src="js/schedulePaint.js?v=2"></script>
+    <script src="js/files/filePreview.js"></script>
+    <script src="js/files/fileUpload.js"></script>
+    <script src="js/files/fileMarquee.js"></script>
+    <script src="js/files/internalDragDrop.js"></script>
+    <script src="js/forms/avatarCrop.js"></script>
+    <script src="js/core/cloudAuthorize.js"></script>
+    <script src="js/forms/mailTemplateEditor.js"></script>
+    <script src="js/forms/schedulePaint.js"></script>
 </body>
 </html>
 

@@ -3,7 +3,8 @@ using Kaimo_File_Server.Core.Services.Search;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Web.Middleware;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Credentials;
+using Kaimo_File_Server.Web.Services.ShareLinks;
 using Kaimo_File_Server.Web.Services.Https;
 
 namespace Kaimo_File_Server.Web.Startup;

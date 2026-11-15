@@ -6,7 +6,7 @@ using Kaimo_File_Server.Core.Security.Credentials;
 using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Core.Services.File;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Credentials;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Logging;
 using Moq;

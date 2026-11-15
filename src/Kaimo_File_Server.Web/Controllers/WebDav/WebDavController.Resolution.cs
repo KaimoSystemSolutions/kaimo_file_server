@@ -5,7 +5,8 @@ using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories.ClientSync;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Core.Services.File;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Auth;
+using Kaimo_File_Server.Web.Services.Security;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Kaimo_File_Server.Web.Controllers.WebDav;

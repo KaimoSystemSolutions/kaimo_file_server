@@ -5,7 +5,7 @@ using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Web.Components.Shared;
 using Kaimo_File_Server.Web.Components.ViewModels;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.CloudAccess;
 using Microsoft.AspNetCore.Components;
 
 namespace Kaimo_File_Server.Web.Components.Pages.CloudAccess;

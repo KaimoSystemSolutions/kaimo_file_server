@@ -7,7 +7,7 @@ using Kaimo_File_Server.Core.Services.CloudSync;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Web.Components.Shared;
 using Kaimo_File_Server.Web.Components.ViewModels;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 

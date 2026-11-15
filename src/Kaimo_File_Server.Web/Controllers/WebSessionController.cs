@@ -1,4 +1,4 @@
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

@@ -1,6 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Files;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 

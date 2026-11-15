@@ -41,7 +41,7 @@ public class JsInteropIdentifierTests
     {
         string webRoot = FindWebProjectRoot();
         string layout = File.ReadAllText(Path.Combine(webRoot, "Components", "Layout", "MainLayout.razor"));
-        string script = File.ReadAllText(Path.Combine(webRoot, "wwwroot", "js", "fileUpload.js"));
+        string script = File.ReadAllText(Path.Combine(webRoot, "wwwroot", "js", "files", "fileUpload.js"));
 
         Assert.Contains("\"kaimoUpload.openFilePicker\"", layout);
         Assert.Matches(@"return \{[^}]*\bopenFilePicker\b[^}]*\};", script);

@@ -8,7 +8,7 @@ using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser.components;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.DynamicHelpers;
 using Kaimo_File_Server.Web.Helpers;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;

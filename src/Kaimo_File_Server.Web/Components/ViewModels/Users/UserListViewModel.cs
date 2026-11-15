@@ -11,7 +11,8 @@ using Kaimo_File_Server.Core.Services.Notifications;
 using Microsoft.AspNetCore.Components.Authorization;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Infrastructure.Configuration;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Auth;
+using Kaimo_File_Server.Web.Services.Security;
 using Microsoft.Extensions.Caching.Memory;
 using Kaimo_File_Server.Infrastructure.Services.Files;
 

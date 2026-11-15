@@ -12,7 +12,7 @@ using Kaimo_File_Server.Web.Components.Pages.Settings;
 using Kaimo_File_Server.Web.Components.Pages.Settings.Components;
 using Kaimo_File_Server.Web.Components.Search;
 using Kaimo_File_Server.Web.Components.ViewModels;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Ui;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;

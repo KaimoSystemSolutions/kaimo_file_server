@@ -1,5 +1,5 @@
 ﻿using Kaimo_File_Server.Web.Controllers.Api;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.ExternalStorage;
 
 namespace Kaimo_File_Server.Web.Startup;
 

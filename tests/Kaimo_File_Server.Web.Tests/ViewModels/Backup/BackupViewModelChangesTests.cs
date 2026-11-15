@@ -11,7 +11,7 @@ using Kaimo_File_Server.Core.Services.Versioning;
 using Kaimo_File_Server.Infrastructure.Backup;
 using Kaimo_File_Server.Infrastructure.Backup.Restic;
 using Kaimo_File_Server.Web.Components.ViewModels.Backup;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Downloads;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

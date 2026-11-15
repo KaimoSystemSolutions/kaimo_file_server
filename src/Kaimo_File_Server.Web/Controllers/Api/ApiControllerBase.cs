@@ -4,7 +4,8 @@ using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories.ClientSync;
 using Kaimo_File_Server.Core.Repositories.Identity;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Auth;
+using Kaimo_File_Server.Web.Services.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 

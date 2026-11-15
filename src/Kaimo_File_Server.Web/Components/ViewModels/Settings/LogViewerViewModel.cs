@@ -3,7 +3,7 @@ using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Core.Services.Management;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Downloads;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
 

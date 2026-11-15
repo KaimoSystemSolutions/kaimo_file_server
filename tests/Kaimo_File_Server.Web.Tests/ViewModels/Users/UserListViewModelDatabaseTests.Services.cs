@@ -1,6 +1,6 @@
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Xunit;

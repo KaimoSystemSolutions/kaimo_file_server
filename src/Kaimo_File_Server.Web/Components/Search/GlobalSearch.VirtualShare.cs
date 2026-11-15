@@ -1,6 +1,6 @@
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.ViewModels;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.CloudAccess;
 using Microsoft.AspNetCore.Components;
 
 namespace Kaimo_File_Server.Web.Components.Search;

@@ -36,7 +36,7 @@
 }
 
 /* -- Tooltip --
-   Positioned as `fixed` in a high layer by infoPopover.js (top/left set there)
+   Positioned as `fixed` in a high layer by popover.js (top/left set there)
    so it escapes any `overflow: hidden` ancestor and never leaves the viewport.
    It is a sibling of the trigger, so only hovering/focusing the trigger itself
    shows it — never hovering the surrounding label or field. */

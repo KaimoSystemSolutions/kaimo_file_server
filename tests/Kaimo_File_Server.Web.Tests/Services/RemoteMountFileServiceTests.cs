@@ -3,7 +3,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.CloudAccess;
 using Xunit;
 
 namespace Kaimo_File_Server.Web.Tests.Services;

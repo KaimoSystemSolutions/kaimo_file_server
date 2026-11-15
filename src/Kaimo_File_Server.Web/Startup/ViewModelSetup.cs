@@ -8,7 +8,9 @@ using Kaimo_File_Server.Core.Services.Management;
 using Kaimo_File_Server.Core.Services.Versioning;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Web.Components.ViewModels;
-using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Security;
+using Kaimo_File_Server.Web.Services.ShareLinks;
+using Kaimo_File_Server.Web.Services.Ui;
 using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Kaimo_File_Server.Web.Startup;
@@ -27,8 +29,8 @@ internal static class ViewModelSetup
         builder.Services.AddScoped<PublicShareFileBrowserViewModel>();
         builder.Services.AddScoped<HomeFileBrowserViewModel>();
         builder.Services.AddScoped<HomesAdminViewModel>();
-        builder.Services.AddScoped<Kaimo_File_Server.Web.Services.ShareLinkService>();
-        builder.Services.AddScoped<Kaimo_File_Server.Web.Services.PublicUploadService>();
+        builder.Services.AddScoped<Kaimo_File_Server.Web.Services.ShareLinks.ShareLinkService>();
+        builder.Services.AddScoped<Kaimo_File_Server.Web.Services.ShareLinks.PublicUploadService>();
         builder.Services.AddSingleton<ShareLinkTokenProtector>();
         builder.Services.AddScoped<ShareLinkListViewModel>();
         builder.Services.AddScoped<SecurityMonitorViewModel>();

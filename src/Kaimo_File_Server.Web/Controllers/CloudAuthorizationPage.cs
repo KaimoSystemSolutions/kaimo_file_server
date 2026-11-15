@@ -33,7 +33,7 @@ internal static class CloudAuthorizationPage
         return $$$"""
             <!doctype html><html lang="{{{language}}}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
             <title>{{{encodedTitle}}} - Kaimo File Server</title><link rel="icon" type="image/svg+xml" href="/svg/favicon.svg">
-            <link rel="stylesheet" href="/css/app.css?v=2"><script src="/js/themeInit.js"></script><style>
+            <link rel="stylesheet" href="/css/app.css?v=2"><script src="/js/core/themeInit.js"></script><style>
             body{display:grid;place-items:center;padding:var(--space-4)}
             .auth-card{width:min(480px,100%);padding:var(--space-6);border:1px solid var(--border);border-radius:var(--radius-modal);background:var(--bg-secondary);box-shadow:var(--shadow-lg);text-align:center}
             .auth-icon{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;margin-bottom:var(--space-4);border-radius:var(--radius-surface);background:var(--bg-tertiary);color:var({{{iconColorVar}}})}

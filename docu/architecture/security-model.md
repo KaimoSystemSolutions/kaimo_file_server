@@ -41,8 +41,8 @@ flowchart LR
 
 | Channel | Mechanism | Implementation |
 |---|---|---|
-| Web UI (Blazor Server) | Username/password (+ optional TOTP second factor, see [Second factor](#second-factor-web-login)) → JWT in the HttpOnly session cookie `__Host-kaimo_session` (see [Web session](#web-session)); logout revokes the token ID (`jti`) in `revoked_web_tokens` | `src/Kaimo_File_Server.Web/Services/JwtTokenService.cs`, `JwtAuthenticationStateProvider.cs`, `WebSessionCookie.cs` |
-| REST API `/api/v1` | Device-scoped JWT bearer + rotating refresh tokens | `src/Kaimo_File_Server.Web/Controllers/Api/AuthApiController.cs`, `Services/Api/ApiTokenService.cs` |
+| Web UI (Blazor Server) | Username/password (+ optional TOTP second factor, see [Second factor](#second-factor-web-login)) → JWT in the HttpOnly session cookie `__Host-kaimo_session` (see [Web session](#web-session)); logout revokes the token ID (`jti`) in `revoked_web_tokens` | `src/Kaimo_File_Server.Web/Services/Auth/JwtTokenService.cs`, `JwtAuthenticationStateProvider.cs`, `WebSessionCookie.cs` |
+| REST API `/api/v1` | Device-scoped JWT bearer + rotating refresh tokens | `src/Kaimo_File_Server.Web/Controllers/Api/AuthApiController.cs`, `Services/Auth/ApiTokenService.cs` |
 | WebDAV `/dav` | HTTP Basic (verified against the user store) or the device-scoped JWT bearer | `src/Kaimo_File_Server.Web/Controllers/WebDav/WebDavBasicAuthenticationHandler.cs` |
 | SMB | NTLMv2 by Samba against NT hashes provisioned from the database | [SMB control plane](../external-access/smb/control-plane-grpc.md) |
 | Public share links | Unguessable token in the URL, no account | [Downloads and share links](../external-access/downloads-and-share-links.md) |
@@ -87,10 +87,10 @@ Common rules:
   refuses to start with a short secret, a known public default, or a development secret outside the
   Development environment. Every token carries the account's `SecurityStamp`; changing the password
   rotates the stamp and invalidates all earlier tokens.
-- **Bearer validation.** `BearerTokenValidation.ValidateAsync` (`src/Kaimo_File_Server.Web/Services/BearerTokenValidation.cs`)
+- **Bearer validation.** `BearerTokenValidation.ValidateAsync` (`src/Kaimo_File_Server.Web/Services/Auth/BearerTokenValidation.cs`)
   runs on every bearer-authenticated request: the token must be device-scoped (the web login token is
   not accepted), the device active, the account enabled and the security stamp current.
-- **Web session validation.** `WebSessionValidation` (`src/Kaimo_File_Server.Web/Services/WebSessionValidation.cs`)
+- **Web session validation.** `WebSessionValidation` (`src/Kaimo_File_Server.Web/Services/Auth/WebSessionValidation.cs`)
   is the counterpart for the web token: not device-scoped, unexpired, `jti` not revoked, account
   enabled, security stamp current. It runs when the Blazor connection is established and periodically
   for the circuit's lifetime (`app.session.revalidationSeconds`, default 30 s).
