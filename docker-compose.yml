@@ -41,6 +41,7 @@ services:
     image: ${KAIMO_HOST_IMAGE:-kaimofileserver}
     container_name: kaimo_file_server
     restart: unless-stopped
+    logging: *bounded-logging
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.Host/Dockerfile
@@ -178,6 +179,7 @@ services:
     image: ${KAIMO_WEB_IMAGE:-kaimofileserverweb}
     container_name: kaimo_file_server_web
     restart: unless-stopped
+    logging: *bounded-logging
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.Web/Dockerfile
@@ -212,6 +214,7 @@ services:
   elasticsearch:
     container_name: kaimo_elasticsearch
     restart: unless-stopped
+    logging: *bounded-logging
     image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
     environment:
       TZ: Europe/Berlin
@@ -254,6 +257,7 @@ services:
     image: postgres:${POSTGRES_VERSION:-17-alpine}
     container_name: kaimo_file_server_db
     restart: unless-stopped
+    logging: *bounded-logging
     environment:
       TZ: ${TZ:-Europe/Berlin}
       POSTGRES_DB: ${POSTGRES_DB:-kaimo_file_server}
