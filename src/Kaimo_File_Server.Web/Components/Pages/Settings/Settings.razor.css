@@ -49,56 +49,6 @@
    the knob when checked (round knob sliding out to the bottom-right instead of the squared
    knob centered vertically). */
 
-/* -- Context-menu builder (single checkbox list) -- */
-
-.settings-page ::deep .ctx-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 8px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-surface);
-    background: var(--bg-secondary);
-}
-
-.settings-page ::deep .ctx-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 6px 10px;
-    border-radius: var(--radius-control);
-}
-
-.settings-page ::deep .ctx-item--off {
-    opacity: 0.55;
-}
-
-.settings-page ::deep .ctx-item-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--text-primary);
-    cursor: pointer;
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-    .settings-page ::deep .ctx-item-label input[type="checkbox"] {
-        width: 15px;
-        height: 15px;
-        cursor: pointer;
-        flex-shrink: 0;
-    }
-
-.settings-page ::deep .ctx-item-actions {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
-}
-
 .settings-page ::deep .settings-row { display: flex; align-items: center; gap: 8px; }
 .settings-page ::deep .settings-row-spaced { margin-bottom: 16px; }
 .settings-page ::deep .settings-actions { margin-top: 24px; }
@@ -108,7 +58,6 @@
 .settings-page ::deep .settings-select-small { max-width: 160px; }
 .settings-page ::deep .settings-text { max-width: 320px; }
 .settings-page ::deep .settings-number { max-width: 100px; }
-.settings-page ::deep .context-scope { max-width: 260px; }
 .settings-page ::deep .settings-field-label { min-width: 200px; font-size: 13px; }
 .settings-page ::deep .settings-subheading { display: block; margin-top: 24px; }
 .settings-page ::deep .settings-empty { margin-top: 8px; color: var(--text-tertiary); font-size: 13px; }
@@ -140,8 +89,7 @@
     min-width: 0;
 }
 
-.settings-page ::deep .storage-pool-name,
-.settings-page ::deep .storage-pool-path {
+.settings-page ::deep .storage-pool-name {
     display: block;
 }
 
@@ -163,15 +111,6 @@
     color: var(--text-primary);
     font-size: 14px;
     font-weight: 650;
-}
-
-.settings-page ::deep .storage-pool-path {
-    margin-top: 3px;
-    overflow: hidden;
-    color: var(--text-tertiary);
-    font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .settings-page ::deep .storage-pool-percent {
@@ -363,7 +302,6 @@
 }
 
 .settings-page ::deep .service-row,
-.settings-page ::deep .ctx-list,
 .settings-page ::deep .info-card {
     border-radius: var(--radius-control);
     background: var(--bg-tertiary);

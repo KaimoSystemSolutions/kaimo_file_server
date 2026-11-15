@@ -342,9 +342,6 @@
   <data name="Web_Acl_ShareRoot" xml:space="preserve">
     <value>(Share-Root)</value>
   </data>
-  <data name="Web_Acl_PermissionsFor" xml:space="preserve">
-    <value>Berechtigungen für "{0}"</value>
-  </data>
   <data name="Web_Acl_RulesSingular" xml:space="preserve">
     <value>{0} Berechtigungsregel</value>
   </data>
@@ -365,12 +362,6 @@
   </data>
   <data name="Web_Upload_Progress" xml:space="preserve">
     <value>Lade „{0}" hoch…</value>
-  </data>
-  <data name="Web_Upload_Cancelled" xml:space="preserve">
-    <value>„{0}" — Upload abgebrochen.</value>
-  </data>
-  <data name="Web_Upload_TooLarge" xml:space="preserve">
-    <value>„{0}" ist zu groß (max. 1,1 GB).</value>
   </data>
   <data name="Web_Upload_Success" xml:space="preserve">
     <value>„{0}" hochgeladen.</value>
@@ -435,12 +426,6 @@
   <data name="Web_ShareBrowser_PageTitle" xml:space="preserve">
     <value>Durchsuchen</value>
   </data>
-  <data name="Web_ShareBrowser_Heading" xml:space="preserve">
-    <value>Durchsuchen – Shares</value>
-  </data>
-  <data name="Web_ShareBrowser_CreateShare" xml:space="preserve">
-    <value>Share erstellen</value>
-  </data>
   <data name="Web_ShareBrowser_ManageShares" xml:space="preserve">
     <value>Shares verwalten</value>
   </data>
@@ -489,12 +474,6 @@
   <data name="Web_ShareList_DepartmentChangeWarning" xml:space="preserve">
     <value>Der Wechsel der Abteilung ändert, welche Abteilungs-Administratoren diesen Share verwalten dürfen und welche Abteilungs-Standardrechte greifen. Bestehende explizite ACL-Einträge bleiben unverändert und funktionieren weiterhin.</value>
   </data>
-  <data name="Web_ShareList_Label_Users" xml:space="preserve">
-    <value>Benutzer</value>
-  </data>
-  <data name="Web_ShareList_Label_Groups" xml:space="preserve">
-    <value>Gruppen</value>
-  </data>
   <data name="Web_ShareList_Status_Active" xml:space="preserve">
     <value>Aktiv</value>
   </data>
@@ -516,9 +495,6 @@
   <data name="Web_ShareList_Tab_Extra" xml:space="preserve">
     <value>Erweitert</value>
   </data>
-  <data name="Web_ShareList_Tab_Visibility" xml:space="preserve">
-    <value>Sichtbarkeit</value>
-  </data>
   <data name="Web_ShareList_DeleteShare" xml:space="preserve">
     <value>Share löschen</value>
   </data>
@@ -530,21 +506,6 @@
   </data>
   <data name="Web_ShareList_VisibilityDescription" xml:space="preserve">
     <value>Ob Share für Leute mit Zugriff versteckt sein soll.</value>
-  </data>
-  <data name="Web_ShareList_NoUsers" xml:space="preserve">
-    <value>Keine Benutzer</value>
-  </data>
-  <data name="Web_ShareList_NoUsersAvailable" xml:space="preserve">
-    <value>Keine Benutzer vorhanden</value>
-  </data>
-  <data name="Web_ShareList_NoGroups" xml:space="preserve">
-    <value>Keine Gruppen</value>
-  </data>
-  <data name="Web_ShareList_NoGroupsAvailable" xml:space="preserve">
-    <value>Keine Gruppen vorhanden</value>
-  </data>
-  <data name="Web_ShareList_VisibleToAll" xml:space="preserve">
-    <value>Für alle Benutzer sichtbar.</value>
   </data>
   <data name="Web_ShareList_AclDescription" xml:space="preserve">
     <value>Spezifisch anpassbare Datei- und Ordnerrechte.</value>
@@ -617,12 +578,6 @@
   </data>
   <data name="Web_Acl_AddPermission" xml:space="preserve">
     <value>Berechtigung hinzufügen</value>
-  </data>
-  <data name="Web_Acl_Button_User" xml:space="preserve">
-    <value>Benutzer</value>
-  </data>
-  <data name="Web_Acl_Button_Group" xml:space="preserve">
-    <value>Gruppe</value>
   </data>
   <data name="Web_Acl_Action" xml:space="preserve">
     <value>Aktion</value>
@@ -765,9 +720,6 @@
   <data name="Web_Acl_Error_Exception" xml:space="preserve">
     <value>Ausnahme</value>
   </data>
-  <data name="Web_Search_Placeholder" xml:space="preserve">
-    <value>Suche nach Dateien</value>
-  </data>
   <data name="Web_Search_Searching" xml:space="preserve">
     <value>Suche...</value>
   </data>
@@ -795,9 +747,6 @@
   <data name="Web_Search_Scope_Share" xml:space="preserve">
     <value>Gesamter Share</value>
   </data>
-  <data name="Web_Search_Scope_Global" xml:space="preserve">
-    <value>Global</value>
-  </data>
   <data name="Web_Search_Scope_Settings" xml:space="preserve">
     <value>Einstellungen</value>
   </data>
@@ -822,9 +771,6 @@
   <data name="Web_Search_Scope_PickedShare" xml:space="preserve">
     <value>Ausgewählter Share</value>
   </data>
-  <data name="Web_Search_PickShare" xml:space="preserve">
-    <value>Shares wählen…</value>
-  </data>
   <data name="Web_Search_SharesSelected" xml:space="preserve">
     <value>{0} Shares ausgewählt</value>
   </data>
@@ -836,12 +782,6 @@
   </data>
   <data name="Web_Login_CredentialsRequired" xml:space="preserve">
     <value>Benutzername und Passwort erforderlich.</value>
-  </data>
-  <data name="Web_Login_AccountDisabled" xml:space="preserve">
-    <value>Dieses Konto ist deaktiviert.</value>
-  </data>
-  <data name="Web_Login_TooManyAttempts" xml:space="preserve">
-    <value>Zu viele fehlgeschlagene Versuche. Bitte versuche es in {0} Minute(n) erneut.</value>
   </data>
   <data name="Web_Error_NotAuthenticated" xml:space="preserve">
     <value>Nicht authentifiziert.</value>
@@ -884,9 +824,6 @@
   </data>
   <data name="Web_Name_InvalidChars" xml:space="preserve">
     <value>Der Name enthält ungültige Zeichen.  Fehler: </value>
-  </data>
-  <data name="Web_FileName_InvalidChars" xml:space="preserve">
-    <value>Der Dateiname enthält ungültige Zeichen. Fehler: </value>
   </data>
   <data name="Web_Error_FileOrFolderNotFound" xml:space="preserve">
     <value>Datei oder Ordner nicht gefunden.</value>
@@ -1098,20 +1035,8 @@
   <data name="Web_Role_NameRequired" xml:space="preserve">
     <value>Rollenname erforderlich.</value>
   </data>
-  <data name="Web_Role_ShowAllPermissions" xml:space="preserve">
-    <value>Alle anzeigen</value>
-  </data>
-  <data name="Web_Role_ShowFewerPermissions" xml:space="preserve">
-    <value>Weniger anzeigen</value>
-  </data>
   <data name="Web_Scope_SelectScope" xml:space="preserve">
     <value>Bitte einen Geltungsbereich auswählen.</value>
-  </data>
-  <data name="Web_Error_GrantAccessFailed" xml:space="preserve">
-    <value>Fehler beim Gewähren des Zugriffs.</value>
-  </data>
-  <data name="Web_Error_RevokeAccessFailed" xml:space="preserve">
-    <value>Fehler beim Entziehen des Zugriffs.</value>
   </data>
   <data name="Web_Error_CreateAssignmentFailed" xml:space="preserve">
     <value>Fehler beim Erstellen der Zuweisung.</value>
@@ -1188,38 +1113,17 @@
   <data name="Web_Settings_SmbDisabled" xml:space="preserve">
     <value>SMB wird deaktiviert. Die Änderung wird vom Dienst innerhalb weniger Sekunden übernommen.</value>
   </data>
-  <data name="Web_Settings_WebDavEnabled" xml:space="preserve">
-    <value>WebDAV wird aktiviert. Die Änderung wird innerhalb weniger Sekunden übernommen.</value>
-  </data>
-  <data name="Web_Settings_WebDavDisabled" xml:space="preserve">
-    <value>WebDAV wird deaktiviert. Die Änderung wird innerhalb weniger Sekunden übernommen.</value>
-  </data>
   <data name="Web_Settings_Tab_ContextMenu" xml:space="preserve">
     <value>Kontextmenü</value>
   </data>
   <data name="Web_Settings_ContextMenu_Desc" xml:space="preserve">
     <value>Stellen Sie das Rechtsklick-Menü je Kategorie selbst zusammen. Änderungen gelten global für alle Benutzer und werden beim nächsten Öffnen des Dateibrowsers wirksam.</value>
   </data>
-  <data name="Web_Settings_CtxAvailable" xml:space="preserve">
-    <value>Verfügbar</value>
-  </data>
-  <data name="Web_Settings_CtxAssigned" xml:space="preserve">
-    <value>Im Menü</value>
-  </data>
-  <data name="Web_Settings_CtxAdd" xml:space="preserve">
-    <value>Zum Menü hinzufügen</value>
-  </data>
-  <data name="Web_Settings_CtxRemove" xml:space="preserve">
-    <value>Aus Menü entfernen</value>
-  </data>
   <data name="Web_Settings_CtxMoveUp" xml:space="preserve">
     <value>Nach oben</value>
   </data>
   <data name="Web_Settings_CtxMoveDown" xml:space="preserve">
     <value>Nach unten</value>
-  </data>
-  <data name="Web_Settings_CtxReset" xml:space="preserve">
-    <value>Kategorie auf Standard zurücksetzen</value>
   </data>
   <data name="Web_Settings_CtxSaved" xml:space="preserve">
     <value>Kontextmenü gespeichert.</value>
@@ -1254,20 +1158,8 @@
   <data name="Web_Settings_CtxScope_Multi" xml:space="preserve">
     <value>Mehrfachauswahl</value>
   </data>
-  <data name="Web_Settings_Ctx_Intro" xml:space="preserve">
-    <value>Klicke auf eine Zeile, um eine Aktion für alle Kategorien auf einmal zu setzen. Klicke auf einen Spaltenkopf für die Vorschau dieser Kategorie; das kleine „alle“ unter dem Kopf schaltet die ganze Spalte.</value>
-  </data>
-  <data name="Web_Settings_Ctx_Step1" xml:space="preserve">
-    <value>Zuordnung</value>
-  </data>
-  <data name="Web_Settings_Ctx_Step2" xml:space="preserve">
-    <value>Reihenfolge</value>
-  </data>
   <data name="Web_Settings_Ctx_MembershipTitle" xml:space="preserve">
     <value>Verfügbare Aktionen je Elementtyp</value>
-  </data>
-  <data name="Web_Settings_Ctx_MembershipHint" xml:space="preserve">
-    <value>Ungültige Kombinationen sind gesperrt</value>
   </data>
   <data name="Web_Settings_Ctx_OrderTitle" xml:space="preserve">
     <value>Globale Reihenfolge</value>
@@ -1295,9 +1187,6 @@
   </data>
   <data name="Web_Settings_Ctx_ResetAll" xml:space="preserve">
     <value>Alles auf Standard zurücksetzen</value>
-  </data>
-  <data name="Web_Settings_Ctx_AllShort" xml:space="preserve">
-    <value>alle</value>
   </data>
   <data name="Web_Settings_Ctx_Lead" xml:space="preserve">
     <value>Lege fest, welche Aktionen im Rechtsklick-Menü erscheinen – je Dateikategorie und in welcher Reihenfolge.</value>
@@ -1587,9 +1476,6 @@
   <data name="Web_Settings_Backup_CreateFailed" xml:space="preserve">
     <value>Backup konnte nicht erstellt werden.</value>
   </data>
-  <data name="Web_Settings_Backup_InvalidWindow" xml:space="preserve">
-    <value>Bitte eine gültige Start- und Endzeit angeben (HH:mm).</value>
-  </data>
   <data name="Web_Perm_ManageCloudAccess" xml:space="preserve">
     <value>Virtuelle Shares verwalten</value>
   </data>
@@ -1616,9 +1502,6 @@
   </data>
   <data name="Web_Tab_RolesCount" xml:space="preserve">
     <value>{0} Rollen</value>
-  </data>
-  <data name="Web_Settings_Tab_Language" xml:space="preserve">
-    <value>Sprache</value>
   </data>
   <data name="Web_Settings_Tab_Password" xml:space="preserve">
     <value>Passwort &amp; Sitzung</value>
@@ -1773,20 +1656,11 @@
   <data name="Web_Settings_LogViewer_ReadFailed" xml:space="preserve">
     <value>Die Systemprotokolle konnten nicht gelesen werden.</value>
   </data>
-  <data name="Web_Settings_Tab_Ram" xml:space="preserve">
-    <value>Arbeitsspeicher</value>
-  </data>
-  <data name="Web_Settings_Tab_IP_Address" xml:space="preserve">
-    <value>IP Adresse</value>
-  </data>
   <data name="Web_Settings_ContextMenu_Detail" xml:space="preserve">
     <value>Kontext Menü</value>
   </data>
   <data name="Web_Settings_Button_Save" xml:space="preserve">
     <value>Speichern</value>
-  </data>
-  <data name="Web_Settings_Storage_CustomNameLabel" xml:space="preserve">
-    <value>Eigener Name</value>
   </data>
   <data name="Web_Settings_Storage_PoolNameHint" xml:space="preserve">
     <value>Vergeben Sie einen sprechenden Namen, der beim Erstellen oder Verschieben von Shares angezeigt wird; der zugrunde liegende Einhängepfad wird dabei nicht verändert.</value>
@@ -1965,12 +1839,6 @@
   <data name="Web_Preview_Download" xml:space="preserve">
     <value>Herunterladen</value>
   </data>
-  <data name="Web_Preview_TooLarge" xml:space="preserve">
-    <value>Die Datei ist zu groß für die Vorschau (max. {0}).</value>
-  </data>
-  <data name="Web_Preview_Unsupported" xml:space="preserve">
-    <value>Für diesen Dateityp ist keine Vorschau verfügbar.</value>
-  </data>
   <data name="Web_Common_Loading" xml:space="preserve">
     <value>Lade...</value>
   </data>
@@ -2085,9 +1953,6 @@
   <data name="Web_Admin_Label_Type" xml:space="preserve">
     <value>Typ</value>
   </data>
-  <data name="Web_Admin_NoDepartments" xml:space="preserve">
-    <value>— Keine Abteilungen verfügbar —</value>
-  </data>
   <data name="Web_Admin_Placeholder_DisplayName" xml:space="preserve">
     <value>z.B. Max Mustermann</value>
   </data>
@@ -2145,9 +2010,6 @@
   <data name="Web_Common_NoGroupsAssigned" xml:space="preserve">
     <value>Keine Gruppen</value>
   </data>
-  <data name="Web_Common_NoRolesAssigned" xml:space="preserve">
-    <value>Keine Rollen</value>
-  </data>
   <data name="Web_Common_NoDepartments" xml:space="preserve">
     <value>Keine Abteilungen</value>
   </data>
@@ -2190,9 +2052,6 @@
   <data name="Web_Admin_Label_Groups" xml:space="preserve">
     <value>Gruppen</value>
   </data>
-  <data name="Web_Admin_Label_Roles" xml:space="preserve">
-    <value>Rollen</value>
-  </data>
   <data name="Web_Admin_Label_PasswordChange" xml:space="preserve">
     <value>Passwort ändern</value>
   </data>
@@ -2205,26 +2064,14 @@
   <data name="Web_Admin_Label_Departments" xml:space="preserve">
     <value>Abteilungen</value>
   </data>
-  <data name="Web_Admin_NotSpecified" xml:space="preserve">
-    <value>Nicht angegeben</value>
-  </data>
-  <data name="Web_Admin_NoDescription" xml:space="preserve">
-    <value>Keine Beschreibung</value>
-  </data>
   <data name="Web_Admin_ScopedAssignments" xml:space="preserve">
     <value>Rollenzuweisungen</value>
-  </data>
-  <data name="Web_Admin_GlobalRoles" xml:space="preserve">
-    <value>Globale Rollen</value>
   </data>
   <data name="Web_Admin_GlobalRoles_Hint" xml:space="preserve">
     <value>Gilt im gesamten System</value>
   </data>
   <data name="Web_Admin_DelegatedRoles_Hint" xml:space="preserve">
     <value>Gilt in einer Abteilung samt Unterabteilungen oder in einem Share. Global gilt systemweit.</value>
-  </data>
-  <data name="Web_Admin_Delegated" xml:space="preserve">
-    <value>Delegiert</value>
   </data>
   <data name="Web_Admin_NoDelegatedRoles" xml:space="preserve">
     <value>Keine Rollenzuweisungen</value>
@@ -2258,9 +2105,6 @@
   </data>
   <data name="Web_Admin_DeleteRole" xml:space="preserve">
     <value>Rolle löschen</value>
-  </data>
-  <data name="Web_Admin_ManageMembers" xml:space="preserve">
-    <value>Mitglieder verwalten</value>
   </data>
   <data name="Web_Admin_Label_Users" xml:space="preserve">
     <value>Benutzer</value>
@@ -2307,26 +2151,11 @@
   <data name="Web_Admin_AssignTo" xml:space="preserve">
     <value>Zuweisen an</value>
   </data>
-  <data name="Web_Admin_Label_User" xml:space="preserve">
-    <value>Benutzer</value>
-  </data>
-  <data name="Web_Admin_Label_Scope" xml:space="preserve">
-    <value>Geltungsbereich</value>
-  </data>
-  <data name="Web_Admin_Scope_Global" xml:space="preserve">
-    <value>Global (systemweit)</value>
-  </data>
   <data name="Web_Admin_Scope_Department" xml:space="preserve">
     <value>Abteilung</value>
   </data>
   <data name="Web_Admin_Scope_Share" xml:space="preserve">
     <value>Share</value>
-  </data>
-  <data name="Web_Admin_Label_ShareId" xml:space="preserve">
-    <value>Share-ID</value>
-  </data>
-  <data name="Web_Admin_Placeholder_ShareId" xml:space="preserve">
-    <value>GUID des Shares</value>
   </data>
   <data name="Web_Admin_Label_Share" xml:space="preserve">
     <value>Share</value>
@@ -2345,12 +2174,6 @@
   </data>
   <data name="Web_Common_None" xml:space="preserve">
     <value>Keine</value>
-  </data>
-  <data name="Web_Common_MoreItems" xml:space="preserve">
-    <value>+{0} weitere</value>
-  </data>
-  <data name="Web_Admin_ScopeType_Global" xml:space="preserve">
-    <value>Global</value>
   </data>
   <data name="Web_Admin_ScopeType_Department" xml:space="preserve">
     <value>Abteilung</value>
@@ -2448,9 +2271,6 @@
   <data name="Web_Dept_SharesHint" xml:space="preserve">
     <value>Jeder Share gehört genau einer Abteilung. Abgewählte Shares werden auf Global zurückgesetzt.</value>
   </data>
-  <data name="Web_Dept_NoSharesAvailable" xml:space="preserve">
-    <value>Keine Shares vorhanden</value>
-  </data>
   <data name="Web_Dept_GlobalDepartment" xml:space="preserve">
     <value>Globale Abteilung</value>
   </data>
@@ -2460,15 +2280,6 @@
   <data name="Web_Dept_NoParentTopLevel" xml:space="preserve">
     <value>Global</value>
   </data>
-  <data name="Web_Dept_Label_MembersCount" xml:space="preserve">
-    <value>Mitglieder ({0})</value>
-  </data>
-  <data name="Web_Dept_Label_GroupsCount" xml:space="preserve">
-    <value>Gruppen ({0})</value>
-  </data>
-  <data name="Web_Dept_Label_SharesCount" xml:space="preserve">
-    <value>Shares ({0})</value>
-  </data>
   <data name="Web_Dept_NoGroupsAssigned" xml:space="preserve">
     <value>Keine Gruppen zugeordnet</value>
   </data>
@@ -2477,9 +2288,6 @@
   </data>
   <data name="Web_Dept_NoDefaultPerm" xml:space="preserve">
     <value>Keine Default-Berechtigung</value>
-  </data>
-  <data name="Web_Dept_InheritedFrom" xml:space="preserve">
-    <value>Geerbt von: {0}</value>
   </data>
   <data name="Web_Dept_ConfirmDelete" xml:space="preserve">
     <value>Abteilung wirklich löschen? Gruppen und Shares werden auf Global zurückgesetzt.</value>
@@ -2507,9 +2315,6 @@
   </data>
   <data name="Web_Common_Name" xml:space="preserve">
     <value>Name</value>
-  </data>
-  <data name="Web_Common_Remove" xml:space="preserve">
-    <value>Entfernen</value>
   </data>
   <data name="Web_Common_NoSharesAvailable" xml:space="preserve">
     <value>Keine Shares vorhanden</value>
@@ -2760,53 +2565,8 @@
   <data name="Web_ShareList_Card_Disabled" xml:space="preserve">
     <value>Deaktiviert</value>
   </data>
-  <data name="Web_Nav_CloudSync" xml:space="preserve">
-    <value>Synchronisierung mit externem Speicher</value>
-  </data>
-  <data name="Web_CloudSync_Title" xml:space="preserve">
-    <value>Synchronisierung mit externem Speicher</value>
-  </data>
-  <data name="Web_CloudSync_Subtitle" xml:space="preserve">
-    <value>Lokale und Remote-Ordnersynchronisierungen für alle Cloud-Anbieter verwalten.</value>
-  </data>
-  <data name="Web_CloudSync_Create" xml:space="preserve">
-    <value>Synchronisierung mit externem Speicher hinzufügen</value>
-  </data>
-  <data name="Web_CloudSync_Create_Title" xml:space="preserve">
-    <value>Ordner verbinden</value>
-  </data>
   <data name="Web_CloudSync_Create_Help" xml:space="preserve">
     <value>Lokalen Ordner und Anbieter auswählen. Der Remote-Ordner kann nach der Autorisierung gewählt werden.</value>
-  </data>
-  <data name="Web_CloudSync_Loading" xml:space="preserve">
-    <value>Synchronisierungen mit externem Speicher werden geladen…</value>
-  </data>
-  <data name="Web_CloudSync_Empty" xml:space="preserve">
-    <value>Es wurden noch keine Synchronisierungen mit externem Speicher eingerichtet.</value>
-  </data>
-  <data name="Web_CloudSync_Select" xml:space="preserve">
-    <value>Eine Synchronisierung mit externem Speicher auswählen, um ihre Einstellungen anzuzeigen.</value>
-  </data>
-  <data name="Web_CloudSync_Share" xml:space="preserve">
-    <value>Share</value>
-  </data>
-  <data name="Web_CloudSync_Provider" xml:space="preserve">
-    <value>Cloud-Anbieter</value>
-  </data>
-  <data name="Web_CloudSync_LocalFolder" xml:space="preserve">
-    <value>Lokaler Ordner</value>
-  </data>
-  <data name="Web_CloudSync_RemoteFolder" xml:space="preserve">
-    <value>Remote-Ordner</value>
-  </data>
-  <data name="Web_CloudSync_Browse" xml:space="preserve">
-    <value>Durchsuchen…</value>
-  </data>
-  <data name="Web_CloudSync_Connect" xml:space="preserve">
-    <value>Autorisieren und verbinden</value>
-  </data>
-  <data name="Web_CloudSync_Mode" xml:space="preserve">
-    <value>Synchronisierungsmodus</value>
   </data>
   <data name="Web_CloudSync_Mode_TwoWay" xml:space="preserve">
     <value>Beidseitig</value>
@@ -2817,14 +2577,8 @@
   <data name="Web_CloudSync_Mode_Push" xml:space="preserve">
     <value>Hochladen (lokal → Cloud)</value>
   </data>
-  <data name="Web_CloudSync_LastSync" xml:space="preserve">
-    <value>Letzte Synchronisierung</value>
-  </data>
   <data name="Web_CloudSync_Never" xml:space="preserve">
     <value>Nie</value>
-  </data>
-  <data name="Web_CloudSync_Name" xml:space="preserve">
-    <value>Name</value>
   </data>
   <data name="Web_CloudSync_Tab_General" xml:space="preserve">
     <value>Allgemein</value>
@@ -2834,9 +2588,6 @@
   </data>
   <data name="Web_CloudSync_Tab_Advanced" xml:space="preserve">
     <value>Erweitert</value>
-  </data>
-  <data name="Web_CloudSync_Description" xml:space="preserve">
-    <value>Beschreibung</value>
   </data>
   <data name="Web_CloudSync_Advanced" xml:space="preserve">
     <value>Erweiterte Einstellungen</value>
@@ -2913,12 +2664,6 @@
   <data name="Web_CloudSync_Schedule_Grid" xml:space="preserve">
     <value>Wöchentlicher stündlicher Synchronisierungsplan</value>
   </data>
-  <data name="Web_CloudSync_Schedule_Hour_Toggle" xml:space="preserve">
-    <value>{0}:00 für alle Tage umschalten</value>
-  </data>
-  <data name="Web_CloudSync_Schedule_Day_Toggle" xml:space="preserve">
-    <value>Alle Stunden am {0} umschalten</value>
-  </data>
   <data name="Web_CloudSync_Schedule_Slot_On" xml:space="preserve">
     <value>{0}, {1}:00–{2}:00: aktiv</value>
   </data>
@@ -2940,38 +2685,8 @@
   <data name="Web_CloudSync_Schedule_Error_Interval" xml:space="preserve">
     <value>Bitte ein Intervall zwischen 1 und 86400 Sekunden eingeben.</value>
   </data>
-  <data name="Web_CloudSync_Save" xml:space="preserve">
-    <value>Einstellungen speichern</value>
-  </data>
-  <data name="Web_CloudSync_Run" xml:space="preserve">
-    <value>Jetzt synchronisieren</value>
-  </data>
-  <data name="Web_CloudSync_Unsync" xml:space="preserve">
-    <value>Synchronisierung mit externem Speicher entfernen</value>
-  </data>
-  <data name="Web_CloudSync_Unsync_Confirm" xml:space="preserve">
-    <value>Diese Konfiguration entfernen und ihre Cloud-Verbindung widerrufen?</value>
-  </data>
-  <data name="Web_CloudSync_Connected" xml:space="preserve">
-    <value>Der Cloud-Anbieter wurde erfolgreich verbunden.</value>
-  </data>
-  <data name="Web_CloudSync_Saved" xml:space="preserve">
-    <value>Einstellungen der Synchronisierung mit externem Speicher wurden gespeichert.</value>
-  </data>
-  <data name="Web_CloudSync_Removed" xml:space="preserve">
-    <value>Synchronisierung mit externem Speicher wurde entfernt.</value>
-  </data>
-  <data name="Web_CloudSync_Progress" xml:space="preserve">
-    <value>Synchronisierung läuft…</value>
-  </data>
-  <data name="Web_CloudSync_Complete" xml:space="preserve">
-    <value>Synchronisierung abgeschlossen.</value>
-  </data>
   <data name="Web_CloudSync_Directory_LocalTitle" xml:space="preserve">
     <value>Lokalen Ordner auswählen</value>
-  </data>
-  <data name="Web_CloudSync_Directory_RemoteTitle" xml:space="preserve">
-    <value>Remote-Ordner auswählen</value>
   </data>
   <data name="Web_CloudSync_Directory_Parent" xml:space="preserve">
     <value>Übergeordneter Ordner</value>
@@ -2991,26 +2706,11 @@
   <data name="Web_CloudSync_Directory_Error" xml:space="preserve">
     <value>Dieser Ordner konnte nicht geöffnet werden.</value>
   </data>
-  <data name="Web_CloudSync_Error_Load" xml:space="preserve">
-    <value>Die Synchronisierungen mit externem Speicher konnten nicht geladen werden.</value>
-  </data>
   <data name="Web_CloudSync_Error_ShareRequired" xml:space="preserve">
     <value>Bitte einen verwaltbaren Share auswählen.</value>
   </data>
-  <data name="Web_CloudSync_Error_ProviderRequired" xml:space="preserve">
-    <value>Bitte einen verfügbaren Cloud-Anbieter auswählen.</value>
-  </data>
   <data name="Web_CloudSync_Error_NotAuthorized" xml:space="preserve">
     <value>Für diese Aktion besteht keine Berechtigung.</value>
-  </data>
-  <data name="Web_CloudSync_Error_Missing" xml:space="preserve">
-    <value>Diese Synchronisierung mit externem Speicher existiert nicht mehr.</value>
-  </data>
-  <data name="Web_CloudSync_Error_Save" xml:space="preserve">
-    <value>Die Einstellungen der Synchronisierung mit externem Speicher konnten nicht gespeichert werden.</value>
-  </data>
-  <data name="Web_CloudSync_Error_Run" xml:space="preserve">
-    <value>Die Synchronisierung mit externem Speicher ist fehlgeschlagen. Bitte das Serverprotokoll prüfen.</value>
   </data>
   <data name="Web_CloudSync_Error_Busy" xml:space="preserve">
     <value>Dieser Ordner wird bereits synchronisiert oder geändert. Bitte später erneut versuchen.</value>
@@ -3020,12 +2720,6 @@
   </data>
   <data name="Web_CloudSync_SharePanel_Help" xml:space="preserve">
     <value>Die lokalen und Remote-Ordnerzuordnungen dieses Shares zentral in der Synchronisierung mit externem Speicher verwalten.</value>
-  </data>
-  <data name="Web_CloudSync_SharePanel_Count" xml:space="preserve">
-    <value>Eingerichtete Synchronisierungen: {0}</value>
-  </data>
-  <data name="Web_CloudSync_SharePanel_Open" xml:space="preserve">
-    <value>Synchronisierung mit externem Speicher öffnen</value>
   </data>
   <data name="Web_CloudSync_Device_Title" xml:space="preserve">
     <value>Microsoft OneDrive verbinden</value>
@@ -3083,9 +2777,6 @@
   </data>
   <data name="Web_CloudAccess_Dropbox_MissingScope" xml:space="preserve">
     <value>Dropbox wurde verbunden, aber der Autorisierung fehlen die Berechtigungen zum Durchsuchen von Ordnern. Bitte die Scopes files.metadata.read, files.content.read und files.content.write in der Dropbox-App aktivieren und diese Verbindung anschließend erneut autorisieren.</value>
-  </data>
-  <data name="Web_CloudSync_Cancelled" xml:space="preserve">
-    <value>Die Synchronisierung wurde abgebrochen.</value>
   </data>
   <data name="Web_Jobs_Title" xml:space="preserve">
     <value>Laufende Jobs</value>
@@ -3166,9 +2857,6 @@
   <data name="Web_CloudAccess_Provider" xml:space="preserve">
     <value>Cloud-Anbieter</value>
   </data>
-  <data name="Web_CloudAccess_Provider_Select" xml:space="preserve">
-    <value>Anbieter auswählen</value>
-  </data>
   <data name="Web_CloudAccess_ConnectionName" xml:space="preserve">
     <value>Verbindungsname</value>
   </data>
@@ -3184,26 +2872,11 @@
   <data name="Web_CloudAccess_Edit" xml:space="preserve">
     <value>Bearbeiten</value>
   </data>
-  <data name="Web_CloudAccess_Rename" xml:space="preserve">
-    <value>Umbenennen</value>
-  </data>
   <data name="Web_CloudAccess_Save" xml:space="preserve">
     <value>Änderungen speichern</value>
   </data>
-  <data name="Web_CloudAccess_Cancel" xml:space="preserve">
-    <value>Abbrechen</value>
-  </data>
   <data name="Web_CloudAccess_EditConnection" xml:space="preserve">
     <value>Verbindung bearbeiten</value>
-  </data>
-  <data name="Web_CloudAccess_EditShare" xml:space="preserve">
-    <value>Virtuellen Share bearbeiten</value>
-  </data>
-  <data name="Web_CloudAccess_ConnectionHelp" xml:space="preserve">
-    <value>Anbieter auswählen und die Verbindung einer Abteilung zuweisen. Zugangsdaten bleiben verschlüsselt auf dem Server.</value>
-  </data>
-  <data name="Web_CloudAccess_Connections" xml:space="preserve">
-    <value>Verbindungen</value>
   </data>
   <data name="Web_CloudAccess_NoConnections" xml:space="preserve">
     <value>Noch keine Cloud-Verbindung eingerichtet.</value>
@@ -3213,9 +2886,6 @@
   </data>
   <data name="Web_CloudAccess_Reauthorize" xml:space="preserve">
     <value>Neu autorisieren</value>
-  </data>
-  <data name="Web_CloudAccess_DeleteConnectionConfirm" xml:space="preserve">
-    <value>Verbindung „{0}“ und alle zugehörigen virtuellen Shares löschen?</value>
   </data>
   <data name="Web_CloudAccess_Shares" xml:space="preserve">
     <value>Virtuelle Shares</value>
@@ -3247,9 +2917,6 @@
   <data name="Web_CloudAccess_ReadOnly" xml:space="preserve">
     <value>Nur Lesen</value>
   </data>
-  <data name="Web_CloudAccess_ReadWrite" xml:space="preserve">
-    <value>Lesen und Schreiben</value>
-  </data>
   <data name="Web_CloudAccess_Access" xml:space="preserve">
     <value>Zugriff</value>
   </data>
@@ -3258,18 +2925,6 @@
   </data>
   <data name="Web_CloudAccess_AccessEditHelp" xml:space="preserve">
     <value>Benutzer und Gruppen hinzufügen oder entfernen und anschließend die Zugriffsliste speichern.</value>
-  </data>
-  <data name="Web_CloudAccess_Principal" xml:space="preserve">
-    <value>Benutzer oder Gruppe</value>
-  </data>
-  <data name="Web_CloudAccess_PrincipalPlaceholder" xml:space="preserve">
-    <value>Benutzer oder Gruppe auswählen</value>
-  </data>
-  <data name="Web_CloudAccess_AddPrincipal" xml:space="preserve">
-    <value>Hinzufügen</value>
-  </data>
-  <data name="Web_CloudAccess_RemovePrincipal" xml:space="preserve">
-    <value>Entfernen</value>
   </data>
   <data name="Web_CloudAccess_Open" xml:space="preserve">
     <value>Share öffnen</value>
@@ -3400,12 +3055,6 @@
   <data name="Web_CloudAccess_FolderPickerTitle" xml:space="preserve">
     <value>Remote-Ordner auswählen</value>
   </data>
-  <data name="Web_CloudAccess_User" xml:space="preserve">
-    <value>Benutzer</value>
-  </data>
-  <data name="Web_CloudAccess_Group" xml:space="preserve">
-    <value>Gruppe</value>
-  </data>
   <data name="Web_CloudAccess_NotAuthorized" xml:space="preserve">
     <value>Nicht autorisiert</value>
   </data>
@@ -3432,27 +3081,6 @@
   </data>
   <data name="Web_CloudAccess_Remote" xml:space="preserve">
     <value>Remote</value>
-  </data>
-  <data name="Web_CloudAccess_StatusReady" xml:space="preserve">
-    <value>Bereit</value>
-  </data>
-  <data name="Web_CloudAccess_StatusPending" xml:space="preserve">
-    <value>Autorisierung ausstehend</value>
-  </data>
-  <data name="Web_CloudAccess_StatusError" xml:space="preserve">
-    <value>Fehler</value>
-  </data>
-  <data name="Web_CloudAccess_StatusDisabled" xml:space="preserve">
-    <value>Deaktiviert</value>
-  </data>
-  <data name="Web_StorageConnection_StatusPendingConfiguration" xml:space="preserve">
-    <value>Konfiguration ausstehend</value>
-  </data>
-  <data name="Web_StorageConnection_StatusDegraded" xml:space="preserve">
-    <value>Eingeschränkt</value>
-  </data>
-  <data name="Web_StorageConnection_StatusNeedsReauthorization" xml:space="preserve">
-    <value>Erneute Autorisierung erforderlich</value>
   </data>
   <data name="Web_StorageConnection_DeleteBlockedBy" xml:space="preserve">
     <value>Kann nicht gelöscht werden, solange sie noch verwendet wird. {0}</value>
@@ -3721,12 +3349,6 @@
   <data name="Web_ExternalStorage_EditSync" xml:space="preserve">
     <value>Synchronisierung bearbeiten</value>
   </data>
-  <data name="Web_ExternalStorage_CreateSyncFromConnection" xml:space="preserve">
-    <value>Synchronisierung erstellen</value>
-  </data>
-  <data name="Web_ExternalStorage_CreateShareFromConnection" xml:space="preserve">
-    <value>Virtuellen Share erstellen</value>
-  </data>
   <data name="Web_ExternalStorage_NoSyncs" xml:space="preserve">
     <value>Es sind keine Synchronisierungen konfiguriert.</value>
   </data>
@@ -3760,29 +3382,8 @@
   <data name="Web_ExternalStorage_Disabled" xml:space="preserve">
     <value>Deaktiviert</value>
   </data>
-  <data name="Web_ExternalStorage_Enable" xml:space="preserve">
-    <value>Aktivieren</value>
-  </data>
-  <data name="Web_ExternalStorage_Disable" xml:space="preserve">
-    <value>Deaktivieren</value>
-  </data>
   <data name="Web_ExternalStorage_ScheduleEnabled" xml:space="preserve">
     <value>Automatisch ausführen</value>
-  </data>
-  <data name="Web_ExternalStorage_Interval" xml:space="preserve">
-    <value>Mindestintervall (Sekunden)</value>
-  </data>
-  <data name="Web_ExternalStorage_ExcludedExtensions" xml:space="preserve">
-    <value>Ausgeschlossene Dateiendungen</value>
-  </data>
-  <data name="Web_ExternalStorage_MaxFileSize" xml:space="preserve">
-    <value>Maximale Dateigröße (MB)</value>
-  </data>
-  <data name="Web_ExternalStorage_MaxUploadRate" xml:space="preserve">
-    <value>Upload-Limit (KB/s)</value>
-  </data>
-  <data name="Web_ExternalStorage_MaxDownloadRate" xml:space="preserve">
-    <value>Download-Limit (KB/s)</value>
   </data>
   <data name="Web_ExternalStorage_LastRun" xml:space="preserve">
     <value>Letzte Ausführung</value>
@@ -3850,17 +3451,11 @@
   <data name="Web_ExternalStorage_RunNow" xml:space="preserve">
     <value>Jetzt ausführen</value>
   </data>
-  <data name="Web_ExternalStorage_SyncSuccessful" xml:space="preserve">
-    <value>Synchronisierung erfolgreich</value>
-  </data>
   <data name="Web_ExternalStorage_OperationFailed" xml:space="preserve">
     <value>Der Vorgang ist fehlgeschlagen. Prüfen Sie das Serverprotokoll.</value>
   </data>
   <data name="Web_ExternalStorage_SyncMissing" xml:space="preserve">
     <value>Die Synchronisierung ist nicht mehr vorhanden.</value>
-  </data>
-  <data name="Web_ExternalStorage_SyncUnavailable" xml:space="preserve">
-    <value>Die Synchronisierung ist belegt oder nicht verfügbar.</value>
   </data>
   <data name="Web_ExternalStorage_ShareMissing" xml:space="preserve">
     <value>Der lokale Share ist nicht mehr vorhanden.</value>
@@ -3873,9 +3468,6 @@
   </data>
   <data name="Web_ExternalStorage_PathInUse" xml:space="preserve">
     <value>Für diesen lokalen Ordner ist bereits eine Synchronisierung eingerichtet.</value>
-  </data>
-  <data name="Web_ExternalStorage_SelectConnection" xml:space="preserve">
-    <value>Wählen Sie eine Verbindung aus, um Details anzuzeigen.</value>
   </data>
   <data name="Web_ExternalStorage_AuthorizationMode" xml:space="preserve">
     <value>Autorisierungsmodus</value>
@@ -3897,12 +3489,6 @@
   </data>
   <data name="Web_ExternalStorage_SecretHealth" xml:space="preserve">
     <value>Anmeldedatenspeicher</value>
-  </data>
-  <data name="Web_ExternalStorage_Usage" xml:space="preserve">
-    <value>Verwendung</value>
-  </data>
-  <data name="Web_ExternalStorage_UsageFormat" xml:space="preserve">
-    <value>{0} Synchronisierung(en), {1} virtuelle(r) Share(s)</value>
   </data>
   <data name="Web_ExternalStorage_ProfileLegacy" xml:space="preserve">
     <value>Legacy / nicht zugewiesen</value>
@@ -3970,9 +3556,6 @@
   <data name="Web_ExternalStorage_RemoteBrowseFailed" xml:space="preserve">
     <value>Die Remote-Ordner konnten nicht geladen werden.</value>
   </data>
-  <data name="Web_ShareList_Tab_Cloud" xml:space="preserve">
-    <value>Cloud</value>
-  </data>
   <data name="Web_ShareList_SelectHint" xml:space="preserve">
     <value>Wählen Sie einen Share aus, um Details und Einstellungen anzuzeigen.</value>
   </data>
@@ -3984,9 +3567,6 @@
   </data>
   <data name="Web_ExternalStorage_None" xml:space="preserve">
     <value>Keine</value>
-  </data>
-  <data name="Web_ExternalStorage_BrowseUnsupported" xml:space="preserve">
-    <value>Dieser Anbieter unterstützt kein Durchsuchen von Remote-Ordnern.</value>
   </data>
   <data name="Web_ExternalStorage_SyncUnsupported" xml:space="preserve">
     <value>Dieser Anbieter unterstützt keine Synchronisierung.</value>
@@ -4081,29 +3661,14 @@
   <data name="Web_ExternalStorage_Domain" xml:space="preserve">
     <value>Domäne (optional)</value>
   </data>
-  <data name="Web_ExternalStorage_SmbShare" xml:space="preserve">
-    <value>SMB-Share</value>
-  </data>
   <data name="Web_ExternalStorage_Username" xml:space="preserve">
     <value>Benutzername</value>
   </data>
   <data name="Web_ExternalStorage_Password" xml:space="preserve">
     <value>Kennwort</value>
   </data>
-  <data name="Web_ExternalStorage_ExpectedServerIdentity" xml:space="preserve">
-    <value>Erwartete Serveridentität</value>
-  </data>
-  <data name="Web_ExternalStorage_MountPath" xml:space="preserve">
-    <value>Lokaler Einhängepfad</value>
-  </data>
-  <data name="Web_ExternalStorage_AttestationPath" xml:space="preserve">
-    <value>Datei mit Einhängenachweis</value>
-  </data>
   <data name="Web_ExternalStorage_MinimumDialect" xml:space="preserve">
     <value>Minimale SMB-Version</value>
-  </data>
-  <data name="Web_ExternalStorage_ReadOnly" xml:space="preserve">
-    <value>Schreibgeschützt</value>
   </data>
   <data name="Web_ExternalStorage_InvalidCredentials" xml:space="preserve">
     <value>Geben Sie einen gültigen Benutzernamen und ein Kennwort für diese Verbindung ein.</value>
@@ -4128,9 +3693,6 @@
   </data>
   <data name="Web_ExternalStorage_Identity" xml:space="preserve">
     <value>Identität und Autorisierung</value>
-  </data>
-  <data name="Web_ExternalStorage_CapabilitiesAndUsage" xml:space="preserve">
-    <value>Funktionen und Verwendung</value>
   </data>
   <data name="Web_ExternalStorage_SelectSyncHint" xml:space="preserve">
     <value>Wählen Sie bei einer Synchronisierung „Bearbeiten“, um ihre Einstellungen zu öffnen.</value>
@@ -4414,9 +3976,6 @@
   <data name="Web_Settings_Storage_Update" xml:space="preserve">
     <value>Aktualisieren</value>
   </data>
-  <data name="Web_Common_Enabled" xml:space="preserve">
-    <value>Aktiviert</value>
-  </data>
   <data name="Web_Settings_Net_Title" xml:space="preserve">
     <value>IP-Adressen</value>
   </data>
@@ -4543,20 +4102,11 @@
   <data name="Web_Settings_Search_StatusUnreachable" xml:space="preserve">
     <value>Nicht erreichbar</value>
   </data>
-  <data name="Web_Settings_Search_StatusFilenameMode" xml:space="preserve">
-    <value>Dateinamen-Modus</value>
-  </data>
   <data name="Web_Settings_Data_Title" xml:space="preserve">
     <value>Datendienste</value>
   </data>
   <data name="Web_Settings_Data_Description" xml:space="preserve">
     <value>Aktiviert oder deaktiviert die Share-Protokolle. Änderungen werden vom Dienst innerhalb weniger Sekunden übernommen – ein Neustart ist nicht nötig.</value>
-  </data>
-  <data name="Web_Settings_Data_SmbToggle" xml:space="preserve">
-    <value>SMB aktivieren/deaktivieren</value>
-  </data>
-  <data name="Web_Settings_Data_WebDavToggle" xml:space="preserve">
-    <value>WebDAV aktivieren/deaktivieren</value>
   </data>
   <data name="Web_Settings_Data_WebDavUrl" xml:space="preserve">
     <value>WebDAV-Adresse</value>
@@ -4696,23 +4246,14 @@
   <data name="Web_ShareLinks_Col_Share" xml:space="preserve">
     <value>Share</value>
   </data>
-  <data name="Web_ShareLinks_Col_CreatedBy" xml:space="preserve">
-    <value>Erstellt von</value>
-  </data>
   <data name="Web_ShareLinks_Col_Access" xml:space="preserve">
     <value>Downloads</value>
   </data>
   <data name="Web_ShareLinks_Col_Status" xml:space="preserve">
     <value>Status</value>
   </data>
-  <data name="Web_ShareLinks_Enable" xml:space="preserve">
-    <value>Aktivieren</value>
-  </data>
   <data name="Web_ShareLinks_Disable" xml:space="preserve">
     <value>Deaktivieren</value>
-  </data>
-  <data name="Web_ShareLinks_Copy" xml:space="preserve">
-    <value>Link kopieren</value>
   </data>
   <data name="Web_ShareLinks_NewPassword" xml:space="preserve">
     <value>Neues Passwort (leer lassen zum Beibehalten)</value>
@@ -5707,12 +5248,6 @@
   <data name="Notification_Role_device_registered_affected" xml:space="preserve">
     <value>Der Benutzer, mit dessen Konto sich das Gerät angemeldet hat</value>
   </data>
-  <data name="Web_Notifications_Recipients" xml:space="preserve">
-    <value>Empfänger</value>
-  </data>
-  <data name="Web_Notifications_ContextRoles" xml:space="preserve">
-    <value>Beteiligte Personen</value>
-  </data>
   <data name="Web_Notifications_ContextRoles_Help" xml:space="preserve">
     <value>Werden je Ereignis ermittelt, z. B. der angelegte Benutzer oder der Ersteller des Links.</value>
   </data>
@@ -5866,9 +5401,6 @@
   <data name="Web_Notifications_Col_Recipient" xml:space="preserve">
     <value>Empfänger</value>
   </data>
-  <data name="Web_Notifications_Col_Status" xml:space="preserve">
-    <value>Status</value>
-  </data>
   <data name="Web_Notifications_Status_Pending" xml:space="preserve">
     <value>Wartet</value>
   </data>
@@ -5883,12 +5415,6 @@
   </data>
   <data name="Web_Notifications_Status_Dead" xml:space="preserve">
     <value>Fehlgeschlagen</value>
-  </data>
-  <data name="Web_Notifications_Attempts" xml:space="preserve">
-    <value>{0} Versuch(e)</value>
-  </data>
-  <data name="Web_Notifications_View" xml:space="preserve">
-    <value>Ansehen</value>
   </data>
   <data name="Web_Notifications_Retry" xml:space="preserve">
     <value>Erneut senden</value>

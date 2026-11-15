@@ -251,12 +251,6 @@
     word-break: break-word;
 }
 
-.detail-value-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
 .detail-rename-row .edit-input,
 .detail-value-row .edit-input,
 .vs-folder-row .edit-input {

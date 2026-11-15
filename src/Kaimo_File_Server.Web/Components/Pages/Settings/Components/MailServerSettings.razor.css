@@ -39,12 +39,6 @@
     color: var(--text-primary);
 }
 
-.mail-server__card-hint {
-    font-size: 12px;
-    line-height: 1.55;
-    color: var(--text-tertiary);
-}
-
 .mail-server__card--off .mail-server__card-icon,
 .mail-server__card--off .mail-server__card-name {
     color: var(--text-tertiary);

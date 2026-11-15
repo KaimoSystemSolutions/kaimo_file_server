@@ -7,7 +7,6 @@
 /* Separates the setting groups (pool | department | status & visibility | recycle limits).
    The preceding section already carries its bottom margin, so only space below. */
 .extra-group-divider { height: 1px; background: var(--border); margin: 0 0 var(--space-4); }
-.edit-input { min-height: 28px; padding: 5px 10px; font-size: 12px; line-height: 1.4; }
 
 /* Field + action rows (move pool): the field grows, the button keeps a fixed size and
    stays vertically centred with the field. */
