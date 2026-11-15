@@ -145,6 +145,35 @@ public sealed class BackupSchedulerService(
         {
             logger.LogError(ex, "Checking backup jobs for missing successful runs failed.");
         }
+
+        try
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            var removed = await PruneRunsAsync(db, now, ct);
+            if (removed > 0)
+                logger.LogInformation("Removed {Count} backup runs older than {Days} days.", removed, RunRetentionDays);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Pruning old backup runs failed.");
+        }
+    }
+
+    /// <summary>How long finished runs (the backup activity log) are kept.</summary>
+    public const int RunRetentionDays = 365;
+
+    /// <summary>
+    /// Deletes finished runs queued more than <see cref="RunRetentionDays"/> ago. Queued and
+    /// running rows are left to the runner's own recovery. Nothing reads old runs back:
+    /// jobs keep their last status and success time themselves.
+    /// </summary>
+    public static Task<int> PruneRunsAsync(ApplicationDbContext db, DateTime nowUtc, CancellationToken ct)
+    {
+        var cutoff = nowUtc.AddDays(-RunRetentionDays);
+        return db.BackupRuns
+            .Where(r => r.QueuedAtUtc < cutoff
+                        && r.Status != BackupRunStatus.Queued && r.Status != BackupRunStatus.Running)
+            .ExecuteDeleteAsync(ct);
     }
 
     // More than two poll intervals late means the server was not running at the slot.

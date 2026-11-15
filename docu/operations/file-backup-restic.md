@@ -19,7 +19,7 @@ Related: [Database backup and restore](database-backup-and-restore.md) ·
 | Catalog and authorization | `BackupCatalogService` | Every action re-checks the actor's permissions server-side |
 | Schedules, stale alerts | `BackupSchedulerService` | Polls every minute |
 | Execution | `BackupRunner` | One serial lane for backups and maintenance, one lane for restores |
-| Audit trail | table `backup_runs` | Every init, backup, forget, prune, check, copy, test restore and restore |
+| Audit trail | table `backup_runs` | Every init, backup, forget, prune, check, copy, test restore and restore; `BackupSchedulerService` deletes finished runs older than 365 days |
 | Snapshot cache | table `backup_snapshots` | The UI and scope checks never contact the repository to list backup points |
 
 restic is always called with secrets in the environment only (`RESTIC_PASSWORD`, backend
