@@ -110,6 +110,78 @@ rc=$?
 check "complete PKI with a leftover marker is kept" \
     '[ "$rc" -eq 0 ] && grep -q "already present" <<<"$output" && [ "$(digest "$interrupted/authority/ca.crt")" = "$before_interrupted_ca" ] && [ ! -e "$interrupted/authority/.generating" ]'
 
+# ---------------------------------------------------------------- renewal
+# Every start renews a leaf that expires within a year and a CA that expires
+# within one leaf lifetime. Keys are kept, so a bridge or Samba still holding
+# the old files keeps working until it restarts.
+renew="$WORK/renew"
+bash "$SUT" "$renew" >/dev/null 2>&1
+valid_for_days() { openssl x509 -checkend "$(($2 * 86400))" -noout -in "$1" >/dev/null; }
+# Re-issues $2 (a leaf certificate of PKI $1) with its own key, valid for $3 days.
+short_leaf() {
+    openssl req -new -key "${2%.crt}.key" -subj "/CN=short" 2>/dev/null \
+        | openssl x509 -req -CA "$1/authority/ca.crt" -CAkey "$1/authority/ca.key" \
+            -set_serial 4242 -days "$3" -out "$2.short" 2>/dev/null && mv "$2.short" "$2"
+}
+resign_leaf() { short_leaf "$renew" "$@"; }
+before_renew_ca="$(digest "$renew/authority/ca.crt")"
+before_renew_samba="$(digest "$renew/samba/samba.crt")"
+before_renew_key="$(digest "$renew/bridge/server.key")"
+resign_leaf "$renew/bridge/server.crt" 30
+output="$(bash "$SUT" "$renew" 2>&1)"
+rc=$?
+check "expiring bridge certificate is renewed" \
+    '[ "$rc" -eq 0 ] && grep -q "renewed" <<<"$output" && valid_for_days "$renew/bridge/server.crt" 800'
+check "renewed bridge certificate keeps its key, name and usage" \
+    '[ "$(digest "$renew/bridge/server.key")" = "$before_renew_key" ] && openssl x509 -in "$renew/bridge/server.crt" -noout -pubkey | cmp -s - <(openssl pkey -in "$renew/bridge/server.key" -pubout) && san "$renew/bridge/server.crt" | grep -q "DNS:kaimo_smb_bridge" && eku "$renew/bridge/server.crt" | grep -q "TLS Web Server Authentication"'
+check "renewed bridge certificate chains to the unchanged CA" \
+    '[ "$(digest "$renew/authority/ca.crt")" = "$before_renew_ca" ] && openssl verify -CAfile "$renew/bridge/ca.crt" "$renew/bridge/server.crt" >/dev/null'
+check "a valid samba certificate is left alone" '[ "$(digest "$renew/samba/samba.crt")" = "$before_renew_samba" ]'
+check "renewed certificate is world readable, no temp leftovers" \
+    '[ "$(mode "$renew/bridge/server.crt")" = 644 ] && ! ls "$renew/bridge" "$renew/samba" "$renew/authority" | grep -qE "\.(new|csr|ext)$"'
+
+before_renew_key="$(digest "$renew/samba/samba.key")"
+resign_leaf "$renew/samba/samba.crt" 300
+output="$(bash "$SUT" "$renew" 2>&1)"
+rc=$?
+check "samba certificate expiring within a year is renewed with its key" \
+    '[ "$rc" -eq 0 ] && valid_for_days "$renew/samba/samba.crt" 800 && [ "$(digest "$renew/samba/samba.key")" = "$before_renew_key" ] && eku "$renew/samba/samba.crt" | grep -q "TLS Web Client Authentication"'
+
+old_ca="$WORK/old-ca.crt"
+cp "$renew/authority/ca.crt" "$old_ca"
+before_renew_cakey="$(digest "$renew/authority/ca.key")"
+openssl req -x509 -new -sha256 -key "$renew/authority/ca.key" -subj "/CN=Kaimo SMB Control Plane CA" \
+    -days 400 -out "$renew/authority/ca.crt" 2>/dev/null
+cp "$renew/authority/ca.crt" "$renew/bridge/ca.crt"
+cp "$renew/authority/ca.crt" "$renew/samba/ca.crt"
+output="$(bash "$SUT" "$renew" 2>&1)"
+rc=$?
+check "CA expiring within one leaf lifetime is renewed and republished" \
+    '[ "$rc" -eq 0 ] && valid_for_days "$renew/authority/ca.crt" 3000 && [ "$(digest "$renew/bridge/ca.crt")" = "$(digest "$renew/authority/ca.crt")" ] && [ "$(digest "$renew/samba/ca.crt")" = "$(digest "$renew/authority/ca.crt")" ]'
+check "renewed CA keeps its key, so existing leaves still chain" \
+    '[ "$(digest "$renew/authority/ca.key")" = "$before_renew_cakey" ] && openssl verify -CAfile "$renew/authority/ca.crt" "$renew/bridge/server.crt" "$renew/samba/samba.crt" >/dev/null'
+resign_leaf "$renew/samba/samba.crt" 30
+bash "$SUT" "$renew" >/dev/null 2>&1
+check "a leaf issued by the renewed CA is trusted by a consumer holding the old CA" \
+    'openssl verify -CAfile "$old_ca" "$renew/samba/samba.crt" >/dev/null'
+
+# Stopped between renewing the authority copy and publishing it.
+cp "$old_ca" "$renew/samba/ca.crt"
+output="$(bash "$SUT" "$renew" 2>&1)"
+check "a stale published CA copy is republished" \
+    '[ "$(digest "$renew/samba/ca.crt")" = "$(digest "$renew/authority/ca.crt")" ]'
+
+# Externally managed PKI: no CA key here, so nothing can be renewed; warn only.
+external="$WORK/external"
+bash "$SUT" "$external" >/dev/null 2>&1
+short_leaf "$external" "$external/bridge/server.crt" 30
+rm -rf "$external/authority"
+before_external="$(digest "$external/bridge/server.crt")"
+output="$(bash "$SUT" "$external" 2>&1)"
+rc=$?
+check "externally managed PKI is only warned about" \
+    '[ "$rc" -eq 0 ] && grep -q "warning: .*server.crt expires" <<<"$output" && [ "$(digest "$external/bridge/server.crt")" = "$before_external" ]'
+
 # ---------------------------------------------------------------- fallbacks
 output="$(KAIMO_BRIDGE_UID=not-a-user bash "$SUT" "$WORK/fallback" 2>&1)"
 rc=$?
@@ -137,6 +209,11 @@ if [ "$(id -u)" -eq 0 ] && command -v setpriv >/dev/null 2>&1; then
         '[ "$rc" -eq 0 ] && grep -q "already present" <<<"$output"'
     check "app UID leaves the root-owned PKI untouched" \
         '[ "$(digest "$root_pki/authority/ca.crt")" = "$before_root_ca" ] && [ "$(mode "$root_pki/samba/samba.key")" = 600 ]'
+    short_leaf "$root_pki" "$root_pki/samba/samba.crt" 30
+    output="$(as_app "$root_pki" 2>&1)"
+    rc=$?
+    check "app UID only warns about an expiring root-owned PKI it cannot renew" \
+        '[ "$rc" -eq 0 ] && grep -q "samba.crt expires within .* cannot be renewed" <<<"$output"'
 
     app_pki="$WORK/app-owned"
     install -d -o 1654 -g 1654 "$app_pki"

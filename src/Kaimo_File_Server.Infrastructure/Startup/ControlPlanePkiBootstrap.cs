@@ -65,7 +65,13 @@ public static class ControlPlanePkiBootstrap
             string messages = (output.Result + error.Result).Trim();
             if (process.ExitCode == 0)
             {
-                logger.LogInformation("SMB control-plane PKI: {Messages}", messages);
+                // The script prefixes warnings (e.g. a certificate that expires
+                // soon but cannot be renewed here); openssl progress on stderr is not one.
+                logger.Log(
+                    error.Result.Contains("warning:", StringComparison.Ordinal)
+                        ? LogLevel.Warning
+                        : LogLevel.Information,
+                    "SMB control-plane PKI: {Messages}", messages);
                 return true;
             }
 

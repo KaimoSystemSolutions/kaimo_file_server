@@ -37,6 +37,15 @@ one-shot container:
 | Server certificate | `CN=kaimo_smb_bridge`, SAN `DNS:kaimo_smb_bridge` (825 days) | `serverAuth` | Bridge |
 | Client certificate | `CN=kaimo-samba` (825 days) | `clientAuth` | Samba |
 
+**Renewal.** On each start the script also renews, with the existing CA key, a leaf certificate that
+expires within 365 days, and re-signs the CA (same key and subject) once it expires within 825 days;
+the published `ca.crt` copies are refreshed whenever they differ from `authority/ca.crt`. Keys are
+kept, so a bridge or Samba process still holding the old certificate or CA keeps interoperating with
+the renewed files. Both load the files only at process start: restart `kaimo_smb_bridge` and
+`kaimo_samba` after a renewal (the Host log says so). Without a readable `authority/ca.key`
+(externally managed PKI, or a root-owned one from the former `pki-init`) nothing is renewed; an
+expiring certificate is logged as a warning instead.
+
 `ControlPlaneTls` (`src/Kaimo_File_Server.SmbBridge/Security/ControlPlaneTls.cs`) validates client
 certificates against the dedicated CA only; the operating-system trust store is not used.
 

@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Infrastructure.Startup;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -45,6 +46,35 @@ public sealed class ControlPlanePkiBootstrapTests : IDisposable
     }
 
     [Fact]
+    public void Run_GeneratorSucceedsWithStderr_LogsWarning()
+    {
+        // e.g. a certificate that expires soon but cannot be renewed here.
+        string generator = WriteGenerator(
+            windows: "@echo warning: samba.crt expires soon 1>&2",
+            unix: "echo 'warning: samba.crt expires soon' >&2");
+        var logger = new CapturingLogger();
+
+        bool ready = ControlPlanePkiBootstrap.Run(
+            logger, generator, _work.FullName, TimeSpan.FromSeconds(30));
+
+        Assert.True(ready);
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("expires soon"));
+    }
+
+    [Fact]
+    public void Run_GeneratorSucceedsWithOpensslProgress_LogsInformation()
+    {
+        string generator = WriteGenerator(
+            windows: "@echo Certificate request self-signature ok 1>&2",
+            unix: "echo 'Certificate request self-signature ok' >&2");
+        var logger = new CapturingLogger();
+
+        ControlPlanePkiBootstrap.Run(logger, generator, _work.FullName, TimeSpan.FromSeconds(30));
+
+        Assert.All(logger.Entries, e => Assert.Equal(LogLevel.Information, e.Level));
+    }
+
+    [Fact]
     public void Run_GeneratorMissing_ReturnsFalseWithoutThrowing()
     {
         bool ready = ControlPlanePkiBootstrap.Run(
@@ -70,5 +100,19 @@ public sealed class ControlPlanePkiBootstrapTests : IDisposable
         File.SetUnixFileMode(shell,
             UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         return shell;
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+            => Entries.Add((logLevel, formatter(state, exception)));
     }
 }

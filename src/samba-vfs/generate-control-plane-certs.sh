@@ -20,6 +20,19 @@ for required in openssl; do
     }
 done
 
+ca_subject="/CN=Kaimo SMB Control Plane CA"
+ca_days=3650
+leaf_days=825
+# Every start renews a leaf that expires within this many days, and the CA once
+# it expires within one leaf lifetime. Renewal keeps the keys, so a bridge or
+# Samba process still holding the old certificate or CA keeps working with the
+# renewed files until it restarts.
+# ponytail: renewal runs only at Host start and the bridge/Samba load the files
+# once per process, so a stack running a whole year without any restart still
+# expires; upgrade path: periodic re-run plus hot reload (Kestrel
+# ServerCertificateSelector, gRPC FileWatcherCertificateProvider).
+renew_days=365
+
 issue_certificate() {
     name="$1"
     common_name="$2"
@@ -27,10 +40,17 @@ issue_certificate() {
     subject_alt_name="${4:-}"
     destination="$5"
 
-    openssl req -new -newkey rsa:3072 -sha256 -nodes \
-        -subj "/CN=$common_name" \
-        -keyout "$destination/$name.key" \
-        -out "$authority_output/$name.csr"
+    if [ -s "$destination/$name.key" ]; then
+        # Renewal: keep the key so swapping the certificate is the only change.
+        openssl req -new -sha256 -key "$destination/$name.key" \
+            -subj "/CN=$common_name" \
+            -out "$authority_output/$name.csr"
+    else
+        openssl req -new -newkey rsa:3072 -sha256 -nodes \
+            -subj "/CN=$common_name" \
+            -keyout "$destination/$name.key" \
+            -out "$authority_output/$name.csr"
+    fi
 
     {
         echo "basicConstraints=critical,CA:FALSE"
@@ -39,15 +59,77 @@ issue_certificate() {
         [ -z "$subject_alt_name" ] || echo "subjectAltName=$subject_alt_name"
     } > "$authority_output/$name.ext"
 
-    openssl x509 -req -sha256 -days 825 \
+    openssl x509 -req -sha256 -days "$leaf_days" \
         -in "$authority_output/$name.csr" \
         -CA "$authority_output/ca.crt" \
         -CAkey "$authority_output/ca.key" \
         -CAcreateserial \
         -extfile "$authority_output/$name.ext" \
-        -out "$destination/$name.crt"
+        -out "$destination/$name.crt.new"
+    mv -f "$destination/$name.crt.new" "$destination/$name.crt"
 
     rm -f "$authority_output/$name.csr" "$authority_output/$name.ext"
+}
+
+issue_bridge_certificate() {
+    issue_certificate server kaimo_smb_bridge serverAuth DNS:kaimo_smb_bridge "$bridge_output"
+}
+
+issue_samba_certificate() {
+    issue_certificate samba kaimo-samba clientAuth "" "$samba_output"
+}
+
+# Atomic per file: a consumer never reads a half-written CA.
+publish_ca() {
+    for publish_dir in "$bridge_output" "$samba_output"; do
+        cp "$authority_output/ca.crt" "$publish_dir/ca.crt.new"
+        mv -f "$publish_dir/ca.crt.new" "$publish_dir/ca.crt"
+    done
+}
+
+# True when certificate $1 is unreadable or expires within $2 days.
+expires_within() {
+    ! openssl x509 -checkend "$(($2 * 86400))" -noout -in "$1" >/dev/null 2>&1
+}
+
+renew_expiring() {
+    # Externally managed PKI, or one the former root-run pki-init created and
+    # this UID cannot read.
+    if [ ! -r "$authority_output/ca.key" ] || [ ! -s "$authority_output/ca.key" ]; then
+        for renew_cert in "$bridge_output/ca.crt" "$bridge_output/server.crt" "$samba_output/samba.crt"; do
+            if expires_within "$renew_cert" "$renew_days"; then
+                echo "warning: $renew_cert expires within $renew_days days and cannot be renewed here: no readable CA key in $authority_output" >&2
+            fi
+        done
+        return 0
+    fi
+
+    renewed=""
+    if expires_within "$authority_output/ca.crt" "$leaf_days"; then
+        # Same key and subject: certificates issued before still chain to it.
+        openssl req -x509 -new -sha256 -days "$ca_days" \
+            -key "$authority_output/ca.key" \
+            -subj "$ca_subject" \
+            -out "$authority_output/ca.crt.new"
+        mv -f "$authority_output/ca.crt.new" "$authority_output/ca.crt"
+        renewed="$renewed CA"
+    fi
+    # Also repairs copies left stale by a run stopped before publishing.
+    if ! cmp -s "$authority_output/ca.crt" "$bridge_output/ca.crt" \
+        || ! cmp -s "$authority_output/ca.crt" "$samba_output/ca.crt"; then
+        publish_ca
+    fi
+    if expires_within "$bridge_output/server.crt" "$renew_days"; then
+        issue_bridge_certificate
+        renewed="$renewed bridge"
+    fi
+    if expires_within "$samba_output/samba.crt" "$renew_days"; then
+        issue_samba_certificate
+        renewed="$renewed samba"
+    fi
+    if [ -n "$renewed" ]; then
+        echo "SMB control-plane certificates renewed:$renewed; restart kaimo_smb_bridge and kaimo_samba to load them"
+    fi
 }
 
 required_files="
@@ -72,6 +154,8 @@ restrict() {
     restrict_mode="$1"
     shift
     for restrict_path in "$@"; do
+        # Missing: an externally managed PKI may come without the authority.
+        [ -e "$restrict_path" ] || continue
         if [ "$(id -u)" -eq 0 ] || [ -O "$restrict_path" ]; then
             chmod "$restrict_mode" "$restrict_path"
         fi
@@ -112,6 +196,7 @@ generating="$authority_output/.generating"
 if [ "$missing" -eq 0 ]; then
     # Stopped after the last file but before the marker was removed: complete.
     [ ! -e "$generating" ] || rm -f "$generating"
+    renew_expiring
     restrict_leaf_keys
     echo "SMB control-plane PKI already present in $output"
     exit 0
@@ -134,7 +219,7 @@ if [ -f "$bridge_output/ca.crt" ] && [ -s "$bridge_output/ca.crt" ] \
     && [ -f "$authority_output/ca.key" ] && [ -s "$authority_output/ca.key" ] \
     && [ ! -e "$samba_output/samba.crt" ] \
     && [ ! -e "$samba_output/samba.key" ]; then
-    issue_certificate samba kaimo-samba clientAuth "" "$samba_output"
+    issue_samba_certificate
     cp "$authority_output/ca.crt" "$samba_output/ca.crt"
 else
     if [ "$present" -ne 0 ]; then
@@ -144,13 +229,13 @@ else
 
     : > "$generating"
     openssl req -x509 -newkey rsa:3072 -sha256 -nodes \
-        -days 3650 \
-        -subj "/CN=Kaimo SMB Control Plane CA" \
+        -days "$ca_days" \
+        -subj "$ca_subject" \
         -keyout "$authority_output/ca.key" \
         -out "$authority_output/ca.crt"
 
-    issue_certificate server kaimo_smb_bridge serverAuth DNS:kaimo_smb_bridge "$bridge_output"
-    issue_certificate samba kaimo-samba clientAuth "" "$samba_output"
+    issue_bridge_certificate
+    issue_samba_certificate
 
     cp "$authority_output/ca.crt" "$bridge_output/ca.crt"
     cp "$authority_output/ca.crt" "$samba_output/ca.crt"
