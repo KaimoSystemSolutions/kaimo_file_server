@@ -1,0 +1,78 @@
+@*
+    Editable path bar (shared UI library).
+
+    Shows the caller's breadcrumbs (ChildContent). Clicking the free space after them turns
+    the bar into a text field holding "Root/sub/folder": the text is pre-selected
+    (pathBar.js) for copying, Enter navigates to the typed or pasted path (ignored while
+    Disabled, i.e. the host is busy), Escape or leaving the field restores the breadcrumbs.
+*@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Helpers
+
+@if (_editing)
+{
+    <input @ref="_input" type="text" class="edit-input path-bar-input @Class" spellcheck="false"
+           aria-label="@Label"
+           @bind="_text" @bind:event="oninput"
+           @onkeydown="OnKeyDownAsync" @onkeydown:stopPropagation="true"
+           @onblur="() => _editing = false" />
+}
+else
+{
+    <nav class="breadcrumb-bar path-bar @Class" aria-label="@Label">
+        @ChildContent
+        <button type="button" class="path-bar-edit" title="@EditLabel" aria-label="@EditLabel"
+                disabled="@Disabled" @onclick="StartEdit"></button>
+    </nav>
+}
+
+@code {
+    /// <summary>Name shown as the first path segment (share name).</summary>
+    [Parameter, EditorRequired] public string RootName { get; set; } = "";
+
+    /// <summary>Current '/'-separated path below the root ("" at the root).</summary>
+    [Parameter] public string Path { get; set; } = "";
+
+    /// <summary>Called with the new path below the root when the user submits a different one.</summary>
+    [Parameter] public EventCallback<string> OnNavigate { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private static string EditLabel => Resources.Web_PathBar_Edit;
+
+    private ElementReference _input;
+    private bool _editing;
+    private bool _focusPending;
+    private string _text = "";
+
+    private void StartEdit()
+    {
+        _text = PathBarText.Format(RootName, Path);
+        _editing = _focusPending = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusPending) return;
+        _focusPending = false;
+        try { await _input.FocusAsync(); } catch { /* field may be gone already */ }
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            _editing = false;
+        }
+        else if (e.Key == "Enter" && !Disabled)
+        {
+            _editing = false;
+            var target = PathBarText.ToRelative(_text, RootName);
+            if (target != Path)
+                await OnNavigate.InvokeAsync(target);
+        }
+    }
+}

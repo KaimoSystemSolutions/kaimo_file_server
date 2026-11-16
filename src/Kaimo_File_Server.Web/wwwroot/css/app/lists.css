@@ -82,7 +82,8 @@
         color: var(--accent);
     }
 
-    .breadcrumb-link:last-child {
+    /* Current location = last crumb; trailing non-crumb controls (PathBar edit area) don't count. */
+    .breadcrumb-link:not(:has(~ .breadcrumb-link)) {
         color: var(--text-primary);
         font-weight: 600;
     }

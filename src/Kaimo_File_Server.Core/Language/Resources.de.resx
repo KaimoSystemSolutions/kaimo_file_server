@@ -240,6 +240,9 @@
   <data name="Web_Breadcrumb_Shares" xml:space="preserve">
     <value>Shares</value>
   </data>
+  <data name="Web_PathBar_Edit" xml:space="preserve">
+    <value>Pfad bearbeiten</value>
+  </data>
   <data name="Web_Action_Open" xml:space="preserve">
     <value>Öffnen</value>
   </data>

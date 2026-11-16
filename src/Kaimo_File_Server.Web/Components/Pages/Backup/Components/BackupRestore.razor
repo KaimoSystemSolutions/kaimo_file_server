@@ -114,14 +114,15 @@
             }
             else
             {
-            <nav class="breadcrumb-bar backup-browse-path" aria-label="@R("Web_Backup_Restore_Path")">
+            <PathBar Class="backup-browse-path" Label="@R("Web_Backup_Restore_Path")" RootName="@share.Name"
+                     Path="@VM.BrowseFolder" Disabled="@VM.IsBusy" OnNavigate="VM.OpenFolderAsync">
                 <button type="button" class="backup-browse-crumb" disabled="@(VM.IsBusy || VM.BrowseFolder.Length == 0)" @onclick="() => VM.OpenFolderAsync(string.Empty)">@share.Name</button>
                 @foreach (var (name, path) in Crumbs(VM.BrowseFolder))
                 {
                     <span class="breadcrumb-sep" aria-hidden="true">/</span>
                     <button type="button" class="backup-browse-crumb" disabled="@(VM.IsBusy || path == VM.BrowseFolder)" @onclick="() => VM.OpenFolderAsync(path)">@name</button>
                 }
-            </nav>
+            </PathBar>
 
             <div class="selection-toolbar backup-restore-toolbar @(VM.SelectedEntries.Count == 0 ? "backup-restore-toolbar--idle" : "")">
                 <div class="toolbar-left">

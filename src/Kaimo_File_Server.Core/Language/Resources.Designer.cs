@@ -15082,6 +15082,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Edit path ähnelt.
+        /// </summary>
+        public static string Web_PathBar_Edit {
+            get {
+                return ResourceManager.GetString("Web_PathBar_Edit", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Access home folder contents ähnelt.
         /// </summary>
         public static string Web_Perm_AccessHomeContents {

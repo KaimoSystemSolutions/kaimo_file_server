@@ -24,7 +24,8 @@
 <PageTitle>@(VM.CurrentBrowserShare?.Name ?? Resources.Web_Files) - Kaimo File Server</PageTitle>
 
 <div class="page-header file-page-header">
-    <div class="breadcrumb-bar">
+    <PathBar RootName="@CurrentShareDisplayName" Path="@VM.RouteSubPathOf(VM.CurrentPath ?? "")"
+             OnNavigate="NavigateToRoutePath" Disabled="@VM.IsLoading">
         <a class="breadcrumb-link" href="@OverviewRoute">@Resources.Web_Breadcrumb_Shares</a>
         <span class="breadcrumb-sep">/</span>
         @if (ParentCrumbs is not null)
@@ -52,10 +53,10 @@
             }
             else
             {
-                <a class="breadcrumb-link" href="@($"{CurrentShareRoute}/{VM.RouteSubPathOf(fullPath)}")">@name</a>
+                <a class="breadcrumb-link" href="@($"{CurrentShareRoute}/{RouteSubPath.Escape(VM.RouteSubPathOf(fullPath))}")">@name</a>
             }
         }
-    </div>
+    </PathBar>
     <div class="file-page-actions">
         <button class="btn-secondary page-command" title="@T("Web_Action_DownloadAll")"
                 @onclick="DownloadAllAsync"

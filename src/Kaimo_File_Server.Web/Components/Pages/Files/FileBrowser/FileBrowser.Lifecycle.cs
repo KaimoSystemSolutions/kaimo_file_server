@@ -538,7 +538,7 @@ public partial class FileBrowser
 
         Nav.NavigateTo(string.IsNullOrEmpty(routeSubPath)
             ? CurrentShareRoute
-            : $"{CurrentShareRoute}/{routeSubPath}");
+            : $"{CurrentShareRoute}/{RouteSubPath.Escape(routeSubPath)}");
     }
 
     private async Task NavigateInPlaceAsync(string routeSubPath)
