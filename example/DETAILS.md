@@ -78,21 +78,27 @@ All persistent state lives under `./data` by default and survives
 | --- | --- | --- |
 | `./data/postgres` | PostgreSQL database | `LOCATION_DB` |
 | `./data/elasticsearch` | Search index | `LOCATION_ES` |
-| `./data/storage/pool01` | File storage pool | — |
-| `./data/kaimo-system` | Application data and snapshot cache | — |
-| `./data/logs` | Archived service logs | — |
+| `./data/storage/pool01` | File storage pool | `LOCATION_STORAGE_01` |
+| `./data/kaimo-system` | Application data and snapshot cache | `LOCATION_APP_DATA` |
+| `./data/logs` | Archived service logs | `LOCATION_LOGS` |
 | `./data/backups` | Database backups | `LOCATION_BACKUP` |
 | `./data/smb-control-plane` | Generated mTLS control-plane certificates | `KAIMO_SMB_CONTROL_PKI` |
 
-Paths without a variable are set in the `x-*` anchors at the top of
-`docker-compose.yml`; change them there.
+The storage pool, application data and log folders are mounted once in the
+`kaimo-common` template at the top of `docker-compose.yml`; `host`,
+`smb-bridge`, `samba` and `web` inherit them via `extends`.
 
 ### Storage pools
 
 Every bind mount below `/data/storage/` is detected as a storage pool. To add a
-second pool, add another anchor (e.g. `./data/storage/pool02:/data/storage/pool02`)
-and mount it into `host`, `smb-bridge`, `samba` and `web`, then run
-`docker compose up -d`. Apply the same ownership as for `pool01`.
+second pool, add one line to the `volumes` of the `kaimo-common` template in
+`docker-compose.yml` (e.g. `/mnt/disk2/kaimo:/data/storage/pool02`, see the
+commented example there) and run `docker compose up -d`. All four Kaimo
+services (`host`, `smb-bridge`, `samba`, `web`) receive the mount automatically.
+Apply the same ownership as for `pool01`.
+
+The template uses Compose `extends` with `!reset`, which requires Docker
+Compose 2.24.4 or newer (`docker compose version`).
 
 After the first login, **Settings → Storage → User home folders** creates a
 private home folder for every user on a pool of your choice (SMB share `users`,

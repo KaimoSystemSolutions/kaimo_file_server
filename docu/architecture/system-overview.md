@@ -56,7 +56,10 @@ flowchart LR
 | `kaimo_file_server_db` | `postgres:17-alpine` | The single PostgreSQL database `kaimo_file_server` | – | `kaimo_database`, `kaimo_bridge_database` |
 | `adminer` | `adminer` | Database administration UI | `127.0.0.1:8080` | default, `kaimo_database` |
 
-`docker-compose.dev.yml` adds a `mailpit` SMTP catcher and development-only secrets.
+`docker-compose.dev.yml` adds a `mailpit` SMTP catcher and development-only secrets. `adminer` and
+`mailpit` belong to the `tools` profile and only start with `docker compose --profile tools up`
+(or `COMPOSE_PROFILES=tools` in `.env`). The four Kaimo services inherit the storage pool, application
+data and log mounts from the `kaimo-common` template via `extends`.
 
 ### Networks
 

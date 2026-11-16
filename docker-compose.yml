@@ -2,15 +2,12 @@
 # and fallback secrets, and publishes extra ports for debugging.
 # Never run it on a server or expose it to a network: use example/docker-compose.yml
 # for any real deployment (see example/DETAILS.md, "Running on the internet").
+#
+# Requires Docker Compose 2.24.4 or newer (`extends` together with `!reset`).
+# Tuning variables (timeouts, caches, retention, ...) are not passed through here:
+# every service already uses the defaults from its code. To change one, add it to
+# the service's environment; see example/OPTIONAL_ENVIRONMENT_VARIABLES.md.
 
-x-storage-pool-01: &storage-pool-01
-  ${LOCATION_STORAGE_01:-./data/storage/pool01}:/data/storage/pool01
-x-storage-pool-02: &storage-pool-02
-  ${LOCATION_STORAGE_02:-./data/storage/pool02}:/data/storage/pool02
-x-app-data: &app-data
-  ${LOCATION_APP_DATA:-./data/kaimo-system}:/data/kaimo-system
-x-logs: &logs
-  ${LOCATION_LOGS:-./data/logs}:/data/kaimo-logs
 x-backups: &backups
   ${LOCATION_BACKUP:-./data/backups}:/data/kaimo-backups
 
@@ -26,9 +23,6 @@ x-dotnet-environment: &dotnet-environment
   ConnectionStrings__Default: >-
     Host=kaimo_file_server_db;Database=${POSTGRES_DB:-kaimo_file_server};Username=${POSTGRES_USER:-kaimo_test_user};Password=${POSTGRES_PASSWORD:-change_me}
   LogArchive__RootPath: /data/kaimo-logs
-  LogArchive__MaxFileBytes: ${KAIMO_LOG_ARCHIVE_MAX_FILE_BYTES:-10485760}
-  LogArchive__RetentionDays: ${KAIMO_LOG_ARCHIVE_RETENTION_DAYS:-14}
-  LogArchive__MaxBytesPerSource: ${KAIMO_LOG_ARCHIVE_MAX_SOURCE_BYTES:-262144000}
   NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:-}
   # Database backups are written here (mounted from LOCATION_BACKUP). Only the
   # Host acts as DB owner and reads Backup__RestoreFromPath for the one-shot
@@ -37,11 +31,25 @@ x-dotnet-environment: &dotnet-environment
   Backup__RestoreFromPath: ${KAIMO_DB_RESTORE_FROM:-}
 
 services:
-  kaimo_file_server.host:
-    image: ${KAIMO_HOST_IMAGE:-kaimofileserver}
-    container_name: kaimo_file_server
+  # Template only, never started (profile "template"). Host, smb-bridge, samba and
+  # web pull it in via `extends`; Compose merges each service's own volumes with
+  # these by container path. Add a storage pool here once and it reaches all four
+  # services: every bind mount below /data/storage/ is detected as a pool.
+  kaimo-common:
+    profiles: ["template"]
     restart: unless-stopped
     logging: *bounded-logging
+    volumes:
+      - ${LOCATION_STORAGE_01:-./data/storage/pool01}:/data/storage/pool01
+      - ${LOCATION_STORAGE_02:-./data/storage/pool02}:/data/storage/pool02
+      - ${LOCATION_APP_DATA:-./data/kaimo-system}:/data/kaimo-system
+      - ${LOCATION_LOGS:-./data/logs}:/data/kaimo-logs
+
+  kaimo_file_server.host:
+    extends: kaimo-common
+    profiles: !reset []
+    image: ${KAIMO_HOST_IMAGE:-kaimofileserver}
+    container_name: kaimo_file_server
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.Host/Dockerfile
@@ -50,10 +58,6 @@ services:
       <<: *dotnet-environment
       KAIMO_LOG_SOURCE: host
     volumes:
-      - *storage-pool-01
-      - *storage-pool-02
-      - *app-data
-      - *logs
       - *backups
       # The Host generates the local mTLS control-plane PKI here on startup
       # (idempotent). Externally managed certificates can use the same layout.
@@ -68,30 +72,19 @@ services:
 
   # Internal, mutually authenticated gRPC control plane for Samba.
   kaimo_smb_bridge:
+    extends: kaimo-common
+    profiles: !reset []
     image: ${KAIMO_SMB_BRIDGE_IMAGE:-kaimosmbbridge}
     container_name: kaimo_smb_bridge
-    restart: unless-stopped
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.SmbBridge/Dockerfile
-    logging: *bounded-logging
     environment:
       <<: *dotnet-environment
       KAIMO_LOG_SOURCE: smb-bridge
-      Snapshots__Cache__RootPath: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}
-      Snapshots__Cache__TtlHours: ${KAIMO_SNAPSHOT_CACHE_TTL_HOURS:-24}
-      Snapshots__Cache__MaxBytesPerShare: ${KAIMO_SNAPSHOT_CACHE_MAX_BYTES_PER_SHARE:-5368709120}
-      Snapshots__Cache__SweepMinutes: ${KAIMO_SNAPSHOT_CACHE_SWEEP_MINUTES:-30}
-      Snapshots__Materialization__MaxFilesPerRequest: ${KAIMO_SNAPSHOT_MAX_FILES:-10000}
-      Snapshots__Materialization__MaxBytesPerRequest: ${KAIMO_SNAPSHOT_MAX_REQUEST_BYTES:-1073741824}
-      Snapshots__Materialization__MaxConcurrentRequests: ${KAIMO_SNAPSHOT_MAX_CONCURRENT_REQUESTS:-2}
-      Snapshots__Materialization__MaxDurationSeconds: ${KAIMO_SNAPSHOT_MAX_DURATION_SECONDS:-25}
-      LifecycleEvents__ReceiptRetentionDays: ${KAIMO_EVENT_RECEIPT_RETENTION_DAYS:-30}
+      # Must match KAIMO_SNAPSHOT_CACHE_ROOT of the samba service.
+      Snapshots__Cache__RootPath: /data/kaimo-system/.kaimo-snapshots
     volumes:
-      - *storage-pool-01
-      - *storage-pool-02
-      - *app-data
-      - *logs
       - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}/bridge:/run/secrets/kaimo-control-plane:ro
     depends_on:
       kaimo_file_server_db:
@@ -109,13 +102,13 @@ services:
   # Samba owns the native SMB data path; authorization and configuration are
   # supplied by the bridge over the isolated mTLS network.
   kaimo_samba:
+    extends: kaimo-common
+    profiles: !reset []
     image: ${KAIMO_SAMBA_IMAGE:-kaimosamba}
     container_name: kaimo_samba
     build:
       context: ./src/samba-vfs
       dockerfile: Dockerfile.vfs
-    restart: unless-stopped
-    logging: *bounded-logging
     dns_search:
       - "."
     ports:
@@ -125,39 +118,11 @@ services:
       KAIMO_LOG_SOURCE: samba
       KAIMO_LOG_LEVEL: ${KAIMO_LOG_LEVEL:-}
       KAIMO_LOG_ARCHIVE_ROOT: /data/kaimo-logs
-      KAIMO_LOG_ARCHIVE_MAX_FILE_BYTES: ${KAIMO_LOG_ARCHIVE_MAX_FILE_BYTES:-10485760}
-      KAIMO_LOG_ARCHIVE_RETENTION_DAYS: ${KAIMO_LOG_ARCHIVE_RETENTION_DAYS:-14}
-      KAIMO_LOG_ARCHIVE_MAX_SOURCE_BYTES: ${KAIMO_LOG_ARCHIVE_MAX_SOURCE_BYTES:-262144000}
       KAIMO_BRIDGE_ADDR: kaimo_smb_bridge:5080
-      KAIMO_AUTHZ_FAILOPEN: ${KAIMO_AUTHZ_FAILOPEN:-0}
-      KAIMO_AUTHD_WORKERS: ${KAIMO_AUTHD_WORKERS:-16}
-      KAIMO_AUTHD_QUEUE_CAPACITY: ${KAIMO_AUTHD_QUEUE_CAPACITY:-64}
-      KAIMO_AUTHD_IO_TIMEOUT_MS: ${KAIMO_AUTHD_IO_TIMEOUT_MS:-2000}
-      KAIMO_VFS_AUTH_TIMEOUT_MS: ${KAIMO_VFS_AUTH_TIMEOUT_MS:-6000}
-      KAIMO_VFS_SNAPSHOT_TIMEOUT_MS: ${KAIMO_VFS_SNAPSHOT_TIMEOUT_MS:-32000}
-      KAIMO_VFS_EVENT_TIMEOUT_MS: ${KAIMO_VFS_EVENT_TIMEOUT_MS:-250}
-      KAIMO_AUTHD_GROUP: kaimo-authd
-      KAIMO_AUTHD_PEER_EXECUTABLE: /opt/samba/sbin/smbd
-      KAIMO_AUTHD_CACHE_MAX_ENTRIES: ${KAIMO_AUTHD_CACHE_MAX_ENTRIES:-10000}
-      KAIMO_AUTHD_CACHE_MAX_BYTES: ${KAIMO_AUTHD_CACHE_MAX_BYTES:-8388608}
-      KAIMO_AUTHD_CACHE_TTL_MS: ${KAIMO_AUTHD_CACHE_TTL_MS:-3000}
       KAIMO_EVENT_SPOOL_PATH: /var/lib/kaimo/event-spool
-      KAIMO_EVENT_MAX_PENDING: ${KAIMO_EVENT_MAX_PENDING:-100000}
-      KAIMO_EVENT_MAX_DEAD: ${KAIMO_EVENT_MAX_DEAD:-10000}
-      KAIMO_EVENT_MAX_ATTEMPTS: ${KAIMO_EVENT_MAX_ATTEMPTS:-20}
-      KAIMO_EVENT_RETRY_BASE_MS: ${KAIMO_EVENT_RETRY_BASE_MS:-1000}
-      KAIMO_EVENT_RETRY_MAX_MS: ${KAIMO_EVENT_RETRY_MAX_MS:-60000}
-      KAIMO_USER_SYNC_INTERVAL_SECONDS: ${KAIMO_USER_SYNC_INTERVAL_SECONDS:-60}
-      KAIMO_SHARE_SYNC_INTERVAL_SECONDS: ${KAIMO_SHARE_SYNC_INTERVAL_SECONDS:-2}
-      KAIMO_CONFIG_SYNC_INTERVAL_SECONDS: ${KAIMO_CONFIG_SYNC_INTERVAL_SECONDS:-2}
-      KAIMO_SYNC_HEALTH_MAX_AGE_SECONDS: ${KAIMO_SYNC_HEALTH_MAX_AGE_SECONDS:-180}
-      KAIMO_SNAPSHOT_OPENAT: ${KAIMO_SNAPSHOT_OPENAT:-1}
-      KAIMO_SNAPSHOT_CACHE_ROOT: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}
+      # Must match Snapshots__Cache__RootPath of the smb-bridge service.
+      KAIMO_SNAPSHOT_CACHE_ROOT: /data/kaimo-system/.kaimo-snapshots
     volumes:
-      - *storage-pool-01
-      - *storage-pool-02
-      - *app-data
-      - *logs
       - ${LOCATION_SAMBA_EVENT_SPOOL:-./data/samba-event-spool}:/var/lib/kaimo/event-spool
       - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
     tmpfs:
@@ -176,10 +141,10 @@ services:
       start_period: 20s
 
   kaimo_file_server.web:
+    extends: kaimo-common
+    profiles: !reset []
     image: ${KAIMO_WEB_IMAGE:-kaimofileserverweb}
     container_name: kaimo_file_server_web
-    restart: unless-stopped
-    logging: *bounded-logging
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.Web/Dockerfile
@@ -194,10 +159,6 @@ services:
       # Public HTTPS port browsers on the plain-HTTP port are redirected to.
       HttpsRedirection__HttpsPort: ${WEB_HTTPS_PORT:-8443}
     volumes:
-      - *storage-pool-01
-      - *storage-pool-02
-      - *app-data
-      - *logs
       - *backups
     depends_on:
       kaimo_file_server_db:
@@ -217,7 +178,7 @@ services:
     logging: *bounded-logging
     image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
     environment:
-      TZ: Europe/Berlin
+      TZ: ${TZ:-Europe/Berlin}
       discovery.type: single-node
       xpack.security.enabled: "false"
       ES_JAVA_OPTS: "-Xms512m -Xmx512m"
@@ -246,10 +207,10 @@ services:
       retries: 30
       start_period: 30s
 
-      # Reserve Memory Addresses for files straight away. Elastic search loads up files on demand later on 
+      # Reserve Memory Addresses for files straight away. Elastic search loads up files on demand later on
       # sudo sysctl -w vm.max_map_count=262144
       # echo "vm.max_map_count=262144" | sudo tee -a /etc/sysctl.conf
-      #  
+      #
       # give permissions to folder:
       # sudo chown -R 1000:1000 ./data/elasticsearch
 
@@ -277,8 +238,11 @@ services:
       - kaimo_database
       - kaimo_bridge_database
 
+  # Optional tool, only started with the "tools" profile
+  # (`docker compose --profile tools up` or COMPOSE_PROFILES=tools in .env).
   adminer:
     image: adminer:${ADMINER_VERSION:-latest}
+    profiles: ["tools"]
     restart: always
     # Full database access with the dev credentials: loopback only.
     ports:

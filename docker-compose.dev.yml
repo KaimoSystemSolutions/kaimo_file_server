@@ -5,40 +5,43 @@
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 # or set COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml in your local .env
 # (use ";" instead of ":" as separator on Windows).
+
+# Shared by host, smb-bridge and web. The Host reads DOTNET_ENVIRONMENT; the
+# ASP.NET Core services (web, smb-bridge) read ASPNETCORE_ENVIRONMENT first.
+x-dev-environment: &dev-environment
+  DOTNET_ENVIRONMENT: Development
+  ASPNETCORE_ENVIRONMENT: Development
+  Seed__DemoData: "true"
+  #Seed__AdminPassword: admin12345
+  NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:-DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey}
+
+x-user-secrets: &user-secrets
+  - ${APPDATA:-./data/user-secrets}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+  - ${APPDATA:-./data/user-secrets}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+
 services:
   kaimo_file_server.host:
     environment:
-      DOTNET_ENVIRONMENT: Development
-      Seed__DemoData: "true"
-      #Seed__AdminPassword: admin12345
-      NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:-DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey}
-    volumes:
-      - ${APPDATA:-./data/user-secrets}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA:-./data/user-secrets}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+      <<: *dev-environment
+    volumes: *user-secrets
 
   kaimo_smb_bridge:
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      Seed__DemoData: "true"
-      #Seed__AdminPassword: admin12345
-      NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:-DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey}
+      <<: *dev-environment
 
   kaimo_file_server.web:
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      <<: *dev-environment
       #KAIMO_DEMO_READONLY: "true"
-      Seed__DemoData: "true"
-      #Seed__AdminPassword: admin12345
       Jwt__Secret: ${JWT_SECRET:-DevOnly-LocalDevelopment-DoNotUseInProduction-JwtSecret}
-      NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:-DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey}
-    volumes:
-      - ${APPDATA:-./data/user-secrets}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA:-./data/user-secrets}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+    volumes: *user-secrets
 
-
-  # Local SMTP catcher for mail notifications. In Settings -> Mail server use host "mailpit",
-  # port 1025, encryption "None" and no authentication; read the mails at http://127.0.0.1:8025.
+  # Local SMTP catcher for mail notifications, only started with the "tools" profile
+  # (`docker compose --profile tools up` or COMPOSE_PROFILES=tools in .env).
+  # In Settings -> Mail server use host "mailpit", port 1025, encryption "None" and
+  # no authentication; read the mails at http://127.0.0.1:8025.
   mailpit:
     image: axllent/mailpit:latest
+    profiles: ["tools"]
     ports:
       - "127.0.0.1:8025:8025"

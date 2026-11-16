@@ -1,9 +1,5 @@
-x-storage-pool-01: &storage-pool-01
-  ./data/storage/pool01:/data/storage/pool01
-x-app-data: &app-data
-  ./data/kaimo-system:/data/kaimo-system
-x-logs: &logs
-  ./data/logs:/data/kaimo-logs
+# Requires Docker Compose 2.24.4 or newer (`extends` together with `!reset`).
+
 x-backups: &backups
   ${LOCATION_BACKUP:-./data/backups}:/data/kaimo-backups
 
@@ -26,6 +22,20 @@ x-dotnet-environment: &dotnet-environment
   Backup__RestoreFromPath: ${KAIMO_DB_RESTORE_FROM:-}
 
 services:
+  # Template only, never started (profile "template"). host, smb-bridge, samba and
+  # web pull it in via `extends`; Compose merges each service's own volumes with
+  # these by container path. Add a storage pool here once and it reaches all four
+  # services: every bind mount below /data/storage/ is detected as a pool.
+  kaimo-common:
+    profiles: ["template"]
+    restart: unless-stopped
+    logging: *bounded-logging
+    volumes:
+      - ${LOCATION_STORAGE_01:-./data/storage/pool01}:/data/storage/pool01
+      # - /mnt/disk2/kaimo:/data/storage/pool02
+      - ${LOCATION_APP_DATA:-./data/kaimo-system}:/data/kaimo-system
+      - ${LOCATION_LOGS:-./data/logs}:/data/kaimo-logs
+
   db:
     image: postgres:${POSTGRES_VERSION:-17-alpine}
     restart: unless-stopped
@@ -47,17 +57,14 @@ services:
       - bridge-database
 
   host:
+    extends: kaimo-common
+    profiles: !reset []
     image: kaimosystem/kaimo_file_server:${KAIMO_IMAGE_TAG:?Set KAIMO_IMAGE_TAG in .env}
-    restart: unless-stopped
-    logging: *bounded-logging
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Host.dll"]
     environment:
       <<: *dotnet-environment
       KAIMO_LOG_SOURCE: host
     volumes:
-      - *storage-pool-01
-      - *app-data
-      - *logs
       - *backups
       # The Host generates the internal mTLS control-plane PKI here on startup
       # (idempotent). Externally managed certificates can use the same layout.
@@ -71,17 +78,15 @@ services:
       - search
 
   smb-bridge:
+    extends: kaimo-common
+    profiles: !reset []
     image: kaimosystem/kaimo_file_server.samba_bridge:${KAIMO_IMAGE_TAG:?Set KAIMO_IMAGE_TAG in .env}
-    restart: unless-stopped
-    logging: *bounded-logging
     environment:
       <<: *dotnet-environment
       KAIMO_LOG_SOURCE: smb-bridge
+      # Must match KAIMO_SNAPSHOT_CACHE_ROOT of the samba service.
       Snapshots__Cache__RootPath: /data/kaimo-system/.kaimo-snapshots
     volumes:
-      - *storage-pool-01
-      - *app-data
-      - *logs
       - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}/bridge:/run/secrets/kaimo-control-plane:ro
     depends_on:
       db:
@@ -97,9 +102,9 @@ services:
           - kaimo_smb_bridge
 
   samba:
+    extends: kaimo-common
+    profiles: !reset []
     image: kaimosystem/kaimo_file_server.samba:${KAIMO_IMAGE_TAG:?Set KAIMO_IMAGE_TAG in .env}
-    restart: unless-stopped
-    logging: *bounded-logging
     dns_search:
       - "."
     ports:
@@ -110,11 +115,9 @@ services:
       KAIMO_LOG_ARCHIVE_ROOT: /data/kaimo-logs
       KAIMO_BRIDGE_ADDR: kaimo_smb_bridge:5080
       KAIMO_EVENT_SPOOL_PATH: /var/lib/kaimo/event-spool
+      # Must match Snapshots__Cache__RootPath of the smb-bridge service.
       KAIMO_SNAPSHOT_CACHE_ROOT: /data/kaimo-system/.kaimo-snapshots
     volumes:
-      - *storage-pool-01
-      - *app-data
-      - *logs
       - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
     tmpfs:
       - /run/kaimo-user-sync:rw,noexec,nosuid,nodev,mode=0700,uid=0,gid=0
@@ -132,9 +135,9 @@ services:
       start_period: 20s
 
   web:
+    extends: kaimo-common
+    profiles: !reset []
     image: kaimosystem/kaimo_file_server.web:${KAIMO_IMAGE_TAG:?Set KAIMO_IMAGE_TAG in .env}
-    restart: unless-stopped
-    logging: *bounded-logging
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Web.dll"]
     ports:
       # Plain HTTP is not published: the client API (/api/v1) refuses it with 426 and browsers
@@ -153,9 +156,6 @@ services:
     #   - source: kaimo-dp-certificate
     #     target: kaimo-dp-certificate
     volumes:
-      - *storage-pool-01
-      - *app-data
-      - *logs
       - *backups
     depends_on:
       db:

@@ -140,5 +140,6 @@ The dispatcher seeds a disabled default rule for the new event on the next start
 
 ## Local testing
 
-`docker-compose.dev.yml` contains Mailpit. Configure the SMTP server as host `mailpit`, port `1025`,
+`docker-compose.dev.yml` contains Mailpit (profile `tools`: start it with
+`docker compose --profile tools up` or `COMPOSE_PROFILES=tools` in `.env`). Configure the SMTP server as host `mailpit`, port `1025`,
 no encryption and no authentication, and read mails at <http://127.0.0.1:8025>.
