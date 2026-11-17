@@ -306,18 +306,55 @@ public partial class CloudAccessViewModel
         await LoadAsync();
     }
 
+    /// <summary>Upper bound for one manual connection test; the UI shows the remaining time against it.</summary>
+    public static readonly TimeSpan DefaultConnectionTestTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>Error code recorded when a connection test exceeds <see cref="ConnectionTestTimeout"/>.</summary>
+    public const string ConnectionTestTimeoutCode = "connection_test_timeout";
+
+    /// <summary>Time limit of <see cref="TestConnectionAsync"/>; settable so tests can shorten it.</summary>
+    public TimeSpan ConnectionTestTimeout { get; set; } = DefaultConnectionTestTimeout;
+
     /// <summary>
     /// Verifies a connection through its provider-neutral health contract.
     /// Provider response details remain behind the sanitized provider boundary.
+    /// The test is bounded by <see cref="ConnectionTestTimeout"/>; exceeding it is
+    /// recorded as an unhealthy result with <see cref="ConnectionTestTimeoutCode"/>.
+    /// Cancellation by the caller propagates and records nothing.
     /// </summary>
-    public async Task TestConnectionAsync(Guid connectionId)
+    public async Task TestConnectionAsync(Guid connectionId, CancellationToken cancellationToken = default)
     {
         var connection = await GetManagedConnectionAsync(connectionId);
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        limit.CancelAfter(ConnectionTestTimeout);
+        try
+        {
+            await RunConnectionTestAsync(connection, limit.Token);
+        }
+        catch (OperationCanceledException) when (limit.IsCancellationRequested
+                                                 && !cancellationToken.IsCancellationRequested)
+        {
+            // Re-read: a partially completed legacy test may have replaced the tracked entity.
+            connection = await GetManagedConnectionAsync(connectionId);
+            var timedOut = new StorageConnectionHealthResult(
+                StorageConnectionHealthState.Unavailable, ConnectionTestTimeoutCode, DateTime.UtcNow);
+            connection.State = MapUnhealthyState(connection, timedOut);
+            connection.LastVerifiedAtUtc = timedOut.CheckedAtUtc;
+            connection.LastErrorCode = timedOut.Code;
+            await _connections.SaveAsync(connection);
+            await LoadAsync();
+        }
+    }
+
+    // WaitAsync bounds providers that do not observe the token (e.g. a blocking socket connect).
+    private async Task RunConnectionTestAsync(StorageConnection connection, CancellationToken cancellationToken)
+    {
+        Guid connectionId = connection.Id;
         if (_providerCatalog is null)
         {
             if (!string.Equals(connection.ProviderId, "onedrive", StringComparison.OrdinalIgnoreCase))
                 throw new NotSupportedException(R("Web_ExternalStorage_TestUnsupported"));
-            await ListRemoteFoldersAsync(connectionId, "/");
+            await ListRemoteFoldersAsync(connectionId, "/").WaitAsync(cancellationToken);
             connection = await GetManagedConnectionAsync(connectionId);
             connection.State = StorageConnectionState.Ready;
             connection.LastVerifiedAtUtc = DateTime.UtcNow;
@@ -325,7 +362,9 @@ public partial class CloudAccessViewModel
         }
         else
         {
-            var result = await _providerCatalog.GetRequired(connection.ProviderId).TestAsync(connection);
+            var result = await _providerCatalog.GetRequired(connection.ProviderId)
+                .TestAsync(connection, cancellationToken)
+                .WaitAsync(cancellationToken);
             connection.State = MapUnhealthyState(connection, result);
             connection.LastVerifiedAtUtc = result.CheckedAtUtc;
             connection.LastErrorCode = result.IsHealthy ? null : result.Code;
