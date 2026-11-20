@@ -3,7 +3,8 @@
 # Never run it on a server or expose it to a network: use example/docker-compose.yml
 # for any real deployment (see example/DETAILS.md, "Running on the internet").
 #
-# Requires Docker Compose 2.24.4 or newer (`extends` together with `!reset`).
+# Shared volumes, restart policy and logging of host, smb-bridge, samba and web
+# live in docker-compose.common.yml (pulled in via `extends`).
 # Tuning variables (timeouts, caches, retention, ...) are not passed through here:
 # every service already uses the defaults from its code. To change one, add it to
 # the service's environment; see example/OPTIONAL_ENVIRONMENT_VARIABLES.md.
@@ -31,23 +32,10 @@ x-dotnet-environment: &dotnet-environment
   Backup__RestoreFromPath: ${KAIMO_DB_RESTORE_FROM:-}
 
 services:
-  # Template only, never started (profile "template"). Host, smb-bridge, samba and
-  # web pull it in via `extends`; Compose merges each service's own volumes with
-  # these by container path. Add a storage pool here once and it reaches all four
-  # services: every bind mount below /data/storage/ is detected as a pool.
-  kaimo-common:
-    profiles: ["template"]
-    restart: unless-stopped
-    logging: *bounded-logging
-    volumes:
-      - ${LOCATION_STORAGE_01:-./data/storage/pool01}:/data/storage/pool01
-      - ${LOCATION_STORAGE_02:-./data/storage/pool02}:/data/storage/pool02
-      - ${LOCATION_APP_DATA:-./data/kaimo-system}:/data/kaimo-system
-      - ${LOCATION_LOGS:-./data/logs}:/data/kaimo-logs
-
   kaimo_file_server.host:
-    extends: kaimo-common
-    profiles: !reset []
+    extends:
+      file: docker-compose.common.yml
+      service: kaimo-common
     image: ${KAIMO_HOST_IMAGE:-kaimofileserver}
     container_name: kaimo_file_server
     build:
@@ -72,8 +60,9 @@ services:
 
   # Internal, mutually authenticated gRPC control plane for Samba.
   kaimo_smb_bridge:
-    extends: kaimo-common
-    profiles: !reset []
+    extends:
+      file: docker-compose.common.yml
+      service: kaimo-common
     image: ${KAIMO_SMB_BRIDGE_IMAGE:-kaimosmbbridge}
     container_name: kaimo_smb_bridge
     build:
@@ -102,8 +91,9 @@ services:
   # Samba owns the native SMB data path; authorization and configuration are
   # supplied by the bridge over the isolated mTLS network.
   kaimo_samba:
-    extends: kaimo-common
-    profiles: !reset []
+    extends:
+      file: docker-compose.common.yml
+      service: kaimo-common
     image: ${KAIMO_SAMBA_IMAGE:-kaimosamba}
     container_name: kaimo_samba
     build:
@@ -141,8 +131,9 @@ services:
       start_period: 20s
 
   kaimo_file_server.web:
-    extends: kaimo-common
-    profiles: !reset []
+    extends:
+      file: docker-compose.common.yml
+      service: kaimo-common
     image: ${KAIMO_WEB_IMAGE:-kaimofileserverweb}
     container_name: kaimo_file_server_web
     build:

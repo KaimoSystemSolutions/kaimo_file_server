@@ -1,0 +1,23 @@
+# Shared service template, never started on its own. Host, smb-bridge, samba and web
+# in docker-compose.yml pull it in via `extends: { file: docker-compose.common.yml }`;
+# Compose merges each service's own volumes with these by container path. Add a
+# storage pool here once and it reaches all four services: every bind mount below
+# /data/storage/ is detected as a pool.
+#
+# Kept in its own file (not as a profile-disabled service in docker-compose.yml)
+# because Visual Studio evaluates the project with all profiles enabled and rejects
+# a service that has neither an image nor a build context.
+
+services:
+  kaimo-common:
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - ${LOCATION_STORAGE_01:-./data/storage/pool01}:/data/storage/pool01
+      - ${LOCATION_STORAGE_02:-./data/storage/pool02}:/data/storage/pool02
+      - ${LOCATION_APP_DATA:-./data/kaimo-system}:/data/kaimo-system
+      - ${LOCATION_LOGS:-./data/logs}:/data/kaimo-logs
