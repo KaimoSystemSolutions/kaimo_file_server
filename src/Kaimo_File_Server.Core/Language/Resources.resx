@@ -3817,6 +3817,12 @@
   <data name="Web_ExternalStorage_TestFailed" xml:space="preserve">
     <value>Connection test failed</value>
   </data>
+  <data name="Web_ExternalStorage_TestRunning" xml:space="preserve">
+    <value>Testing connection … at most {0} s remaining</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_connection_test_timeout" xml:space="preserve">
+    <value>The connection test did not finish within the time limit. The server may be unreachable or responding too slowly.</value>
+  </data>
   <data name="Web_ExternalStorage_NoConnectionSelected" xml:space="preserve">
     <value>No connection selected</value>
   </data>

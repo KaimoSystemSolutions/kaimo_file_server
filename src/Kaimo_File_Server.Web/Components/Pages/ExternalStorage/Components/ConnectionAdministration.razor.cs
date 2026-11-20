@@ -14,8 +14,9 @@ using Kaimo_File_Server.Infrastructure.ExternalStorage.Ssh;
 
 namespace Kaimo_File_Server.Web.Components.Pages.ExternalStorage.Components;
 
-// Connection list, create flow, test/authorize/delete actions. Editing lives in
-// ConnectionAdministration.Edit.cs, the guided SSH key setup in ConnectionAdministration.Ssh.cs.
+// Connection list, create flow, authorize/delete actions. Editing lives in
+// ConnectionAdministration.Edit.cs, the guided SSH key setup in ConnectionAdministration.Ssh.cs,
+// the connection test with its progress bar in ConnectionAdministration.Test.cs.
 public partial class ConnectionAdministration
 {
     /// <summary>Opens the syncs tab; the syncs tile shows no link without it.</summary>
@@ -152,30 +153,6 @@ public partial class ConnectionAdministration
             $"/api/cloud-access/{authorization.Endpoint}/connect",
             authorization.ConnectionId,
             authorization.Ticket);
-    private async Task TestAsync()
-    {
-        _testFailed = false;
-        Guid selectedId = _selected!.Id;
-        _busy = true; _error = null;
-        try
-        {
-            await VM.TestConnectionAsync(selectedId);
-            _selected = VM.Connections.FirstOrDefault(connection => connection.Id == selectedId);
-            // Success is transient (toast); a failure stays as a banner until the next test.
-            _testFailed = !(_selected?.State == StorageConnectionState.Ready
-                            && string.IsNullOrWhiteSpace(_selected.LastErrorCode));
-            if (!_testFailed)
-                Toasts.Show(R("Web_ExternalStorage_TestSuccessful"), ToastType.Success);
-        }
-        catch (Exception exception)
-        {
-            _error = exception is InvalidOperationException or ArgumentException
-                ? exception.Message
-                : R("Web_ExternalStorage_OperationFailed");
-            _testFailed = true;
-        }
-        finally { _busy = false; }
-    }
     private async Task DeleteAsync()
     {
         _confirmDelete = false;
@@ -290,5 +267,9 @@ public partial class ConnectionAdministration
         _creating = opening;
     }
 
-    public async ValueTask DisposeAsync() => await ResetGuidedSshStateAsync();
+    public async ValueTask DisposeAsync()
+    {
+        StopTestProgress();
+        await ResetGuidedSshStateAsync();
+    }
 }

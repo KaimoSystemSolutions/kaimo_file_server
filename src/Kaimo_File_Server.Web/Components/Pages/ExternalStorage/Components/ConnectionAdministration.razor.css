@@ -509,3 +509,18 @@
 .connection-form input[aria-invalid="true"] {
     border-color: var(--danger);
 }
+
+/* Connection test: time-limit bar (shared .job-progress) with the remaining-time hint below. */
+.connection-test-progress {
+    display: grid;
+    gap: var(--space-1);
+}
+
+    .connection-test-progress .job-progress {
+        margin: 0;
+    }
+
+    .connection-test-progress .form-hint {
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+    }

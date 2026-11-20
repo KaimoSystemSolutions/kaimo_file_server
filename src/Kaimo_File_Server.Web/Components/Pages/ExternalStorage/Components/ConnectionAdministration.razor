@@ -167,20 +167,34 @@ else
                         </MoreActions>
                     </DetailHeader>
 
-                    @if (hasError || _testFailed)
+                    @if (ShowTestProgress || hasError || _testFailed)
                     {
                         <div class="detail-alerts">
-                            <div class="error-banner" role="alert">
-                                @if (_testFailed)
-                                {
-                                    <strong>@R("Web_ExternalStorage_TestFailed")@(hasError ? ":" : "")</strong>
-                                    @(hasError ? ErrorMessage(_selected.LastErrorCode!) : "")
-                                }
-                                else
-                                {
-                                    @ErrorMessage(_selected.LastErrorCode!)
-                                }
-                            </div>
+                            @if (ShowTestProgress)
+                            {
+                                var testProgressText = TestProgressText;
+                                <div class="connection-test-progress">
+                                    <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                                         aria-valuenow="@TestPercent" aria-valuetext="@testProgressText">
+                                        <div class="job-progress-fill" style="width: @(TestPercent)%"></div>
+                                    </div>
+                                    <span class="form-hint">@testProgressText</span>
+                                </div>
+                            }
+                            else if (hasError || _testFailed)
+                            {
+                                <div class="error-banner" role="alert">
+                                    @if (_testFailed)
+                                    {
+                                        <strong>@R("Web_ExternalStorage_TestFailed")@(hasError ? ":" : "")</strong>
+                                        @(hasError ? ErrorMessage(_selected.LastErrorCode!) : "")
+                                    }
+                                    else
+                                    {
+                                        @ErrorMessage(_selected.LastErrorCode!)
+                                    }
+                                </div>
+                            }
                         </div>
                     }
 
