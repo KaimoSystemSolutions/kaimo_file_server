@@ -97,6 +97,7 @@ Add these variables to `samba`.
 | `KAIMO_USER_SYNC_INTERVAL_SECONDS` | `60` | Samba user synchronization interval. |
 | `KAIMO_SHARE_SYNC_INTERVAL_SECONDS` | `2` | Samba share synchronization interval. |
 | `KAIMO_CONFIG_SYNC_INTERVAL_SECONDS` | `2` | Samba configuration synchronization interval. |
+| `KAIMO_SYNC_FULL_RECONCILE_SECONDS` | `60` | Maximum age of a share/config synchronization that unchanged cycles may rely on before Samba is reconciled fully again. `0` or an invalid value reconciles fully on every cycle. |
 | `KAIMO_SYNC_HEALTH_MAX_AGE_SECONDS` | `180` | Maximum age of the last successful synchronization before Samba becomes unhealthy. |
 | `KAIMO_LIST_FILTER` | `1` | Set to `0` to disable ACL-based directory-list filtering. |
 | `KAIMO_SNAPSHOT_OPENAT` | `1` | Set to `0` to disable snapshot `openat` handling. |

@@ -101,6 +101,13 @@ CONFIG_SYNC_INTERVAL_SECONDS="${KAIMO_CONFIG_SYNC_INTERVAL_SECONDS:-2}"
 "$SCRIPT_DIR/validate-sync-interval.sh" \
     KAIMO_CONFIG_SYNC_INTERVAL_SECONDS "$CONFIG_SYNC_INTERVAL_SECONDS" 1 5
 
+# Applied-state records (steady-state fast path, see run-sync.sh) of a previous
+# container life must not shortcut the first reconciliation of this one, and its
+# containment markers (sync-cycle.sh; possibly stamped ahead after a clock step)
+# must not suppress the first revocation of a new failure streak.
+rm -f -- "${KAIMO_SYNC_RUNNER_RUNTIME_DIR:-/run/kaimo-sync}"/*.applied \
+         "${KAIMO_SYNC_HEALTH_DIR:-/var/lib/kaimo-sync}"/*.contained
+
 initial_sync users "NT-Hash/user sync from bridge" "$SCRIPT_DIR/sync-users.sh"
 initial_sync shares "share sync from bridge" "$SCRIPT_DIR/sync-shares.sh"
 initial_sync config "protocol settings sync from bridge" "$SCRIPT_DIR/sync-config.sh"

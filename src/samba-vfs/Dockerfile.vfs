@@ -226,7 +226,8 @@ COPY selftest.sh              /usr/local/bin/selftest.sh
 COPY sync-users.sh            /usr/local/bin/sync-users.sh
 COPY sync-shares.sh           /usr/local/bin/sync-shares.sh
 COPY sync-config.sh           /usr/local/bin/sync-config.sh
-COPY run-sync.sh              /usr/local/bin/run-sync.sh
+COPY sync-applied-state.sh    /usr/local/bin/sync-applied-state.sh
+COPY run-sync.sh             /usr/local/bin/run-sync.sh
 COPY sync-cycle.sh            /usr/local/bin/sync-cycle.sh
 COPY revoke-samba-sessions.sh /usr/local/bin/revoke-samba-sessions.sh
 COPY validate-sync-interval.sh /usr/local/bin/validate-sync-interval.sh
@@ -242,6 +243,7 @@ COPY tests/test-sync-config.sh /tmp/test-sync-config.sh
 COPY tests/test-sync-config-samba-registry.sh /tmp/test-sync-config-samba-registry.sh
 COPY tests/test-sync-runner.sh /tmp/test-sync-runner.sh
 COPY tests/test-revocation-policy.sh /tmp/test-revocation-policy.sh
+COPY tests/shell/test-sync-steady-state.sh /tmp/test-sync-steady-state.sh
 COPY tests/test-authd-supervisor.sh /tmp/test-authd-supervisor.sh
 COPY tests/test-operational-credentials.sh /tmp/test-operational-credentials.sh
 COPY tests/test-event-spool-permissions.sh /tmp/test-event-spool-permissions.sh
@@ -250,7 +252,7 @@ COPY tests/test-vfs-operation-compatibility.py /tmp/test-vfs-operation-compatibi
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
                        /usr/local/bin/prepare-event-spool.sh \
                        /usr/local/bin/sync-users.sh /usr/local/bin/sync-shares.sh \
-                       /usr/local/bin/sync-config.sh \
+                       /usr/local/bin/sync-config.sh /usr/local/bin/sync-applied-state.sh \
                        /usr/local/bin/run-sync.sh /usr/local/bin/sync-cycle.sh \
                        /usr/local/bin/revoke-samba-sessions.sh \
                        /usr/local/bin/validate-sync-interval.sh \
@@ -264,6 +266,7 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
                        /tmp/test-sync-shares.sh /tmp/test-sync-config.sh \
                        /tmp/test-sync-config-samba-registry.sh \
                        /tmp/test-sync-runner.sh /tmp/test-revocation-policy.sh \
+                       /tmp/test-sync-steady-state.sh \
                        /tmp/test-authd-supervisor.sh \
                        /tmp/test-operational-credentials.sh \
                        /tmp/test-event-spool-permissions.sh \
@@ -295,6 +298,9 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
        SYNC_CYCLE_SUT=/usr/local/bin/sync-cycle.sh \
        SYNC_INTERVAL_VALIDATOR_SUT=/usr/local/bin/validate-sync-interval.sh \
        bash /tmp/test-revocation-policy.sh \
+    && SYNC_SHARES_SUT=/usr/local/bin/sync-shares.sh \
+       SYNC_CONFIG_SUT=/usr/local/bin/sync-config.sh \
+       bash /tmp/test-sync-steady-state.sh \
     && AUTHD_SUPERVISOR_SUT=/usr/local/bin/supervise-samba.sh \
        AUTHD_HEALTH_SUT=/usr/local/bin/authd-health.sh \
        SMBD_HEALTH_SUT=/usr/local/bin/smbd-health.sh \
@@ -312,7 +318,7 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
     && rm /tmp/test-sync-users.sh /tmp/test-sync-shares.sh \
           /tmp/test-sync-config.sh /tmp/test-sync-config-samba-registry.sh \
           /tmp/test-sync-runner.sh \
-          /tmp/test-revocation-policy.sh \
+          /tmp/test-revocation-policy.sh /tmp/test-sync-steady-state.sh \
           /tmp/test-authd-supervisor.sh \
           /tmp/test-operational-credentials.sh \
           /tmp/test-event-spool-permissions.sh /tmp/phase0-entrypoint.sh \

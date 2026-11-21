@@ -19,7 +19,7 @@ SAMBA_PATH_PREFIX="${KAIMO_SAMBA_PATH_PREFIX-/opt/samba/sbin:/opt/samba/bin}"
 CACHE_ROOT="$(readlink -m "${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}")"
 STORAGE_ROOT="$(readlink -m "${KAIMO_STORAGE_ROOT:-${KAIMO_STORAGE:-/data/storage}}")"
 
-OUT="$(kaimo_sharesync 2>>/tmp/sharesync.err)"
+OUT="$(kaimo_sharesync 2>/tmp/sharesync.err)"
 rc=$?
 if [ $rc -ne 0 ]; then
     echo "[sync-shares] Bridge unreachable (rc=$rc) - see /tmp/sharesync.err"
@@ -40,6 +40,26 @@ if [ "${#OUT}" -gt "$MAX_JSON_BYTES" ]; then
     echo "[sync-shares] Structured response exceeds size limit." >&2
     exit 1
 fi
+
+# --- Steady state: skip an unchanged reconciliation (sync-applied-state.sh) ---
+# A full pass spawns several `net` calls per share, which kept a CPU core 30 %
+# busy on an idle server. Local inputs: registry, share ACLs, passdb SIDs, and
+# the share and close-capture directories recorded with the last pass.
+here="${BASH_SOURCE[0]%/*}"; [ "$here" = "${BASH_SOURCE[0]}" ] && here=.
+. "$here/sync-applied-state.sh" || {
+    echo "[sync-shares] cannot load sync-applied-state.sh." >&2
+    exit 1
+}
+WATCHED_FILES="${KAIMO_SHARE_SYNC_WATCHED_FILES-/opt/samba/var/locks/registry.tdb:/opt/samba/var/locks/share_info.tdb:/opt/samba/private/passdb.tdb}"
+if applied_state_unchanged "$OUT" "$WATCHED_FILES"; then
+    echo "[sync-shares] unchanged since the last verified reconciliation; skipped."
+    exit 0
+fi
+applied_state_discard || {
+    echo "[sync-shares] cannot discard the applied-state record." >&2
+    exit 1
+}
+
 if ! SHARE_RECORDS="$(printf '%s' "$OUT" | jq -s -e -r '
     def exact_keys($expected): (keys | sort) == ($expected | sort);
     def reserved_share:
@@ -350,4 +370,10 @@ if (( ${#want_path[@]} > 0 )); then
 fi
 
 echo "[sync-shares] done: ${#want_path[@]} desired shares (${added} new, ${updated} updated, ${removed} removed)."
+watched_dirs=()
+for name in "${!want_path[@]}"; do
+    watched_dirs+=("${want_path[$name]}" "${want_path[$name]}/.kaimo-close-captures")
+done
+applied_state_record "$OUT" "$WATCHED_FILES" "${watched_dirs[@]}" \
+    || echo "[sync-shares] cannot record the applied state; the next cycle reconciles fully." >&2
 exit 0

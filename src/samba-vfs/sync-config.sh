@@ -15,7 +15,7 @@ set -uo pipefail
 SAMBA_PATH_PREFIX="${KAIMO_SAMBA_PATH_PREFIX-/opt/samba/sbin:/opt/samba/bin}"
 [ -n "$SAMBA_PATH_PREFIX" ] && export PATH="$SAMBA_PATH_PREFIX:$PATH"
 
-OUT="$(kaimo_configsync 2>>/tmp/configsync.err)"
+OUT="$(kaimo_configsync 2>/tmp/configsync.err)"
 rc=$?
 if [ $rc -ne 0 ]; then
     echo "[sync-config] Bridge unreachable (rc=$rc) - see /tmp/configsync.err"
@@ -37,6 +37,30 @@ if [ "${#OUT}" -gt "$MAX_JSON_BYTES" ]; then
     echo "[sync-config] Structured response exceeds size limit." >&2
     exit 1
 fi
+console_level_file="${KAIMO_LOG_CONSOLE_LEVEL_FILE:-/var/run/kaimo/console-log-level}"
+LOCKOUT_STATE_FILE="${KAIMO_SMB_LOCKOUT_STATE_FILE:-/var/run/kaimo/smb-lockout-applied}"
+
+# --- Steady state: skip an unchanged reconciliation (sync-applied-state.sh) ---
+# Desired state includes the log-level override; local inputs are the global
+# registry, the account policies and the files this script writes. An expiring
+# record also restarts a vanished wsdd.
+here="${BASH_SOURCE[0]%/*}"; [ "$here" = "${BASH_SOURCE[0]}" ] && here=.
+. "$here/sync-applied-state.sh" || {
+    echo "[sync-config] cannot load sync-applied-state.sh." >&2
+    exit 1
+}
+DESIRED_STATE="$OUT"$'\n'"${KAIMO_LOG_LEVEL-<unset>}"
+WATCHED_FILES="${KAIMO_CONFIG_SYNC_WATCHED_FILES-/opt/samba/var/locks/registry.tdb:/opt/samba/var/locks/account_policy.tdb}"
+WATCHED_FILES="${WATCHED_FILES:+$WATCHED_FILES:}$console_level_file:$LOCKOUT_STATE_FILE"
+if applied_state_unchanged "$DESIRED_STATE" "$WATCHED_FILES"; then
+    echo "[sync-config] unchanged since the last verified reconciliation; skipped."
+    exit 0
+fi
+applied_state_discard || {
+    echo "[sync-config] cannot discard the applied-state record." >&2
+    exit 1
+}
+
 if ! CONFIG_RECORD="$(printf '%s' "$OUT" | jq -s -e -r '
     def exact_keys($expected): (keys | sort) == ($expected | sort);
     def dialect:
@@ -178,7 +202,6 @@ case "${effective_log_level,,}" in
         ;;
 esac
 
-console_level_file="${KAIMO_LOG_CONSOLE_LEVEL_FILE:-/var/run/kaimo/console-log-level}"
 console_level_tmp="${console_level_file}.tmp.$$"
 printf '%s\n' "$console_log_level" >"$console_level_tmp"
 chmod 0644 "$console_level_tmp"
@@ -276,7 +299,6 @@ fi
 # remembered on tmpfs so a steady cycle costs no pdbedit call; after a restart
 # they are applied once more, which is idempotent. Switched off, only the
 # attempt threshold drops to 0; existing locks still expire after their duration.
-LOCKOUT_STATE_FILE="${KAIMO_SMB_LOCKOUT_STATE_FILE:-/var/run/kaimo/smb-lockout-applied}"
 if [ "$lockout_on" = "1" ]; then
     desired_lockout="$lockout_attempts $lockout_minutes"
 else
@@ -381,4 +403,6 @@ else
     manage_wsdd 0 || exit 1
 fi
 
+applied_state_record "$DESIRED_STATE" "$WATCHED_FILES" \
+    || echo "[sync-config] cannot record the applied state; the next cycle reconciles fully." >&2
 exit 0

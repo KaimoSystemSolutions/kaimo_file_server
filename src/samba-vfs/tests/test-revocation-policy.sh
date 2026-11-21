@@ -10,6 +10,8 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 export KAIMO_SAMBA_PATH_PREFIX=""
+export KAIMO_SYNC_HEALTH_DIR="$WORK/health"
+mkdir -p "$KAIMO_SYNC_HEALTH_DIR"
 export SMBCONTROL_LOG="$WORK/smbcontrol.log"
 export RUNNER_LOG="$WORK/runner.log"
 export REVOKER_LOG="$WORK/revoker.log"
@@ -114,6 +116,44 @@ fi
 export REVOKER_EXIT_CODE=9
 if bash "$CYCLE" config /bin/false >/dev/null 2>&1; then
     echo "FAIL: unprovable session revocation did not fail the cycle."
+    exit 1
+fi
+if [ -e "$KAIMO_SYNC_HEALTH_DIR/config.contained" ]; then
+    echo "FAIL: an unprovable revocation was recorded as contained."
+    exit 1
+fi
+
+# A persisting failure is contained once per failure streak: sessions opened
+# after the first revocation passed the live VFS authorization, so closing
+# them again every cycle adds no protection but disconnects clients and burns
+# CPU while the bridge is down.
+unset REVOKER_EXIT_CODE
+: >"$REVOKER_LOG"
+if ! streak_output="$(bash "$CYCLE" shares /bin/false 2>&1)" \
+    || [ -s "$REVOKER_LOG" ] \
+    || ! grep -Fq 'already closed' <<<"$streak_output"; then
+    echo "FAIL: a continuing failure streak revoked sessions again."
+    exit 1
+fi
+if ! bash "$CYCLE" config /bin/false >/dev/null 2>&1 \
+    || ! grep -Fqx 'config reconciliation failure' "$REVOKER_LOG" \
+    || [ ! -e "$KAIMO_SYNC_HEALTH_DIR/config.contained" ]; then
+    echo "FAIL: a component without a contained streak was not revoked."
+    exit 1
+fi
+
+# A success after the streak ends it; the next failure must revoke again.
+touch -d '-10 seconds' "$KAIMO_SYNC_HEALTH_DIR/shares.contained"
+date +%s >"$KAIMO_SYNC_HEALTH_DIR/shares.last-success"
+: >"$REVOKER_LOG"
+if ! bash "$CYCLE" shares /bin/false >/dev/null 2>&1 \
+    || ! grep -Fqx 'shares reconciliation failure' "$REVOKER_LOG"; then
+    echo "FAIL: a new failure streak after a success was not revoked."
+    exit 1
+fi
+: >"$REVOKER_LOG"
+if ! bash "$CYCLE" shares /bin/false >/dev/null 2>&1 || [ -s "$REVOKER_LOG" ]; then
+    echo "FAIL: the new failure streak was revoked more than once."
     exit 1
 fi
 

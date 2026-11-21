@@ -83,6 +83,20 @@ if [ -e "$KAIMO_SYNC_HEALTH_DIR/users.last-failure" ]; then
     exit 1
 fi
 
+# The reconciler gets a per-component record of its last applied state in the
+# private runtime directory (steady-state fast path of sync-shares/sync-config).
+cat >"$WORK/bin/print-state-file" <<'EOF'
+#!/bin/bash
+printf '%s\n' "${KAIMO_SYNC_STATE_FILE:-}" >"$STATE_FILE_OUT"
+EOF
+chmod +x "$WORK/bin/print-state-file"
+export STATE_FILE_OUT="$WORK/state-file"
+"$RUNNER" shares "$WORK/bin/print-state-file" || exit 1
+if [ "$(cat "$STATE_FILE_OUT")" != "$KAIMO_SYNC_RUNNER_RUNTIME_DIR/shares.applied" ]; then
+    echo "FAIL: reconciler did not get its private applied-state record path."
+    exit 1
+fi
+
 cat >"$WORK/bin/spawn-descendant" <<'EOF'
 #!/bin/bash
 sleep 300 &

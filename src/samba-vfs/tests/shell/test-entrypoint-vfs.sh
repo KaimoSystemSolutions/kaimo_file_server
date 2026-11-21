@@ -98,6 +98,8 @@ start_entrypoint() {
         KAIMO_STORAGE_GROUP="$STORAGE_GROUP" \
         KAIMO_AUTHD_GROUP="$AUTHD_GROUP" \
         KAIMO_INITIAL_SYNC_RETRY_SECONDS=0 \
+        KAIMO_SYNC_RUNNER_RUNTIME_DIR="$WORK/sync-run" \
+        KAIMO_SYNC_HEALTH_DIR="$WORK/sync-health" \
         "$@" setsid bash "$ENTRYPOINT" > "$WORK/out" 2>&1 &
     session=$!
 }
@@ -124,10 +126,25 @@ wait_for_file() {
 
 # ---------------------------------------------------------------- happy path
 reset_run
+# Applied-state records of a previous container life must not let the first
+# reconciliation of this one take the steady-state fast path.
+mkdir -p "$WORK/sync-run"
+echo stale > "$WORK/sync-run/shares.applied"
+echo stale > "$WORK/sync-run/config.applied"
+echo keep > "$WORK/sync-run/shares.lock"
+# A containment marker of a previous life (possibly stamped in the future after
+# a clock step) must not suppress the first revocation of a new failure streak.
+mkdir -p "$WORK/sync-health"
+touch -d '+1 day' "$WORK/sync-health/shares.contained" "$WORK/sync-health/config.contained"
+echo 1 > "$WORK/sync-health/shares.last-success"
 start_entrypoint KAIMO_SHARE_SYNC_INTERVAL_SECONDS=1 KAIMO_CONFIG_SYNC_INTERVAL_SECONDS=1 \
     SUPERVISOR_SECONDS=2.5
 wait_for_file "$WORK/supervisor.done"
 stop_session
+check "stale applied-state records are discarded at start" \
+    '[ ! -e "$WORK/sync-run/shares.applied" ] && [ ! -e "$WORK/sync-run/config.applied" ] && [ -e "$WORK/sync-run/shares.lock" ]'
+check "stale containment markers are discarded at start, health state kept" \
+    '[ ! -e "$WORK/sync-health/shares.contained" ] && [ ! -e "$WORK/sync-health/config.contained" ] && [ -e "$WORK/sync-health/shares.last-success" ]'
 check "initial sync converges users, shares, config in order" \
     '[ "$(cut -d" " -f1 "$WORK/run-sync.log" | tr "\n" " ")" = "users shares config " ]'
 check "initial sync passes the installed reconcilers" \

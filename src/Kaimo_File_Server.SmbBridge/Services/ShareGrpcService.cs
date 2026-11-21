@@ -53,7 +53,9 @@ public sealed class ShareGrpcService : ShareService.ShareServiceBase
             .WaitAsync(cancellationToken);
 
         var reply = new ListSharesReply();
-        foreach (var def in defs)
+        // Canonical order: the Samba reconciler skips a cycle only when the reply is
+        // byte-identical to the last applied one, and database row order is unstable.
+        foreach (var def in defs.OrderBy(d => d.Name, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var entry = new ShareEntry
@@ -74,7 +76,8 @@ public sealed class ShareGrpcService : ShareService.ShareServiceBase
                 entry.AllowedUsers.Add((await _users.GetAllAsync().WaitAsync(cancellationToken))
                     .Where(u => u.IsEnabled && (u.HomeDirectoryEnabled || homeAdmins.Contains(u.Id))
                         && SambaName.IsValidUsername(u.Username))
-                    .Select(u => u.Username));
+                    .Select(u => u.Username)
+                    .Order(StringComparer.Ordinal));
             }
             reply.Shares.Add(entry);
         }

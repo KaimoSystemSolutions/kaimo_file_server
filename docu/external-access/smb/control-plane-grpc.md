@@ -107,6 +107,30 @@ flowchart LR
 Registry configuration (`config backend = registry`, `registry shares = yes`) makes `smbd` read
 changes live, without reload or restart.
 
+### Steady state and failure streaks
+
+- **Unchanged cycles are skipped.** `run-sync.sh` hands every reconciler a private record of its
+  last verified pass (`/run/kaimo-sync/<component>.applied`). `sync-shares.sh` and `sync-config.sh`
+  still pull the desired state on every cycle, but skip the `net`/`pdbedit`/`sharesec` calls when
+  the reply is byte-identical and no local input changed: the registry, share-ACL, passdb and
+  account-policy databases (inode, size, mode, timestamps), the share and close-capture directories
+  (type, mode, owner, inode) and the files `sync-config.sh` writes. Each `net` call loads the full
+  Samba configuration, so a full pass with a handful of shares costs about 0.5 s CPU; a skipped
+  cycle costs about 50 ms, most of it the mTLS round trip.
+- A record expires after `KAIMO_SYNC_FULL_RECONCILE_SECONDS` (default 60), which bounds drift that
+  no file stamp reveals (for example a stopped `wsdd`). A failed pass deletes the record before it
+  mutates anything, and the entrypoint deletes all records on container start.
+- `ListShares` orders shares and `allowed_users` ordinally, so database row order cannot defeat the
+  comparison.
+- **A failure streak is contained once.** The first failed cycle of a component closes all sessions
+  (`revoke-samba-sessions.sh`) and writes `/var/lib/kaimo-sync/<component>.contained`. Later failures
+  of the same streak skip the revocation while that marker is newer than the component's last
+  success: sessions opened after the first revocation passed the live VFS authorization (which fails
+  closed without the bridge) against the same stale local state, so revoking them again adds no
+  protection. The first failure after a success revokes again, and the entrypoint deletes all
+  markers on container start.
+- The fast path lives in `sync-applied-state.sh`, which both reconcilers source.
+
 ### NT hash export
 
 - Kaimo stores `MD4(UTF-16LE(password))` — identical to Samba's NT hash — AES-256-GCM encrypted in the

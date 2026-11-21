@@ -24,6 +24,7 @@ shift
 
 runner="${KAIMO_SYNC_RUNNER:-/usr/local/bin/run-sync.sh}"
 revoker="${KAIMO_SESSION_REVOKER:-/usr/local/bin/revoke-samba-sessions.sh}"
+state_dir="${KAIMO_SYNC_HEALTH_DIR:-/var/lib/kaimo-sync}"
 lock_busy_exit=75
 umask 077
 cycle_log="$(mktemp "${TMPDIR:-/tmp}/kaimo-sync-cycle.$component.XXXXXX")" || {
@@ -47,10 +48,25 @@ if [ "$rc" -eq "$lock_busy_exit" ]; then
     exit 0
 fi
 
+# Contain a failure streak once. Sessions opened after that revocation passed
+# the live VFS authorization (which fails closed without the bridge), and the
+# stale local state is the same on every retry, so revoking again each cycle
+# adds no protection; it only disconnects clients and burns CPU while the
+# bridge is down. The marker counts only while it is newer than the last
+# success (run-sync.sh); equal stamps count as a new streak (fail closed).
+contained_marker="$state_dir/$component.contained"
+if [ "$contained_marker" -nt "$state_dir/$component.last-success" ]; then
+    echo "[sync-cycle] $component reconciliation still failing (rc=$rc); active sessions were already closed when this failure began." >&2
+    exit 0
+fi
+
 echo "[sync-cycle] $component reconciliation failed (rc=$rc); closing active sessions." >&2
 if "$revoker" "$component reconciliation failure"; then
     # The uncertain state is contained. run-sync.sh has published the failed
     # health state; a later successful cycle restores convergence health.
+    # Without the marker the next failing cycle simply revokes again.
+    : >"$contained_marker" 2>/dev/null \
+        || echo "[sync-cycle] cannot record the contained $component failure." >&2
     exit 0
 fi
 

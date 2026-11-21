@@ -74,7 +74,9 @@ fi
 # but close it in the reconciliation command. Any daemon/background descendant
 # started by that command then cannot retain the runner's lock after the
 # command itself has completed.
-"$@" 9>&-
+# KAIMO_SYNC_STATE_FILE: private record of the last verified reconciliation,
+# serialized by the lock above; lets an unchanged cycle skip the Samba tools.
+KAIMO_SYNC_STATE_FILE="$runtime_dir/$component.applied" "$@" 9>&-
 rc=$?
 # Reserve EX_TEMPFAIL for this runner's pre-execution lock miss. A reconciler
 # returning the same numeric value is a real executed failure and must not be
