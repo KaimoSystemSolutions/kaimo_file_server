@@ -1,0 +1,129 @@
+{
+  // "Debug Full Stack" (F5) works like Visual Studio's fast mode: docker-compose.debug.yml
+  // keeps the .NET containers idle (Debug build), and the hidden "Launch ..." configurations
+  // start each app under vsdbg inside them, so breakpoints in Program.cs are hit. Ending the
+  // session runs `docker compose down` (postDebugTask of "Launch Host": with stopAll it always
+  // ends with the others, so down runs exactly once).
+  //
+  // "Attach ..." connects to the app already running as PID 1 in a stack started without the
+  // debugger (Ctrl+Shift+B / the CLI command). That stack is a Release build: justMyCode is
+  // off so breakpoints bind, but some locals may be optimized away.
+  //
+  // Notes: sources were built under /src/src (= the workspace's src/); map "/src" to the bare
+  // ${workspaceFolder}, appending "/src" there mixes separators on Windows. Keep the default
+  // quoteArgs (true): pipeArgs are joined into one command line, and without quotes the
+  // `sh -c` script falls apart (docker exits with code 0). `umask 0002` mirrors the
+  // regular entrypoint of Host and Web.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Host",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "dotnet",
+      "args": ["Kaimo_File_Server.Host.dll"],
+      "cwd": "/app",
+      "pipeTransport": {
+        "pipeProgram": "docker",
+        "pipeArgs": ["exec", "-i", "kaimo_file_server", "sh", "-c", "umask 0002 && exec ${debuggerCommand}"],
+        "debuggerPath": "/remote_debugger/vsdbg",
+        "pipeCwd": "${workspaceFolder}"
+      },
+      "sourceFileMap": { "/src": "${workspaceFolder}" },
+      "postDebugTask": "Stack: down",
+      "presentation": { "hidden": true }
+    },
+    {
+      "name": "Launch Web",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "dotnet",
+      "args": ["Kaimo_File_Server.Web.dll"],
+      "cwd": "/app",
+      "pipeTransport": {
+        "pipeProgram": "docker",
+        "pipeArgs": ["exec", "-i", "kaimo_file_server_web", "sh", "-c", "umask 0002 && exec ${debuggerCommand}"],
+        "debuggerPath": "/remote_debugger/vsdbg",
+        "pipeCwd": "${workspaceFolder}"
+      },
+      "sourceFileMap": { "/src": "${workspaceFolder}" },
+      "presentation": { "hidden": true }
+    },
+    {
+      "name": "Launch SMB Bridge",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "dotnet",
+      "args": ["Kaimo_File_Server.SmbBridge.dll"],
+      "cwd": "/app",
+      "pipeTransport": {
+        "pipeProgram": "docker",
+        "pipeArgs": ["exec", "-i", "kaimo_smb_bridge", "sh", "-c", "exec ${debuggerCommand}"],
+        "debuggerPath": "/remote_debugger/vsdbg",
+        "pipeCwd": "${workspaceFolder}"
+      },
+      "sourceFileMap": { "/src": "${workspaceFolder}" },
+      "presentation": { "hidden": true }
+    },
+    {
+      "name": "Attach Host",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "1",
+      "pipeTransport": {
+        "pipeProgram": "docker",
+        "pipeArgs": ["exec", "-i", "kaimo_file_server"],
+        "debuggerPath": "/tmp/vsdbg/vsdbg",
+        "pipeCwd": "${workspaceFolder}"
+      },
+      "sourceFileMap": { "/src": "${workspaceFolder}" },
+      "justMyCode": false,
+      "preLaunchTask": "vsdbg: copy into running containers",
+      "presentation": { "group": "2_attach" }
+    },
+    {
+      "name": "Attach Web",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "1",
+      "pipeTransport": {
+        "pipeProgram": "docker",
+        "pipeArgs": ["exec", "-i", "kaimo_file_server_web"],
+        "debuggerPath": "/tmp/vsdbg/vsdbg",
+        "pipeCwd": "${workspaceFolder}"
+      },
+      "sourceFileMap": { "/src": "${workspaceFolder}" },
+      "justMyCode": false,
+      "preLaunchTask": "vsdbg: copy into running containers",
+      "presentation": { "group": "2_attach" }
+    },
+    {
+      "name": "Attach SMB Bridge",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "1",
+      "pipeTransport": {
+        "pipeProgram": "docker",
+        "pipeArgs": ["exec", "-i", "kaimo_smb_bridge"],
+        "debuggerPath": "/tmp/vsdbg/vsdbg",
+        "pipeCwd": "${workspaceFolder}"
+      },
+      "sourceFileMap": { "/src": "${workspaceFolder}" },
+      "justMyCode": false,
+      "preLaunchTask": "vsdbg: copy into running containers",
+      "presentation": { "group": "2_attach" }
+    }
+  ],
+  "compounds": [
+    {
+      // F5: build + start the debug stack, launch all three services under the debugger;
+      // stopping it shuts the stack down.
+      "name": "Debug Full Stack",
+      "configurations": ["Launch Host", "Launch Web", "Launch SMB Bridge"],
+      "preLaunchTask": "Stack: up (debug)",
+      "stopAll": true,
+      // Group "1_..." sorts before the attach group, so this is the first entry.
+      "presentation": { "group": "1_stack", "order": 1 }
+    }
+  ]
+}

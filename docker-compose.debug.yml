@@ -1,0 +1,28 @@
+# VS CODE DEBUGGING ONLY (see .vscode/launch.json). Layered on top of
+# docker-compose.yml + docker-compose.dev.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.debug.yml up -d --build
+# Visual Studio (docker-compose.dcproj) and Rider never load this file.
+#
+# Works like Visual Studio's fast mode: the .NET containers only idle, and the
+# VS Code debugger starts `dotnet <app>.dll` inside them through `docker exec`,
+# so breakpoints in Program.cs are hit. The apps therefore run only while a
+# debug session is active. Also builds in Debug configuration and mounts the
+# Linux build of vsdbg at /remote_debugger. The VS Code task
+# "vsdbg: update (Linux x64)" (.vscode/update-vsdbg.ps1) installs the release
+# matching the C# extension into its own folder (Visual Studio's copy in
+# vsdbg/vs2017u5 is left alone); override the path with VSDBG_PATH in .env.
+
+x-debug: &debug
+  build:
+    args:
+      BUILD_CONFIGURATION: Debug
+  # Placeholder instead of the app; init forwards SIGTERM so `down` stops it at once.
+  entrypoint: ["sleep", "infinity"]
+  init: true
+  volumes:
+    - ${VSDBG_PATH:-${USERPROFILE}/vsdbg/vscode}:/remote_debugger:ro
+
+services:
+  kaimo_file_server.host: *debug
+  kaimo_smb_bridge: *debug
+  kaimo_file_server.web: *debug

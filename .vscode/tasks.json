@@ -1,0 +1,52 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // Ctrl+Shift+B: start the dev stack (Release build), same as the CLI command.
+      "label": "Stack: up",
+      "type": "process",
+      "command": "docker",
+      "args": ["compose", "-f", "docker-compose.yml", "-f", "docker-compose.dev.yml", "up", "-d", "--build"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      // Used by F5: Debug build of the .NET services with vsdbg mounted.
+      "label": "Stack: up (debug)",
+      "type": "process",
+      "command": "docker",
+      "args": ["compose", "-f", "docker-compose.yml", "-f", "docker-compose.dev.yml", "-f", "docker-compose.debug.yml", "up", "-d", "--build"],
+      "dependsOn": "vsdbg: update (Linux x64)",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      // Also runs automatically when "Debug Full Stack" ends (postDebugTask in launch.json).
+      "label": "Stack: down",
+      "type": "process",
+      "command": "docker",
+      "args": ["compose", "-f", "docker-compose.yml", "-f", "docker-compose.dev.yml", "down"],
+      "problemMatcher": []
+    },
+    {
+      // Runs before every debug start; downloads only when the C# extension changed.
+      // See update-vsdbg.ps1 for why the container needs exactly this vsdbg.
+      "label": "vsdbg: update (Linux x64)",
+      "type": "process",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/.vscode/update-vsdbg.ps1"],
+      "problemMatcher": []
+    },
+    {
+      // Used by the "Attach ..." configurations: puts vsdbg into the running containers.
+      "label": "vsdbg: copy into running containers",
+      "type": "process",
+      "command": "powershell",
+      "args": [
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/.vscode/update-vsdbg.ps1",
+        "-CopyTo", "kaimo_file_server,kaimo_file_server_web,kaimo_smb_bridge"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
