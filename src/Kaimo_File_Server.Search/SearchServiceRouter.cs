@@ -152,7 +152,7 @@ public sealed partial class SearchServiceRouter : ISearchService, ISearchAdminSe
     public async Task<List<FileDocument>> SearchAsync(
         string searchText, UserContext user,
         string? shareName = null, string? pathPrefix = null,
-        CancellationToken ct = default, bool includeRecycleBin = false)
+        CancellationToken ct = default, bool includeRecycleBin = false, int? maxHits = null)
     {
         // Searching inside a recycle bin always shows its contents, whatever the toggle says.
         includeRecycleBin |= IsRecycleBinScope(pathPrefix);
@@ -163,7 +163,7 @@ public sealed partial class SearchServiceRouter : ISearchService, ISearchAdminSe
             try
             {
                 var index = await GetIndexAsync(engine, ct);
-                return await index.SearchAsync(searchText, user, shareName, pathPrefix, ct, includeRecycleBin);
+                return await index.SearchAsync(searchText, user, shareName, pathPrefix, ct, includeRecycleBin, maxHits);
             }
             catch (OperationCanceledException)
             {
@@ -185,7 +185,7 @@ public sealed partial class SearchServiceRouter : ISearchService, ISearchAdminSe
             }
         }
 
-        return await _filename.SearchAsync(searchText, user, shareName, pathPrefix, ct, includeRecycleBin);
+        return await _filename.SearchAsync(searchText, user, shareName, pathPrefix, ct, includeRecycleBin, maxHits);
     }
 
     /// <summary>

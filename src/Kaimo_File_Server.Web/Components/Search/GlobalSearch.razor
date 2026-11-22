@@ -38,75 +38,109 @@
 
             @if (_dropdownVisible && HasResults)
             {
-                <div class="search-dropdown" role="listbox">
-                    @if (_fileResults.Any())
+                @* tabindex="-1": a click on its scrollbar keeps the focus inside the search. *@
+                <div class="search-dropdown" role="listbox" tabindex="-1">
+                    @if (_groups.Any())
                     {
-                        @foreach (var group in _fileResults.GroupBy(r => r.ShareName))
-                        {
-                            <div class="search-group-header">@group.Key</div>
-                            @foreach (var result in group)
+                        @* Own scroll area: the settings section and "show all" stay in view below. *@
+                        <div class="search-file-results">
+                            @foreach (var group in _groups)
                             {
-                                var fileIndex = _fileResults.IndexOf(result);
-                                <div class="search-result-item @(fileIndex == _activeIndex ? "active" : "")"
-                                     role="option" aria-selected="@(fileIndex == _activeIndex ? "true" : "false")"
-                                     @onmousedown="() => NavigateToFile(result)">
-                                    @* Same icon and colors as the file browser row. *@
-                                    @{ var icon = FileHelper.GetEntryIcon(result.FileName, result.IsDirectory, IsRecycleBinRoot(result)); }
-                                    @Assets.SVG(icon.File, new SvgOptions(Color: icon.Color, Fill: icon.Fill, CssClass: "search-entry-icon"))
-                                    <div class="search-result-info">
-                                        <span class="search-result-name">@result.FileName</span>
-                                        @if (IsInRecycleBin(result))
-                                        {
-                                            <StatusBadge Tone="StatusTone.Neutral" ShowDot="false" Class="search-result-badge"
-                                                         Label="@Text("Web_Search_RecycleBin", "Recycle bin")" />
-                                        }
-                                        <span class="search-result-meta">
-                                            @if (!string.IsNullOrEmpty(result.HighlightSnippet))
+                                @* Collapsible share section; mousedown:preventDefault keeps the focus in the
+                                   input so the focus-out auto-hide does not close the dropdown. *@
+                                <button type="button" class="search-group-header search-group-toggle"
+                                        aria-expanded="@(group.Collapsed ? "false" : "true")"
+                                        title="@(group.Collapsed ? Text("Web_Search_ExpandShare", "Show hits of this share") : Text("Web_Search_CollapseShare", "Hide hits of this share"))"
+                                        @onmousedown:preventDefault
+                                        @onclick="() => ToggleShare(group.Share)">
+                                    <span class="search-group-chevron @(group.Collapsed ? "" : "is-open")">
+                                        @Assets.SVG("chevron_right.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2f))
+                                    </span>
+                                    <span class="search-group-name">@group.Share</span>
+                                    <span class="search-group-count">@CountLabel(group.Total)</span>
+                                </button>
+                                @foreach (var result in group.Shown)
+                                {
+                                    var fileIndex = _fileResults.IndexOf(result);
+                                    <div class="search-result-item @(fileIndex == _activeIndex ? "active" : "")"
+                                         role="option" aria-selected="@(fileIndex == _activeIndex ? "true" : "false")"
+                                         @onmousedown:preventDefault
+                                         @onclick="() => NavigateToFile(result)">
+                                        @* Same icon and colors as the file browser row. *@
+                                        @{ var icon = FileHelper.GetEntryIcon(result.FileName, result.IsDirectory, IsRecycleBinRoot(result)); }
+                                        @Assets.SVG(icon.File, new SvgOptions(Color: icon.Color, Fill: icon.Fill, CssClass: "search-entry-icon"))
+                                        <div class="search-result-info">
+                                            <span class="search-result-name">@result.FileName</span>
+                                            @if (IsInRecycleBin(result))
                                             {
-                                                @* Rendered as encoded text segments — the snippet contains
-                                                   user-controlled file names/content and must never be raw HTML. *@
-                                                @foreach (var segment in SearchSnippet.Split(result.HighlightSnippet))
+                                                <StatusBadge Tone="StatusTone.Neutral" ShowDot="false" Class="search-result-badge"
+                                                             Label="@Text("Web_Search_RecycleBin", "Recycle bin")" />
+                                            }
+                                            <span class="search-result-meta">
+                                                @if (!string.IsNullOrEmpty(result.HighlightSnippet))
                                                 {
-                                                    if (segment.Highlighted)
+                                                    @* Rendered as encoded text segments — the snippet contains
+                                                       user-controlled file names/content and must never be raw HTML. *@
+                                                    @foreach (var segment in SearchSnippet.Split(result.HighlightSnippet))
                                                     {
-                                                        <mark>@segment.Text</mark>
-                                                    }
-                                                    else
-                                                    {
-                                                        @segment.Text
+                                                        if (segment.Highlighted)
+                                                        {
+                                                            <mark>@segment.Text</mark>
+                                                        }
+                                                        else
+                                                        {
+                                                            @segment.Text
+                                                        }
                                                     }
                                                 }
-                                            }
-                                            else
-                                            {
-                                                @result.SharePath
-                                            }
-                                        </span>
+                                                else
+                                                {
+                                                    @result.SharePath
+                                                }
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
+                                }
+                                @if (!group.Collapsed && group.Total > group.Shown.Count && CanShowAllResults)
+                                {
+                                    <button type="button" class="search-more" @onmousedown:preventDefault
+                                            @onclick="() => ShowAllResults(MoreTarget(group))">
+                                        @MoreLabel(group)
+                                    </button>
+                                }
                             }
-                        }
+                        </div>
                     }
                     @if (_destResults.Any())
                     {
-                        <div class="search-group-header">@Text("Web_Search_Section_Destinations", "Settings & tabs")</div>
-                        @foreach (var dest in _destResults)
-                        {
-                            var destIndex = _fileResults.Count + _destResults.IndexOf(dest);
-                            <div class="search-result-item @(destIndex == _activeIndex ? "active" : "")"
-                                 role="option" aria-selected="@(destIndex == _activeIndex ? "true" : "false")"
-                                 @onmousedown="() => NavigateToDestination(dest)">
-                                @Assets.SVG(dest.Icon, new SvgOptions())
-                                <div class="search-result-info">
-                                    <span class="search-result-name">@dest.Title</span>
-                                    <span class="search-result-meta">@dest.Category</span>
+                        <div class="search-dest-results">
+                            <div class="search-group-header">@Text("Web_Search_Section_Destinations", "Settings & tabs")</div>
+                            @foreach (var dest in _destResults)
+                            {
+                                var destIndex = _fileResults.Count + _destResults.IndexOf(dest);
+                                <div class="search-result-item @(destIndex == _activeIndex ? "active" : "")"
+                                     role="option" aria-selected="@(destIndex == _activeIndex ? "true" : "false")"
+                                     @onmousedown:preventDefault
+                                     @onclick="() => NavigateToDestination(dest)">
+                                    @Assets.SVG(dest.Icon, new SvgOptions())
+                                    <div class="search-result-info">
+                                        <span class="search-result-name">@dest.Title</span>
+                                        <span class="search-result-meta">@dest.Category</span>
+                                    </div>
                                 </div>
-                            </div>
-                        }
+                            }
+                        </div>
+                    }
+                    @if (CanShowAllResults)
+                    {
+                        <button type="button" class="search-show-all" @onmousedown:preventDefault @onclick="() => ShowAllResults()">
+                            @string.Format(Text("Web_Search_ShowAll", "Show all results ({0})"), CountLabel(TotalFileHits))
+                            @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 14, Height: 14))
+                        </button>
                     }
                 </div>
             }
-            else if (_dropdownVisible && _isSearching)
+            else if (_dropdownVisible && _isSearching && !_onResultsPage)
             {
                 <div class="search-dropdown">
                     <div class="search-result-item searching">
@@ -114,7 +148,7 @@
                     </div>
                 </div>
             }
-            else if (_dropdownVisible && _searchQuery.Length >= 2 && !HasResults && !_isSearching)
+            else if (_dropdownVisible && _searchQuery.Length >= 2 && !HasResults && !_isSearching && !_onResultsPage)
             {
                 <div class="search-dropdown">
                     <div class="search-result-item no-results">

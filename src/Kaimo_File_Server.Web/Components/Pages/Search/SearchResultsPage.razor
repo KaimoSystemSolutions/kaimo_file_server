@@ -1,0 +1,243 @@
+@page "/search"
+@using Kaimo_File_Server.Core.Helpers
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser.components
+@using Kaimo_File_Server.Web.Components.Search
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+
+@*
+    Full search results as a file tree (share → folders → hits), opened from the search
+    dropdown ("Show all results", "n more in …"). The search itself travels in the history
+    entry, not the URL (SearchResultsRequest); the search bar keeps driving it live. The refine
+    field (file names, or full text) and the filters beside the term narrow the loaded hits;
+    double-click previews a file; Preview / Show in folder act on the selection (toolbar or
+    the file browser's context menu look, with only these entries — they are not part of the
+    configurable file-browser menu).
+*@
+
+@* Standard page header (same position as every page): the term is part of the title. *@
+<div class="page-header">
+    <div class="search-results-heading">
+        @if (HasQuery)
+        {
+            <h1 class="search-results-title" title="@_request!.Query">@string.Format(T("Web_SearchResults_TitleFor", "Results for \u201c{0}\u201d"), _request.Query)</h1>
+            <p class="subtitle search-results-subtitle">
+                <span>@CountText</span>
+                <span aria-hidden="true">·</span>
+                <span>@ScopeText</span>
+                @if (_updating || _refining)
+                {
+                    <span class="search-results-updating" role="status">@T("Web_SearchResults_Updating", "Updating…")</span>
+                }
+            </p>
+        }
+        else
+        {
+            <h1>@T("Web_SearchResults_Title", "Search results")</h1>
+        }
+    </div>
+</div>
+
+@if (HasQuery && _allHits.Count > 0)
+{
+    @* One full-width row: the refine field takes the free width, the filters follow. *@
+    <div class="search-results-toolbar">
+        <div class="search-results-refine-field">
+            @Assets.SVG("search.svg", new SvgOptions(Width: 16, Height: 16, Color: "var(--text-tertiary)"))
+            <input type="search" class="edit-input"
+                   placeholder="@RefinePlaceholder" aria-label="@RefinePlaceholder"
+                   @bind="_refineText" @bind:event="oninput" @bind:after="OnRefineChangedAsync" />
+        </div>
+        <div class="toggle-button-group" role="radiogroup" aria-label="@T("Web_SearchResults_RefineIn", "Search in")">
+            <button type="button" role="radio" aria-checked="@(_refineMode == SearchRefineMode.Name ? "true" : "false")"
+                    class="toggle-btn @(_refineMode == SearchRefineMode.Name ? "toggle-btn--active" : "")"
+                    @onclick="() => SetRefineModeAsync(SearchRefineMode.Name)">@T("Web_SearchResults_Refine_Name", "File name")</button>
+            <button type="button" role="radio" aria-checked="@(_refineMode == SearchRefineMode.Content ? "true" : "false")"
+                    class="toggle-btn @(_refineMode == SearchRefineMode.Content ? "toggle-btn--active" : "")"
+                    @onclick="() => SetRefineModeAsync(SearchRefineMode.Content)">@T("Web_SearchResults_Refine_Content", "Full text")</button>
+        </div>
+        @* Filters wrap as one group: on a narrow row they move below the refine field together. *@
+        <div class="search-results-filters">
+            <select class="edit-input" aria-label="@T("Web_SearchResults_FilterType", "Type")"
+                    @bind="_typeFilter" @bind:after="ApplyFilter">
+                @foreach (var type in Enum.GetValues<SearchTypeFilter>())
+                {
+                    <option value="@type">@TypeLabel(type)</option>
+                }
+            </select>
+            <select class="edit-input" aria-label="@T("Web_SearchResults_FilterModified", "Modified")"
+                    @bind="_dateFilter" @bind:after="ApplyFilter">
+                @foreach (var period in Enum.GetValues<SearchDateFilter>())
+                {
+                    <option value="@period">@DateLabel(period)</option>
+                }
+            </select>
+            @if (_dateFilter == SearchDateFilter.Custom)
+            {
+                <div class="search-results-range">
+                    <input type="date" class="edit-input" aria-label="@T("Web_SearchResults_From", "From")"
+                           title="@T("Web_SearchResults_From", "From")" max="@_to?.ToString("yyyy-MM-dd")"
+                           @bind="_from" @bind:format="yyyy-MM-dd" @bind:after="ApplyFilter" />
+                    <span aria-hidden="true">–</span>
+                    <input type="date" class="edit-input" aria-label="@T("Web_SearchResults_To", "To")"
+                           title="@T("Web_SearchResults_To", "To")" min="@_from?.ToString("yyyy-MM-dd")"
+                           @bind="_to" @bind:format="yyyy-MM-dd" @bind:after="ApplyFilter" />
+                </div>
+            }
+            <button type="button" class="btn btn-secondary search-results-reset"
+                    disabled="@(!Filter.IsActive)" @onclick="ResetFilter">
+                @T("Web_SearchResults_FilterReset", "Reset filter")
+            </button>
+        </div>
+    </div>
+}
+
+@if (_error is not null)
+{
+    <div class="error-banner search-results-banner">@_error</div>
+}
+
+@if (_restoring || _loading)
+{
+    <div class="loading-state"><div class="spinner"></div></div>
+}
+else if (!HasQuery)
+{
+    <div class="empty-state">
+        @Assets.SVG("search.svg", new SvgOptions(Width: 48, Height: 48, Color: "var(--text-tertiary)"))
+        <p>@T("Web_SearchResults_NoQuery", "Start a search in the search bar above.")</p>
+    </div>
+}
+else if (_allHits.Count == 0)
+{
+    <div class="empty-state">
+        @Assets.SVG("search.svg", new SvgOptions(Width: 48, Height: 48, Color: "var(--text-tertiary)"))
+        <p>@Resources.Web_Search_NoResults</p>
+    </div>
+}
+else
+{
+    <div class="search-results-list">
+        @* List header: the actions act on the selected row, so they sit on the list itself. *@
+        <div class="search-results-list-header">
+            <span class="search-results-selection @(_selected is null ? "search-results-selection--none" : "")">
+                @(_selected?.Name ?? Resources.Web_Selection_None)
+            </span>
+            <div class="search-results-actions">
+                <button type="button" class="toolbar-btn" disabled="@(!CanPreview(_selected))" @onclick="() => PreviewAsync(_selected!)">
+                    @Assets.SVG("eye.svg", new SvgOptions(Width: 14, Height: 14))
+                    <span>@T("Web_SearchResults_Preview", "Preview")</span>
+                </button>
+                <button type="button" class="toolbar-btn" disabled="@(_selected is null)" @onclick="() => ShowInFolder(_selected!)">
+                    @Assets.SVG("folder.svg", new SvgOptions(Width: 14, Height: 14))
+                    <span>@ShowInFolderLabel(_selected)</span>
+                </button>
+                <span class="search-results-divider" aria-hidden="true"></span>
+                <button type="button" class="toolbar-btn" @onclick="ExpandAll">@T("Web_SearchResults_ExpandAll", "Expand all")</button>
+                <button type="button" class="toolbar-btn" @onclick="CollapseAll">@T("Web_SearchResults_CollapseAll", "Collapse all")</button>
+            </div>
+        </div>
+
+    @if (_roots.Count == 0)
+    {
+        <div class="empty-state">
+            <p>@T("Web_SearchResults_FilterEmpty", "No results match this filter.")</p>
+            <button type="button" class="btn btn-secondary" @onclick="ResetFilter">@T("Web_SearchResults_FilterReset", "Reset filter")</button>
+        </div>
+    }
+    else
+    {
+        <div class="search-tree" role="tree" aria-label="@T("Web_SearchResults_Title", "Search results")">
+            @foreach (var row in SearchResultTree.Flatten(_roots, _collapsed))
+            {
+                var node = row.Node;
+                var isSelected = ReferenceEquals(node, _selected);
+                var hasChildren = node.Children.Count > 0;
+                var isCollapsed = _collapsed.Contains(node.Key);
+                <div class="search-tree-row @(isSelected ? "search-tree-row--selected" : "") @(node.Hit is null ? "search-tree-row--path" : "")"
+                     role="treeitem" tabindex="0"
+                     aria-level="@(row.Depth + 1)"
+                     aria-selected="@(isSelected ? "true" : "false")"
+                     aria-expanded="@(hasChildren ? (isCollapsed ? "false" : "true") : null)"
+                     style="--tree-depth: @row.Depth"
+                     @onclick="() => Select(node)"
+                     @ondblclick="() => ActivateAsync(node)"
+                     @onkeydown="e => OnRowKeyAsync(e, node)"
+                     @oncontextmenu="e => OpenMenu(e, node)" @oncontextmenu:preventDefault="true">
+                    @if (hasChildren)
+                    {
+                        <button type="button" class="search-tree-toggle @(isCollapsed ? "" : "search-tree-toggle--open")"
+                                tabindex="-1"
+                                title="@(isCollapsed ? T("Web_SearchResults_Expand", "Expand") : T("Web_SearchResults_Collapse", "Collapse"))"
+                                @onclick="() => Toggle(node)" @onclick:stopPropagation="true">
+                            @Assets.SVG("chevron_right.svg", new SvgOptions(Width: 14, Height: 14, Color: "currentColor", StrokeWidth: 2f))
+                        </button>
+                    }
+                    else
+                    {
+                        <span class="search-tree-toggle-spacer"></span>
+                    }
+
+                    @if (node.IsShare)
+                    {
+                        @Assets.SVG(node.Share == SearchHitNavigation.HomeRoute ? "home.svg" : "share.svg",
+                            new SvgOptions(Width: 18, Height: 18, Color: "var(--folder-stroke)", CssClass: "search-tree-icon"))
+                    }
+                    else
+                    {
+                        var icon = FileHelper.GetEntryIcon(node.Name, node.IsDirectory, false);
+                        @Assets.SVG(icon.File, new SvgOptions(Width: 18, Height: 18, Color: icon.Color, Fill: icon.Fill, CssClass: "search-tree-icon"))
+                    }
+
+                    <span class="search-tree-name">@node.Name</span>
+
+                    @if (node.Hit is { } hit && ShareEntryPolicy.IsRecycleBinPath(hit.SharePath))
+                    {
+                        <StatusBadge Tone="StatusTone.Neutral" ShowDot="false" Class="search-tree-badge"
+                                     Label="@Resources.Web_Search_RecycleBin" />
+                    }
+
+                    <span class="search-tree-meta">
+                        @if (node.Hit is { } snippetHit && SnippetOf(snippetHit) is { } snippet
+                             && SearchSnippet.AddsTo(snippet, node.Name))
+                        {
+                            @* Encoded text segments: the snippet carries user-controlled content. *@
+                            @foreach (var segment in SearchSnippet.Split(snippet))
+                            {
+                                if (segment.Highlighted)
+                                {
+                                    <mark>@segment.Text</mark>
+                                }
+                                else
+                                {
+                                    @segment.Text
+                                }
+                            }
+                        }
+                    </span>
+
+                    @if (node.IsDirectory && node.HitCount > (node.Hit is null ? 0 : 1))
+                    {
+                        <span class="search-tree-count" title="@string.Format(T("Web_SearchResults_HitsBelow", "{0} hits"), node.HitCount)">@node.HitCount</span>
+                    }
+                </div>
+            }
+        </div>
+    }
+    </div>
+}
+
+@if (_menuNode is not null)
+{
+    @* Same look as the file browser's context menu (shared component), with only the entries
+       that apply to the selected item. *@
+    <div class="context-menu-backdrop" @onclick="CloseMenu" @oncontextmenu="CloseMenu" @oncontextmenu:preventDefault="true"></div>
+    <div class="context-menu" @ref="_menuRef" style="top: @(_menuAt.Y)px; left: @(_menuAt.X)px;">
+        <ContextMenu Items="MenuItems(_menuNode)" />
+    </div>
+}
+
+<FilePreview @ref="_sharePreview" VM="_shareBrowser" />
+<FilePreview @ref="_homePreview" VM="_homeBrowser" />

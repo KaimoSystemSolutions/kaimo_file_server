@@ -16,4 +16,11 @@ public static class SearchLimits
     /// page any caller asks for (client API maximum).
     /// </summary>
     public const int MinVisibleHits = 50;
+
+    /// <summary>
+    /// Readable hits a search collects before paging stops: <see cref="MinVisibleHits"/> unless
+    /// the caller asks for more (the web results page), never more than <see cref="MaxRawScan"/>.
+    /// </summary>
+    public static int VisibleHits(int? requested)
+        => Math.Clamp(requested ?? MinVisibleHits, 1, MaxRawScan);
 }

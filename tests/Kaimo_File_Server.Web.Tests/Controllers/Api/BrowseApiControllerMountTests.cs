@@ -476,7 +476,7 @@ public sealed class BrowseApiControllerMountTests : IDisposable
         shares.Setup(r => r.GetAllEnabledAsync()).ReturnsAsync([_h.Host]);
         var search = new Mock<ISearchService>();
         search.Setup(s => s.SearchAsync(It.IsAny<string>(), _h.User, It.IsAny<string?>(), It.IsAny<string?>(),
-                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>(), It.IsAny<int?>()))
             .ReturnsAsync([]);
         var sut = new SearchApiController(users.Object, shares.Object, search.Object, _h.NewRouter())
         {
@@ -501,7 +501,7 @@ public sealed class BrowseApiControllerMountTests : IDisposable
         Assert.Equal(5, hit.Size);
         Assert.Equal(Id, hit.ShareId);
         search.Verify(s => s.SearchAsync(It.IsAny<string>(), _h.User, It.IsAny<string?>(), It.IsAny<string?>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
+            It.IsAny<CancellationToken>(), It.IsAny<bool>(), It.IsAny<int?>()), Times.Never);
     }
 
     [Fact]

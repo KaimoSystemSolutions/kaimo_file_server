@@ -69,6 +69,8 @@ public partial class GlobalSearch : IDisposable
 
     private List<FileDocument> _allFileHits = new();  // fetched hits incl. recycle bin, ranked
     private List<FileDocument> _fileResults = new();  // shown hits (recycle-bin filter applied)
+    private List<SearchHitGroup> _groups = new();      // shown hits per share, in rank order
+    private readonly HashSet<string> _collapsedShares = new(StringComparer.Ordinal);
     private List<SearchDestination> _destResults = new();
     private int _activeIndex = -1;        // keyboard-selected result (files first, then destinations); -1 = none
     private bool _revealActive;           // scroll the selected result into view after the next render
@@ -108,6 +110,7 @@ public partial class GlobalSearch : IDisposable
     protected override async Task OnInitializedAsync()
     {
         Nav.LocationChanged += OnLocationChanged;
+        StartResultsLink();
 
         var state = await AuthStateProvider.GetAuthenticationStateAsync();
         var username = state.User.Identity?.Name;
@@ -115,6 +118,7 @@ public partial class GlobalSearch : IDisposable
             _user = await UserContextFactory.CreateByUsernameAsync(username);
 
         DetectContext();
+        _searchQuery = _resultsRequest?.Query ?? "";
         if (!_inBrowser)
             await LoadVisibleSharesAsync();
     }
@@ -125,7 +129,9 @@ public partial class GlobalSearch : IDisposable
             var wasInBrowser = _inBrowser;
             DetectContext();
             ResetResults();
-            _searchQuery = "";
+            _collapsedShares.Clear();
+            // On the results page the bar keeps showing what was searched.
+            _searchQuery = _resultsRequest?.Query ?? "";
             _pickedShares.Clear();
             if (!_inBrowser && (_visibleShares is null || wasInBrowser))
                 await LoadVisibleSharesAsync();
@@ -145,6 +151,9 @@ public partial class GlobalSearch : IDisposable
         _virtualShareId = null;
         _virtualRouteBase = null;
         _mountedFolder = null;
+
+        if (TryDetectResultsPage(segs))
+            return;
 
         if (segs.Length == 0 || !segs[0].Equals("files", StringComparison.OrdinalIgnoreCase))
         {
@@ -184,28 +193,7 @@ public partial class GlobalSearch : IDisposable
     }
 
     // Route segment of the own home folder (/files/user).
-    private const string HomeRoute = "user";
-
-    /// <summary>
-    /// Presents a home-folder hit the way the browser shows the home: as "user", relative to
-    /// the caller's own folder, so the folder GUID never reaches the dropdown or the URL.
-    /// Hits in other users' homes only pass the ACL filter for holders of AccessHomeContents;
-    /// they keep the "users" share and open in /files/users.
-    /// </summary>
-    private FileDocument? ToWebHit(FileDocument hit)
-    {
-        if (!hit.ShareName.Equals(HomeDirectoryService.ShareName, StringComparison.OrdinalIgnoreCase))
-            return hit;
-
-        var root = HomeDirectoryService.HomePathOf(_user!.User.Id) + "/";
-        var path = hit.SharePath.Replace('\\', '/').TrimStart('/');
-        if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-            return hit;
-
-        hit.ShareName = HomeRoute;
-        hit.SharePath = path[root.Length..];
-        return hit;
-    }
+    private const string HomeRoute = SearchHitNavigation.HomeRoute;
 
     /// <summary>Scope options for the current context, as (value, label) pairs.</summary>
     private IEnumerable<(string Value, string Label)> ScopeOptions()
@@ -223,6 +211,13 @@ public partial class GlobalSearch : IDisposable
         {
             yield return (ScopeGlobal, Text("Web_Search_AllShares", "All shares"));
             yield return (ScopeDest, Text("Web_Search_Scope_Settings", "Settings"));
+            yield break;
+        }
+
+        if (_onResultsPage)
+        {
+            foreach (var option in ResultsPageScopeOptions())
+                yield return option;
             yield break;
         }
 
@@ -353,6 +348,8 @@ public partial class GlobalSearch : IDisposable
     {
         _includeRecycleBin = !_includeRecycleBin;
         ApplyRecycleBinFilter();
+        if (_onResultsPage && _searchQuery.Length >= 2)
+            ForwardToResultsPage(ResolvePlan().Targets);
         if (_searchQuery.Length >= 2)
             _dropdownVisible = true;
     }
@@ -429,12 +426,20 @@ public partial class GlobalSearch : IDisposable
 
         var plan = ResolvePlan();
 
+        // On the results page the files are listed by the page below: the bar hands it the term
+        // and scope and shows only settings & tabs itself.
+        if (_onResultsPage)
+        {
+            ForwardToResultsPage(plan.Targets);
+            plan = (true, 8, new List<(string?, string)>());
+        }
+
         // Several picked shares are searched concurrently (the search service is a shared
         // singleton, safe for parallel calls). Always fetched with the recycle bin; the toggle
         // only filters the display, so it switches the results live without another round trip.
         var perTarget = await Task.WhenAll(plan.Targets.Select(t =>
             SearchService.SearchAsync(_searchQuery, _user, t.Share, t.Sub, token, includeRecycleBin: true)));
-        var files = perTarget.SelectMany(hits => hits).Select(ToWebHit).OfType<FileDocument>().ToList();
+        var files = perTarget.SelectMany(hits => hits).Select(h => SearchHitNavigation.ToWebHit(h, _user.User.Id)).ToList();
         var virtualShareId = IsVirtualShareScope ? _virtualShareId : null;
         if (virtualShareId is { } shareId)
             files = await SearchVirtualShareAsync(shareId, token);
@@ -453,6 +458,7 @@ public partial class GlobalSearch : IDisposable
             .GroupBy(f => f.Id)
             .Select(g => g.First())
             .ToList();
+        _hitsCapped = virtualShareId is null && perTarget.Any(hits => hits.Count >= SearchLimits.MinVisibleHits);
         _hitsVirtualShareId = virtualShareId;
         _hitsVirtualRouteBase = virtualShareId is null ? null : _virtualRouteBase;
         ApplyRecycleBinFilter();
@@ -462,18 +468,16 @@ public partial class GlobalSearch : IDisposable
 
     /// <summary>
     /// Derives the shown file hits from the fetched ones: recycle-bin hits only while the toggle
-    /// is on (or the folder scope lies in a recycle bin), the best 8, in display order (grouped
-    /// by share) so the keyboard index matches the dropdown.
+    /// is on (or the folder scope lies in a recycle bin), grouped by share with at most
+    /// <see cref="MaxHitsPerShare"/> each and none for a collapsed share. <c>_fileResults</c> is
+    /// the flat display order, so the keyboard index matches the dropdown.
     /// </summary>
     private void ApplyRecycleBinFilter()
     {
         bool showBin = _includeRecycleBin || IsRecycleBinScope;
-        _fileResults = _allFileHits
-            .Where(f => showBin || !IsInRecycleBin(f))
-            .Take(MaxShownFileHits)
-            .GroupBy(f => f.ShareName)
-            .SelectMany(g => g)
-            .ToList();
+        _groups = SearchHitGroups.Build(
+            _allFileHits.Where(f => showBin || !IsInRecycleBin(f)), MaxHitsPerShare, _collapsedShares);
+        _fileResults = _groups.SelectMany(g => g.Shown).ToList();
         _activeIndex = -1;
     }
 
@@ -482,7 +486,11 @@ public partial class GlobalSearch : IDisposable
         _scope == ScopeFolder
         && _contextSubPath.Split('/').Any(s => s.Equals(ShareEntryPolicy.RecycleBinName, StringComparison.OrdinalIgnoreCase));
 
+    // Name-walk limit of a virtual share (no index to rank against).
     private const int MaxShownFileHits = 8;
+
+    // Hits shown per share in the dropdown; the results page shows them all.
+    private const int MaxHitsPerShare = 5;
 
     private (bool Dest, int DestLimit, List<(string? Share, string Sub)> Targets) ResolvePlan()
     {
@@ -492,6 +500,9 @@ public partial class GlobalSearch : IDisposable
 
         if (_scope == ScopeDest)
             return (true, 8, new List<(string?, string)>());
+
+        if (_scope == ScopeResults && _resultsRequest is { } results && _user is not null)
+            return (true, 3, results.ToSearchTargets(_user.User.Id));
 
         if (_scope == ScopeGlobal)
             return (true, 3, new List<(string?, string)> { (null, "") });
@@ -518,33 +529,9 @@ public partial class GlobalSearch : IDisposable
         // A virtual share's hits open in its GUID route, whose browser is keyed by the share id.
         var routeBase = _hitsVirtualShareId is { } virtualId
             ? _hitsVirtualRouteBase ?? $"/files/access/{virtualId}"
-            : $"/files/{result.ShareName}";
-
-        string url;
-        if (result.IsDirectory)
-        {
-            var dirPath = (result.SharePath ?? string.Empty).Replace('\\', '/').Trim('/');
-            url = string.IsNullOrEmpty(dirPath) || dirPath == "."
-                ? routeBase
-                : $"{routeBase}/{dirPath}";
-        }
-        else
-        {
-            var folderPath = (Path.GetDirectoryName(result.SharePath) ?? string.Empty)
-                .Replace('\\', '/').Trim('/');
-            url = string.IsNullOrEmpty(folderPath)
-                ? routeBase
-                : $"{routeBase}/{folderPath}";
-
-            // The home browser addresses its share by the real name, not by the "user" route;
-            // a virtual share's browser by its id.
-            var browserShare = _hitsVirtualShareId?.ToString()
-                ?? (result.ShareName == HomeRoute ? HomeDirectoryService.ShareName : result.ShareName);
-            if (FileSelectionCoordinator.RequestSelection(browserShare, folderPath, result.FileName))
-                return;
-        }
-
-        Nav.NavigateTo(url);
+            : null;
+        SearchHitNavigation.Open(Nav, FileSelectionCoordinator, result.ShareName, result.SharePath ?? "",
+            result.FileName, result.IsDirectory, routeBase, _hitsVirtualShareId?.ToString());
     }
 
     private void NavigateToDestination(SearchDestination dest)
@@ -568,6 +555,10 @@ public partial class GlobalSearch : IDisposable
                     ? (_activeIndex + 1) % count
                     : (_activeIndex <= 0 ? count : _activeIndex) - 1;
                 _revealActive = true;
+                break;
+            case "Enter" when _activeIndex < 0 && CanShowAllResults:
+                // Nothing picked with the arrow keys: Enter opens all results.
+                ShowAllResults();
                 break;
             case "Enter" when _dropdownVisible && _activeIndex >= 0 && _activeIndex < count:
                 // Same as clicking the selected result.
@@ -628,6 +619,8 @@ public partial class GlobalSearch : IDisposable
 
         if (_scope == ScopeDest)
             return Text("Web_Search_Hint_Settings", "Searching settings & tabs");
+        if (_scope == ScopeResults)
+            return $"{Text("Web_Search_Hint_In", "Searching in:")} {ResultsScopeLabel}";
         if (_scope == ScopeGlobal)
             return Text("Web_Search_Hint_AllShares", "Searching all shares");
 
@@ -665,16 +658,20 @@ public partial class GlobalSearch : IDisposable
     {
         _allFileHits = new();
         _fileResults = new();
+        _groups = new();
+        _hitsCapped = false;
         _destResults = new();
         _activeIndex = -1;
         _isSearching = false;
     }
 
-    private bool HasResults => _fileResults.Count > 0 || _destResults.Count > 0;
+    // Groups, not shown hits: with every share collapsed the dropdown still lists them.
+    private bool HasResults => _groups.Count > 0 || _destResults.Count > 0;
 
     public void Dispose()
     {
         Nav.LocationChanged -= OnLocationChanged;
+        StopResultsLink();
         _searchCts?.Cancel();
         _searchCts?.Dispose();
     }

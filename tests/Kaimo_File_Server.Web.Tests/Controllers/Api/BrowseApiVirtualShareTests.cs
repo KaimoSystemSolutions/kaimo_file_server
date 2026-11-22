@@ -235,7 +235,7 @@ public sealed class BrowseApiVirtualShareTests : IDisposable
         shares.Setup(r => r.GetAllEnabledAsync()).ReturnsAsync([_h.Host]);
         var search = new Mock<ISearchService>();
         search.Setup(s => s.SearchAsync(It.IsAny<string>(), _h.User, It.IsAny<string?>(), It.IsAny<string?>(),
-                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>(), It.IsAny<int?>()))
             .ReturnsAsync([]);
         var sut = new SearchApiController(NewUsers().Object, shares.Object, search.Object, _h.NewRouter())
         {

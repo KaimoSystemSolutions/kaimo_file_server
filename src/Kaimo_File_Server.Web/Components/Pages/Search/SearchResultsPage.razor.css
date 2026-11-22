@@ -1,0 +1,325 @@
+/* Search results page: a file tree in the list surface of the file browser (share → folders →
+   hits). Rows follow the list rules: hover, selected (accent-selected + 3 px accent bar),
+   focus-visible from the global rule. Folders on the way to a hit are muted. */
+
+/* Header: the standard page header; the title carries the searched term. */
+.search-results-heading {
+    min-width: 0;
+}
+
+.search-results-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.search-results-subtitle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
+}
+
+.search-results-updating {
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+/* Toolbar: one full-width row. The refine field takes the free width; every control shares
+   one height (36 px) so field, segments, selects, dates and reset line up. */
+.search-results-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+.search-results-toolbar .edit-input,
+.search-results-toolbar .search-results-reset,
+.search-results-toolbar .toggle-button-group {
+    box-sizing: border-box;
+    height: 36px;
+    min-height: 36px;
+    margin: 0;
+}
+
+.search-results-refine-field {
+    position: relative;
+    display: flex;
+    flex: 1 1 280px;
+    align-items: center;
+    min-width: 220px;
+}
+
+.search-results-refine-field ::deep svg {
+    position: absolute;
+    left: var(--space-3);
+    pointer-events: none;
+}
+
+.search-results-refine-field .edit-input {
+    width: 100%;
+    /* Room for the 16 px search icon plus a gap. */
+    padding: 0 var(--space-3) 0 calc(var(--space-3) + 16px + var(--space-2));
+    font-size: 14px;
+}
+
+/* Segments: the group is the 36 px box, the buttons fill it. */
+.search-results-toolbar .toggle-button-group {
+    flex: 0 0 auto;
+    align-items: stretch;
+}
+
+.search-results-toolbar .toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    padding-top: 0;
+    padding-bottom: 0;
+    white-space: nowrap;
+}
+
+.search-results-filters {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-left: auto;
+}
+
+.search-results-toolbar select.edit-input {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 150px;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: normal;
+}
+
+.search-results-range {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--text-tertiary);
+}
+
+.search-results-range .edit-input {
+    width: 140px;
+    padding: 0 var(--space-2);
+    line-height: normal;
+}
+
+/* The native calendar icon follows color-scheme; without it it stays black on dark. */
+:root[data-theme="dark"] .search-results-range .edit-input {
+    color-scheme: dark;
+}
+
+.search-results-toolbar .search-results-reset {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    padding-top: 0;
+    padding-bottom: 0;
+    white-space: nowrap;
+}
+
+.search-results-banner {
+    margin-bottom: var(--space-3);
+}
+
+/* The list surface: a header band with the selection and the actions that act on it, then
+   the tree. */
+.search-results-list {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+}
+
+.search-results-list-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-tertiary);
+}
+
+.search-results-selection {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.search-results-selection--none {
+    color: var(--text-tertiary);
+    font-weight: 500;
+}
+
+.search-results-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.search-results-actions .toolbar-btn {
+    padding: var(--space-1) var(--space-2);
+}
+
+.search-results-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+}
+
+.search-results-list .empty-state {
+    padding: var(--space-6) var(--space-4);
+}
+
+.search-tree {
+    /* Size of the expand toggle; one tree level indents by it, so children line up under it. */
+    --tree-toggle-size: 22px;
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-1) 0;
+}
+
+.search-tree-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 34px;
+    padding: 0 var(--space-4) 0 calc(var(--space-2) + var(--tree-depth, 0) * var(--tree-toggle-size));
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    user-select: none;
+}
+
+.search-tree-row:hover {
+    background: var(--bg-hover);
+}
+
+.search-tree-row:focus-visible {
+    outline-offset: -2px;
+}
+
+.search-tree-row--selected {
+    background: var(--accent-selected);
+    border-left-color: var(--accent);
+}
+
+.search-tree-row--selected:hover {
+    background: var(--accent-selected);
+}
+
+.search-tree-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: var(--tree-toggle-size);
+    height: var(--tree-toggle-size);
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-control);
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: transform 0.08s linear;
+}
+
+.search-tree-toggle:hover {
+    background: var(--bg-active);
+    color: var(--text-primary);
+}
+
+.search-tree-toggle--open {
+    transform: rotate(90deg);
+}
+
+.search-tree-toggle-spacer {
+    flex-shrink: 0;
+    width: var(--tree-toggle-size);
+}
+
+::deep .search-tree-icon {
+    flex-shrink: 0;
+}
+
+.search-tree-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.search-tree-row--selected .search-tree-name {
+    color: var(--accent-strong);
+}
+
+/* A folder only on the way to a hit: structure, not a result. */
+.search-tree-row--path .search-tree-name {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+::deep .search-tree-badge {
+    flex: 0 0 auto;
+    font-size: 0.7rem;
+}
+
+.search-tree-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.search-tree-meta mark {
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-control);
+    background: var(--accent-subtle);
+    color: var(--text-primary);
+}
+
+.search-tree-count {
+    flex: 0 0 auto;
+    min-width: var(--tree-toggle-size);
+    padding: 1px var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 11.5px;
+    font-weight: 600;
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    .search-results-refine-field {
+        flex-basis: 100%;
+    }
+
+    .search-tree-meta {
+        display: none;
+    }
+
+    .search-tree-row {
+        min-height: 40px;
+    }
+}

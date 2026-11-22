@@ -10,6 +10,9 @@ interface Window {
     };
     kaimoGlobalSearch: {
         revealActive(): void;
+        revealTreeSelection(): void;
+        historyState(): string | null;
+        replaceHistoryState(json: string): void;
     };
     contextMenu: {
         reposition(el: HTMLElement | null): Promise<void> | undefined;

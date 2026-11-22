@@ -97,6 +97,7 @@ public sealed class SearchScopeGateTests
         ctx.Services.AddSingleton(_mgmt.Object);
         ctx.Services.AddSingleton(auth.Object);
         ctx.Services.AddSingleton(new FileSelectionCoordinator());
+        ctx.Services.AddSingleton(new SearchResultsCoordinator());
         ctx.Services.AddSingleton(shares.Object);
         ctx.Services.AddSingleton(acl.Object);
 

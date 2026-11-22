@@ -225,7 +225,7 @@ public sealed partial class LocalIndexSearchService : ISearchService
     public async Task<List<FileDocument>> SearchAsync(
         string searchText, UserContext user,
         string? shareName = null, string? pathPrefix = null,
-        CancellationToken ct = default, bool includeRecycleBin = false)
+        CancellationToken ct = default, bool includeRecycleBin = false, int? maxHits = null)
     {
         // Fail closed: no user context means no results, ever.
         if (user is null)
@@ -241,12 +241,13 @@ public sealed partial class LocalIndexSearchService : ISearchService
         // until enough readable ones are collected, so matches the user may not read cannot
         // crowd out the ones they may.
         var ranked = await _index.SearchAsync(tokens, shareName, pathPrefix, 0, SearchLimits.MaxRawScan, includeRecycleBin, ct);
+        var wanted = SearchLimits.VisibleHits(maxHits);
         var allowed = new List<FileDocument>();
         foreach (var page in ranked.Chunk(RawFetchSize))
         {
             // SECURITY: every hit must pass an ACL check before it is exposed.
             allowed.AddRange(await _aclFilter.FilterAsync(page.ToList(), user, ct));
-            if (allowed.Count >= SearchLimits.MinVisibleHits)
+            if (allowed.Count >= wanted)
                 break;
         }
 

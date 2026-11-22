@@ -15,11 +15,13 @@ public partial class ElasticSearchService
     public async Task<List<FileDocument>> SearchAsync(
         string searchText, UserContext user,
         string? shareName = null, string? pathPrefix = null,
-        CancellationToken ct = default, bool includeRecycleBin = false)
+        CancellationToken ct = default, bool includeRecycleBin = false, int? maxHits = null)
     {
         // Fail closed: no user context means no results, ever.
         if (user is null)
             return new List<FileDocument>();
+
+        var wanted = SearchLimits.VisibleHits(maxHits);
 
         // Page through the ranked hits until enough readable ones are collected, so
         // matches the user may not read cannot crowd out the ones they may.
@@ -32,7 +34,7 @@ public partial class ElasticSearchService
             if (raw.Count > 0)
                 allowed.AddRange(await _aclFilter.FilterAsync(raw, user, ct));
 
-            if (raw.Count < RawFetchSize || allowed.Count >= SearchLimits.MinVisibleHits)
+            if (raw.Count < RawFetchSize || allowed.Count >= wanted)
                 break;
         }
 

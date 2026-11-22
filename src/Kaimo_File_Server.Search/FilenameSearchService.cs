@@ -43,7 +43,7 @@ public sealed class FilenameSearchService
     public async Task<List<FileDocument>> SearchAsync(
         string searchText, UserContext user,
         string? shareName = null, string? pathPrefix = null,
-        CancellationToken ct = default, bool includeRecycleBin = false)
+        CancellationToken ct = default, bool includeRecycleBin = false, int? maxHits = null)
     {
         if (user is null || string.IsNullOrWhiteSpace(searchText))
             return new List<FileDocument>();
@@ -52,7 +52,8 @@ public sealed class FilenameSearchService
         try
         {
             // Folders first across all shares (stable, so walk order is kept within each group).
-            var hits = await CollectVisibleMatchesAsync(searchText, user, shareName, pathPrefix, includeRecycleBin, ct);
+            var hits = await CollectVisibleMatchesAsync(
+                searchText, user, shareName, pathPrefix, includeRecycleBin, SearchLimits.VisibleHits(maxHits), ct);
             return hits.OrderByDescending(h => h.IsDirectory).ToList();
         }
         finally
@@ -73,7 +74,7 @@ public sealed class FilenameSearchService
     /// </summary>
     private async Task<List<FileDocument>> CollectVisibleMatchesAsync(
         string searchText, UserContext user, string? shareName, string? pathPrefix,
-        bool includeRecycleBin, CancellationToken ct)
+        bool includeRecycleBin, int wanted, CancellationToken ct)
     {
         var results = new List<FileDocument>();
         var batch = new List<FileDocument>(RawFetchSize);
@@ -97,7 +98,7 @@ public sealed class FilenameSearchService
                 return false;
 
             await FlushAsync();
-            return results.Count >= SearchLimits.MinVisibleHits || scanned >= SearchLimits.MaxRawScan;
+            return results.Count >= wanted || scanned >= SearchLimits.MaxRawScan;
         }
 
         using var scope = _scopeFactory.CreateScope();

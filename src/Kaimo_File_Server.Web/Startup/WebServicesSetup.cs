@@ -32,6 +32,7 @@ internal static class WebServicesSetup
         builder.Services.AddSingleton<BackupDownloadTokenService>();
         builder.Services.AddScoped<FileUploadCoordinator>();
         builder.Services.AddScoped<FileSelectionCoordinator>();
+        builder.Services.AddScoped<Components.Search.SearchResultsCoordinator>();
         builder.Services.AddSingleton<AssetProvider>();
         builder.Services.AddSingleton<ICloudAuthorizationTicketStore, CloudAuthorizationTicketStore>();
         builder.Services.AddSingleton<IOneDriveDeviceAuthorizationService, OneDriveDeviceAuthorizationService>();

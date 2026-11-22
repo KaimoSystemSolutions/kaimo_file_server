@@ -246,7 +246,7 @@ public sealed class SearchApiTests : IDisposable
 
         var search = new Mock<ISearchService>();
         search.Setup(s => s.SearchAsync(It.IsAny<string>(), user, It.IsAny<string?>(),
-                It.IsAny<string?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                It.IsAny<string?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>(), It.IsAny<int?>()))
             .ReturnsAsync(hits.ToList());
 
         var controller = new SearchApiController(users.Object, shares.Object, search.Object, Kaimo_File_Server.Web.Tests.Services.TestMountRouters.None(Mock.Of<Kaimo_File_Server.Core.Services.File.IFileServiceFactory>()))

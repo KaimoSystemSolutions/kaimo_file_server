@@ -777,6 +777,144 @@
   <data name="Web_Search_SharesSelected" xml:space="preserve">
     <value>{0} shares selected</value>
   </data>
+  <data name="Web_Search_ExpandShare" xml:space="preserve">
+    <value>Show hits of this share</value>
+  </data>
+  <data name="Web_Search_CollapseShare" xml:space="preserve">
+    <value>Hide hits of this share</value>
+  </data>
+  <data name="Web_Search_MoreInShare" xml:space="preserve">
+    <value>{0} more in this share</value>
+  </data>
+  <data name="Web_Search_ShowAll" xml:space="preserve">
+    <value>Show all results ({0})</value>
+  </data>
+  <data name="Web_SearchResults_Title" xml:space="preserve">
+    <value>Search results</value>
+  </data>
+  <data name="Web_SearchResults_ExpandAll" xml:space="preserve">
+    <value>Expand all</value>
+  </data>
+  <data name="Web_SearchResults_CollapseAll" xml:space="preserve">
+    <value>Collapse all</value>
+  </data>
+  <data name="Web_SearchResults_Expand" xml:space="preserve">
+    <value>Expand</value>
+  </data>
+  <data name="Web_SearchResults_Collapse" xml:space="preserve">
+    <value>Collapse</value>
+  </data>
+  <data name="Web_SearchResults_NoQuery" xml:space="preserve">
+    <value>Start a search in the search bar above.</value>
+  </data>
+  <data name="Web_SearchResults_Preview" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="Web_SearchResults_ShowInFolder" xml:space="preserve">
+    <value>Show in folder</value>
+  </data>
+  <data name="Web_SearchResults_OpenFolder" xml:space="preserve">
+    <value>Open folder</value>
+  </data>
+  <data name="Web_SearchResults_HitsBelow" xml:space="preserve">
+    <value>{0} hits</value>
+  </data>
+  <data name="Web_SearchResults_TimedOut" xml:space="preserve">
+    <value>The search took too long. Narrow it down and try again.</value>
+  </data>
+  <data name="Web_SearchResults_Gone" xml:space="preserve">
+    <value>This file no longer exists. The search index will catch up shortly.</value>
+  </data>
+  <data name="Web_Search_MoreInFolder" xml:space="preserve">
+    <value>{0} more in this folder</value>
+  </data>
+  <data name="Web_SearchResults_Count" xml:space="preserve">
+    <value>{0} results</value>
+  </data>
+  <data name="Web_SearchResults_CountFiltered" xml:space="preserve">
+    <value>{0} of {1} results</value>
+  </data>
+  <data name="Web_SearchResults_FilterType" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="Web_SearchResults_FilterModified" xml:space="preserve">
+    <value>Modified</value>
+  </data>
+  <data name="Web_SearchResults_FilterReset" xml:space="preserve">
+    <value>Reset filter</value>
+  </data>
+  <data name="Web_SearchResults_FilterEmpty" xml:space="preserve">
+    <value>No results match this filter.</value>
+  </data>
+  <data name="Web_SearchResults_Type_All" xml:space="preserve">
+    <value>All types</value>
+  </data>
+  <data name="Web_SearchResults_Type_Folders" xml:space="preserve">
+    <value>Folders</value>
+  </data>
+  <data name="Web_SearchResults_Type_Files" xml:space="preserve">
+    <value>Files</value>
+  </data>
+  <data name="Web_SearchResults_Type_Documents" xml:space="preserve">
+    <value>Documents</value>
+  </data>
+  <data name="Web_SearchResults_Type_Images" xml:space="preserve">
+    <value>Images</value>
+  </data>
+  <data name="Web_SearchResults_Type_Media" xml:space="preserve">
+    <value>Audio &amp; video</value>
+  </data>
+  <data name="Web_SearchResults_Type_Archives" xml:space="preserve">
+    <value>Archives</value>
+  </data>
+  <data name="Web_SearchResults_Modified_Any" xml:space="preserve">
+    <value>Any date</value>
+  </data>
+  <data name="Web_SearchResults_Modified_Day" xml:space="preserve">
+    <value>Last 24 hours</value>
+  </data>
+  <data name="Web_SearchResults_Modified_Week" xml:space="preserve">
+    <value>Last 7 days</value>
+  </data>
+  <data name="Web_SearchResults_Modified_Month" xml:space="preserve">
+    <value>Last 30 days</value>
+  </data>
+  <data name="Web_SearchResults_Modified_Year" xml:space="preserve">
+    <value>Last 12 months</value>
+  </data>
+  <data name="Web_SearchResults_ScopeIn" xml:space="preserve">
+    <value>in {0}</value>
+  </data>
+  <data name="Web_SearchResults_Updating" xml:space="preserve">
+    <value>Updating…</value>
+  </data>
+  <data name="Web_SearchResults_RefineIn" xml:space="preserve">
+    <value>Search in</value>
+  </data>
+  <data name="Web_SearchResults_Refine_Name" xml:space="preserve">
+    <value>File name</value>
+  </data>
+  <data name="Web_SearchResults_Refine_Content" xml:space="preserve">
+    <value>Full text</value>
+  </data>
+  <data name="Web_SearchResults_RefineName_Placeholder" xml:space="preserve">
+    <value>Filter these results by name or path…</value>
+  </data>
+  <data name="Web_SearchResults_RefineContent_Placeholder" xml:space="preserve">
+    <value>Search the text of these results…</value>
+  </data>
+  <data name="Web_SearchResults_Modified_Custom" xml:space="preserve">
+    <value>Custom range</value>
+  </data>
+  <data name="Web_SearchResults_From" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="Web_SearchResults_To" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="Web_SearchResults_TitleFor" xml:space="preserve">
+    <value>Search results for “{0}”</value>
+  </data>
   <data name="Web_Login_Failed" xml:space="preserve">
     <value>Login failed. Please try again.</value>
   </data>

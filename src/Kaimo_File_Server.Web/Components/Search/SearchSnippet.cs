@@ -14,6 +14,16 @@ public static class SearchSnippet
 
     public readonly record struct Segment(string Text, bool Highlighted);
 
+    /// <summary>
+    /// True when the snippet says more than the file name (e.g. a content excerpt). A name-only
+    /// match (filename search) just repeats the name and is not worth showing next to it.
+    /// </summary>
+    public static bool AddsTo(string? snippet, string name)
+    {
+        var text = string.Concat(Split(snippet).Select(s => s.Text)).Trim();
+        return text.Length > 0 && !text.Equals(name, StringComparison.CurrentCultureIgnoreCase);
+    }
+
     public static IEnumerable<Segment> Split(string? snippet)
     {
         if (string.IsNullOrEmpty(snippet))

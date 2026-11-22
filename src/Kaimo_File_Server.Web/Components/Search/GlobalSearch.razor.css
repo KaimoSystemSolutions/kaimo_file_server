@@ -49,3 +49,133 @@
     flex: 0 0 auto;
     font-size: 0.7rem;
 }
+
+/* ── Results: own scroll area for file hits, collapsible share sections ──
+   The dropdown becomes a column: file hits scroll on their own, the settings section and
+   the "show all" footer stay visible below them. */
+.global-search .search-dropdown {
+    display: flex;
+    flex-direction: column;
+    max-height: min(70vh, 480px);
+    overflow: hidden;
+    transition: opacity 0.12s ease;
+}
+
+/* Leaving the search fades the dropdown out at once, in the browser. The server removes it a
+   moment later (it waits so moving between the input and the scope picker keeps it open). */
+.global-search:not(:focus-within) .search-dropdown {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.search-file-results {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* Settings & tabs stay put below the file hits (at most three entries, never scrolled);
+   only when they are the whole dropdown (settings scope) may they scroll. */
+.search-dest-results {
+    flex: 0 0 auto;
+}
+
+.search-dest-results:first-child {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.search-file-results + .search-dest-results {
+    border-top: 1px solid var(--border);
+}
+
+/* Share header as a toggle: same micro-label look as the static section header. */
+.search-group-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-family: var(--font-body);
+    text-align: left;
+    cursor: pointer;
+}
+
+.search-group-toggle:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    opacity: 1;
+}
+
+.search-group-chevron {
+    display: inline-flex;
+    transition: transform 0.1s linear;
+}
+
+.search-group-chevron.is-open {
+    transform: rotate(90deg);
+}
+
+.search-group-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.search-group-count {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+}
+
+/* "n more in this share" under a capped share section; a button, so it is keyboard-reachable.
+   The text lines up with the hit names: the 17 px result icon plus the row's 9 px gap. */
+.search-more {
+    display: block;
+    width: 100%;
+    padding: var(--space-1) var(--space-3) var(--space-1) calc(var(--space-3) + 17px + 9px);
+    border: none;
+    background: transparent;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    text-align: left;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.search-more:hover,
+.search-more:focus-visible {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* Footer link to the full results page. */
+.search-show-all {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--accent-strong);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.search-show-all:hover {
+    background: var(--bg-hover);
+}
+
+.search-show-all ::deep svg {
+    width: 14px;
+    height: 14px;
+    opacity: 1;
+}

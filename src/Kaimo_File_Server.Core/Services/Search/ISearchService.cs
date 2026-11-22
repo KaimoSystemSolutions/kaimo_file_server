@@ -36,11 +36,15 @@ public interface ISearchService
     ///
     /// Recycle-bin contents are indexed but only returned when
     /// <paramref name="includeRecycleBin"/> is set (or the scope itself lies inside a recycle bin).
+    ///
+    /// <paramref name="maxHits"/> is the number of readable hits collected before paging stops
+    /// (null = the backend default of 50; capped by the raw scan limit). A result of at least
+    /// that size may be incomplete.
     /// </summary>
     Task<List<FileDocument>> SearchAsync(
         string searchText, UserContext user,
         string? shareName = null, string? pathPrefix = null,
-        CancellationToken ct = default, bool includeRecycleBin = false);
+        CancellationToken ct = default, bool includeRecycleBin = false, int? maxHits = null);
 
     Task InitializeAsync(CancellationToken ct = default);
 }

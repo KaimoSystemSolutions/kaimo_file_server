@@ -82,6 +82,24 @@ public sealed class LocalIndexSearchServiceTests
     }
 
     [Fact]
+    public async Task Search_CollectsTheRequestedNumberOfReadableHits()
+    {
+        // Name hits need no excerpt, so only the ranked query matters here.
+        RankedHits(Enumerable.Range(0, 120).Select(i => Hit($"file_{i}.txt")).ToArray());
+
+        Assert.Equal(SearchLimits.MinVisibleHits, (await Service().SearchAsync("file", User())).Count);
+        Assert.Equal(100, (await Service().SearchAsync("file", User(), maxHits: 100)).Count);
+    }
+
+    [Theory]
+    [InlineData(null, SearchLimits.MinVisibleHits)]
+    [InlineData(200, 200)]
+    [InlineData(5000, SearchLimits.MaxRawScan)]
+    [InlineData(0, 1)]
+    public void VisibleHits_DefaultsAndClampsTheRequestedLimit(int? requested, int expected)
+        => Assert.Equal(expected, SearchLimits.VisibleHits(requested));
+
+    [Fact]
     public async Task Search_SkipsTheExcerptQuery_WhenNothingNeedsOne()
     {
         RankedHits(Hit("secret_a.txt"), Hit("report.txt"));
