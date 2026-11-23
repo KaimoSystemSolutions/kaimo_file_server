@@ -60,8 +60,10 @@ public sealed class GlobalSearchShowAllTests
         // The next term is still being searched when Enter opens the results page.
         cut.Find("input.search-input").Input("report");
         await started.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        // KeyDown is queued while the renderer is still busy with the search: wait for it.
         cut.Find("input.search-input").KeyDown(new KeyboardEventArgs { Key = "Enter" });
-        Assert.EndsWith("/search", ctx.Services.GetRequiredService<NavigationManager>().Uri);
+        var nav = ctx.Services.GetRequiredService<NavigationManager>();
+        cut.WaitForAssertion(() => Assert.EndsWith("/search", nav.Uri), TimeSpan.FromSeconds(3));
 
         pending.SetResult([Hit("report.txt")]);
         await Task.Delay(200);

@@ -45,7 +45,7 @@ public sealed class FileServiceTimesLogTests
         => _logger.Verify(l => l.Log(
                 LogLevel.Debug,
                 LogEvents.FileTimesApplied,
-                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains(expectedText)),
+                It.Is<It.IsAnyType>((v, _) => v != null && v.ToString()!.Contains(expectedText)),
                 null,
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             times);

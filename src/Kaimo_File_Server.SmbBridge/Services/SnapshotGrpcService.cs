@@ -163,7 +163,7 @@ public sealed partial class SnapshotGrpcService : SnapshotService.SnapshotServic
         if (orderedLabels.Count > MaxEnumerationLabels)
         {
             _logger.LogWarning(
-                "EnumerateSnapshots: user={User} share={Share} path=[{Path}] has more than {Maximum} labels; returning the newest {Maximum}",
+                "EnumerateSnapshots: user={User} share={Share} path=[{Path}] has more than {Maximum} labels; returning only the newest ones",
                 request.Username, request.Share, request.Path, MaxEnumerationLabels);
         }
         reply.GmtTokens.AddRange(
