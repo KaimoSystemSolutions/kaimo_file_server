@@ -81,6 +81,8 @@ paths that existed after the last converged run (`SyncDefinitionRuntime.LastSync
 
 - Without a stored manifest every one-sided item counts as new, so a first run can only copy, never
   mass-delete.
+- A deletion that fails (no delete permission, a file held open) keeps the path in the new
+  manifest, so the next run retries it instead of copying the surviving item back.
 - A local deletion applied by the sync honors the share's recycle bin
   (`ShareDefinition.IsRecycleEnabled`). Remote deletions use the provider's delete; a provider that
   cannot delete fails the run instead of resurrecting the item.

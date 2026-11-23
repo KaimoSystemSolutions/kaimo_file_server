@@ -38,7 +38,7 @@ Related: [Security model](../architecture/security-model.md)
 | **Device** | One app installation (`SyncDevice`), registered on first login. Refresh tokens and sync selections hang off it. |
 | **Access token** | Short-lived JWT presented as `Authorization: Bearer <token>` on every call. |
 | **Refresh token** | Long-lived opaque secret used to mint new access tokens. Rotated on every use. |
-| **Item tag** | An `ETag`-style validator for one file/directory, `"{size}:{modifiedTicks}"` (quoted). Returned on `metadata`/`content`/upload and reproducible on the client from a delta entry, so it can be sent back as `If-Match` without a metadata round trip. See [§3.1](#31-safe-mutations-conditional-requests--idempotency-keys). |
+| **Item tag** | An `ETag`-style validator for one file/directory, `"{size}:{modifiedTicks}"` (quoted). Returned on `metadata`/`content`/upload and as `tag` on sync `delta`/`changes` file entries, so it can be sent back as `If-Match` without a metadata round trip. See [§3.1](#31-safe-mutations-conditional-requests--idempotency-keys). |
 | **Idempotency key** | A client-chosen, per-device stable id for one mutating operation, sent as the `Idempotency-Key` header. Lets a retried request replay its original outcome instead of re-executing. |
 
 All timestamps are UTC ISO-8601. All enums serialize as their names (e.g. `"TwoWay"`).
@@ -229,8 +229,12 @@ behavior is unchanged.
 **Conditional requests (`If-Match` / `If-None-Match`) — optimistic concurrency.**
 The *item tag* of a file/directory is `"{size}:{modifiedTicks}"` (quoted; `modifiedTicks`
 is the UTC `DateTime.Ticks` of its modified time). It is returned as the `ETag` on
-`metadata`, `content`, and a successful upload, and is reproducible on the client from
-a [`delta`](sync-api.md#4-delta-enumeration) entry (`size` + `modifiedAtUtc`), so no extra round trip is needed to build it.
+`metadata`, `content`, and a successful upload, and as `tag` on every file entry of a
+[`delta`](sync-api.md#4-delta-enumeration) and on file creates/modifies of the
+[change feed](sync-api.md#5-incremental-change-feed-change_seq), so no extra round trip is
+needed. Send the tag back verbatim rather than rebuilding it: a client clock type rarely
+keeps 100 ns ticks. The time is compared within one microsecond, because the change feed
+builds its tags from the change log, which stores microseconds.
 
 - `PUT content` with `If-Match: "<tag>"` — overwrite **only** if the current item still
   matches; a mismatch (or a missing file) → `412 precondition_failed`.

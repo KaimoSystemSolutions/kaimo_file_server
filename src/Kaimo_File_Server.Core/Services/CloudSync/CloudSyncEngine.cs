@@ -456,7 +456,7 @@ internal sealed partial class CloudSyncEngine
         if (_previousManifest?.Contains(localChild) == true)
         {
             _progress.Update(string.Format(SyncProgress.Text("Web_Jobs_CloudSync_Removing", "Removing {0}"), local.Name));
-            return (await DeleteLocalAsync(localChild), false);
+            return (await DeleteKnownAsync(localChild, () => DeleteLocalAsync(localChild)), false);
         }
 
         if (local.IsDirectory)
@@ -499,8 +499,9 @@ internal sealed partial class CloudSyncEngine
         if (_previousManifest?.Contains(localChild) == true)
         {
             _progress.Update(string.Format(SyncProgress.Text("Web_Jobs_CloudSync_Removing", "Removing {0}"), remote.Name));
-            bool deleted = await TryTransferAsync(remoteChild, SyncFailureOperation.Delete,
-                () => _remote.DeleteAsync(remoteChild, remote.IsDirectory, _cancellationToken));
+            bool deleted = await DeleteKnownAsync(localChild, () => TryTransferAsync(remoteChild,
+                SyncFailureOperation.Delete,
+                () => _remote.DeleteAsync(remoteChild, remote.IsDirectory, _cancellationToken)));
             return (false, deleted);
         }
 
@@ -579,6 +580,19 @@ internal sealed partial class CloudSyncEngine
         _progress.FileDone(Math.Max(local.Size, remote.Size));
         _progress.Update(SyncProgress.Text("Web_Jobs_CloudSync_Comparing", "Comparing files…"));
         return (false, false);
+    }
+
+    /// <summary>
+    /// Propagates the deletion of a path known from the last run. A failed delete keeps the path
+    /// in the new manifest, so the next run retries it: dropping it would make the surviving copy
+    /// look new, and that run would copy the deleted item back.
+    /// </summary>
+    private async Task<bool> DeleteKnownAsync(string localChild, Func<Task<bool>> delete)
+    {
+        bool deleted = await delete();
+        if (!deleted)
+            _newManifest.Paths.Add(localChild);
+        return deleted;
     }
 
     private Task<bool> DeleteLocalAsync(string localChild)

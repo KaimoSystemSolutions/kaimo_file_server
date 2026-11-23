@@ -257,6 +257,49 @@ public sealed class ClientSyncApiTests
         Assert.False(ItemTag.Matches("\"1:2\"", m));             // a different tag does not match
     }
 
+    [Fact]
+    public void If_match_tolerates_the_microsecond_precision_of_a_logged_time()
+    {
+        // The change log stores times in microseconds; the file keeps 100 ns ticks.
+        var exact = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddTicks(1234567);
+        var m = Meta(42, exact);
+        var logged = new DateTime(exact.Ticks - exact.Ticks % 10, DateTimeKind.Utc);
+
+        Assert.True(ItemTag.Matches(ItemTag.For(42, logged), m));
+        Assert.True(ItemTag.Matches(ItemTag.For(42, logged.AddTicks(10)), m)); // rounded up
+        Assert.False(ItemTag.Matches(ItemTag.For(42, exact.AddMilliseconds(1)), m));
+        Assert.False(ItemTag.Matches(ItemTag.For(43, exact), m));
+        Assert.False(ItemTag.Matches("\"42:not-a-number\"", m));
+    }
+
+    [Fact]
+    public void Delta_entry_carries_the_item_tag_of_a_file_only()
+    {
+        var when = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var file = SyncEntryDto.From(new SyncEntry("a.txt", false, 7, when));
+        var dir = SyncEntryDto.From(new SyncEntry("d", true, 0, when));
+
+        Assert.Equal(ItemTag.For(7, when), file.Tag);
+        Assert.Null(dir.Tag);
+    }
+
+    [Fact]
+    public void Change_entry_carries_the_item_tag_of_a_file_upsert_only()
+    {
+        var when = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        FileChangeDto Dto(FileChangeType type, bool dir = false, long? size = 7, DateTime? mtime = null) =>
+            FileChangeDto.From(new FileChangeLogEntry
+            {
+                Path = "a.txt", ChangeType = type, IsDirectory = dir, Size = size, ModifiedAtUtc = mtime,
+            });
+
+        Assert.Equal(ItemTag.For(7, when), Dto(FileChangeType.Created, mtime: when).Tag);
+        Assert.Equal(ItemTag.For(7, when), Dto(FileChangeType.Modified, mtime: when).Tag);
+        Assert.Null(Dto(FileChangeType.Modified, dir: true, mtime: when).Tag);
+        Assert.Null(Dto(FileChangeType.Deleted, size: null).Tag);
+        Assert.Null(Dto(FileChangeType.Renamed, size: null).Tag);
+    }
+
     // ─────────────────── Idempotency fingerprint & decision ───────────────────
 
     [Fact]

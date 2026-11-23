@@ -125,9 +125,14 @@ public sealed partial class CloudSyncReconciliationTests
             return Task.CompletedTask;
         }
 
+        /// <summary>Deletes of these normalized paths always fail (e.g. no delete permission).</summary>
+        public HashSet<string> HardFailDeletes { get; } = new();
+
         public Task DeleteAsync(string path, bool isDirectory, CancellationToken ct = default)
         {
             string key = Normalize(path);
+            if (HardFailDeletes.Contains(key))
+                throw new UnauthorizedAccessException($"delete denied for {key}");
             if (isDirectory)
             {
                 _dirs.RemoveWhere(d => d == key || d.StartsWith(key + "/", StringComparison.Ordinal));
@@ -438,9 +443,14 @@ public sealed partial class CloudSyncReconciliationTests
                 await SetModifiedAtAsync(path, user, modified);
         }
 
+        /// <summary>Deletes of these normalized paths always fail (e.g. a file held open).</summary>
+        public HashSet<string> HardFailDeletes { get; } = new();
+
         public Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled)
         {
             string key = Normalize(path);
+            if (HardFailDeletes.Contains(key))
+                throw new UnauthorizedAccessException($"delete denied for {key}");
             Deletions.Add((key, isRecycleEnabled));
             _files.Remove(key);
             _dirs.RemoveWhere(d => d == key || d.StartsWith(key + "/", StringComparison.Ordinal));

@@ -124,7 +124,7 @@ change **sequence**:
 {
   "entries": [
     { "path": "projects/2026", "isDirectory": true,  "size": 0,      "modifiedAtUtc": "…", "createdAtUtc": "…" },
-    { "path": "projects/2026/a.pdf", "isDirectory": false, "size": 1234, "modifiedAtUtc": "…", "createdAtUtc": "…" }
+    { "path": "projects/2026/a.pdf", "isDirectory": false, "size": 1234, "modifiedAtUtc": "…", "createdAtUtc": "…", "tag": "\"1234:638…\"" }
   ],
   "token": "638…",
   "seq": 4211
@@ -138,6 +138,18 @@ deletes, then transfers according to the profile's direction:
 
 Transfers use the browse endpoints; replay-safe uploads, renames and deletes use the
 [conditional requests and idempotency keys](rest-api.md#31-safe-mutations-conditional-requests--idempotency-keys).
+Each file entry carries its item `tag`. A client writes only against the version it compared:
+an overwrite or delete sends that `tag` as `If-Match`, an upload of a file the server did not
+have sends `If-None-Match: *`. A `412` means another device or transport changed the file
+meanwhile; nothing was written, and the next pass compares the new version.
+
+**Deletion state.** A two-way client remembers which paths were present on both sides after the
+last pass (its baseline). A path may leave that memory only once it is gone on *both* sides: a
+delete that failed (no delete right, a file held open, a `412`) must stay pending, or the next
+pass takes the surviving copy for a new file and copies it back. Likewise, record a file as
+synced only when both sides actually match, and store the remote snapshot from the view the
+pass worked on (plus its own writes) with the cursor of that view — never from a fresh listing
+taken afterwards, which would absorb other devices' changes unreconciled.
 
 `seq` is the baseline cursor: after this one full enumeration, switch to the
 incremental change feed below (`changes?since=<seq>`) and re-enumerate only when
@@ -173,8 +185,8 @@ changes included, which the coarse token alone cannot see:
   client can apply the disappearance. A rename or delete of an **ancestor** of the watched
   folder appears too (its `path` lies outside the subtree): the synced folder itself moved
   or vanished — the next `delta`/`changes` call answers as described in [§8](#8-renamed-or-missing-sync-folder).
-- `size` / `modifiedAtUtc` accompany creates and modifies so the client can rebuild
-  the item tag without a metadata round trip.
+- `size` / `modifiedAtUtc` / `tag` accompany file creates and modifies, so the client has
+  the item tag without a metadata round trip. A rename keeps the source's tag.
 - `seq` in the envelope is the cursor to store next. It advances even when a page is
   empty or was entirely hidden by ACLs, so you never re-request the same range.
 - `truncated: true` means more entries remain past `limit` — call again immediately

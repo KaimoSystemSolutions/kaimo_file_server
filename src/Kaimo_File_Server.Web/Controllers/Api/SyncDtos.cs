@@ -38,12 +38,18 @@ public sealed record CreateSyncProfileRequest(
 public sealed record UpdateSyncProfileRequest(
     string? RelativePath, string? LocalPath, SyncMode Mode, bool Enabled);
 
-/// <summary>One entry in a delta enumeration.</summary>
+/// <summary>
+/// One entry in a delta enumeration. <see cref="Tag"/> is the file's item tag, to send back as
+/// <c>If-Match</c> so an overwrite or delete only applies to the version the client saw; <c>null</c>
+/// for directories.
+/// </summary>
 public sealed record SyncEntryDto(
-    string Path, bool IsDirectory, long Size, DateTime ModifiedAtUtc, DateTime CreatedAtUtc, DateTime? AccessedAtUtc = null)
+    string Path, bool IsDirectory, long Size, DateTime ModifiedAtUtc, DateTime CreatedAtUtc,
+    DateTime? AccessedAtUtc = null, string? Tag = null)
 {
     public static SyncEntryDto From(SyncEntry e) =>
-        new(e.Path, e.IsDirectory, e.Size, e.ModifiedAtUtc, e.CreatedAtUtc, e.AccessedAtUtc);
+        new(e.Path, e.IsDirectory, e.Size, e.ModifiedAtUtc, e.CreatedAtUtc, e.AccessedAtUtc,
+            e.IsDirectory ? null : ItemTag.For(e.Size, e.ModifiedAtUtc));
 }
 
 /// <summary>
@@ -59,14 +65,19 @@ public sealed record ChangeWaitDto(string Token, bool Changed);
 /// One entry in the incremental change feed. <see cref="ChangeType"/> is a
 /// <see cref="FileChangeType"/> name (e.g. <c>"Renamed"</c>). <see cref="OldPath"/> is set only for
 /// renames (the source). <see cref="Size"/> / <see cref="ModifiedAtUtc"/> are present for
-/// creates/modifies so a client can rebuild the item tag without a metadata round trip.
+/// creates/modifies, together with the file's item <see cref="Tag"/> (for <c>If-Match</c>, see
+/// <see cref="SyncEntryDto"/>); a rename keeps the tag the client already holds for the source.
 /// </summary>
 public sealed record FileChangeDto(
     long Seq, string Path, string? OldPath, string ChangeType,
-    bool IsDirectory, long? Size, DateTime? ModifiedAtUtc)
+    bool IsDirectory, long? Size, DateTime? ModifiedAtUtc, string? Tag = null)
 {
     public static FileChangeDto From(FileChangeLogEntry e) => new(
-        e.Seq, e.Path, e.OldPath, e.ChangeType.ToString(), e.IsDirectory, e.Size, e.ModifiedAtUtc);
+        e.Seq, e.Path, e.OldPath, e.ChangeType.ToString(), e.IsDirectory, e.Size, e.ModifiedAtUtc,
+        !e.IsDirectory && (e.ChangeType is FileChangeType.Created or FileChangeType.Modified)
+            && e.Size is { } size && e.ModifiedAtUtc is { } modified
+            ? ItemTag.For(size, modified)
+            : null);
 }
 
 /// <summary>
