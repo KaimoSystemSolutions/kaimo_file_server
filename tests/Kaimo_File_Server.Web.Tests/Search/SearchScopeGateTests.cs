@@ -100,6 +100,7 @@ public sealed class SearchScopeGateTests
         ctx.Services.AddSingleton(new SearchResultsCoordinator());
         ctx.Services.AddSingleton(shares.Object);
         ctx.Services.AddSingleton(acl.Object);
+        ctx.Services.AddSingleton(new HomeFolderSearch(Mock.Of<IUserRepository>(), shares.Object, Mock.Of<Kaimo_File_Server.Core.Services.File.IFileServiceFactory>(), _mgmt.Object));
 
         var cut = ctx.Render<GlobalSearch>();
         cut.Find("select.search-scope-select").Change("pick");

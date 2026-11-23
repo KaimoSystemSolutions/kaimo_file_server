@@ -160,7 +160,7 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     // -- Computed --
 
     public IEnumerable<FileMetadata> Directories
-        => Items.Where(f => f.IsDirectory).OrderBy(f => f.Name);
+        => Items.Where(f => f.IsDirectory).OrderBy(DisplayNameOf);
 
     public IEnumerable<FileMetadata> Files
         => Items.Where(f => !f.IsDirectory).OrderBy(f => f.Name);
@@ -239,7 +239,8 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
                 // real path (the confined-root prefix is preserved).
                 var below = string.Join('/', parts[..(i + 1)]);
                 var full = RootPath.Length > 0 ? $"{RootPath}/{below}" : below;
-                result.Add((parts[i], full));
+                // A home folder in the home-folder share is labelled with its owner's username.
+                result.Add((i == 0 && InHomesShare ? HomeLabel(parts[i]) : parts[i], full));
             }
 
             return result;
@@ -271,6 +272,7 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             // not keep showing the last opened share/path while the new target loads.
             CurrentShare = null;
             CurrentPath = "";
+            FileToSelect = null;
 
             // Resolved into a local first: the permission check awaits, and an overlapping load
             // resets CurrentShare meanwhile.
@@ -305,6 +307,7 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             else if (cleanSub.StartsWith(sharePath + "/", StringComparison.OrdinalIgnoreCase))
                 cleanSub = cleanSub[(sharePath.Length + 1)..];
 
+            cleanSub = await ResolveHomeOwnerSegmentAsync(cleanSub);
             CurrentPath = ResolveSubPath(cleanSub);
 
             if (!ShareRelativePath.IsValid(CurrentPath))
@@ -366,9 +369,8 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             _logger.LogDebug("Loading path: '{CurrentPath}' (share={ShareName}, user={User})",
                 CurrentPath, shareName, userContext.User.Username);
 
-            Items = await _fileService.ListAsync(CurrentPath, userContext);
+            Items = await ListOrOpenFileAsync(userContext);
             await InjectMountEntriesAsync(userContext);
-            await LoadHomeOwnerNamesAsync();
 
             _logger.LogDebug("Found {Total} items ({Dirs} dirs, {Files} files)",
                 Items.Count, Directories.Count(), Files.Count());

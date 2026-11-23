@@ -32,10 +32,10 @@ public partial class FileBrowser
             BrowserClipboard.Set(_clipboardSourceShare, _clipboard, deleteOnPaste, _clipboardStartPath);
         
         var msg = _clipboard.Count == 1
-            ? string.Format(T(deleteOnPaste ? "Web_Transfer_CuttingOne" : "Web_Transfer_CopyingOne"), _clipboard.First().Name)
+            ? string.Format(T(deleteOnPaste ? "Web_Transfer_CuttingOne" : "Web_Transfer_CopyingOne"), VM.DisplayNameOf(_clipboard.First()))
             : string.Format(T(deleteOnPaste ? "Web_Transfer_CuttingMany" : "Web_Transfer_CopyingMany"), _clipboard.Count);
         var tooltip = _clipboard.Count > 1
-            ? string.Join(Environment.NewLine, _clipboard.Select(item => item.Name).OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
+            ? string.Join(Environment.NewLine, _clipboard.Select(VM.DisplayNameOf).OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
             : null;
 
         _clipboardToastID = Toast.Show(msg, ToastType.State, ClearClipboard, tooltip);

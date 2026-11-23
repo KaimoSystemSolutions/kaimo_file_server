@@ -75,8 +75,17 @@ role by actors who could assign that role directly (see
 [Security model](../architecture/security-model.md#administrative-authorization)).
 
 - Web: holders see a pinned `users` entry in the share overview (`/files/users`). Home folders keep
-  their GUID name; at the share root the owner's username is shown as a note next to it. Cloud sync
-  and the ACL editor stay off in the share. Search hits in other homes in scope link there.
+  their GUID name on disk, but the listing (sorted by it), the breadcrumb, the context menu header
+  and the dialogs/toasts that name the folder show the owner's username instead
+  (`IFileBrowserViewModel.DisplayNameOf`); the editable path bar shows the real GUID path (`/users/<guid>`, where `/` is
+  the shares overview, see `PathBarText`). A username typed or pasted as
+  the first path segment (path bar or URL, e.g. `/files/users/alice/docs`) opens that user's home
+  (`FileBrowserViewModel.Homes.cs`). Cloud sync and the ACL editor stay off in the share. Search
+  hits in other homes in scope link there and show the home as the owner's username in the
+  dropdown path, the results tree and the name filter (`HomeLabels`). A search over all shares or
+  the `users` root also lists homes whose owner's username contains the term as folder hits named
+  like the user (`HomeFolderSearch`): the candidates are the folders the browser lists at the share
+  root (same ACL-filtered listing, AccessHomeContents required), own home excluded, at most 5.
 - REST API: `GET /api/v1/browse/shares` additionally lists the `users` share (no `rootPath`).
   Syncing its root stays refused.
 - SMB: holders at any scope are added to the share's allow list (`ListShares`).

@@ -57,7 +57,7 @@ public partial class FileBrowser
         // per batch, per-item progress, cancellable from the menu or toast.
         var jobTitle = string.Format(
             T("Web_Jobs_Delete_Title"),
-            targets.Count == 1 ? targets[0].Name : string.Format(T("Web_Transfer_Items"), targets.Count));
+            targets.Count == 1 ? VM.DisplayNameOf(targets[0]) : string.Format(T("Web_Transfer_Items"), targets.Count));
         using var job = Jobs.Start(jobTitle, Resources.Web_Common_Deleting, "delete");
         Toast.Update(toastId, onDismiss: () => { job.Cancel(); return Task.CompletedTask; });
 

@@ -243,6 +243,18 @@ public interface IFileBrowserViewModel
     string RouteSubPathOf(string shareRelativePath) => shareRelativePath;
 
     /// <summary>
+    /// Name shown for a listed entry. The real name by default; the regular browser shows the
+    /// owner's username for a home folder at the root of the home-folder share.
+    /// </summary>
+    string DisplayNameOf(FileMetadata entry) => entry.Name;
+
+    /// <summary>
+    /// Set by the last load when its path named a file: the folder was opened instead and the
+    /// view selects this entry. <c>null</c> otherwise (and for browsers without this support).
+    /// </summary>
+    string? FileToSelect => null;
+
+    /// <summary>
     /// True for the synthetic folder entry of a virtual share mounted into this listing. It
     /// can only be opened; every other action (rename, delete, copy, download …) is withheld.
     /// </summary>

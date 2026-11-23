@@ -23,8 +23,9 @@ namespace Kaimo_File_Server.Web.Tests.ViewModels.Files;
 
 /// <summary>
 /// The home-folder share in the regular file browser (<c>/files/users</c>): only holders of
-/// <see cref="ManagementPermission.AccessHomeContents"/> may open it, home folders keep their
-/// GUID name with the owner's username as a note, and administrative features stay off.
+/// <see cref="ManagementPermission.AccessHomeContents"/> may open it, home folders are shown and
+/// addressable by their owner's username (the real path keeps the GUID), and administrative
+/// features stay off.
 /// </summary>
 public class FileBrowserViewModelHomesTests
 {
@@ -105,15 +106,87 @@ public class FileBrowserViewModelHomesTests
     }
 
     [Fact]
-    public async Task Home_folders_at_the_share_root_carry_the_owner_username_as_note()
+    public async Task Home_folders_at_the_share_root_show_the_owner_username_instead_of_the_guid()
     {
         AllowHomes(true);
 
         await _sut.LoadShareAsync("users");
 
-        Assert.Equal("alice", _sut.GetHomeOwnerName(_sut.Items[0]));
-        Assert.Null(_sut.GetHomeOwnerName(_sut.Items[1]));   // no such user
-        Assert.Null(_sut.GetHomeOwnerName(_sut.Items[2]));   // not a home folder
+        Assert.Equal("alice", _sut.DisplayNameOf(_sut.Items[0]));
+        Assert.Equal(_sut.Items[1].Name, _sut.DisplayNameOf(_sut.Items[1]));   // no such user
+        Assert.Equal("notes.txt", _sut.DisplayNameOf(_sut.Items[2]));          // not a home folder
+    }
+
+    [Fact]
+    public async Task Home_folders_are_sorted_by_username()
+    {
+        AllowHomes(true);
+        var zed = new User(Guid.Parse("00000000-0000-0000-0000-000000000001"), "Zed", "zed", "hash", "nt");
+        var amy = new User(Guid.Parse("ffffffff-0000-0000-0000-000000000001"), "Amy", "amy", "hash", "nt");
+        _userRepo.Setup(r => r.GetAllAsync()).ReturnsAsync([zed, amy]);
+        _fileService.Setup(s => s.ListAsync("", It.IsAny<UserContext>())).ReturnsAsync(
+        [
+            new FileMetadata { Name = zed.Id.ToString("D"), Path = zed.Id.ToString("D"), IsDirectory = true },
+            new FileMetadata { Name = amy.Id.ToString("D"), Path = amy.Id.ToString("D"), IsDirectory = true },
+        ]);
+
+        await _sut.LoadShareAsync("users");
+
+        Assert.Equal(["amy", "zed"], _sut.Directories.Select(_sut.DisplayNameOf));
+    }
+
+    [Fact]
+    public async Task Inside_a_home_the_breadcrumb_shows_the_username_but_the_path_keeps_the_guid()
+    {
+        AllowHomes(true);
+        var home = _alice.Id.ToString("D");
+
+        await _sut.LoadShareAsync("users", home);
+
+        Assert.Equal(("alice", home), Assert.Single(_sut.Breadcrumbs));
+        Assert.Equal(home, _sut.RouteSubPathOf(_sut.CurrentPath));   // the editable path bar text
+    }
+
+    [Theory]
+    [InlineData("alice", "")]
+    [InlineData("ALICE", "")]
+    [InlineData("alice/docs", "/docs")]
+    public async Task A_username_in_the_path_opens_that_users_home(string typed, string rest)
+    {
+        AllowHomes(true);
+        _fileService.Setup(s => s.ListAsync(It.IsAny<string>(), It.IsAny<UserContext>())).ReturnsAsync([]);
+
+        await _sut.LoadShareAsync("users", typed);
+
+        Assert.Null(_sut.ErrorMessage);
+        Assert.Equal($"{_alice.Id:D}{rest}", _sut.CurrentPath);
+    }
+
+    [Fact]
+    public async Task An_unknown_name_in_the_path_is_not_resolved()
+    {
+        AllowHomes(true);
+        _fileService.Setup(s => s.ListAsync(It.IsAny<string>(), It.IsAny<UserContext>())).ReturnsAsync([]);
+
+        await _sut.LoadShareAsync("users", "nobody");
+
+        Assert.Equal("nobody", _sut.CurrentPath);
+    }
+
+    [Fact]
+    public async Task Usernames_are_not_resolved_or_shown_in_other_shares()
+    {
+        var projects = new ShareDefinition("projects", "/data/projects", isEnabled: true);
+        var home = _alice.Id.ToString("D");
+        _shareRepo.Setup(r => r.GetByNameAsync("projects")).ReturnsAsync(projects);
+        _fileService.Setup(s => s.ListAsync(It.IsAny<string>(), It.IsAny<UserContext>())).ReturnsAsync(
+            [new FileMetadata { Name = home, Path = home, IsDirectory = true }]);
+
+        await _sut.LoadShareAsync("projects", "alice");
+        Assert.Equal("alice", _sut.CurrentPath);
+
+        await _sut.LoadShareAsync("projects");
+        Assert.Equal(home, _sut.DisplayNameOf(Assert.Single(_sut.Items)));
     }
 
     [Fact]
@@ -142,12 +215,13 @@ public class FileBrowserViewModelHomesTests
     }
 
     [Fact]
-    public async Task Owner_note_is_only_shown_at_the_share_root()
+    public async Task Only_folders_at_the_share_root_are_renamed_to_usernames()
     {
         AllowHomes(true);
 
         await _sut.LoadShareAsync("users", _alice.Id.ToString("D"));
 
-        Assert.Null(_sut.GetHomeOwnerName(Assert.Single(_sut.Items)));
+        var inner = Assert.Single(_sut.Items);
+        Assert.Equal(inner.Name, _sut.DisplayNameOf(inner));
     }
 }

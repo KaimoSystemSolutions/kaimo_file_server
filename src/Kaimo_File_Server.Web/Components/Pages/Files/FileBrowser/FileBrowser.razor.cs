@@ -261,12 +261,12 @@ public partial class FileBrowser
 
         Func<FileMetadata, object> keySelector = _sortColumn switch
         {
-            "name" => f => f.Name.ToLowerInvariant(),
+            "name" => f => VM.DisplayNameOf(f).ToLowerInvariant(),
             "size" => f => f.IsDirectory ? (VM.GetDirectorySize(f) ?? 0L) : f.Size,
             "created" => f => f.CreatedAt,
             "modified" => f => f.ModifiedAt,
             "lastaccess" => f => f.LastAccessedAt ?? DateTime.MinValue,
-            _ => f => f.Name.ToLowerInvariant()
+            _ => f => VM.DisplayNameOf(f).ToLowerInvariant()
         };
 
         return _sortDirection == 1

@@ -74,6 +74,82 @@ public sealed class PathBarTests : IDisposable
         Assert.True(cut.Find("button.path-bar-edit").HasAttribute("disabled"));
     }
 
+    // ── Absolute mode: "/" stands for the shares overview ──
+
+    [Fact]
+    public void AbsoluteMode_EditTextStartsWithSlash()
+    {
+        var cut = RenderAbsolute(path: "a/b", prefix: "Host");
+
+        cut.Find("button.path-bar-edit").Click();
+
+        Assert.Equal("/Host/Docs/a/b", cut.Find("input.path-bar-input").GetAttribute("value"));
+    }
+
+    [Theory]
+    [InlineData("/", "")]
+    [InlineData("/Other/x", "Other/x")]
+    [InlineData(@"\\kaimo\Other", "Other")]
+    public void AbsoluteMode_PathOutsideTheRootGoesToTheOverview(string typed, string expected)
+    {
+        var cut = RenderAbsolute(path: "a");
+        Edit(cut, typed);
+
+        cut.Find("input.path-bar-input").KeyDown("Enter");
+
+        Assert.Equal([expected], _absolute);
+        Assert.Empty(_navigated);
+    }
+
+    [Theory]
+    [InlineData("/Docs/x", "x")]
+    [InlineData("/Docs", "")]
+    [InlineData("Docs/a/x", "a/x")]   // without a leading slash the text is still relative
+    [InlineData("y", "y")]
+    public void AbsoluteMode_PathInsideTheRootStaysInTheBrowser(string typed, string expected)
+    {
+        var cut = RenderAbsolute(path: "a");
+        Edit(cut, typed);
+
+        cut.Find("input.path-bar-input").KeyDown("Enter");
+
+        Assert.Equal([expected], _navigated);
+        Assert.Empty(_absolute);
+    }
+
+    [Fact]
+    public void AbsoluteMode_UnchangedPath_DoesNotNavigate()
+    {
+        var cut = RenderAbsolute(path: "a");
+        Edit(cut, "/Docs/a");
+
+        cut.Find("input.path-bar-input").KeyDown("Enter");
+
+        Assert.Empty(_navigated);
+        Assert.Empty(_absolute);
+    }
+
+    [Fact]
+    public void WithoutAbsoluteMode_LeadingSlashStaysRelative()
+    {
+        var cut = Render(path: "a");
+        Edit(cut, "/");
+
+        cut.Find("input.path-bar-input").KeyDown("Enter");
+
+        Assert.Equal([""], _navigated);
+    }
+
+    private readonly List<string> _absolute = [];
+
+    private IRenderedComponent<PathBar> RenderAbsolute(string path, string prefix = "")
+        => _ctx.Render<PathBar>(parameters => parameters
+            .Add(bar => bar.RootName, "Docs")
+            .Add(bar => bar.RootPrefix, prefix)
+            .Add(bar => bar.Path, path)
+            .Add(bar => bar.OnNavigate, EventCallback.Factory.Create<string>(this, p => _navigated.Add(p)))
+            .Add(bar => bar.OnNavigateAbsolute, EventCallback.Factory.Create<string>(this, p => _absolute.Add(p))));
+
     private IRenderedComponent<PathBar> Render(string path, bool disabled = false)
         => _ctx.Render<PathBar>(parameters => parameters
             .Add(bar => bar.RootName, "Docs")

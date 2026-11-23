@@ -49,6 +49,10 @@ public partial class GlobalSearch : IDisposable
     [Inject] private FileSelectionCoordinator FileSelectionCoordinator { get; set; } = default!;
     [Inject] private IShareRepository ShareRepo { get; set; } = default!;
     [Inject] private IAclService Acl { get; set; } = default!;
+    [Inject] private HomeFolderSearch HomeSearch { get; set; } = default!;
+
+    // Shows paths inside other users' homes with the owner's username (like the file browser).
+    private HomeLabels _homeLabels = HomeLabels.None;
     [Inject] private IJSRuntime JS { get; set; } = default!;
 
     //  "dest"   → settings/tabs only
@@ -439,7 +443,10 @@ public partial class GlobalSearch : IDisposable
         // only filters the display, so it switches the results live without another round trip.
         var perTarget = await Task.WhenAll(plan.Targets.Select(t =>
             SearchService.SearchAsync(_searchQuery, _user, t.Share, t.Sub, token, includeRecycleBin: true)));
-        var files = perTarget.SelectMany(hits => hits).Select(h => SearchHitNavigation.ToWebHit(h, _user.User.Id)).ToList();
+        // Home folders are found by their owner's username (their real name is a GUID); listed first.
+        var homes = await HomeSearch.FindAsync(_searchQuery, _user, plan.Targets);
+        _homeLabels = homes.Labels;
+        var files = homes.Hits.Concat(perTarget.SelectMany(hits => hits).Select(h => SearchHitNavigation.ToWebHit(h, _user.User.Id))).ToList();
         var virtualShareId = IsVirtualShareScope ? _virtualShareId : null;
         if (virtualShareId is { } shareId)
             files = await SearchVirtualShareAsync(shareId, token);

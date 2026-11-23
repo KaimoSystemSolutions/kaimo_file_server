@@ -25,6 +25,7 @@ public partial class SearchResultsPage : IDisposable
     [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
     [Inject] private NavigationManager Nav { get; set; } = default!;
     [Inject] private FileSelectionCoordinator Selection { get; set; } = default!;
+    [Inject] private HomeFolderSearch HomeSearch { get; set; } = default!;
     [Inject] private IServiceProvider Services { get; set; } = default!;
     [Inject] private IJSRuntime JS { get; set; } = default!;
 
@@ -44,6 +45,7 @@ public partial class SearchResultsPage : IDisposable
     private string? _error;
 
     private List<FileDocument> _allHits = [];
+    private HomeLabels _homeLabels = HomeLabels.None;
     private bool _capped;            // the search stopped at its hit limit: there may be more
     private List<SearchTreeNode> _roots = [];
     private int _shownHits;
@@ -98,11 +100,12 @@ public partial class SearchResultsPage : IDisposable
             if (_user is null)
                 return;
 
-            var (hits, capped) = await FindAsync(_request!.Query, token);
+            var (hits, capped, labels) = await FindAsync(_request!.Query, token);
             await RefreshContentHitsAsync(token);
             if (_cts != cts)
                 return;   // a newer search (or Dispose) replaced this one: its hits are stale
             _allHits = hits;
+            _homeLabels = labels;
             _capped = capped;
             ApplyFilter();
             if (!keepView)
@@ -125,15 +128,18 @@ public partial class SearchResultsPage : IDisposable
     /// Searches <paramref name="query"/> over the page's scope (main search and full-text refine).
     /// <c>Capped</c>: a target returned its full hit limit, so there may be more.
     /// </summary>
-    private async Task<(List<FileDocument> Hits, bool Capped)> FindAsync(string query, CancellationToken token)
+    private async Task<(List<FileDocument> Hits, bool Capped, HomeLabels Labels)> FindAsync(string query, CancellationToken token)
     {
-        var perTarget = await Task.WhenAll(_request!.ToSearchTargets(_user!.User.Id).Select(t =>
+        var targets = _request!.ToSearchTargets(_user!.User.Id);
+        var perTarget = await Task.WhenAll(targets.Select(t =>
             SearchService.SearchAsync(query, _user, t.Share, t.Sub, token, _request.IncludeRecycleBin, MaxHitsPerTarget)));
-        var hits = perTarget.SelectMany(h => h)
+        // Home folders by their owner's username; the labels show other homes by username too.
+        var homes = await HomeSearch.FindAsync(query, _user, targets);
+        var hits = homes.Hits.Concat(perTarget.SelectMany(h => h))
             .Select(h => SearchHitNavigation.ToWebHit(h, _user.User.Id))
             .DistinctBy(h => h.Id)
             .ToList();
-        return (hits, perTarget.Any(h => h.Count >= MaxHitsPerTarget));
+        return (hits, perTarget.Any(h => h.Count >= MaxHitsPerTarget), homes.Labels);
     }
 
     private async Task<UserContext?> CurrentUserAsync()

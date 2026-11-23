@@ -28,7 +28,7 @@ public partial class SearchResultsPage
     private SearchResultsFilter Filter => new(
         _refineMode == SearchRefineMode.Name ? _refineText : "",
         _typeFilter, _dateFilter, _from, _to,
-        _refineMode == SearchRefineMode.Content ? _contentHits : null);
+        _refineMode == SearchRefineMode.Content ? _contentHits : null, _homeLabels);
 
     /// <summary>Rebuilds the tree from the hits that pass the filter; selection and folding stay.</summary>
     private void ApplyFilter()
@@ -37,7 +37,7 @@ public partial class SearchResultsPage
         var now = DateTime.UtcNow;
         var shown = _allHits.Where(h => filter.Matches(h, now)).ToList();
         _shownHits = shown.Count;
-        _roots = SearchResultTree.Build(shown);
+        _roots = SearchResultTree.Build(shown, _homeLabels);
         _selected = _selectedKey is null ? null : FindNode(_selectedKey);
     }
 
@@ -115,7 +115,7 @@ public partial class SearchResultsPage
 
         // Same hit limit as the main search, so a loaded hit that contains the term is found.
         // ponytail: above 1000 refine matches per target some can still be missed; combine both terms in one query if that matters
-        var (hits, _) = await FindAsync(text, token);
+        var (hits, _, _) = await FindAsync(text, token);
         _contentHits = hits.Select(h => h.Id).ToHashSet();
         _contentSnippets = hits
             .Where(h => !string.IsNullOrEmpty(h.HighlightSnippet))

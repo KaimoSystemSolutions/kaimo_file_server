@@ -25,7 +25,7 @@
                 <span class="properties-header-icon">
                     @Assets.SVG(IsUpload ? "upload.svg" : "share.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)"))
                 </span>
-                <span class="properties-header-name" title="@_target.Name">@_target.Name</span>
+                <span class="properties-header-name" title="@VM.DisplayNameOf(_target)">@VM.DisplayNameOf(_target)</span>
                 <button class="btn-icon" title="@Resources.Web_Button_Close" @onclick="Close">
                     @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                 </button>

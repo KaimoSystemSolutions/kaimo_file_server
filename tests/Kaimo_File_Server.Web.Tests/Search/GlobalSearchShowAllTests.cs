@@ -98,6 +98,7 @@ public sealed class GlobalSearchShowAllTests
         ctx.Services.AddSingleton(new SearchResultsCoordinator());
         ctx.Services.AddSingleton(shares.Object);
         ctx.Services.AddSingleton(Mock.Of<IAclService>());
+        ctx.Services.AddSingleton(new HomeFolderSearch(Mock.Of<IUserRepository>(), shares.Object, Mock.Of<Kaimo_File_Server.Core.Services.File.IFileServiceFactory>(), mgmt.Object));
         return ctx;
     }
 }

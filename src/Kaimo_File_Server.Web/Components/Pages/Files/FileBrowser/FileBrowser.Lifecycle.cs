@@ -59,8 +59,9 @@ public partial class FileBrowser
         VM.OnStateChanged -= OnVmStateChanged;
         VM.OnStateChanged += OnVmStateChanged;
 
-        // A search hit selects its own entry; otherwise going up re-selects where we came from.
-        if (!TryApplyPendingFileSelection())
+        // A file path (pasted or linked) or a search hit selects its own entry; otherwise going
+        // up re-selects where we came from.
+        if (!SelectFileOfPath() && !TryApplyPendingFileSelection())
             SelectChildWeCameFrom(previousShare, previousPath);
 
         await CheckForJustSynced();
@@ -101,6 +102,18 @@ public partial class FileBrowser
             _pendingScrollIndex = SortedEntries.IndexOf(item);
         }
 
+        return true;
+    }
+
+    // The loaded path named a file, so its folder opened: select and reveal the file.
+    private bool SelectFileOfPath()
+    {
+        if (VM.FileToSelect is not { } name || FindShareItem(name) is not { } item)
+            return false;
+
+        _selectedItems.Add(item);
+        _anchorItem = _cursorItem = item; // arrow keys and Shift continue from here
+        _pendingScrollIndex = SortedEntries.IndexOf(item);
         return true;
     }
 
@@ -540,6 +553,21 @@ public partial class FileBrowser
             ? CurrentShareRoute
             : $"{CurrentShareRoute}/{RouteSubPath.Escape(routeSubPath)}");
     }
+
+    // "/" in the path bar is the shares overview; "/Share/sub" opens that share. A public share
+    // link has no overview, so its bar stays relative.
+    private EventCallback<string> SharesNavigation => InPlaceNavigation
+        ? default
+        : EventCallback.Factory.Create<string>(this, NavigateToSharesPathAsync);
+
+    // A mounted folder shows its host share and parent folders above it.
+    private string PathBarRootPrefix => string.Join('/', ParentCrumbs?.Select(c => c.Name) ?? []);
+
+    // Shares are named as the overview lists them (a virtual share by name, any letter case).
+    private async Task NavigateToSharesPathAsync(string path)
+        => Nav.NavigateTo(path.Length == 0
+            ? OverviewRoute
+            : $"{OverviewRoute.TrimEnd('/')}/{await SharePaths.RouteOfAsync(path)}");
 
     private async Task NavigateInPlaceAsync(string routeSubPath)
     {

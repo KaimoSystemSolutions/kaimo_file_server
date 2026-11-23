@@ -20,14 +20,25 @@
 @inject CrossShareTransferService CrossShareTransfer
 @inject FileBrowserClipboardService BrowserClipboard
 @inject DateFormatService DateFmt
+@inject SharePathRouter SharePaths
 
 <PageTitle>@(VM.CurrentBrowserShare?.Name ?? Resources.Web_Files) - Kaimo File Server</PageTitle>
 
 <div class="page-header file-page-header">
     <PathBar RootName="@CurrentShareDisplayName" Path="@VM.RouteSubPathOf(VM.CurrentPath ?? "")"
-             OnNavigate="NavigateToRoutePath" Disabled="@VM.IsLoading">
-        <a class="breadcrumb-link" href="@OverviewRoute">@Resources.Web_Breadcrumb_Shares</a>
-        <span class="breadcrumb-sep">/</span>
+             OnNavigate="NavigateToRoutePath" Disabled="@VM.IsLoading"
+             OnNavigateAbsolute="SharesNavigation" RootPrefix="@PathBarRootPrefix">
+        @if (InPlaceNavigation)
+        {
+            <a class="breadcrumb-link" href="@OverviewRoute">@Resources.Web_Breadcrumb_Shares</a>
+            <span class="breadcrumb-sep">/</span>
+        }
+        else
+        {
+            @* "/" is the shares overview, as in the editable path ("/Share/sub"). *@
+            <a class="breadcrumb-link" href="@OverviewRoute" title="@Resources.Web_Breadcrumb_Shares"
+               aria-label="@Resources.Web_Breadcrumb_Shares">/</a>
+        }
         @if (ParentCrumbs is not null)
         {
             @foreach (var (crumbName, crumbHref) in ParentCrumbs)
@@ -503,14 +514,7 @@ else
                         var icon = FileHelper.GetEntryIcon(entry.Name, entry.IsDirectory, IsRecycleBinEntry(entry));
                         @Assets.SVG(icon.File, new SvgOptions(Width: 20, Height: 20, Color: icon.Color, Fill: icon.Fill, CssClass: "file-icon"))
                     }
-                    <span>@entry.Name</span>
-                    @if (VM is FileBrowserViewModel local && local.GetHomeOwnerName(entry) is { } owner)
-                    {
-                        <span class="home-owner-note" title="@owner">
-                            @Assets.SVG("user.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, Color: "var(--text-tertiary)"))
-                            <span>@owner</span>
-                        </span>
-                    }
+                    <span>@VM.DisplayNameOf(entry)</span>
                     @if (syncMarker is not null)
                     {
                         <span class="sync-indicator @SyncIndicatorClass(syncMarker.State) @(CanManageSyncs() && syncMarker.SyncId != Guid.Empty ? "sync-indicator--clickable" : "")"

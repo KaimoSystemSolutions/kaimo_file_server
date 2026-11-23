@@ -133,7 +133,8 @@ public enum SearchRefineMode { Name, Content }
 /// </summary>
 public sealed record SearchResultsFilter(
     string Text, SearchTypeFilter Type, SearchDateFilter Modified,
-    DateOnly? From = null, DateOnly? To = null, IReadOnlySet<string>? ContentHits = null)
+    DateOnly? From = null, DateOnly? To = null, IReadOnlySet<string>? ContentHits = null,
+    HomeLabels? Labels = null)
 {
     private static readonly HashSet<string> DocumentIcons =
         ["file_pdf.svg", "file_word.svg", "file_excel.svg", "file_powerpoint.svg", "file_text.svg"];
@@ -157,7 +158,9 @@ public sealed record SearchResultsFilter(
         var text = Text.Trim();
         return text.Length == 0
             || hit.FileName.Contains(text, StringComparison.CurrentCultureIgnoreCase)
-            || hit.SharePath.Replace('\\', '/').Contains(text, StringComparison.CurrentCultureIgnoreCase);
+            || hit.SharePath.Replace('\\', '/').Contains(text, StringComparison.CurrentCultureIgnoreCase)
+            // The path as shown (a home folder by its owner's username).
+            || (Labels ?? HomeLabels.None).DisplayPath(hit).Replace('\\', '/').Contains(text, StringComparison.CurrentCultureIgnoreCase);
     }
 
     private bool MatchesType(FileDocument hit) => Type switch

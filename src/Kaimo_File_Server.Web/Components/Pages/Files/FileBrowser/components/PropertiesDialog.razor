@@ -30,7 +30,7 @@
     var multi = _targets.Count > 1;
     var title = multi
         ? string.Format(Resources.Context_Menu_SelectedItems, _targets.Count).Trim()
-        : _target.Name;
+        : VM.DisplayNameOf(_target);
     var allDirectories = _targets.All(t => t.IsDirectory);
 
     <div class="modal-backdrop" @onclick="Close">

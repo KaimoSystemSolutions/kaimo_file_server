@@ -5,6 +5,9 @@
     the bar into a text field holding "Root/sub/folder": the text is pre-selected
     (pathBar.js) for copying, Enter navigates to the typed or pasted path (ignored while
     Disabled, i.e. the host is busy), Escape or leaving the field restores the breadcrumbs.
+    With OnNavigateAbsolute set, "/" stands for the overview above the root: the field holds
+    "/RootPrefix/Root/sub", and a typed path starting with "/" (or a UNC path) that lies outside
+    RootPrefix/Root goes to OnNavigateAbsolute ("" = the overview itself).
 *@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Helpers
@@ -36,12 +39,23 @@ else
     /// <summary>Called with the new path below the root when the user submits a different one.</summary>
     [Parameter] public EventCallback<string> OnNavigate { get; set; }
 
+    /// <summary>
+    /// Enables the absolute form: called with the path below the overview ("" for "/") when the
+    /// user submits an absolute path outside this root.
+    /// </summary>
+    [Parameter] public EventCallback<string> OnNavigateAbsolute { get; set; }
+
+    /// <summary>Absolute form only: the '/'-separated folders shown above the root (e.g. a mount's host path).</summary>
+    [Parameter] public string RootPrefix { get; set; } = "";
+
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public string? Label { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public string? Class { get; set; }
 
     private static string EditLabel => Resources.Web_PathBar_Edit;
+
+    private bool Absolute => OnNavigateAbsolute.HasDelegate;
 
     private ElementReference _input;
     private bool _editing;
@@ -50,7 +64,9 @@ else
 
     private void StartEdit()
     {
-        _text = PathBarText.Format(RootName, Path);
+        _text = Absolute
+            ? PathBarText.FormatAbsolute(RootPrefix, RootName, Path)
+            : PathBarText.Format(RootName, Path);
         _editing = _focusPending = true;
     }
 
@@ -70,8 +86,13 @@ else
         else if (e.Key == "Enter" && !Disabled)
         {
             _editing = false;
-            var target = PathBarText.ToRelative(_text, RootName);
-            if (target != Path)
+            var absolute = Absolute ? PathBarText.ToAbsolute(_text) : null;
+            var target = absolute is null
+                ? PathBarText.ToRelative(_text, RootName)
+                : PathBarText.BelowRoot(absolute, RootPrefix, RootName);
+            if (target is null)
+                await OnNavigateAbsolute.InvokeAsync(absolute!);
+            else if (target != Path)
                 await OnNavigate.InvokeAsync(target);
         }
     }

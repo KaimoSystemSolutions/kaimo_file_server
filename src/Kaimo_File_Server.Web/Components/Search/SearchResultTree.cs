@@ -31,8 +31,13 @@ public sealed record SearchTreeRow(SearchTreeNode Node, int Depth);
 /// <summary>Builds the file-tree view of the search results page from flat hits.</summary>
 public static class SearchResultTree
 {
-    public static List<SearchTreeNode> Build(IEnumerable<FileDocument> hits)
+    /// <summary>
+    /// <paramref name="labels"/> names the folders as shown (a home folder by its owner's
+    /// username); keys and paths keep the real names.
+    /// </summary>
+    public static List<SearchTreeNode> Build(IEnumerable<FileDocument> hits, HomeLabels? labels = null)
     {
+        labels ??= HomeLabels.None;
         var roots = new Dictionary<string, SearchTreeNode>(StringComparer.Ordinal);
         var nodes = new Dictionary<string, SearchTreeNode>(StringComparer.Ordinal);
 
@@ -46,6 +51,9 @@ public static class SearchResultTree
             node.HitCount++;
 
             var parts = hit.SharePath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+            var shown = labels.DisplayPath(hit).Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (shown.Length != parts.Length)
+                shown = parts;
             for (var i = 0; i < parts.Length; i++)
             {
                 var path = string.Join('/', parts[..(i + 1)]);
@@ -54,7 +62,7 @@ public static class SearchResultTree
                 {
                     nodes[key] = child = new SearchTreeNode
                     {
-                        Key = key, Share = hit.ShareName, Name = parts[i], SharePath = path, IsDirectory = true
+                        Key = key, Share = hit.ShareName, Name = shown[i], SharePath = path, IsDirectory = true
                     };
                     node.Children.Add(child);
                 }

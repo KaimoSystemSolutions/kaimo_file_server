@@ -66,7 +66,7 @@
         if (scope == ContextMenuScope.MultiSelection)
             builder.AddHeader(string.Format(Resources.Context_Menu_SelectedItems, selectedItems.Count));
         else if (scope != ContextMenuScope.Background)
-            builder.AddHeader(FileBrowser.getFirstSelectedItem().Name);
+            builder.AddHeader(FileBrowser.VM.DisplayNameOf(FileBrowser.getFirstSelectedItem()));
 
         var target = scope is ContextMenuScope.Background or ContextMenuScope.MultiSelection
             ? null

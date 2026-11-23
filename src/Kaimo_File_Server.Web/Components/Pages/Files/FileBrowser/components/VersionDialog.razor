@@ -137,7 +137,7 @@
             <h3 class="modal-title">@Resources.Web_Version_Restore</h3>
             <p class="modal-text">
                 @((MarkupString)string.Format(Resources.Web_Version_RestoreConfirm,
-                    $"<strong>{System.Net.WebUtility.HtmlEncode(_target?.Name)}</strong>",
+                    $"<strong>{System.Net.WebUtility.HtmlEncode(_target is null ? null : VM.DisplayNameOf(_target))}</strong>",
                     $"<strong>{DateFmt.FormatDateTime(_restoreConfirm.Value)}</strong>"))
             </p>
             <div class="modal-actions">
