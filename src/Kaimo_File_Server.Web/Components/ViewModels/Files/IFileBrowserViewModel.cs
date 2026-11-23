@@ -28,6 +28,17 @@ public enum SyncItemState
 /// </summary>
 public sealed record SyncFolderMarker(SyncMode Mode, string SyncName, SyncItemState State = SyncItemState.Synced, Guid SyncId = default);
 
+/// <summary>
+/// Marks a browsed entry that is, or lives beneath, a folder synced to one or more client
+/// devices (desktop/mobile app). <see cref="Mode"/> is the common direction, or
+/// <see cref="SyncMode.TwoWay"/> when the devices differ. Only the devices the viewer may see
+/// are listed: their own, or every device for a client-device admin.
+/// </summary>
+public sealed record ClientSyncMarker(SyncMode Mode, IReadOnlyList<ClientSyncDevice> Devices);
+
+/// <summary>One device behind a <see cref="ClientSyncMarker"/>; <see cref="OwnerName"/> is null for the viewer's own device.</summary>
+public sealed record ClientSyncDevice(string DeviceName, string? OwnerName, SyncMode Mode);
+
 /// <summary>Decides a browsed entry's sync state from timestamps and direction.</summary>
 public static class SyncItemStateEvaluator
 {
@@ -132,6 +143,13 @@ public interface IFileBrowserViewModel
     /// syncs (Cloud Access, remote) keep the safe default.
     /// </summary>
     SyncFolderMarker? GetSyncMarker(FileMetadata entry) => null;
+
+    /// <summary>
+    /// Returns the client-device sync marker for an entry that is, or lives beneath, a folder
+    /// synced to a device the viewer may see; <c>null</c> otherwise (and for every backend
+    /// without client sync, such as Cloud Access, remote or public-link browsers).
+    /// </summary>
+    ClientSyncMarker? GetClientSyncMarker(FileMetadata entry) => null;
 
     /// <summary>Whether the entry is shared via a public link (or lives beneath a shared folder).</summary>
     bool IsShared(FileMetadata entry) => false;

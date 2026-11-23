@@ -111,6 +111,8 @@ public class FileBrowserViewModelAclScopeTests
     {
         Authorize(false);
         await _sut.LoadShareAsync("share");
+        // The share load itself reads client-device syncs; only the ACL-count load is under test.
+        _dbFactory.Invocations.Clear();
 
         await _sut.LoadAclCountsAsync();
 

@@ -131,6 +131,7 @@ Both naming sets are valid; the short legacy aliases (`--bg-*`, `--text-*`, `--b
 | `--info` | `#7BB7E8` | `#256B9B` | neutral information, progress |
 | `--entity-user` / `-soft` | `#77BCE8` | `#236F9F` | users |
 | `--entity-group` / `-soft` | `#B59AE7` | `#6F4EAA` | groups |
+| `--sync-client` | `#B59AE7` | `#7C3AED` | client-device sync emblem in the file browser (kept apart from the `--info` cloud-sync emblem; saturated in light theme so thin strokes do not read as grey) |
 | `--entity-role` / `-soft` | `#E2B769` | `#986313` | roles |
 | `--entity-department` / `-soft` | `#E28A84` | `#A3453F` | departments |
 | `--entity-pool` / `-soft` | `#6CC7BD` | `#1F7A72` | storage pools and the system backup source (`pool.svg` / `gear.svg`) |

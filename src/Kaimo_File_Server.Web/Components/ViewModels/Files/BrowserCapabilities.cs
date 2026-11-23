@@ -26,6 +26,12 @@ public sealed record BrowserCapabilities
     public bool HasVersions { get; init; }
     public bool HasProperties { get; init; } = true;
     public bool HasCloudSync { get; init; }
+    /// <summary>
+    /// Shows which folders are synced to client devices (desktop/mobile app). Off for the
+    /// anonymous public browser, which runs under the link creator's identity and must not
+    /// reveal their devices. Unlike <see cref="HasCloudSync"/> it stays on in home folders.
+    /// </summary>
+    public bool HasClientSyncMarkers { get; init; }
     public bool HasSearchIntegration { get; init; }
     public bool ShowDirectorySizes { get; init; }
     /// <summary>"Create hash" reads the whole file server-side; the anonymous public browser opts out.</summary>
@@ -65,6 +71,7 @@ public sealed record BrowserCapabilities
         HasVersions = true,
         HasProperties = true,
         HasCloudSync = true,
+        HasClientSyncMarkers = true,
         HasSearchIntegration = true,
         ShowDirectorySizes = true
     };

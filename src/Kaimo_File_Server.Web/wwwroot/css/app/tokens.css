@@ -101,6 +101,8 @@
     --entity-department-soft: rgba(190, 80, 73, 0.17);
     --entity-pool: #6cc7bd;
     --entity-pool-soft: rgba(44, 150, 138, 0.18);
+    /* Client-device sync emblem (file browser); distinct from the --info cloud-sync emblem. */
+    --sync-client: #b59ae7;
     --folder-fill: rgba(214, 158, 46, 0.16);
     --folder-stroke: #ddb765;
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
@@ -169,6 +171,9 @@
     --entity-department-soft: #f8e4e2;
     --entity-pool: #1f7a72;
     --entity-pool-soft: #dcf2ef;
+    /* Saturated violet: the muted group violet read as grey on thin icon strokes.
+       5.7:1 on the surface, >= 4.4:1 on hover/selected rows (icon minimum is 3:1). */
+    --sync-client: #7c3aed;
     --folder-fill: rgba(183, 121, 31, 0.12);
     --folder-stroke: #9a6700;
     --shadow: 0 2px 8px rgba(27, 32, 28, 0.08);

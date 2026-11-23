@@ -354,6 +354,24 @@
   <data name="Web_Sync_FolderTooltip" xml:space="preserve">
     <value>Synchronized folder of "{0}"</value>
   </data>
+  <data name="Web_ClientSync_Tooltip" xml:space="preserve">
+    <value>Synchronized with client devices:</value>
+  </data>
+  <data name="Web_ClientSync_OwnDeviceLine" xml:space="preserve">
+    <value>Your device "{0}": {1}</value>
+  </data>
+  <data name="Web_ClientSync_UserDeviceLine" xml:space="preserve">
+    <value>"{0}" of {1}: {2}</value>
+  </data>
+  <data name="Web_ClientSync_Mode_Pull" xml:space="preserve">
+    <value>downloaded to the device</value>
+  </data>
+  <data name="Web_ClientSync_Mode_Push" xml:space="preserve">
+    <value>uploaded from the device</value>
+  </data>
+  <data name="Web_ClientSync_Mode_TwoWay" xml:space="preserve">
+    <value>synchronized in both directions</value>
+  </data>
   <data name="Web_Sync_PendingUploadTooltip" xml:space="preserve">
     <value>Not yet uploaded to "{0}" — will sync on the next run</value>
   </data>

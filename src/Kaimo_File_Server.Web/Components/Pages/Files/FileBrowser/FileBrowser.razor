@@ -474,6 +474,7 @@ else
                 var aclPath = entry.IsDirectory ? GetDirAclPath(entry) : GetFileAclPath(entry);
                 var aclCount = CanManageAcls() ? GetAclCount(aclPath) : 0;
                 var syncMarker = VM.GetSyncMarker(entry);
+                var clientSyncMarker = VM.GetClientSyncMarker(entry);
             }
             <div
                 class="file-grid-row @(entry.IsDirectory ? "file-row-dir" : "") @(isSelected ? "file-row--selected" : "")"
@@ -518,6 +519,24 @@ else
                               @onclick:stopPropagation="true">
                             @Assets.SVG(SyncMarkerIcon(syncMarker), new SvgOptions(Width: 20, Height: 20, Color: SyncMarkerColor(syncMarker.State), StrokeWidth: 2, CssClass: "sync-indicator-icon"))
                         </span>
+                    }
+                    @if (clientSyncMarker is not null)
+                    {
+                        var clientSyncIcon = Assets.SVG(ClientSyncIcon(clientSyncMarker.Mode), new SvgOptions(Width: 20, Height: 20, Color: ClientSyncColor, StrokeWidth: 2, CssClass: "sync-indicator-icon"));
+                        @* A real button when it links somewhere, so it is keyboard-reachable (Enter/Space, focus ring). *@
+                        if (CanOpenClientDevices)
+                        {
+                            <button type="button" class="sync-indicator sync-indicator--client sync-indicator--clickable"
+                                    title="@ClientSyncTooltip(clientSyncMarker)"
+                                    @onclick="OpenClientDevices"
+                                    @onclick:stopPropagation="true">
+                                @clientSyncIcon
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="sync-indicator sync-indicator--client" title="@ClientSyncTooltip(clientSyncMarker)">@clientSyncIcon</span>
+                        }
                     }
                     @* Download link first, then upload link — both show when a folder has both. *@
                     @foreach (var kind in ShareLinkEmblemOrder)

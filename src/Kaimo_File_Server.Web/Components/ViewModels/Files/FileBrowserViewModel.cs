@@ -264,6 +264,7 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             _shareSyncs = [];
             _activeSyncPaths = [];
             _sharedRoots = [];
+            _clientSyncs = [];
             _fileService = null;
 
             // Clear the previously loaded location up front so the breadcrumb does
@@ -348,6 +349,8 @@ public partial class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
                     .Select(g => (Root: g.Key.Root, LinkId: g.First().Id, g.Key.Kind))
                     .ToList()
                 : [];
+
+            await LoadClientSyncsAsync(CurrentShare.Id, userContext);
 
             // Sync state is internal configuration: a browser without cloud-sync support (the
             // anonymous public-link browser) never loads it, so no sync marker can be rendered.

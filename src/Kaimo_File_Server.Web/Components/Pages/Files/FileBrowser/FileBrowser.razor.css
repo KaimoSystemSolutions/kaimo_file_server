@@ -427,6 +427,15 @@
     color: var(--warning);
 }
 
+/* Clickable client-device emblem is a real button: strip the native chrome (the global
+   :focus-visible ring still applies). Its violet tint is set inline on the icon. */
+button.sync-indicator {
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+}
+
 /* Clickable emblem (actor may manage the backing sync): jumps to its overview entry. */
 .sync-indicator--clickable {
     cursor: pointer;

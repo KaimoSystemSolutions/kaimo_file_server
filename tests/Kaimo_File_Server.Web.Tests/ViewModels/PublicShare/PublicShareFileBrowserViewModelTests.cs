@@ -44,6 +44,18 @@ public class PublicShareFileBrowserViewModelTests
     }
 
     [Fact]
+    public async Task LoadShareAsync_NeverLoadsClientDeviceSyncs()
+    {
+        await _sut.LoadShareAsync(_f.Share.Name);
+
+        // Runs under the link creator's identity: their devices must not leak to visitors.
+        Assert.Null(_sut.GetClientSyncMarker(new FileMetadata { Path = "/data/internal-share/projects/secret/a" }));
+        _f.MgmtAuth.Verify(m => m.HasGlobalPermissionAsync(
+            It.IsAny<Kaimo_File_Server.Core.Domain.Identity.UserContext>(),
+            Kaimo_File_Server.Core.Security.Management.ManagementPermission.ManageClientDevices), Times.Never);
+    }
+
+    [Fact]
     public async Task CurrentBrowserShare_ExposesOnlyTheLinkDisplayName()
     {
         await _sut.LoadShareAsync(_f.Share.Name);
