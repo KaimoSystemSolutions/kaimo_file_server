@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain.Backup;
 using Kaimo_File_Server.Core.Domain.Department;
+using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Infrastructure.Backup.Restic;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels.Backup;
@@ -13,7 +14,7 @@ public partial class BackupViewModel
     public void NewRepository()
     {
         ClearMessages();
-        ProbeResult = null;
+        ResetProbe();
         RepositoryForm = new BackupRepositoryForm
         {
             Path = LocalPathSuggestion,
@@ -101,18 +102,82 @@ public partial class BackupViewModel
         SuccessMessage = R("Web_Backup_Maintenance_Started");
     });
 
-    public void ResetProbe() => ProbeResult = null;
+    /// <summary>Error of the last "Test location" or "Connect"/"Initialize", shown next to those buttons.</summary>
+    public string? SetupError { get; private set; }
 
-    public Task ProbeAsync() => RunAsync(async actor =>
+    /// <summary>Unconnected local repository folders, suggested when "connect existing" found nothing.</summary>
+    public IReadOnlyList<string> LocalRepositoryHints { get; private set; } = [];
+
+    /// <summary>A local repository path as shown to the administrator (backup folder as <c>/backups</c>).</summary>
+    public string DisplayLocalPath(string path) => catalog.DisplayLocalPath(path);
+
+    /// <summary>The local path in the free field: shown and typed as <c>/backups/…</c>, stored as container path.</summary>
+    public string LocalPathDisplay
     {
+        get => DisplayLocalPath(RepositoryForm.Path);
+        set => RepositoryForm.Path = catalog.ContainerLocalPath(value ?? string.Empty);
+    }
+
+    public void ResetProbe()
+    {
+        ProbeResult = null;
+        SetupError = null;
+        LocalRepositoryHints = [];
+    }
+
+    /// <summary>Takes a suggested repository folder as the location; it still has to be tested.</summary>
+    public void UseLocalRepositoryHint(string path)
+    {
+        RepositoryForm.Path = path;
+        ResetProbe();
+    }
+
+    /// <summary>Next step of the setup section of a new repository.</summary>
+    public BackupRepositorySetupStep RepositorySetupStep => BackupUi.SetupStep(RepositoryForm.ConnectExisting, ProbeResult);
+
+    /// <summary>Switches the intent; the probe result stays valid because the location did not change.</summary>
+    public void SetConnectExisting(bool connectExisting)
+    {
+        ClearMessages();
+        SetupError = null;
+        RepositoryForm.ConnectExisting = connectExisting;
+        if (!connectExisting)
+            RepositoryForm.ExistingPassword = string.Empty;
+    }
+
+    /// <summary>Tests the location; the result is shown in the setup section, not as a page banner.</summary>
+    public Task ProbeAsync() => RunSetupAsync(async actor =>
+    {
+        ProbeResult = null;
+        LocalRepositoryHints = [];
         ProbeResult = await catalog.ProbeAsync(actor, RepositoryForm.ToDraft());
-        SuccessMessage = ProbeResult == BackupRepositoryProbe.Empty
-            ? R("Web_Backup_Probe_Empty")
-            : R("Web_Backup_Probe_Existing");
+        if (RepositorySetupStep == BackupRepositorySetupStep.NothingToConnect && RepositoryForm.Backend == BackupBackend.Local)
+        {
+            // Suggestions are optional: their failure must not turn a successful test into an error.
+            try { LocalRepositoryHints = await catalog.FindLocalRepositoriesAsync(actor); }
+            catch (Exception ex) { logger.LogWarning(ex, "Looking for local repository folders failed"); }
+        }
     });
 
+    /// <summary>
+    /// Runs a setup step: a failure belongs next to the setup buttons, so it is moved from the
+    /// page banner into <see cref="SetupError"/>. Only a repository actually added gets a banner,
+    /// and so does a failure after it was added: the setup section is gone by then.
+    /// </summary>
+    private async Task<bool> RunSetupAsync(Func<UserContext, Task> action)
+    {
+        SetupError = null;
+        var succeeded = await RunAsync(action);
+        if (succeeded || RepositoryForm.Id is not null)
+            return succeeded;
+        SetupError = ErrorMessage;
+        ErrorMessage = null;
+        Changed?.Invoke();
+        return false;
+    }
+
     /// <summary>Initializes a new repository (no password) or connects an existing one.</summary>
-    public Task<bool> CreateRepositoryAsync(bool connectExisting) => RunAsync(async actor =>
+    public Task<bool> CreateRepositoryAsync(bool connectExisting) => RunSetupAsync(async actor =>
     {
         var password = connectExisting ? RepositoryForm.ExistingPassword : null;
         if (connectExisting && string.IsNullOrEmpty(password))

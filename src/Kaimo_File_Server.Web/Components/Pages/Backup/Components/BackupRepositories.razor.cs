@@ -155,12 +155,12 @@ public partial class BackupRepositories
         return names.Count == 0 ? R("Web_Backup_Repos_DepartmentsNone") : string.Join(", ", names);
     }
 
-    private static string Location(BackupRepository repo)
+    private string Location(BackupRepository repo)
     {
         var s = ResticRepositorySettings.Parse(repo.SettingsJson);
         return repo.Backend switch
         {
-            BackupBackend.Local => s.Path ?? "–",
+            BackupBackend.Local => s.Path is { } path ? VM.DisplayLocalPath(path) : "–",
             BackupBackend.Sftp => "sftp: " + s.Path,
             BackupBackend.Smb => "smb: " + s.Path,
             BackupBackend.Rest => s.Endpoint + (string.IsNullOrEmpty(s.Path) ? "" : "/" + s.Path.Trim('/')),

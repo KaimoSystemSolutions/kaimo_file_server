@@ -5934,10 +5934,10 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>Repository</value>
   </data>
   <data name="Web_Backup_Repos_Empty" xml:space="preserve">
-    <value>No repositories yet.</value>
+    <value>No repositories yet. Create a new one or connect an existing restic repository.</value>
   </data>
   <data name="Web_Backup_Repos_SelectHint" xml:space="preserve">
-    <value>Select a repository to see its details, or create a new one.</value>
+    <value>Select a repository to see its details, or add one – new or existing.</value>
   </data>
   <data name="Web_Backup_Repos_Backend" xml:space="preserve">
     <value>Storage type</value>
@@ -6018,7 +6018,43 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>Set up</value>
   </data>
   <data name="Web_Backup_Repos_SetupHelp" xml:space="preserve">
-    <value>First test the location. An empty location is initialized with a new, generated password; an existing restic repository is connected with its password.</value>
+    <value>Test the location, then initialize the repository. Kaimo generates its password and hands it out in the recovery kit.</value>
+  </data>
+  <data name="Web_Backup_Repos_SetupHelpExisting" xml:space="preserve">
+    <value>Enter the restic password of the repository (not the code of a recovery kit), test the location, then connect it. Kaimo keeps the backups that are already in it.</value>
+  </data>
+  <data name="Web_Backup_Repos_Add" xml:space="preserve">
+    <value>Add repository</value>
+  </data>
+  <data name="Web_Backup_Repos_ConnectTitle" xml:space="preserve">
+    <value>Connect existing repository</value>
+  </data>
+  <data name="Web_Backup_Repos_Intent" xml:space="preserve">
+    <value>What do you want to do?</value>
+  </data>
+  <data name="Web_Backup_Repos_Intent_New" xml:space="preserve">
+    <value>Create new</value>
+  </data>
+  <data name="Web_Backup_Repos_Intent_Existing" xml:space="preserve">
+    <value>Connect existing</value>
+  </data>
+  <data name="Web_Backup_Repos_Intent_NewHelp" xml:space="preserve">
+    <value>Kaimo sets up a new, empty restic repository at an empty location.</value>
+  </data>
+  <data name="Web_Backup_Repos_Intent_ExistingHelp" xml:space="preserve">
+    <value>Use a restic repository that already exists, e.g. after a server move or one created with the restic command line. The location must point exactly at the repository folder (the one containing "config", "data" and "keys"). You need its restic password.</value>
+  </data>
+  <data name="Web_Backup_Repos_NothingToConnect" xml:space="preserve">
+    <value>There is no restic repository at this location. Check the path, bucket or prefix – it must point exactly at the repository folder.</value>
+  </data>
+  <data name="Web_Backup_Repos_AlreadyExists" xml:space="preserve">
+    <value>There is already a restic repository at this location. Connect it with its restic password, or choose an empty location.</value>
+  </data>
+  <data name="Web_Backup_Repos_SwitchToNew" xml:space="preserve">
+    <value>Create a new one here instead</value>
+  </data>
+  <data name="Web_Backup_Repos_SwitchToExisting" xml:space="preserve">
+    <value>Connect it instead</value>
   </data>
   <data name="Web_Backup_Repos_Test" xml:space="preserve">
     <value>Test location</value>
@@ -6027,7 +6063,7 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>Initialize new repository</value>
   </data>
   <data name="Web_Backup_Repos_ExistingPassword" xml:space="preserve">
-    <value>Password of the existing repository</value>
+    <value>restic password</value>
   </data>
   <data name="Web_Backup_Repos_Connect" xml:space="preserve">
     <value>Connect repository</value>
@@ -6045,7 +6081,19 @@ NT_HASH_ENCRYPTION_KEY, .env) separately - they are not part of any backup.
     <value>The location is reachable and empty – a new repository can be initialized.</value>
   </data>
   <data name="Web_Backup_Probe_Existing" xml:space="preserve">
-    <value>There is already a restic repository at this location. Enter its password to connect it.</value>
+    <value>There is a restic repository at this location. Connect it with its restic password.</value>
+  </data>
+  <data name="Web_Backup_Setup_Failed" xml:space="preserve">
+    <value>Failed</value>
+  </data>
+  <data name="Web_Backup_Setup_LocationOk" xml:space="preserve">
+    <value>Location OK</value>
+  </data>
+  <data name="Web_Backup_Setup_RepositoryFound" xml:space="preserve">
+    <value>Repository found</value>
+  </data>
+  <data name="Web_Backup_Repos_FoundRepositories" xml:space="preserve">
+    <value>These folders contain a restic repository that is not connected yet:</value>
   </data>
   <data name="Web_Backup_Repo_Initialized" xml:space="preserve">
     <value>Repository initialized. Download and confirm the recovery kit to activate it.</value>

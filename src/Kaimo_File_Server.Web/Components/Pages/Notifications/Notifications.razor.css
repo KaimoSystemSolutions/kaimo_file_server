@@ -23,7 +23,7 @@
 
 .notif-inline-error {
     margin: 0;
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     white-space: pre-wrap;
 }
@@ -41,7 +41,7 @@
 }
 
 .notif-code {
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 12.5px;
     line-height: 1.5;
     resize: vertical;
@@ -259,7 +259,7 @@
 }
 
 .notif-chip {
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 11.5px;
 }
 

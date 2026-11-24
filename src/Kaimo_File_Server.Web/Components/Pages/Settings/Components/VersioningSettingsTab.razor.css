@@ -29,7 +29,7 @@
 
 .versioning-patterns-input {
     width: 100%;
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     resize: vertical;
 }

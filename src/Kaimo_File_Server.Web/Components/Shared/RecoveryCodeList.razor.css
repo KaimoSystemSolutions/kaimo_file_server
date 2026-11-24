@@ -14,7 +14,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-surface);
     background: var(--bg-tertiary);
-    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    font-family: var(--font-mono);
     font-size: 13px;
     color: var(--text-primary);
     user-select: all;

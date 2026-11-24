@@ -73,13 +73,13 @@
 }
 
 .dateformat-card-example {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 16px;
     color: var(--text-primary);
 }
 
 .dateformat-card-pattern {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     color: var(--text-tertiary);
 }

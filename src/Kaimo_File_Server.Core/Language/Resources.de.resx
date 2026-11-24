@@ -5695,67 +5695,6 @@
   <data name="Web_Notifications_Role_jobCreator" xml:space="preserve">
     <value>Auftragsersteller</value>
   </data>
-  <data name="Web_Backup_Kit_Template" xml:space="preserve">
-    <value>KAIMO FILE SERVER - WIEDERHERSTELLUNGS-KIT
-==========================================
-Bewahre diese Datei offline und sicher auf (z. B. ausgedruckt im Tresor oder in einem Passwort-Manager).
-Wer sie besitzt, kann die Sicherungen lesen - ohne sie kann NIEMAND sie wiederherstellen.
-
-Repository:      {0}
-Backend:         {1}
-Repository-ID:   {5}
-Erstellt:        {7}
-restic-Version:  {6}
-Kit-Code:        {8}
-
-RESTIC_REPOSITORY={2}
-RESTIC_PASSWORD={4}
-
-Weitere Parameter / Zugangsdaten, die du selbst angeben musst:
-{3}
-
-Zugangsdaten des Speicherziels (Zugriffsschlüssel, REST-Benutzer, SSH-Schlüssel, Dienstkonto, rclone-Konfiguration) sind NICHT Teil dieses Kits. Bewahre sie getrennt auf.
-
-AUFBAU
-------
-Jeder Sicherungslauf erzeugt pro Share einen Snapshot mit den Tags:
-  kaimo, job:&lt;Auftrags-ID&gt;, run:&lt;Lauf-ID&gt;, level:files|db|full, share:&lt;Share-ID&gt;
-Ein Snapshot enthält den Share-Ordner und kaimo-acl-manifest.json (Besitzer und Berechtigungen des Shares).
-Aufträge globaler Administratoren können zusätzlich erzeugen:
-  - pro Pool einen Snapshot (Tag pool:&lt;Pool-Name&gt;): den ganzen Pool-Ordner plus ein ACL-Manifest pro Share;
-  - einen System-Snapshot (Tag kind:system, Stufen db und full) mit kaimo-database.dump (pg_dump),
-    kaimo-backup-info.json (Shares, Pools, Pfade) und bei Stufe full dem Anwendungsdaten-Ordner
-    (/data/kaimo-system: DataProtection-Schlüssel, Zertifikate).
-
-WIEDERHERSTELLEN MIT DER RESTIC-KOMMANDOZEILE (funktioniert ohne Kaimo-Server)
-------------------------------------------------------------------------------
-1. restic installieren (https://restic.net), obige Version oder neuer.
-2. export RESTIC_REPOSITORY='&lt;Wert oben&gt;'
-   export RESTIC_PASSWORD='&lt;Wert oben&gt;'
-   dazu die Zugangsdaten des Speicherziels (siehe "Weitere Parameter" oben, z. B. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).
-3. Sicherungen auflisten:      restic snapshots --tag kaimo
-   Nur ein Share:              restic snapshots --tag share:&lt;Share-ID&gt;
-4. Sicherung durchsuchen:      restic ls &lt;Snapshot-ID&gt;
-5. Alles wiederherstellen:     restic restore &lt;Snapshot-ID&gt; --target /restore
-   Einen Ordner:               restic restore &lt;Snapshot-ID&gt;:&lt;Share-Pfad&gt;/&lt;Ordner&gt; --target /restore
-6. Die wiederhergestellten Dateien zurück in den Share-Ordner kopieren. Besitzer und Berechtigungen stehen in kaimo-acl-manifest.json.
-
-NOTFALL-WIEDERHERSTELLUNG (Server komplett verloren)
-----------------------------------------------------
-Braucht einen Auftrag mit Stufe "full". Die Umgebungs-Geheimnisse des alten Servers (JWT_SECRET,
-NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherung enthalten.
-1. Neuen Server mit derselben docker-compose.yml und .env vorbereiten; Kaimo noch nicht starten.
-2. Neuester System-Snapshot:   restic snapshots --tag kind:system --latest 1
-3. Wiederherstellen:           restic restore &lt;Snapshot-ID&gt; --target /restore
-4. /restore/data/kaimo-system/ (bzw. deinen Anwendungsdaten-Pfad) in den neuen Anwendungsdaten-Ordner kopieren
-   und /restore/data/kaimo-backups/restic-meta/system/kaimo-database.dump in den neuen Sicherungsordner.
-5. Stack mit KAIMO_DB_RESTORE_FROM=kaimo-database.dump starten - die Datenbank (Benutzer, Shares,
-   Berechtigungen, dieses Repository samt Passwort) ist wieder da.
-6. Dateien wiederherstellen, jeweils neuester Snapshot pro Pool oder Share, an ihre ursprünglichen Pfade:
-   restic restore &lt;Snapshot-ID&gt;:&lt;Pool- oder Share-Pfad&gt; --target &lt;derselbe Pfad&gt;
-   Danach den Stack neu starten. Wiederherstellungen über die Weboberfläche funktionieren wieder.
-</value>
-  </data>
   <data name="Web_Nav_Backup" xml:space="preserve">
     <value>Sicherung</value>
   </data>
@@ -5934,10 +5873,10 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Repository</value>
   </data>
   <data name="Web_Backup_Repos_Empty" xml:space="preserve">
-    <value>Noch keine Repositories.</value>
+    <value>Noch keine Repositories. Erstelle ein neues oder verbinde ein bestehendes restic-Repository.</value>
   </data>
   <data name="Web_Backup_Repos_SelectHint" xml:space="preserve">
-    <value>Wähle ein Repository aus, um Details zu sehen, oder lege ein neues an.</value>
+    <value>Wähle ein Repository aus, um Details zu sehen, oder füge eines hinzu – neu oder bestehend.</value>
   </data>
   <data name="Web_Backup_Repos_Backend" xml:space="preserve">
     <value>Speicherart</value>
@@ -6018,7 +5957,43 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Einrichten</value>
   </data>
   <data name="Web_Backup_Repos_SetupHelp" xml:space="preserve">
-    <value>Teste zuerst den Speicherort. Ein leerer Speicherort wird mit einem neuen, generierten Passwort eingerichtet; ein vorhandenes restic-Repository wird mit seinem Passwort verbunden.</value>
+    <value>Teste den Speicherort und initialisiere dann das Repository. Kaimo erzeugt das Passwort und gibt es im Wiederherstellungs-Kit aus.</value>
+  </data>
+  <data name="Web_Backup_Repos_SetupHelpExisting" xml:space="preserve">
+    <value>Gib das restic-Passwort des Repositorys ein (nicht den Code eines Wiederherstellungs-Kits), teste den Speicherort und verbinde es dann. Die darin vorhandenen Sicherungen bleiben erhalten.</value>
+  </data>
+  <data name="Web_Backup_Repos_Add" xml:space="preserve">
+    <value>Repository hinzufügen</value>
+  </data>
+  <data name="Web_Backup_Repos_ConnectTitle" xml:space="preserve">
+    <value>Bestehendes Repository verbinden</value>
+  </data>
+  <data name="Web_Backup_Repos_Intent" xml:space="preserve">
+    <value>Was möchtest du tun?</value>
+  </data>
+  <data name="Web_Backup_Repos_Intent_New" xml:space="preserve">
+    <value>Neu erstellen</value>
+  </data>
+  <data name="Web_Backup_Repos_Intent_Existing" xml:space="preserve">
+    <value>Bestehendes verbinden</value>
+  </data>
+  <data name="Web_Backup_Repos_Intent_NewHelp" xml:space="preserve">
+    <value>Kaimo richtet an einem leeren Speicherort ein neues, leeres restic-Repository ein.</value>
+  </data>
+  <data name="Web_Backup_Repos_Intent_ExistingHelp" xml:space="preserve">
+    <value>Ein bereits vorhandenes restic-Repository verwenden, z. B. nach einem Serverumzug oder eines, das mit der restic-Kommandozeile erstellt wurde. Der Speicherort muss genau auf den Repository-Ordner zeigen (den mit „config“, „data“ und „keys“). Du brauchst sein restic-Passwort.</value>
+  </data>
+  <data name="Web_Backup_Repos_NothingToConnect" xml:space="preserve">
+    <value>An diesem Speicherort liegt kein restic-Repository. Prüfe Pfad, Bucket oder Präfix – sie müssen genau auf den Repository-Ordner zeigen.</value>
+  </data>
+  <data name="Web_Backup_Repos_AlreadyExists" xml:space="preserve">
+    <value>An diesem Speicherort liegt bereits ein restic-Repository. Verbinde es mit seinem restic-Passwort oder wähle einen leeren Speicherort.</value>
+  </data>
+  <data name="Web_Backup_Repos_SwitchToNew" xml:space="preserve">
+    <value>Stattdessen hier neu erstellen</value>
+  </data>
+  <data name="Web_Backup_Repos_SwitchToExisting" xml:space="preserve">
+    <value>Stattdessen verbinden</value>
   </data>
   <data name="Web_Backup_Repos_Test" xml:space="preserve">
     <value>Speicherort testen</value>
@@ -6027,7 +6002,7 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Neues Repository einrichten</value>
   </data>
   <data name="Web_Backup_Repos_ExistingPassword" xml:space="preserve">
-    <value>Passwort des vorhandenen Repositorys</value>
+    <value>restic-Passwort</value>
   </data>
   <data name="Web_Backup_Repos_Connect" xml:space="preserve">
     <value>Repository verbinden</value>
@@ -6045,7 +6020,19 @@ NT_HASH_ENCRYPTION_KEY, .env) getrennt aufbewahren - sie sind in keiner Sicherun
     <value>Der Speicherort ist erreichbar und leer – ein neues Repository kann eingerichtet werden.</value>
   </data>
   <data name="Web_Backup_Probe_Existing" xml:space="preserve">
-    <value>An diesem Speicherort liegt bereits ein restic-Repository. Gib sein Passwort ein, um es zu verbinden.</value>
+    <value>An diesem Speicherort liegt ein restic-Repository. Verbinde es mit seinem restic-Passwort.</value>
+  </data>
+  <data name="Web_Backup_Setup_Failed" xml:space="preserve">
+    <value>Fehlgeschlagen</value>
+  </data>
+  <data name="Web_Backup_Setup_LocationOk" xml:space="preserve">
+    <value>Speicherort OK</value>
+  </data>
+  <data name="Web_Backup_Setup_RepositoryFound" xml:space="preserve">
+    <value>Repository gefunden</value>
+  </data>
+  <data name="Web_Backup_Repos_FoundRepositories" xml:space="preserve">
+    <value>In diesen Ordnern liegt ein restic-Repository, das noch nicht verbunden ist:</value>
   </data>
   <data name="Web_Backup_Repo_Initialized" xml:space="preserve">
     <value>Repository eingerichtet. Lade das Wiederherstellungs-Kit herunter und bestätige es, um es zu aktivieren.</value>

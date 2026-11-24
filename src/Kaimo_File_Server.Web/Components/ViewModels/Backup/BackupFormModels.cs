@@ -40,6 +40,12 @@ public sealed class BackupRepositoryForm
     public int TestRestoreSampleSize { get; set; } = 20;
     public Guid MirrorTargetId { get; set; }
 
+    /// <summary>
+    /// Intent of a new repository: false = initialize a new one, true = connect an existing one.
+    /// Only steers the setup guidance; the probe result still decides what is possible.
+    /// </summary>
+    public bool ConnectExisting { get; set; }
+
     /// <summary>Password typed for "connect existing"; never stored in the form after use.</summary>
     public string ExistingPassword { get; set; } = string.Empty;
 
@@ -146,4 +152,23 @@ public sealed class BackupRestoreForm
     public BackupRestoreConflict Conflict { get; set; } = BackupRestoreConflict.Rename;
     public Guid TargetShareId { get; set; }
     public string TargetFolder { get; set; } = string.Empty;
+}
+
+/// <summary>What the setup section of a new repository offers next (intent + probe result).</summary>
+public enum BackupRepositorySetupStep
+{
+    /// <summary>Location not tested yet.</summary>
+    Test,
+
+    /// <summary>New repository wanted, location empty.</summary>
+    Initialize,
+
+    /// <summary>Existing repository wanted and found.</summary>
+    Connect,
+
+    /// <summary>Existing repository wanted, but the location is empty (usually a wrong path or prefix).</summary>
+    NothingToConnect,
+
+    /// <summary>New repository wanted, but a repository already exists at the location.</summary>
+    AlreadyExists,
 }

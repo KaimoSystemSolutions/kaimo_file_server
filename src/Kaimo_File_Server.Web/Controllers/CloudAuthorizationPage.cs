@@ -42,11 +42,11 @@ internal static class CloudAuthorizationPage
             h1{margin-bottom:var(--space-2);color:var(--text-primary);font-size:20px;font-weight:700;letter-spacing:-.02em}
             .auth-text{color:var(--text-secondary);font-size:13px;line-height:1.55}
             .auth-code-row{display:flex;gap:var(--space-2);margin:var(--space-5) 0}
-            .auth-code{flex:1;min-width:0;padding:var(--space-3);border:1px solid var(--border);border-radius:var(--radius-control);background:var(--bg-primary);color:var(--text-primary);font:700 26px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.12em;user-select:all;overflow-wrap:anywhere}
+            .auth-code{flex:1;min-width:0;padding:var(--space-3);border:1px solid var(--border);border-radius:var(--radius-control);background:var(--bg-primary);color:var(--text-primary);font:700 26px/1.2 var(--font-mono);letter-spacing:.12em;user-select:all;overflow-wrap:anywhere}
             .auth-copy{display:inline-flex;align-items:center;gap:var(--space-2)}
             .auth-copy svg{width:16px;height:16px;stroke-width:2}
             .auth-form{margin-top:var(--space-5);text-align:left}
-            .auth-form input{width:100%;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+            .auth-form input{width:100%;font-family:var(--font-mono)}
             .auth-actions{display:flex;flex-direction:column;gap:var(--space-2);margin-top:var(--space-5)}
             .auth-actions a,.auth-cancel{display:block;text-decoration:none;text-align:center}
             .auth-cancel{margin-top:var(--space-2)}

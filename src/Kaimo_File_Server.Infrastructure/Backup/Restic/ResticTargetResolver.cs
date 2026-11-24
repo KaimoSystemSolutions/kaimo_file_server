@@ -48,6 +48,9 @@ public sealed class ResticTargetResolver(
     public string TempRoot => configuration["Backup:Restic:TempDirectory"]
         ?? Path.Combine(ApplicationDataPath, ".kaimo-restic-tmp");
 
+    /// <summary>The backup folder mounted into the container.</summary>
+    public string BackupRootPath => configuration["Backup:RootPath"] ?? "/data/kaimo-backups";
+
     /// <summary>Directories local repositories may be created in.</summary>
     public IReadOnlyList<string> LocalRoots
     {
@@ -59,9 +62,18 @@ public sealed class ResticTargetResolver(
                 roots.AddRange(single.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
             return roots.Count > 0
                 ? roots
-                : [Path.Combine(configuration["Backup:RootPath"] ?? "/data/kaimo-backups", "restic")];
+                : [Path.Combine(BackupRootPath, "restic")];
         }
     }
+
+    /// <summary>A local repository path as shown to the administrator (backup folder as <c>/backups</c>).</summary>
+    public string DisplayLocalPath(string path) => ResticLocalPaths.ToDisplay(path, BackupRootPath);
+
+    /// <summary>Reverse of <see cref="DisplayLocalPath"/>: a typed <c>/backups/…</c> path as container path.</summary>
+    public string ContainerLocalPath(string path) => ResticLocalPaths.FromDisplay(path, BackupRootPath);
+
+    /// <summary>True when a local repository path lies in the mounted backup folder (shown as <c>/backups</c>).</summary>
+    public bool IsInBackupRoot(string path) => ResticLocalPaths.IsInBackupRoot(path, BackupRootPath);
 
     public ResticBackendSecrets ReadSecrets(BackupRepository repository)
         => string.IsNullOrEmpty(repository.EncryptedSecrets)

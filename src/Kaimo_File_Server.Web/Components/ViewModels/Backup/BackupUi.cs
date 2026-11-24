@@ -1,5 +1,6 @@
 using System.Globalization;
 using Kaimo_File_Server.Core.Domain.Backup;
+using Kaimo_File_Server.Infrastructure.Backup.Restic;
 using Kaimo_File_Server.Web.Components.Shared;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels.Backup;
@@ -19,6 +20,19 @@ public static class BackupUi
     /// <summary>Storage types of the editor's dropdown; a hidden type stays listed while its repository is edited.</summary>
     public static IReadOnlyList<BackupBackend> SelectableBackends(BackupBackend current)
         => OfferedBackends.Contains(current) ? OfferedBackends : [.. OfferedBackends, current];
+
+    /// <summary>
+    /// Next setup step of a new repository. A mismatch between intent and probe never leads
+    /// straight to initializing or connecting: the administrator switches the intent first.
+    /// </summary>
+    public static BackupRepositorySetupStep SetupStep(bool connectExisting, BackupRepositoryProbe? probe) => (connectExisting, probe) switch
+    {
+        (_, null) => BackupRepositorySetupStep.Test,
+        (false, BackupRepositoryProbe.Empty) => BackupRepositorySetupStep.Initialize,
+        (true, BackupRepositoryProbe.Existing) => BackupRepositorySetupStep.Connect,
+        (true, _) => BackupRepositorySetupStep.NothingToConnect,
+        _ => BackupRepositorySetupStep.AlreadyExists,
+    };
 
     /// <summary>The part of a local repository path below <paramref name="prefix"/> (ends with '/'); null when outside.</summary>
     public static string? LocalSubPath(string path, string prefix)

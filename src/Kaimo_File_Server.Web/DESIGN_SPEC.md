@@ -156,7 +156,7 @@ Semantic backgrounds are tinted (`*-subtle`); solid fills are reserved for badge
 | Page title | 22 px / 700, `-0.02em` | `.page-header h1` (18 px below 480 px) |
 
 - Headings are compact and factual, never marketing headlines.
-- Paths, hashes, ports, IDs and logs MAY use monospace (`.detail-value--mono`).
+- Paths, hashes, ports, IDs and logs MAY use monospace (`.detail-value--mono`); the font always comes from `--font-mono`, never a literal font stack.
 - Weight and size create hierarchy; the accent MUST NOT replace typographic hierarchy.
 - File names and primary object names outrank supporting metadata.
 

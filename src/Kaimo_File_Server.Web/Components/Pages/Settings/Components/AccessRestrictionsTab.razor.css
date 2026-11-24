@@ -15,7 +15,7 @@
 }
 
 .access-networks {
-    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    font-family: var(--font-mono);
     resize: vertical;
 }
 

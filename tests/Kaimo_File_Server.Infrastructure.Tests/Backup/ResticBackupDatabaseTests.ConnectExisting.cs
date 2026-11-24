@@ -149,6 +149,47 @@ public partial class ResticBackupDatabaseTests
     }
 
     [Fact]
+    public async Task FindLocalRepositories_SuggestsUnconnectedRepositoryFolders_OnlyToRepositoryAdmins()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "kaimo-connect-" + Guid.NewGuid().ToString("N"));
+        var connected = Path.Combine(root, "connected");
+        var loose = Path.Combine(root, "old-nas");
+        foreach (var path in new[] { connected, loose })
+        {
+            Directory.CreateDirectory(Path.Combine(path, "keys"));
+            File.WriteAllText(Path.Combine(path, "config"), "");
+        }
+        try
+        {
+            var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Backup:Restic:LocalRoots"] = root,
+            }).Build();
+            await using (var db = NewContext())
+            {
+                db.BackupRepositories.Add(new BackupRepository
+                {
+                    Name = "Connected",
+                    Backend = BackupBackend.Local,
+                    SettingsJson = new ResticRepositorySettings { Path = connected + Path.DirectorySeparatorChar }.Serialize(),
+                });
+                await db.SaveChangesAsync();
+            }
+            var catalog = Catalog(config: config);
+
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => catalog.FindLocalRepositoriesAsync(Actor));
+
+            _auth.Setup(a => a.HasGlobalPermissionAsync(It.IsAny<Core.Domain.Identity.UserContext>(), ManagementPermission.ManageBackupRepositories))
+                .ReturnsAsync(true);
+            Assert.Equal([loose], await catalog.FindLocalRepositoriesAsync(Actor));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Maintenance_TestRestore_SkipsSharePointsWhoseShareIsGone()
     {
         var runner = new ScriptedRunner(command => command switch

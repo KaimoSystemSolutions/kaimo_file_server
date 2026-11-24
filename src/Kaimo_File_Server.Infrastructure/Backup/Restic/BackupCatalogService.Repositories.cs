@@ -31,6 +31,29 @@ public partial class BackupCatalogService
     /// <summary>Directories local repositories may be created in (shown as a hint in the form).</summary>
     public IReadOnlyList<string> LocalRoots => resolver.LocalRoots;
 
+    /// <summary>A local repository path as shown to the administrator (backup folder as <c>/backups</c>).</summary>
+    public string DisplayLocalPath(string path) => resolver.DisplayLocalPath(path);
+
+    /// <summary>Reverse of <see cref="DisplayLocalPath"/>: a typed <c>/backups/…</c> path as container path.</summary>
+    public string ContainerLocalPath(string path) => resolver.ContainerLocalPath(path);
+
+    /// <summary>
+    /// Restic repository folders below the local roots that Kaimo does not know yet: suggestions
+    /// when "connect existing" finds nothing at the typed location.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> FindLocalRepositoriesAsync(UserContext actor, CancellationToken ct = default)
+    {
+        await RequireRepositoriesAsync(actor);
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var known = (await db.BackupRepositories.AsNoTracking().Where(r => r.Backend == BackupBackend.Local)
+                .Select(r => r.SettingsJson).ToListAsync(ct))
+            .Select(json => ResticRepositorySettings.Parse(json).Path)
+            .Where(path => !string.IsNullOrEmpty(path))
+            .Select(path => Path.TrimEndingDirectorySeparator(path!))
+            .ToHashSet(StringComparer.Ordinal);
+        return await Task.Run(() => ResticLocalPaths.FindRepositories(resolver.LocalRoots, maxResults: 10, skip: known.Contains), ct);
+    }
+
     /// <summary>
     /// Checks whether the location is reachable and whether a repository already exists
     /// there. Uses a random password: "wrong password" proves an existing repository,

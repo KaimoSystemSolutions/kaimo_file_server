@@ -24,6 +24,8 @@
     /* Typography — Plus Jakarta Sans (self-hosted) for body, controls and headings. */
     --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     --font-heading: 'Plus Jakarta Sans', var(--font-body);
+    /* Paths, hashes, IDs, logs: the platform's own monospace font. */
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
     --label-spacing: 0.08em;
 
     /* External-storage provider identification colors (fixed, theme-independent). */

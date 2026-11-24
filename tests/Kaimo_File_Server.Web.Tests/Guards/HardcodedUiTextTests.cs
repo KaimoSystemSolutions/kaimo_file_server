@@ -141,13 +141,19 @@ public class HardcodedUiTextTests
         Assert.True(offenders.Count == 0, "Hard-coded user-facing message:\n" + string.Join("\n", offenders));
     }
 
+    /// <summary>Texts that are English on purpose and have no translation.</summary>
+    private static readonly string[] EnglishOnlyKeys =
+    [
+        "Web_Backup_Kit_Template", // recovery kit: read in a disaster, matches the restic documentation
+    ];
+
     [Fact]
     public void LanguageFiles_DefineTheSameNonEmptyKeys()
     {
         var en = ResxValues("Resources.resx");
         var de = ResxValues("Resources.de.resx");
 
-        Assert.Empty(en.Keys.Except(de.Keys).Select(k => "missing in de: " + k)
+        Assert.Empty(en.Keys.Except(de.Keys).Except(EnglishOnlyKeys).Select(k => "missing in de: " + k)
             .Concat(de.Keys.Except(en.Keys).Select(k => "missing in en: " + k))
             .Concat(en.Concat(de).Where(kv => string.IsNullOrWhiteSpace(kv.Value)).Select(kv => "empty: " + kv.Key)));
     }

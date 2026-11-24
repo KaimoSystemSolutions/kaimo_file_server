@@ -38,6 +38,14 @@ public partial class BackupCatalogService
             using var target = await resolver.ResolveAsync(repository, resolver.ReadSecrets(repository), password, ct);
             url = target.RepositoryUrl;
         }
+        if (repository.Backend == BackupBackend.Local)
+        {
+            // Restored outside the container: name the folder as the administrator mounted it.
+            var inBackupRoot = resolver.IsInBackupRoot(url);
+            url = resolver.DisplayLocalPath(url);
+            if (inBackupRoot)
+                parameters.AppendLine($"{ResticLocalPaths.DisplayRoot} = the backup folder mounted into the Kaimo container (LOCATION_BACKUP in .env, default ./data/backups)");
+        }
         if (!string.IsNullOrWhiteSpace(settings.Region)) parameters.AppendLine("AWS_DEFAULT_REGION=" + settings.Region);
         if (settings.S3PathStyle) parameters.AppendLine("-o s3.bucket-lookup=path");
         if (repository.Backend == BackupBackend.Sftp && settings.StorageConnectionId is { } connectionId)
@@ -100,7 +108,9 @@ public partial class BackupCatalogService
                 break;
         }
 
-        var template = Resources.ResourceManager.GetString("Web_Backup_Kit_Template") ?? DefaultKitTemplate;
+        // English only: the kit is read during a disaster, possibly by someone else, and
+        // matches the restic documentation.
+        var template = Resources.ResourceManager.GetString("Web_Backup_Kit_Template", CultureInfo.InvariantCulture) ?? DefaultKitTemplate;
         var now = time.GetUtcNow().UtcDateTime;
         var content = string.Format(CultureInfo.InvariantCulture, template,
             repository.Name,
@@ -146,6 +156,6 @@ public partial class BackupCatalogService
         return true;
     }
 
-    // Fallback only; the localized template lives in the resource files.
+    // Fallback only; the English template lives in Resources.resx (no translations on purpose).
     private const string DefaultKitTemplate = "Kaimo recovery kit\n\nRepository: {0} ({1})\nRESTIC_REPOSITORY={2}\n{3}\nRESTIC_PASSWORD={4}\nRepository id: {5}\nrestic: {6}\nCreated: {7}\nKit code: {8}\n";
 }

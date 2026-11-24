@@ -234,7 +234,7 @@
 }
 
 .log-row {
-    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     /* Native off-screen skipping — keeps a 1,000-row list cheap without a
        JS virtualizer (whose scroll estimation caused the list to jump). */

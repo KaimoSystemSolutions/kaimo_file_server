@@ -497,7 +497,7 @@
 /* Full-width hairline between logical groups of rows. */
 
 .properties-mono {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 11px !important;
     color: var(--text-secondary) !important;
 }

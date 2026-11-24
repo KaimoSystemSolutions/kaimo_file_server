@@ -11,13 +11,14 @@
 @inject NavigationManager Nav
 
 @*
-    Repositories (Global): create (test → initialize new / connect existing), recovery kit
+    Repositories (Global): add with an intent (create new / connect existing) → test → initialize
+    or connect; a mismatch between intent and probe offers to switch the intent. Recovery kit
     (download → type code → active), department release, enable/disable, delete.
 *@
 
 <div class="backup-toolbar">
     <p class="subtitle">@R("Web_Backup_Repos_Help")</p>
-    <button class="btn-primary" type="button" disabled="@VM.IsReadOnlyDemo" @onclick="StartCreate">@R("Web_Backup_Repos_Create")</button>
+    <button class="btn-primary" type="button" disabled="@VM.IsReadOnlyDemo" @onclick="StartCreate">@R("Web_Backup_Repos_Add")</button>
 </div>
 
 <div class="workspace">
@@ -49,12 +50,27 @@
             var isNew = form.Id is null;
             <div class="workspace-heading">
                 <div>
-                    <h3>@(isNew ? R("Web_Backup_Repos_Create") : R("Web_Backup_Repos_Edit"))</h3>
+                    <h3>@R(!isNew ? "Web_Backup_Repos_Edit" : form.ConnectExisting ? "Web_Backup_Repos_ConnectTitle" : "Web_Backup_Repos_Create")</h3>
                     <span class="workspace-heading-sub">@BackupUi.BackendLabel(form.Backend)</span>
                 </div>
             </div>
 
             <div class="workspace-form">
+                @if (isNew)
+                {
+                    <div class="workspace-field">
+                        <span id="backup-repo-intent">@R("Web_Backup_Repos_Intent")</span>
+                        <div class="toggle-button-group" role="radiogroup" aria-labelledby="backup-repo-intent">
+                            @foreach (var existing in new[] { false, true })
+                            {
+                                <button type="button" role="radio" aria-checked="@(form.ConnectExisting == existing ? "true" : "false")"
+                                        class="toggle-btn @(form.ConnectExisting == existing ? "toggle-btn--active" : null)" disabled="@VM.IsBusy"
+                                        @onclick="() => VM.SetConnectExisting(existing)">@R(existing ? "Web_Backup_Repos_Intent_Existing" : "Web_Backup_Repos_Intent_New")</button>
+                            }
+                        </div>
+                        <small>@R(form.ConnectExisting ? "Web_Backup_Repos_Intent_ExistingHelp" : "Web_Backup_Repos_Intent_NewHelp")</small>
+                    </div>
+                }
                 <label>
                     <span>@R("Web_Backup_Name")</span>
                     <input class="edit-input" maxlength="200" @bind="form.Name" @bind:event="oninput" />
@@ -77,15 +93,15 @@
                             @if (LocalPrefix is { } prefix && LocalSubPath is not null)
                             {
                                 <span class="edit-input backup-path-input">
-                                    <span class="backup-path-prefix">@prefix</span>
+                                    <span class="backup-path-prefix">@VM.DisplayLocalPath(prefix)</span>
                                     <input class="backup-path-field" @bind:get="LocalSubPath" @bind:set="SetLocalSubPathAsync" @bind:event="oninput"
                                            spellcheck="false" placeholder="kaimo-repo" />
                                 </span>
                             }
                             else
                             {
-                                <input class="edit-input" @bind="form.Path" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
-                                <small>@string.Format(R("Web_Backup_Repos_LocalPathHelp"), string.Join(", ", VM.LocalRoots))</small>
+                                <input class="edit-input" @bind="VM.LocalPathDisplay" @bind:event="oninput" @bind:after="Changed" spellcheck="false" />
+                                <small>@string.Format(R("Web_Backup_Repos_LocalPathHelp"), string.Join(", ", VM.LocalRoots.Select(VM.DisplayLocalPath)))</small>
                             }
                         </label>
                         break;
@@ -396,28 +412,76 @@
 
             @if (isNew)
             {
+                var step = VM.RepositorySetupStep;
                 <section class="workspace-section">
                     <h4>@R("Web_Backup_Repos_Setup")</h4>
-                    <p>@R("Web_Backup_Repos_SetupHelp")</p>
+                    <p>@R(form.ConnectExisting ? "Web_Backup_Repos_SetupHelpExisting" : "Web_Backup_Repos_SetupHelp")</p>
+                    @if (form.ConnectExisting)
+                    {
+                        <label class="workspace-field backup-setup-password">
+                            <span>@R("Web_Backup_Repos_ExistingPassword")</span>
+                            <input class="edit-input" type="password" autocomplete="off" @bind="form.ExistingPassword" @bind:event="oninput" />
+                        </label>
+                    }
                     <div class="detail-actions backup-inline-actions">
                         <button class="btn-secondary" type="button" disabled="@(VM.IsBusy || !CanSubmit)" @onclick="VM.ProbeAsync">
                             @(VM.IsBusy ? R("Web_Backup_Working") : R("Web_Backup_Repos_Test"))
                         </button>
+                        @switch (step)
+                        {
+                            case BackupRepositorySetupStep.Initialize:
+                                <button class="btn-primary" type="button" disabled="@(VM.IsBusy || !CanSubmit)" @onclick="() => CreateAsync(false)">@R("Web_Backup_Repos_Initialize")</button>
+                                break;
+                            case BackupRepositorySetupStep.Connect:
+                                <button class="btn-primary" type="button" disabled="@(VM.IsBusy || string.IsNullOrEmpty(form.ExistingPassword))" @onclick="() => CreateAsync(true)">@R("Web_Backup_Repos_Connect")</button>
+                                break;
+                        }
                     </div>
-                    @if (VM.ProbeResult == BackupRepositoryProbe.Empty)
+                    @* Results of "Test" / "Connect" stay here; the page banner only reports a repository actually added. *@
+                    @if (VM.SetupError is { } setupError)
                     {
-                        <div class="detail-actions backup-inline-actions">
-                            <button class="btn-primary" type="button" disabled="@(VM.IsBusy || !CanSubmit)" @onclick="() => CreateAsync(false)">@R("Web_Backup_Repos_Initialize")</button>
+                        <div class="backup-setup-status" role="alert">
+                            <StatusBadge Tone="StatusTone.Negative" Label="@R("Web_Backup_Setup_Failed")" />
+                            <span>@setupError</span>
                         </div>
                     }
-                    else if (VM.ProbeResult == BackupRepositoryProbe.Existing)
+                    else if (step == BackupRepositorySetupStep.Initialize)
                     {
-                        <label class="workspace-field">
-                            <span>@R("Web_Backup_Repos_ExistingPassword")</span>
-                            <input class="edit-input" type="password" autocomplete="off" @bind="form.ExistingPassword" @bind:event="oninput" />
-                        </label>
-                        <div class="detail-actions backup-inline-actions">
-                            <button class="btn-primary" type="button" disabled="@(VM.IsBusy || string.IsNullOrEmpty(form.ExistingPassword))" @onclick="() => CreateAsync(true)">@R("Web_Backup_Repos_Connect")</button>
+                        <div class="backup-setup-status" role="status">
+                            <StatusBadge Tone="StatusTone.Positive" Label="@R("Web_Backup_Setup_LocationOk")" />
+                            <span>@R("Web_Backup_Probe_Empty")</span>
+                        </div>
+                    }
+                    else if (step == BackupRepositorySetupStep.Connect)
+                    {
+                        <div class="backup-setup-status" role="status">
+                            <StatusBadge Tone="StatusTone.Positive" Label="@R("Web_Backup_Setup_RepositoryFound")" />
+                            <span>@R("Web_Backup_Probe_Existing")</span>
+                        </div>
+                    }
+                    @if (step == BackupRepositorySetupStep.NothingToConnect)
+                    {
+                        <div class="warning-banner backup-setup-mismatch" role="status">
+                            <p>@R("Web_Backup_Repos_NothingToConnect")</p>
+                            <button class="btn-secondary btn-secondary--sm" type="button" disabled="@VM.IsBusy" @onclick="() => VM.SetConnectExisting(false)">@R("Web_Backup_Repos_SwitchToNew")</button>
+                        </div>
+                        @if (VM.LocalRepositoryHints.Count > 0)
+                        {
+                            <div class="backup-setup-hints">
+                                <span>@R("Web_Backup_Repos_FoundRepositories")</span>
+                                @foreach (var hint in VM.LocalRepositoryHints)
+                                {
+                                    <button class="btn-secondary btn-secondary--sm backup-setup-hint" type="button" disabled="@VM.IsBusy"
+                                            @onclick="() => VM.UseLocalRepositoryHint(hint)">@VM.DisplayLocalPath(hint)</button>
+                                }
+                            </div>
+                        }
+                    }
+                    else if (step == BackupRepositorySetupStep.AlreadyExists)
+                    {
+                        <div class="warning-banner backup-setup-mismatch" role="status">
+                            <p>@R("Web_Backup_Repos_AlreadyExists")</p>
+                            <button class="btn-secondary btn-secondary--sm" type="button" disabled="@VM.IsBusy" @onclick="() => VM.SetConnectExisting(true)">@R("Web_Backup_Repos_SwitchToExisting")</button>
                         </div>
                     }
                 </section>

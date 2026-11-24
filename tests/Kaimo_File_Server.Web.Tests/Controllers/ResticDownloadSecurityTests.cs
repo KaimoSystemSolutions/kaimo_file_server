@@ -220,6 +220,37 @@ public sealed class ResticDownloadSecurityTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task Kit_IsEnglishOnly_EvenWhenTheUiIsGerman()
+    {
+        var repo = await SeedRepositoryAsync();
+        var admin = new UserContext(_admin, [], [], new HashSet<string>());
+        var previous = System.Globalization.CultureInfo.CurrentUICulture;
+        System.Globalization.CultureInfo.CurrentUICulture = new System.Globalization.CultureInfo("de-DE");
+        try
+        {
+            var (_, content) = await Catalog().BuildRecoveryKitAsync(admin, repo.Id);
+
+            Assert.Contains("RESTORE WITH THE RESTIC COMMAND LINE", content);
+            Assert.DoesNotContain("Wiederherstell", content);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = previous;
+        }
+    }
+
+    [Fact]
+    public void Kit_HasNoGermanTemplate()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Kaimo_File_Server.slnx")))
+            dir = dir.Parent;
+        var german = File.ReadAllText(Path.Combine(dir!.FullName, "src/Kaimo_File_Server.Core/Language/Resources.de.resx"));
+
+        Assert.DoesNotContain("\"Web_Backup_Kit_Template\"", german);
+    }
+
+    [Fact]
     public async Task Kit_Smb_ListsTheConnectionParameters_ButNeverTheSmbPassword()
     {
         const string smbPassword = "smb-secret-password";

@@ -224,7 +224,7 @@
 
 .ssh-public-key {
     resize: vertical;
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 10.5px;
     overflow-wrap: anywhere;
 }
@@ -238,7 +238,7 @@
     border-radius: var(--radius-control);
     background: var(--bg-secondary);
     color: var(--text-primary);
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
 }
 
