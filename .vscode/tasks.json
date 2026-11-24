@@ -31,10 +31,17 @@
     {
       // Runs before every debug start; downloads only when the C# extension changed.
       // See update-vsdbg.ps1 for why the container needs exactly this vsdbg.
+      // "Linux x64" is the vsdbg build for the containers, not the host OS.
       "label": "vsdbg: update (Linux x64)",
       "type": "process",
       "command": "powershell",
+      // Default (Windows, and any OS without its own block): PowerShell script.
+      // Add an "osx" block here to support macOS hosts.
       "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/.vscode/update-vsdbg.ps1"],
+      "linux": {
+        "command": "bash",
+        "args": ["${workspaceFolder}/.vscode/update-vsdbg.sh"]
+      },
       "problemMatcher": []
     },
     {
@@ -46,6 +53,13 @@
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/.vscode/update-vsdbg.ps1",
         "-CopyTo", "kaimo_file_server,kaimo_file_server_web,kaimo_smb_bridge"
       ],
+      "linux": {
+        "command": "bash",
+        "args": [
+          "${workspaceFolder}/.vscode/update-vsdbg.sh",
+          "--copy-to", "kaimo_file_server,kaimo_file_server_web,kaimo_smb_bridge"
+        ]
+      },
       "problemMatcher": []
     }
   ]

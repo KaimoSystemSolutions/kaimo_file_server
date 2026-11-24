@@ -8,9 +8,11 @@
 # so breakpoints in Program.cs are hit. The apps therefore run only while a
 # debug session is active. Also builds in Debug configuration and mounts the
 # Linux build of vsdbg at /remote_debugger. The VS Code task
-# "vsdbg: update (Linux x64)" (.vscode/update-vsdbg.ps1) installs the release
+# "vsdbg: update (Linux x64)" (.vscode/update-vsdbg.ps1 on Windows,
+# .vscode/update-vsdbg.sh on Linux) installs the release
 # matching the C# extension into its own folder (Visual Studio's copy in
-# vsdbg/vs2017u5 is left alone); override the path with VSDBG_PATH in .env.
+# vsdbg/vs2017u5 is left alone) under %USERPROFILE% (Windows) or $HOME (Linux);
+# override the path with VSDBG_PATH in .env.
 
 x-debug: &debug
   build:
@@ -20,7 +22,7 @@ x-debug: &debug
   entrypoint: ["sleep", "infinity"]
   init: true
   volumes:
-    - ${VSDBG_PATH:-${USERPROFILE}/vsdbg/vscode}:/remote_debugger:ro
+    - ${VSDBG_PATH:-${USERPROFILE:-${HOME}}/vsdbg/vscode}:/remote_debugger:ro
 
 services:
   kaimo_file_server.host: *debug
