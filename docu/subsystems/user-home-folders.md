@@ -133,7 +133,7 @@ any transport: it is an ordinary folder inside the home. Deleting `<userId>/docs
 
 | Transport | Behavior |
 |---|---|
-| REST API | `GET /api/v1/browse/shares` lists the caller's home first with `rootPath = <userId>`; holders of `AccessHomeContents` also get the `users` share |
+| REST API | `GET /api/v1/browse/shares` lists the caller's home first with `rootPath = <userId>`; holders of `AccessHomeContents` also get the `users` share. `GET /api/v1/browse/homes` names the home folders by username (`HomeFoldersApiController`): exactly the folders of the caller's ACL-filtered root listing plus the own home, so clients never show a `<userId>` |
 | WebDAV | `users` appears in the root listing; inside, only the caller's own folder is visible |
 | SMB | The bridge's `ListShares` marks `users` as `restricted` with the usernames of all enabled homes and of all holders of `AccessHomeContents`; `sync-shares.sh` resolves them to SIDs and writes the share security descriptor (`sharesec`), and `access based share enum` hides the share from everyone else |
 

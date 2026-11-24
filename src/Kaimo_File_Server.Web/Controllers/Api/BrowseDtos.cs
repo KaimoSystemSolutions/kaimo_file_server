@@ -46,3 +46,9 @@ public sealed record SizeDto(string Path, bool IsDirectory, long Size);
 
 /// <summary>One stored version of a file.</summary>
 public sealed record FileVersionDto(DateTime SnapshotTimestampUtc, long Size, string ContentHash);
+
+/// <summary>
+/// A home folder at the root of the home-folder share and its owner's username: homes are named by
+/// the owner's id (GUID), which a client shows as the username instead.
+/// </summary>
+public sealed record HomeFolderDto(string Folder, string Username);

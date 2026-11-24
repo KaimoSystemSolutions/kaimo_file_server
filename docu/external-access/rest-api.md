@@ -109,6 +109,7 @@ All browse endpoints are ACL-checked per call.
 | Method & path | Purpose | Conditional / idempotent |
 |---|---|---|
 | `GET /api/v1/browse/shares` | Shares the caller may browse. | — |
+| `GET /api/v1/browse/homes` | `[{ folder, username }]` ordered by username: the owner of every home folder (`<userId>`) the caller may list at the root of the `users` share, plus the caller's own home. Clients show the username and keep `<userId>` in every path. Empty while home folders are not configured. See [User home folders](../subsystems/user-home-folders.md). | — |
 | `GET /api/v1/browse/{shareId}/list?path=` | Directory children (+ `ETag`). | `If-None-Match` → 304 |
 | `GET /api/v1/browse/{shareId}/metadata?path=` | One item's metadata (+ item-tag `ETag`). | — |
 | `GET /api/v1/browse/{shareId}/content?path=` | Download; supports `Range` (+ item-tag `ETag`, `X-Kaimo-Created-At`, `X-Kaimo-Accessed-At`). Optional `X-Kaimo-Preserve-Access-Time: true` for sync reads. | — |
