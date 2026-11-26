@@ -82,7 +82,8 @@
             }
             @foreach (var change in visible.Take(_shown))
             {
-                var folder = ShareRelativePath.GetParent(change.Path);
+                var shown = VM.DisplayPath(change.Path);
+                var folder = ShareRelativePath.GetParent(shown);
                 <div class="backup-browse-row backup-changes-row" role="row">
                     <span role="cell"><StatusBadge Tone="@Tone(change.Kind)" Label="@KindLabel(change.Kind)" /></span>
                     <span role="cell" class="backup-browse-name">
@@ -97,7 +98,7 @@
                             {
                                 @Assets.SVG("file.svg", new SvgOptions(Width: 16, Height: 16))
                             }
-                            <span>@ShareRelativePath.GetFileName(change.Path)</span>
+                            <span>@ShareRelativePath.GetFileName(shown)</span>
                         </button>
                         @if (folder.Length > 0)
                         {
@@ -139,10 +140,19 @@
     private int _shown = PageSize;
 
     private List<BackupChange> Filtered(BackupChangeSet changes)
-        => changes.Items
+    {
+        var query = _query.Trim();
+        return changes.Items
             .Where(c => _kind is null || c.Kind == _kind)
-            .Where(c => _query.Length == 0 || c.Path.Contains(_query.Trim(), StringComparison.CurrentCultureIgnoreCase))
+            .Where(c => query.Length == 0 || Matches(c.Path, query))
             .ToList();
+    }
+
+    // Matches the shown path (username for a home) as well as the real one (GUID); the view
+    // model caches the shown paths, so filtering stays cheap on every keystroke.
+    private bool Matches(string path, string query)
+        => path.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+           || VM.DisplayPath(path).Contains(query, StringComparison.CurrentCultureIgnoreCase);
 
     private void ResetPaging() => _shown = PageSize;
 

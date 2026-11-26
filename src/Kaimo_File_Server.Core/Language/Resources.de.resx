@@ -4010,10 +4010,10 @@
     <value>Share</value>
   </data>
   <data name="Web_Devices_Col_RemoteFolder" xml:space="preserve">
-    <value>Remote-Ordner</value>
+    <value>Ordner auf Server</value>
   </data>
   <data name="Web_Devices_Col_LocalFolder" xml:space="preserve">
-    <value>Lokaler Ordner</value>
+    <value>Ordner auf Gerät</value>
   </data>
   <data name="Web_Devices_Col_Direction" xml:space="preserve">
     <value>Richtung</value>

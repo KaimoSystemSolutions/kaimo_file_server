@@ -140,7 +140,7 @@
                                         {
                                             <tr>
                                                 <td>@VM.ShareName(profile.ShareId)</td>
-                                                <td>@(string.IsNullOrEmpty(profile.RelativePath) ? "/" : profile.RelativePath)</td>
+                                                <td>@VM.FolderPath(profile)</td>
                                                 <td>@(string.IsNullOrEmpty(profile.LocalPath) ? "—" : profile.LocalPath)</td>
                                                 <td>@ModeLabel(profile.Mode)</td>
                                                 <td>

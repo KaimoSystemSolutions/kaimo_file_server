@@ -78,6 +78,7 @@ public partial class BackupViewModel
         ServerSource = null;
         BackupPoints = await catalog.ListBackupPointsAsync(actor, shareId);
         RestoreRights = await catalog.GetRestoreRightsAsync(actor, shareId);
+        await LoadHomeLabelsAsync();
         BackupPoint = BackupPoints.FirstOrDefault();
         ClearPointViews(string.Empty);
     }
@@ -109,7 +110,7 @@ public partial class BackupViewModel
         catch (ResticException) when (folder.Length > 0) { await BrowseCoreAsync(actor, string.Empty); }
     }
 
-    public Task<bool> OpenFolderAsync(string folder) => RunAsync(actor => BrowseCoreAsync(actor, folder));
+    public Task<bool> OpenFolderAsync(string folder) => RunAsync(actor => BrowseCoreAsync(actor, ResolveTypedPath(folder)));
 
     private async Task BrowseCoreAsync(UserContext actor, string folder)
     {
@@ -122,7 +123,7 @@ public partial class BackupViewModel
         Changed?.Invoke();
         try
         {
-            BrowseEntries = await catalog.BrowseAsync(actor, BackupPoint.RepositoryId, BackupPoint.SnapshotId, folder);
+            BrowseEntries = OrderByLabel(await catalog.BrowseAsync(actor, BackupPoint.RepositoryId, BackupPoint.SnapshotId, folder));
         }
         finally
         {

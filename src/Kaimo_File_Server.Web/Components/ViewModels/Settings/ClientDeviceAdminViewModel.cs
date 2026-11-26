@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Repositories.Identity;
 using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Core.Security.Management;
 using Kaimo_File_Server.Core.Services.Management;
+using Kaimo_File_Server.Web.Components.Search;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
 
@@ -87,6 +88,8 @@ public sealed class ClientDeviceAdminViewModel
 
     private readonly Dictionary<Guid, string> _ownerNames = new();
     private readonly Dictionary<Guid, string> _shareNames = new();
+    private readonly HashSet<Guid> _homeShareIds = new();
+    private HomeLabels _homeLabels = HomeLabels.None;
 
     private UserContext? _actor;
 
@@ -111,16 +114,23 @@ public sealed class ClientDeviceAdminViewModel
 
             var byDevice = new Dictionary<Guid, List<DeviceSyncProfile>>();
             _shareNames.Clear();
+            _homeShareIds.Clear();
             _ownerNames.Clear();
+            var homeOwners = new HashSet<Guid>();
             foreach (var device in Devices)
             {
                 await CacheOwnerNameAsync(device.UserId);
                 var profiles = await _profiles.GetByDeviceAsync(device.Id);
                 byDevice[device.Id] = profiles;
                 foreach (var profile in profiles)
+                {
                     await CacheShareNameAsync(profile.ShareId);
+                    if (HomeOwnerOf(profile) is { } homeOwner && homeOwners.Add(homeOwner))
+                        await CacheOwnerNameAsync(homeOwner);
+                }
             }
             ProfilesByDevice = byDevice;
+            _homeLabels = HomeLabelsOf(homeOwners);
         }
         catch (Exception ex)
         {
@@ -279,6 +289,29 @@ public sealed class ClientDeviceAdminViewModel
     public string ShareName(Guid shareId)
         => _shareNames.TryGetValue(shareId, out var name) ? name : shareId.ToString();
 
+    /// <summary>
+    /// The synced server folder as shown: "/" for the share root; on the home-folder share the
+    /// home (named by its owner's GUID) as the owner's username, like the file browser.
+    /// </summary>
+    public string FolderPath(DeviceSyncProfile profile)
+        => string.IsNullOrEmpty(profile.RelativePath) ? "/"
+            : _homeShareIds.Contains(profile.ShareId) ? _homeLabels.DisplayPath(profile.RelativePath)
+            : profile.RelativePath;
+
+    // Owner of the home a profile syncs (first path segment on the home-folder share), if any.
+    // Homes are named by the "D" form of the owner's id only.
+    private Guid? HomeOwnerOf(DeviceSyncProfile profile)
+        => _homeShareIds.Contains(profile.ShareId)
+           && Guid.TryParseExact(HomeLabels.FirstSegment(profile.RelativePath), "D", out var owner)
+            ? owner
+            : null;
+
+    // Labels for the synced homes whose owner still exists (a missing owner keeps the GUID).
+    private HomeLabels HomeLabelsOf(IEnumerable<Guid> homeOwners)
+        => new(homeOwners
+            .Where(id => _ownerNames.TryGetValue(id, out var name) && name != id.ToString())
+            .ToDictionary(id => id.ToString("D"), id => _ownerNames[id], StringComparer.OrdinalIgnoreCase));
+
     private async Task CacheOwnerNameAsync(Guid userId)
     {
         if (_ownerNames.ContainsKey(userId))
@@ -293,6 +326,8 @@ public sealed class ClientDeviceAdminViewModel
             return;
         var share = await _shares.GetByIdAsync(shareId);
         _shareNames[shareId] = share?.Name ?? shareId.ToString();
+        if (share?.IsUserHomes == true)
+            _homeShareIds.Add(shareId);
     }
 
     private void Reset()
@@ -300,6 +335,8 @@ public sealed class ClientDeviceAdminViewModel
         Devices = [];
         ProfilesByDevice = new Dictionary<Guid, List<DeviceSyncProfile>>();
         _shareNames.Clear();
+        _homeShareIds.Clear();
+        _homeLabels = HomeLabels.None;
         _ownerNames.Clear();
     }
 

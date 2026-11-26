@@ -133,7 +133,8 @@ public sealed class BackupViewModelChangesTests : DatabaseTestBase, IDisposable
             Mock.Of<IFileChangeLog>(), new ShareLockManager(), config, TimeProvider.System, NullLogger<BackupRestoreExecutor>.Instance);
         var vm = new BackupViewModel(AuthStateFor("alice"), UserContextFactoryFor(("alice", ContextFor(_user))).Object, catalog,
             Mock.Of<IBackupRunner>(), Mock.Of<IDepartmentRepository>(), new BackupDownloadTokenService(new EphemeralDataProtectionProvider()),
-            executor, new DemoModeOptions(), TimeProvider.System, NullLogger<BackupViewModel>.Instance);
+            executor, new DemoModeOptions(), TimeProvider.System, NullLogger<BackupViewModel>.Instance,
+            Mock.Of<IUserRepository>());
         await vm.LoadAsync();
         Assert.True(await vm.SelectRestoreShareAsync(_share.Id), vm.ErrorMessage);
         return vm;

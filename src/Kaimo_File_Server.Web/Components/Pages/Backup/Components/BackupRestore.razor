@@ -170,7 +170,7 @@
                         <div class="backup-browse-row @(isSelected ? "backup-browse-row--selected" : "")" role="row">
                             <span role="cell">
                                 <input type="checkbox" class="backup-browse-check" checked="@isSelected"
-                                       aria-label="@string.Format(R("Web_Backup_Restore_SelectEntry"), entry.Name)" @onchange="() => VM.ToggleEntry(entry.Name)" />
+                                       aria-label="@string.Format(R("Web_Backup_Restore_SelectEntry"), VM.EntryLabel(entry.Name))" @onchange="() => VM.ToggleEntry(entry.Name)" />
                             </span>
                             <span role="cell" class="backup-browse-name">
                                 @if (entry.IsDirectory)
@@ -178,14 +178,14 @@
                                     <button type="button" class="backup-browse-open" disabled="@VM.IsBusy"
                                             @onclick="() => VM.OpenFolderAsync(ShareRelativePath.Combine(VM.BrowseFolder, entry.Name))">
                                         @Assets.SVG("folder.svg", new SvgOptions(Width: 16, Height: 16, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)"))
-                                        <span>@entry.Name</span>
+                                        <span>@VM.EntryLabel(entry.Name)</span>
                                     </button>
                                 }
                                 else
                                 {
                                     <span class="backup-browse-file">
                                         @Assets.SVG("file.svg", new SvgOptions(Width: 16, Height: 16))
-                                        <span>@entry.Name</span>
+                                        <span>@VM.EntryLabel(entry.Name)</span>
                                     </span>
                                 }
                             </span>
@@ -403,15 +403,17 @@
         => kind == BackupSnapshotKind.Share ? BackupUi.ShareIconClass : BackupUi.PoolIconClass;
 
     private string FolderLabel(string shareName)
-        => VM.BrowseFolder.Length == 0 ? shareName : shareName + "/" + VM.BrowseFolder;
+        => VM.BrowseFolder.Length == 0 ? shareName : shareName + "/" + VM.DisplayPath(VM.BrowseFolder);
 
-    private static IEnumerable<(string Name, string Path)> Crumbs(string folder)
+    // A home folder in the first segment is shown by its owner's username; the path keeps the GUID.
+    private IEnumerable<(string Name, string Path)> Crumbs(string folder)
     {
         var path = string.Empty;
         foreach (var segment in folder.Split('/', StringSplitOptions.RemoveEmptyEntries))
         {
+            var label = path.Length == 0 ? VM.DisplayPath(segment) : segment;
             path = ShareRelativePath.Combine(path, segment);
-            yield return (segment, path);
+            yield return (label, path);
         }
     }
 

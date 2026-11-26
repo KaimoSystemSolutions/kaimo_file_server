@@ -85,7 +85,8 @@ public sealed class BackupViewModelSetupTests : DatabaseTestBase, IDisposable
             Mock.Of<IFileChangeLog>(), new ShareLockManager(), config, TimeProvider.System, NullLogger<BackupRestoreExecutor>.Instance);
         var vm = new BackupViewModel(AuthStateFor("alice"), UserContextFactoryFor(("alice", ContextFor(_user))).Object, catalog,
             Mock.Of<IBackupRunner>(), Mock.Of<IDepartmentRepository>(), new BackupDownloadTokenService(new EphemeralDataProtectionProvider()),
-            executor, new DemoModeOptions(), TimeProvider.System, NullLogger<BackupViewModel>.Instance);
+            executor, new DemoModeOptions(), TimeProvider.System, NullLogger<BackupViewModel>.Instance,
+            Mock.Of<IUserRepository>());
         await vm.LoadAsync();
         vm.NewRepository();
         vm.RepositoryForm.Name = "Old NAS";

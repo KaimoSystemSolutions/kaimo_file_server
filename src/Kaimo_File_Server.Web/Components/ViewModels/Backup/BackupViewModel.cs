@@ -26,7 +26,8 @@ public sealed partial class BackupViewModel(
     BackupRestoreExecutor restoreExecutor,
     DemoModeOptions demo,
     TimeProvider time,
-    ILogger<BackupViewModel> logger)
+    ILogger<BackupViewModel> logger,
+    IUserRepository users)
 {
     private UserContext? _actor;
 
@@ -114,6 +115,7 @@ public sealed partial class BackupViewModel(
             RestoreShares = await catalog.ListRestorableSharesAsync(_actor);
             RestoreShare = RestoreShares.FirstOrDefault(s => s.ShareId == RestoreShare?.ShareId);
         }
+        await LoadActivityHomeLabelsAsync();
     }
 
     public void ClearMessages()

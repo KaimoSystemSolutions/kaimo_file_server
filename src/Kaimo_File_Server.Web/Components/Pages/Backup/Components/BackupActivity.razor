@@ -130,10 +130,10 @@
                         <PropertyRow Label="@R("Web_Backup_Restore_Mode")"
                                      Value="@(R("Web_Backup_Restore_Mode_" + request.Mode) + (request.Mode == BackupRestoreMode.InPlace ? " · " + R("Web_Backup_Restore_Conflict_" + request.Conflict) : ""))" />
                         <PropertyRow Label="@R("Web_Backup_Activity_RestoreSource")"
-                                     Value="@(SharePath(result?.SourceShareName, request.FolderPath) + (request.Items.Count == 0 ? "" : " · " + string.Join(", ", request.Items)))" Mono />
+                                     Value="@(SharePath(result?.SourceShareName, VM.RestoreSourceFolder(restore)) + (request.Items.Count == 0 ? "" : " · " + string.Join(", ", VM.RestoreItems(restore))))" Mono />
                         @if (result is not null && request.Mode != BackupRestoreMode.Download)
                         {
-                            <PropertyRow Label="@R("Web_Backup_Activity_RestoreTarget")" Value="@SharePath(result.DestinationShareName, result.DestinationPath)" Mono />
+                            <PropertyRow Label="@R("Web_Backup_Activity_RestoreTarget")" Value="@SharePath(result.DestinationShareName, VM.RestoreTargetFolder(result))" Mono />
                             <PropertyRow Label="@R("Web_Backup_Activity_Files")" Value="@string.Format(R("Web_Backup_Activity_RestoreFilesValue"), result.FilesRestored, NotificationEvents.FormatSize(result.BytesRestored))" />
                             @if (request.Mode == BackupRestoreMode.InPlace)
                             {
@@ -292,7 +292,7 @@
     /// <summary>Restores name their source ("share/folder"), jobs their job, the rest their repository.</summary>
     private string RunSubject(BackupRun run)
         => run.Type == BackupRunType.Restore && BackupRestoreDetails.TryParse(run.DetailsJson) is { } restore
-            ? SharePath(restore.Result?.SourceShareName, restore.Request.FolderPath)
+            ? SharePath(restore.Result?.SourceShareName, VM.RestoreSourceFolder(restore))
             : run.JobId is null ? VM.RepositoryName(run.RepositoryId) : VM.JobName(run.JobId);
 
     // The share name is only recorded once the run started; a queued restore shows its folder.
