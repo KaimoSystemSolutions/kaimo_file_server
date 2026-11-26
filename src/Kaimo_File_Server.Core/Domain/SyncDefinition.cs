@@ -41,7 +41,13 @@ public sealed class SyncDefinition
     public string? MigrationSourceChecksum { get; set; }
 
     /// <summary>Short "local → remote" summary whose arrow reflects <see cref="Mode"/>.</summary>
-    public string DescribePaths()
+    public string DescribePaths() => DescribePaths(LocalPath);
+
+    /// <summary>
+    /// The same summary with <paramref name="shownLocalPath"/> in place of the stored local path
+    /// (e.g. a home folder shown by its owner's username).
+    /// </summary>
+    public string DescribePaths(string shownLocalPath)
     {
         string arrow = Mode switch
         {
@@ -49,7 +55,7 @@ public sealed class SyncDefinition
             SyncMode.Push => "→",
             _ => "↔"
         };
-        return $"{LocalPath} {arrow} {RemotePath}";
+        return $"{shownLocalPath} {arrow} {RemotePath}";
     }
 
     public static string SerializeSchedule(CloudSyncSchedule value)

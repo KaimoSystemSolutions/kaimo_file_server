@@ -20,4 +20,15 @@ public class SyncDefinitionPathSummaryTests
 
         Assert.Equal(expected, definition.DescribePaths());
     }
+
+    [Fact]
+    public void DescribePaths_ShowsTheGivenLocalPathInPlaceOfTheStoredOne()
+    {
+        // A home on the home-folder share is shown by its owner's username; the stored path keeps the GUID.
+        var home = Guid.NewGuid().ToString("D");
+        var definition = new SyncDefinition { LocalPath = $"{home}/docs", RemotePath = "/remote", Mode = SyncMode.Push };
+
+        Assert.Equal("bob/docs → /remote", definition.DescribePaths("bob/docs"));
+        Assert.Equal($"{home}/docs", definition.LocalPath);
+    }
 }

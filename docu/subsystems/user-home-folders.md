@@ -86,6 +86,14 @@ role by actors who could assign that role directly (see
   the `users` root also lists homes whose owner's username contains the term as folder hits named
   like the user (`HomeFolderSearch`): the candidates are the folders the browser lists at the share
   root (same ACL-filtered listing, AccessHomeContents required), own home excluded, at most 5.
+  The external-storage sync editor does the same for a sync's local folder on the `users` share:
+  the folder picker lists the homes by username, and the picker's path field, the local-path
+  field and the sync details show the home as the owner's username, accepting a typed username in
+  place of the GUID; the stored `LocalPath` keeps the GUID
+  (`ExternalStorageSyncViewModel.HomeLabels.cs`, `DirectoryPickerDialog.ShownPath`). The
+  Running Jobs entry of a manual or scheduled run of such a sync names the home the same way
+  (title of an unnamed sync and the `DescribePaths(shownLocalPath)` summary; scheduled runs via
+  `SyncJobHomeLabeler`); the job itself keeps the stored path.
 - REST API: `GET /api/v1/browse/shares` additionally lists the `users` share (no `rootPath`).
   Syncing its root stays refused.
 - SMB: holders at any scope are added to the share's allow list (`ListShares`).

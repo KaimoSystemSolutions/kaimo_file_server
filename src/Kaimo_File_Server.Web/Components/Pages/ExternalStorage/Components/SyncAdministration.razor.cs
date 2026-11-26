@@ -60,11 +60,12 @@ public partial class SyncAdministration
         && VM.Syncs.Any(sync => sync.Definition.Id != _editingId
             && string.Equals(sync.Definition.DisplayName?.Trim(), _model.DisplayName.Trim(), StringComparison.OrdinalIgnoreCase));
     // Local paths are stored share-relative ("" = root) but shown rooted ("/docs"),
-    // exactly like remote paths. Bound on change, so normalizing never fights typing.
+    // exactly like remote paths; a home on the home-folder share is shown (and may be
+    // typed) as its owner's username. Bound on change, so normalizing never fights typing.
     private string LocalPathDisplay
     {
-        get => DisplayPath(_model.LocalPath);
-        set => _model.LocalPath = ShareRelativePath.Normalize(value);
+        get => VM.DisplayLocalPath(_model.LocalShareId, _model.LocalPath);
+        set => _model.LocalPath = VM.ResolveLocalPath(_model.LocalShareId, value);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -205,8 +206,9 @@ public partial class SyncAdministration
     }
     private async Task NavigatePickerAsync(string path)
     {
-        _pickerPath = path;
-        await LoadPickerAsync(path);
+        // A typed local path may name a home by its owner's username.
+        _pickerPath = _pickerIsRemote ? path : VM.ResolveLocalPath(_model.LocalShareId, path);
+        await LoadPickerAsync(_pickerPath);
     }
     private async Task LoadPickerAsync(string path)
     {
@@ -244,7 +246,6 @@ public partial class SyncAdministration
     private void ClosePicker() { _pickerOpen = false; _pickerItems = []; _pickerError = null; }
     private static long? ToUnit(long? value, long divisor) => value is > 0 ? (long)Math.Ceiling(value.Value / (double)divisor) : null;
     private static string DisplayName(ExternalStorageSyncListItem item) => string.IsNullOrWhiteSpace(item.Definition.DisplayName) ? item.ShareName : item.Definition.DisplayName;
-    private static string DisplayPath(string path) => string.IsNullOrEmpty(path) ? "/" : $"/{path}";
     private string ProviderName(string id) => VM.GetProviderName(id);
     private string ProviderIdFor(ExternalStorageSyncListItem item)
         => VM.Connections.FirstOrDefault(connection => connection.Id == item.Definition.ConnectionId)?.ProviderId ?? "";

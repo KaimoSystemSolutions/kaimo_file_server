@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories.ExternalStorage;
 using Kaimo_File_Server.Core.Repositories.Identity;
+using Kaimo_File_Server.Core.Repositories.Shares;
 using Kaimo_File_Server.Core.Services.CloudSync;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -92,6 +93,10 @@ public sealed class CloudSyncSchedulerService(
         var legacyMigration = scope.ServiceProvider.GetRequiredService<ILegacyCloudSyncMigrationService>();
         var users = scope.ServiceProvider.GetRequiredService<IUserContextFactory>();
         var actors = new Dictionary<Guid, UserContext?>();
+        // Optional: without them the Running Jobs entry shows the stored path.
+        var homeLabels = new SyncJobHomeLabeler(
+            scope.ServiceProvider.GetService<IShareRepository>(),
+            scope.ServiceProvider.GetService<IUserRepository>());
 
         await legacyMigration.EnsureMigratedAsync(cancellationToken);
         foreach (SyncDefinitionScheduleEntry entry in
@@ -150,16 +155,18 @@ public sealed class CloudSyncSchedulerService(
                 // Hand execution to the shared background runner so scheduled and
                 // manual syncs run through the same off-thread path and both show
                 // up in the Running Jobs menu. The runner dedupes an already
-                // queued/running sync for this share+path.
+                // queued/running sync for this share+path. A home folder is shown by its
+                // owner's username; the job keeps the stored path.
+                string shownPath = await homeLabels.ShownLocalPathAsync(definition.LocalShareId, localPath);
                 string title = string.Format(
                     Resources.ResourceManager.GetString("Web_Jobs_CloudSync_Title") ?? "Sync: {0}",
-                    string.IsNullOrWhiteSpace(definition.DisplayName) ? localPath : definition.DisplayName);
+                    string.IsNullOrWhiteSpace(definition.DisplayName) ? shownPath : definition.DisplayName);
                 jobRunner.Enqueue(
                     definition.LocalShareId,
                     localPath,
                     runAsUserId.Value,
                     title,
-                    definition.DescribePaths());
+                    definition.DescribePaths(shownPath));
         }
 
         foreach (ScheduleKey staleKey in _lastEvaluations.Keys

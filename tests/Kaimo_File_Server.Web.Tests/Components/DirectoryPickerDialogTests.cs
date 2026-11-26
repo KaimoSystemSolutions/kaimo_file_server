@@ -40,6 +40,36 @@ public sealed class DirectoryPickerDialogTests : IDisposable
         Assert.Contains("cannot be synchronized", cut.Find(".modal-error").TextContent);
     }
 
+    [Fact]
+    public void PathField_ShowsTheRealPathByDefault()
+    {
+        var cut = Render();
+
+        Assert.Equal("/data", cut.Find("input.directory-picker-path").GetAttribute("value"));
+    }
+
+    [Fact]
+    public void PathField_ShowsTheShownPath_WhileSelectAndParentKeepTheRealPath()
+    {
+        // A home on the home-folder share is shown by its owner's username; the real path keeps the GUID.
+        var home = Guid.NewGuid().ToString("D");
+        string? selected = null, navigated = null;
+        var cut = _ctx.Render<DirectoryPickerDialog>(parameters => parameters
+            .Add(dialog => dialog.IsOpen, true)
+            .Add(dialog => dialog.IsRemote, false)
+            .Add(dialog => dialog.CurrentPath, $"{home}/docs")
+            .Add(dialog => dialog.ShownPath, "/bob/docs")
+            .Add(dialog => dialog.OnSelected, (string path) => selected = path)
+            .Add(dialog => dialog.OnNavigate, (string path) => navigated = path));
+
+        Assert.Equal("/bob/docs", cut.Find("input.directory-picker-path").GetAttribute("value"));
+        cut.Find(".modal-actions .btn-primary").Click();
+        cut.Find(".directory-picker-toolbar .btn-secondary").Click();
+
+        Assert.Equal($"{home}/docs", selected);
+        Assert.Equal(home, navigated);
+    }
+
     private IRenderedComponent<DirectoryPickerDialog> Render(bool canSelect = true, string? error = null)
         => _ctx.Render<DirectoryPickerDialog>(parameters => parameters
             .Add(dialog => dialog.IsOpen, true)

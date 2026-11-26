@@ -20,7 +20,7 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 /// never reads or writes provider credentials and all mutations are reauthorized
 /// against the selected share and connection department.
 /// </summary>
-public sealed class ExternalStorageSyncViewModel(
+public sealed partial class ExternalStorageSyncViewModel(
     ISyncDefinitionRepository syncDefinitions,
     IStorageConnectionRepository connections,
     IShareRepository shares,
@@ -34,6 +34,7 @@ public sealed class ExternalStorageSyncViewModel(
     IStorageDirectoryTargetResolver directoryTargets,
     ICloudSyncOperationCoordinator syncOperations,
     CloudSyncSchedulerSignal schedulerSignal,
+    IUserRepository users,
     ILogger<ExternalStorageSyncViewModel> logger)
 {
     private UserContext? _actor;
@@ -70,6 +71,7 @@ public sealed class ExternalStorageSyncViewModel(
             Shares = allShares.Where(share => visibleShareIds.Contains(share.Id))
                 .OrderBy(share => share.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ToArray();
+            await LoadHomeLabelsAsync();
 
             var allConnections = await connections.GetAllAsync();
             // Connections are global: visible to any holder of global UseConnections.
@@ -241,17 +243,19 @@ public sealed class ExternalStorageSyncViewModel(
                              "Web_ExternalStorage_SyncMissing", "The sync no longer exists."));
         await GetAuthorizedShareAsync(definition.LocalShareId, ManagementPermission.SyncManually);
 
+        // A home folder is shown by its owner's username; the job keeps the stored path.
+        string shownPath = ShownLocalPath(definition.LocalShareId, definition.LocalPath);
         string title = string.Format(
             Text("Web_Jobs_CloudSync_Title", "Sync: {0}"),
             string.IsNullOrWhiteSpace(definition.DisplayName)
-                ? definition.LocalPath
+                ? shownPath
                 : definition.DisplayName);
         return syncJobRunner.Enqueue(
             definition.LocalShareId,
             definition.LocalPath,
             _actor!.User.Id,
             title,
-            definition.DescribePaths());
+            definition.DescribePaths(shownPath));
     }
 
     /// <summary>
@@ -305,12 +309,17 @@ public sealed class ExternalStorageSyncViewModel(
         string normalized = ShareRelativePath.Normalize(path);
         var items = await fileServices.CreateForShare(share)
             .ListAsync(normalized, _actor!);
+        // At the root of the home-folder share the homes are named by their owner's username
+        // (reloaded on every visit, so new users show up); the path keeps the real folder name.
+        bool homesRoot = share.IsUserHomes && normalized.Length == 0;
+        if (homesRoot)
+            await ReloadHomeLabelsAsync();
         return items
             .Where(item => item.IsDirectory)
-            .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
             .Select(item => new CloudDirectoryItem(
-                item.Name,
+                homesRoot ? _homeLabels.DisplayPath(item.Name) : item.Name,
                 normalized.Length == 0 ? item.Name : $"{normalized}/{item.Name}"))
+            .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
     }
 

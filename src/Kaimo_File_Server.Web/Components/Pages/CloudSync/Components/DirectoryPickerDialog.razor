@@ -72,6 +72,12 @@
     [Parameter] public bool CanSelect { get; set; } = true;
     [Parameter] public string Title { get; set; } = "";
     [Parameter] public string CurrentPath { get; set; } = "";
+    /// <summary>
+    /// Optional text for the path field when it differs from <see cref="CurrentPath"/> (e.g. a
+    /// home folder shown by its owner's username). Navigation and selection keep the real path;
+    /// the parent maps a typed shown path back in its <see cref="OnNavigate"/> handler.
+    /// </summary>
+    [Parameter] public string? ShownPath { get; set; }
     [Parameter] public string? ErrorMessage { get; set; }
     [Parameter] public IReadOnlyList<CloudDirectoryItem> Items { get; set; } = [];
     [Parameter] public EventCallback<string> OnNavigate { get; set; }
@@ -80,7 +86,7 @@
 
     private string RootPath => IsRemote ? "/" : "";
     // Shown rooted for both sides; typed input goes through NormalizePath either way.
-    private string DisplayPath => "/" + CurrentPath.TrimStart('/');
+    private string DisplayPath => ShownPath ?? "/" + CurrentPath.TrimStart('/');
     private bool IsAtRoot => string.Equals(CurrentPath, RootPath, StringComparison.Ordinal);
 
     // The parent owns picker state; the dialog only reports user intent.
